@@ -1,7 +1,7 @@
 package peers
 
 import (
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"sync"
 )
 

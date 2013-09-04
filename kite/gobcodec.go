@@ -9,7 +9,7 @@ import (
 	"errors"
 	"github.com/fatih/goset"
 	"io"
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"net/rpc"
 )
 

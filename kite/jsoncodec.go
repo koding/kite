@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"net/rpc"
 	"sync"
 )

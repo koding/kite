@@ -3,7 +3,6 @@ package kite
 import (
 	"fmt"
 	"io/ioutil"
-
 	"log"
 	"os"
 	"strings"

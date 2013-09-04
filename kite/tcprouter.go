@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"log"
 	"net"
 	"net/rpc"

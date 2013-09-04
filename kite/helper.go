@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"log"
 	"net"
 	"net/http"
-
 	"os/user"
 	"strings"
 )

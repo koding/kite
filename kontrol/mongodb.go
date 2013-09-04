@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"kite/protocol"
+	"koding/newkite/protocol"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 )
