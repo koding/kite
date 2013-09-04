@@ -58,13 +58,17 @@ type Kite struct {
 }
 
 func New(o *protocol.Options, method interface{}) *Kite {
-	o, err := readOptions("manifest.json")
-	if err != nil {
-		log.Fatal("error: could not read config file", err)
+
+	var err error
+	if o == nil {
+		o, err = readOptions("manifest.json")
+		if err != nil {
+			log.Fatal("error: could not read config file", err)
+		}
 	}
 
 	// some simple validations for config
-	if o == nil || o.Username == "" || o.Kitename == "" {
+	if o.Username == "" || o.Kitename == "" {
 		log.Fatal("error: options data is not set properly")
 	}
 
