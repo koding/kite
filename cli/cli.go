@@ -49,9 +49,10 @@ func (k *Kd) Register() error {
 	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", authSite, k.ID, k.PublicKey)
 	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", authSite, k.PublicKey)
 
-	fmt.Printf("Please open the following url for authentication:")
-	PrintBox(registerUrl)
-	fmt.Printf("waiting . ")
+	fmt.Printf("Please open the following url for authentication:\n\n")
+	// PrintBox(registerUrl)
+	fmt.Println(registerUrl)
+	fmt.Printf("\nwaiting . ")
 
 	// check the result every two seconds
 	ticker := time.NewTicker(time.Second * 2).C

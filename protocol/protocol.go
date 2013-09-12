@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"labix.org/v2/mgo/bson"
-	"net/rpc"
 	"time"
 )
 
@@ -15,7 +14,7 @@ const WEBSOCKET_PATH = "/sock"
 const ORIGIN_JSON = "json"
 const ORIGIN_GOB = "gob"
 
-const DEBUG_ENABLED = true
+const DEBUG_ENABLED = false
 
 const (
 	AllowKite  = "AllowKite"
@@ -39,12 +38,6 @@ type Base struct {
 	LocalIP   string        `bson:"localIP" json:"localIP"`
 	PublicIP  string        `bson:"publicIP" json:"publicIP"`
 	Port      string        `bson:"port" json:"port"`
-}
-
-type Kite struct {
-	Base      `bson:",inline"`
-	UpdatedAt time.Time   `bson:"updatedAt"`
-	Client    *rpc.Client `json:"-"`
 }
 
 type KiteRequest struct {

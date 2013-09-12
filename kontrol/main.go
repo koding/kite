@@ -9,7 +9,9 @@ import (
 	zmq "github.com/pebbe/zmq3"
 	"io"
 	"io/ioutil"
-	"koding/kontrol/kontrolproxy/proxyconfig"
+	"koding/db/models"
+	"koding/db/mongodb"
+	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -25,10 +27,10 @@ import (
 type Storage interface {
 	// Add inserts the kite into the storage with the kite.Uuid key. If there
 	// is already a kite available with this uuid, it should update/replace it.
-	Add(kite *protocol.Kite)
+	Add(kite *models.Kite)
 
 	// Get returns the specified kite struct with the given uuid
-	Get(uuid string) *protocol.Kite
+	Get(uuid string) *models.Kite
 
 	// Remove deletes the kite with the given uuid
 	Remove(uuid string)
@@ -40,7 +42,7 @@ type Storage interface {
 	Size() int
 
 	// List returns a slice of all kites in the storage
-	List() []*protocol.Kite
+	List() []*models.Kite
 }
 
 // Dependency is an interface that encapsulates basic dependency operations
@@ -73,7 +75,6 @@ type Kontrol struct {
 var (
 	self       string
 	tokens     = make(map[string]string)
-	mongo      *proxyconfig.ProxyConfiguration
 	storage    Storage
 	dependency Dependency
 )
@@ -92,12 +93,6 @@ func main() {
 	// storage = NewRedis() // future
 	storage = NewMongoDB()
 	dependency = NewDependency()
-
-	var err error
-	mongo, err = proxyconfig.Connect()
-	if err != nil {
-		log.Fatalf("proxyconfig mongodb connect: %s", err)
-	}
 
 	k := &Kontrol{
 		Hostname:  hostname,
@@ -377,7 +372,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 	return []byte("handle error"), nil
 }
 
-func createResponse(action string, kite *protocol.Kite) protocol.PubResponse {
+func createResponse(action string, kite *models.Kite) protocol.PubResponse {
 	return protocol.PubResponse{
 		Base: protocol.Base{
 			Username: kite.Username,
@@ -398,7 +393,7 @@ func createResponse(action string, kite *protocol.Kite) protocol.PubResponse {
 // Notifies all kites that depends on source kite, it may be kites of the same
 // type (they have the same name) or kites that depens on it (like calles,
 // clients or other kites of other types)
-func (k *Kontrol) NotifyDependencies(kite *protocol.Kite) {
+func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 	// notify kites of the same type
 	for _, r := range storage.List() {
 		if r.Kitename == kite.Kitename && r.Uuid != kite.Uuid {
@@ -435,7 +430,7 @@ func (k *Kontrol) Publish(filter string, msg []byte, logEnabled bool) {
 // RegisterKite returns true if the specified kite has been seen before.
 // If not, it first validates the kites. If the kite has permission to run, it
 // creates a new struct, stores it and returns it.
-func (k *Kontrol) RegisterKite(req protocol.Request) (*protocol.Kite, error) {
+func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 	kite := storage.Get(req.Uuid)
 	if kite == nil {
 		token, ok := tokens[req.Kitename]
@@ -444,7 +439,7 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*protocol.Kite, error) {
 			tokens[req.Kitename] = token
 		}
 
-		kite = &protocol.Kite{
+		kite = &models.Kite{
 			Base: protocol.Base{
 				Username:  req.Username,
 				Kitename:  req.Kitename,
@@ -487,8 +482,8 @@ func (k *Kontrol) UpdateKite(Uuid string) error {
 }
 
 // GetRelationship returns a slice of of kites that has a relationship to kite itself
-func (k *Kontrol) getRelationship(kite string) []*protocol.Kite {
-	targetKites := make([]*protocol.Kite, 0)
+func (k *Kontrol) getRelationship(kite string) []*models.Kite {
+	targetKites := make([]*models.Kite, 0)
 	if storage.Size() == 0 {
 		return targetKites
 	}
@@ -524,7 +519,7 @@ func getSesion(token string) (*Session, error) {
 		return c.Find(bson.M{"clientId": token}).One(&session)
 	}
 
-	err := mongo.RunCollection("jSessions", query)
+	err := mongodb.Run("jSessions", query)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +543,7 @@ func checkKey(publicKey string) bool {
 		return c.Find(bson.M{"key": publicKey}).One(&kodingKey)
 	}
 
-	err := mongo.RunCollection("jKodingKeys", query)
+	err := mongodb.Run("jKodingKeys", query)
 	if err != nil {
 		fmt.Println("public key is not registered", publicKey)
 		return false
@@ -557,7 +552,7 @@ func checkKey(publicKey string) bool {
 	return true
 }
 
-func validate(k *protocol.Kite) bool {
+func validate(k *models.Kite) bool {
 	// in the future we'll check other things too, for now just make sure that
 	// the variables are not empty
 	if k.Username == "" && k.Kitename == "" && k.Version == "" && k.Addr == "" {
@@ -586,7 +581,7 @@ func checkServer(host string) error {
 	return nil
 }
 
-func addToProxy(kite *protocol.Kite) {
+func addToProxy(kite *models.Kite) {
 	err := checkServer(kite.Addr)
 	if err != nil {
 		fmt.Printf("server not reachable: %s (%s) \n", kite.Addr, err.Error())
@@ -594,7 +589,7 @@ func addToProxy(kite *protocol.Kite) {
 		fmt.Println("checking ok..", kite.Addr)
 	}
 
-	err = mongo.UpsertKey(
+	err = modelhelper.UpsertKey(
 		kite.Username,     // username
 		"",                // persistence, empty means disabled
 		"",                // loadbalancing mode, empty means direct

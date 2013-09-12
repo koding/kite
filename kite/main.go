@@ -11,6 +11,7 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 	zmq "github.com/pebbe/zmq3"
 	"io"
+	"koding/db/models"
 	"koding/newkite/balancer"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
@@ -189,7 +190,7 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 		return
 	}
 
-	kite := &protocol.Kite{
+	kite := &models.Kite{
 		Base: protocol.Base{
 			Username: r.Username,
 			Kitename: r.Kitename,
@@ -316,7 +317,7 @@ RPC
 // Can connect to RPC service using HTTP CONNECT to rpcPath.
 var connected = "200 Connected to Go RPC"
 
-func (k *Kite) DialClient(kite *protocol.Kite) (*rpc.Client, error) {
+func (k *Kite) DialClient(kite *models.Kite) (*rpc.Client, error) {
 	debug("establishing HTTP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
 	var err error
 	conn, err := net.Dial("tcp4", kite.Addr)
@@ -424,7 +425,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 	runCall := make(chan bool, 1)
 	resetOnce := make(chan bool, 1)
 
-	var remoteKite *protocol.Kite
+	var remoteKite *models.Kite
 	var err error
 
 	for {
@@ -495,7 +496,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 	}
 }
 
-func (k *Kite) GetRemoteKite(kite string) (*protocol.Kite, error) {
+func (k *Kite) GetRemoteKite(kite string) (*models.Kite, error) {
 	r, err := k.RoundRobin(kite)
 	if err != nil {
 		return nil, err
@@ -513,7 +514,7 @@ func (k *Kite) GetRemoteKite(kite string) (*protocol.Kite, error) {
 	return r, nil
 }
 
-func (k *Kite) RoundRobin(kite string) (*protocol.Kite, error) {
+func (k *Kite) RoundRobin(kite string) (*models.Kite, error) {
 	// TODO: use cointainer/ring :)
 	remoteKites := k.RemoteKites(kite)
 	lenOfKites := len(remoteKites)
@@ -528,9 +529,9 @@ func (k *Kite) RoundRobin(kite string) (*protocol.Kite, error) {
 	return remoteKites[n], nil
 }
 
-func (k *Kite) RemoteKites(kite string) []*protocol.Kite {
+func (k *Kite) RemoteKites(kite string) []*models.Kite {
 	l := kites.List()
-	remoteKites := make([]*protocol.Kite, 0, len(l)-1) // allocate one less, it's the kite itself
+	remoteKites := make([]*models.Kite, 0, len(l)-1) // allocate one less, it's the kite itself
 
 	for _, r := range l {
 		if r.Kitename == kite {
