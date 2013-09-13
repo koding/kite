@@ -104,7 +104,6 @@ func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
 
 func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
 	path := r.Args.(string)
-
 	fileEntry, err := GetInfo(path)
 	if err != nil {
 		return err
@@ -137,6 +136,62 @@ func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
 	*result = true
 	return nil
 
+}
+
+func (Os) Remove(r *protocol.KiteRequest, result *bool) error {
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
+
+	err := Remove(path)
+	if err != nil {
+		return err
+	}
+
+	*result = true
+	return nil
+}
+
+func (Os) Rename(r *protocol.KiteRequest, result *bool) error {
+	params := r.Args.(map[string]interface{})
+	oldPath, ok := params["oldPath"].(string)
+	if !ok {
+		return errors.New("oldPath argument missing")
+	}
+
+	newPath, ok := params["newPath"].(string)
+	if !ok {
+		return errors.New("newPath argument missing")
+	}
+
+	err := Rename(oldPath, newPath)
+	if err != nil {
+		return err
+	}
+
+	*result = true
+	return nil
+}
+
+func (Os) CreateDirectory(r *protocol.KiteRequest, result *bool) error {
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
+	recursive, ok := params["recursive"].(bool)
+	if !ok {
+		return errors.New("recursive argument missing")
+	}
+
+	err := CreateDirectory(path, recursive)
+	if err != nil {
+		return err
+	}
+	*result = true
+	return nil
 }
 
 /****************************************
@@ -333,4 +388,20 @@ func SetPermissions(name string, mode os.FileMode, recursive bool) error {
 	}
 
 	return doChange(name)
+}
+
+func Remove(path string) error {
+	return os.Remove(path)
+}
+
+func Rename(oldname, newname string) error {
+	return os.Rename(oldname, newname)
+}
+
+func CreateDirectory(name string, recursive bool) error {
+	if recursive {
+		return os.MkdirAll(name, 0755)
+	}
+
+	return os.Mkdir(name, 0755)
 }
