@@ -3,19 +3,20 @@ package main
 import (
 	"encoding/base64"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
-	"os"
-	"reflect"
-	"regexp"
-	"strconv"
-	"time"
-
-	"flag"
 	"io/ioutil"
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
+	"os"
+	"path"
 	"path/filepath"
+	"reflect"
+	"regexp"
+	"strconv"
+
+	"time"
 )
 
 type Os struct{}
@@ -24,24 +25,37 @@ var port = flag.String("port", "", "port to bind itself")
 
 func main() {
 	flag.Parse()
-	o := &protocol.Options{Username: "fatih", Kitename: "os", Version: "1", Port: *port}
+	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
 	k := kite.New(o, new(Os))
+
 	k.Start()
 }
 
-func (Os) ReadDirectory(r *protocol.KiteRequest, result *[]string) error {
-	path := r.Args.(string)
+func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
+
+	response := make(map[string]interface{})
 	files, err := ReadDirectory(path)
 	if err != nil {
 		return err
 	}
 
-	*result = files
+	response["files"] = files
+	*result = response
 	return nil
 }
 
 func (Os) Glob(r *protocol.KiteRequest, result *[]string) error {
-	glob := r.Args.(string)
+	params := r.Args.(map[string]interface{})
+	glob, ok := params["pattern"].(string)
+	if !ok {
+		return errors.New("pattern argument missing")
+	}
+
 	files, err := Glob(glob)
 	if err != nil {
 		return err
@@ -53,7 +67,11 @@ func (Os) Glob(r *protocol.KiteRequest, result *[]string) error {
 }
 
 func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) error {
-	path := r.Args.(string)
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
 	buf, err := ReadFile(path)
 	if err != nil {
 		return err
@@ -64,7 +82,6 @@ func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) erro
 }
 
 func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
-	// TODO: write an Unmarshaller from interface{} to a given struct
 	params := r.Args.(map[string]interface{})
 	path, ok := params["path"].(string)
 	if !ok {
@@ -224,15 +241,15 @@ func unmarshal(a, s interface{}) {
 	}
 }
 
-func ReadDirectory(path string) ([]string, error) {
-	files, err := ioutil.ReadDir(path)
+func ReadDirectory(p string) ([]FileEntry, error) {
+	files, err := ioutil.ReadDir(p)
 	if err != nil {
 		return nil, err
 	}
 
-	ls := make([]string, len(files))
-	for i, file := range files {
-		ls[i] = file.Name()
+	ls := make([]FileEntry, len(files))
+	for i, info := range files {
+		ls[i] = makeFileEntry(path.Join(p, info.Name()), info)
 	}
 
 	return ls, nil
@@ -327,14 +344,34 @@ func GetInfo(path string) (*FileEntry, error) {
 		return nil, err
 	}
 
-	return &FileEntry{
+	fileEntry := makeFileEntry(path, fi)
+
+	return &fileEntry, nil
+}
+
+func makeFileEntry(fullPath string, fi os.FileInfo) FileEntry {
+	entry := FileEntry{
 		Name:     fi.Name(),
-		FullPath: path,
+		FullPath: fullPath,
 		IsDir:    fi.IsDir(),
 		Size:     fi.Size(),
 		Mode:     fi.Mode(),
 		Time:     fi.ModTime(),
-	}, nil
+	}
+
+	if fi.Mode()&os.ModeSymlink != 0 {
+		symlinkInfo, err := os.Stat(path.Dir(fullPath) + "/" + fi.Name())
+		if err != nil {
+			entry.IsBroken = true
+			return entry
+		}
+		entry.IsDir = symlinkInfo.IsDir()
+		entry.Size = symlinkInfo.Size()
+		entry.Mode = symlinkInfo.Mode()
+		entry.Time = symlinkInfo.ModTime()
+	}
+
+	return entry
 }
 
 type FileEntry struct {
@@ -344,6 +381,9 @@ type FileEntry struct {
 	Size     int64       `json:"size"`
 	Mode     os.FileMode `json:"mode"`
 	Time     time.Time   `json:"time"`
+	IsBroken bool        `json:"isBroken"`
+	Readable bool        `json:"readable"`
+	Writable bool        `json:"writable"`
 }
 
 func SetPermissions(name string, mode os.FileMode, recursive bool) error {
@@ -405,3 +445,19 @@ func CreateDirectory(name string, recursive bool) error {
 
 	return os.Mkdir(name, 0755)
 }
+
+// https://groups.google.com/forum/#!topic/golang-nuts/7tn9vSEe0ww
+// func IsReadable(info os.FileInfo) bool {
+//
+// 	fm := info.FileMode()
+// 	if fm&(1<<2) != 0 {
+// 		// yes
+// 	} else if (fm & (1 << 5)) && (os.Getegid() ==
+// 		int(info.Sys().(syscall.Stat_t).Gid)) {
+// 		// yes
+// 	} else if (fm & (1 << 8)) && (os.Geteuid() ==
+// 		int(info.Sys().(syscall.Stat_t).Uid)) {
+// 		//yes
+// 	}
+//
+// }
