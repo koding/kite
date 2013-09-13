@@ -74,7 +74,6 @@ func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
 	if !ok {
 		return errors.New("content argument missing")
 	}
-
 	doNotOverwrite, _ := params["doNotOverwrite"].(bool)
 	appendTo, _ := params["append"].(bool)
 
@@ -113,6 +112,31 @@ func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
 
 	*result = *fileEntry
 	return nil
+}
+
+func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
+	mode, ok := params["mode"].(int)
+	if !ok {
+		return errors.New("mode argument missing")
+	}
+	recursive, ok := params["recursive"].(bool)
+	if !ok {
+		return errors.New("recursive argument missing")
+	}
+
+	err := SetPermissions(path, os.FileMode(mode), recursive)
+	if err != nil {
+		return err
+	}
+
+	*result = true
+	return nil
+
 }
 
 /****************************************
@@ -265,4 +289,48 @@ type FileEntry struct {
 	Size     int64       `json:"size"`
 	Mode     os.FileMode `json:"mode"`
 	Time     time.Time   `json:"time"`
+}
+
+func SetPermissions(name string, mode os.FileMode, recursive bool) error {
+	var doChange func(name string) error
+
+	doChange = func(name string) error {
+		if err := os.Chmod(name, mode); err != nil {
+			return err
+		}
+
+		if !recursive {
+			return nil
+		}
+
+		fi, err := os.Stat(name)
+		if err != nil {
+			return err
+		}
+
+		if !fi.IsDir() {
+			return nil
+		}
+
+		dir, err := os.Open(name)
+		if err != nil {
+			return err
+		}
+		defer dir.Close()
+
+		entries, err := dir.Readdirnames(0)
+		if err != nil {
+			return err
+		}
+		var firstErr error
+		for _, entry := range entries {
+			err := doChange(name + "/" + entry)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
+	}
+
+	return doChange(name)
 }
