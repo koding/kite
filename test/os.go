@@ -5,10 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/howeyc/fsnotify"
 	"io"
 	"io/ioutil"
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,10 +30,15 @@ func main() {
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
 	k := kite.New(o, new(Os))
 
+	go watcher()
+
 	k.Start()
 }
 
 func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
+
+	fmt.Println(r.Username, r.Kitename, r.Origin, r.Method)
+
 	params := r.Args.(map[string]interface{})
 	path, ok := params["path"].(string)
 	if !ok {
@@ -109,8 +116,12 @@ func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
 }
 
 func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
-	name := r.Args.(string)
-	name, err := EnsureNonexistentPath(name)
+	params := r.Args.(map[string]interface{})
+	path, ok := params["path"].(string)
+	if !ok {
+		return errors.New("path argument missing")
+	}
+	name, err := EnsureNonexistentPath(path)
 	if err != nil {
 		return err
 	}
@@ -461,3 +472,31 @@ func CreateDirectory(name string, recursive bool) error {
 // 	}
 //
 // }
+
+func watcher() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Process events
+	go func() {
+		for {
+			select {
+			case ev := <-watcher.Event:
+				log.Println("event:", ev)
+			case err := <-watcher.Error:
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	err = watcher.Watch("/Users/fatih/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	select {}
+
+	watcher.Close()
+}
