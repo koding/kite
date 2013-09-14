@@ -41,7 +41,8 @@ func main() {
 				continue
 			}
 
-			fileEntry := FileEntry{Name: change.Name, FullPath: change.Name}
+			fileEntry := FileEntry{Name: path.Base(change.Name), FullPath: change.Name}
+			fmt.Println("changed", change.Name)
 
 			msg := struct {
 				Event string    `json:"event"`
@@ -486,7 +487,7 @@ func watcher() chan *fsnotify.FileEvent {
 		log.Fatal(err)
 	}
 
-	err = watcher.Watch("/Users/fatih/test")
+	err = watcher.Watch("/Users/fatih/Code")
 	if err != nil {
 		log.Fatal(err)
 	}
