@@ -30,7 +30,30 @@ func main() {
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
 	k := kite.New(o, new(Os))
 
-	go watcher()
+	go func() {
+		var event string
+		for change := range watcher() {
+			if change.IsCreate() {
+				event = "added"
+			} else if change.IsDelete() {
+				event = "removed"
+			} else {
+				continue
+			}
+
+			fileEntry := FileEntry{Name: change.Name, FullPath: change.Name}
+
+			msg := struct {
+				Event string    `json:"event"`
+				File  FileEntry `json:"file"`
+			}{
+				event,
+				fileEntry,
+			}
+
+			k.SendMsg("devrim", "onChange", msg)
+		}
+	}()
 
 	k.Start()
 }
@@ -457,46 +480,16 @@ func CreateDirectory(name string, recursive bool) error {
 	return os.Mkdir(name, 0755)
 }
 
-// https://groups.google.com/forum/#!topic/golang-nuts/7tn9vSEe0ww
-// func IsReadable(info os.FileInfo) bool {
-//
-// 	fm := info.FileMode()
-// 	if fm&(1<<2) != 0 {
-// 		// yes
-// 	} else if (fm & (1 << 5)) && (os.Getegid() ==
-// 		int(info.Sys().(syscall.Stat_t).Gid)) {
-// 		// yes
-// 	} else if (fm & (1 << 8)) && (os.Geteuid() ==
-// 		int(info.Sys().(syscall.Stat_t).Uid)) {
-// 		//yes
-// 	}
-//
-// }
-
-func watcher() {
+func watcher() chan *fsnotify.FileEvent {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Process events
-	go func() {
-		for {
-			select {
-			case ev := <-watcher.Event:
-				log.Println("event:", ev)
-			case err := <-watcher.Error:
-				log.Println("error:", err)
-			}
-		}
-	}()
-
-	err = watcher.Watch("/Users/fatih/")
+	err = watcher.Watch("/Users/fatih/test")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	select {}
-
-	watcher.Close()
+	return watcher.Event
 }

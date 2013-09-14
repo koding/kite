@@ -103,8 +103,8 @@ func New(o *protocol.Options, method interface{}) *Kite {
 	}
 
 	// print dependencies
-	pwd, _ := os.Getwd()
-	getDeps(pwd, o.Kitename)
+	// pwd, _ := os.Getwd()
+	// getDeps(pwd, o.Kitename)
 
 	k := &Kite{
 		Username:   o.Username,
@@ -654,16 +654,16 @@ func (w wsClients) add(lookup string, c *client) {
 	} else {
 		w[lookup] = append(w[lookup], c)
 	}
+	fmt.Println("After adding", w)
 }
 
-func (w wsClients) get(addr string) []*client {
+func (w wsClients) get(username string) []*client {
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
-	c, ok := w[addr]
+	c, ok := w[username]
 	if !ok {
 		return nil
 	}
-
 	return c
 }
 
@@ -714,9 +714,21 @@ func (k *Kite) Broadcast(msg string) {
 	clients.broadcast(msg)
 }
 
-func (k *Kite) SendMsg(msg, user string) {
+type jsonrpc struct {
+	Method string         `json:"method"`
+	Params [1]interface{} `json:"params"`
+	Id     *string        `json:"id"`
+}
+
+func (k *Kite) SendMsg(user, method string, msg interface{}) {
 	for _, c := range clients.get(user) {
-		if err := websocket.Message.Send(c.Conn, msg); err != nil {
+		req := jsonrpc{
+			Method: method,
+			Id:     nil, // means notification
+		}
+		req.Params[0] = msg
+
+		if err := websocket.JSON.Send(c.Conn, req); err != nil {
 			log.Println("Could not send message to ", c.Addr, err.Error())
 		}
 	}
