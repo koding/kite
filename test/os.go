@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"time"
 )
@@ -25,48 +26,35 @@ type Os struct{}
 
 var port = flag.String("port", "", "port to bind itself")
 
+var k *kite.Kite
+var once sync.Once
+var watcher *fsnotify.Watcher
+
 func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
-	k := kite.New(o, new(Os))
-
-	go func() {
-		var event string
-		for change := range watcher() {
-			if change.IsCreate() {
-				event = "added"
-			} else if change.IsDelete() {
-				event = "removed"
-			} else {
-				continue
-			}
-
-			fileEntry := FileEntry{Name: path.Base(change.Name), FullPath: change.Name}
-			fmt.Println("changed", change.Name)
-
-			msg := struct {
-				Event string    `json:"event"`
-				File  FileEntry `json:"file"`
-			}{
-				event,
-				fileEntry,
-			}
-
-			k.SendMsg("devrim", "onChange", msg)
-		}
-	}()
-
+	k = kite.New(o, new(Os))
 	k.Start()
 }
 
+var pathWatcher = make(chan string)
+
 func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
-
-	fmt.Println(r.Username, r.Kitename, r.Origin, r.Method)
-
+	fmt.Println(r.Args, r.Callbacks)
 	params := r.Args.(map[string]interface{})
 	path, ok := params["path"].(string)
 	if !ok {
 		return errors.New("path argument missing")
+	}
+
+	for _, callback := range r.Callbacks {
+		if callback == "onChange" {
+			onceBody := func() { startWatcher(pathWatcher) }
+			go once.Do(onceBody)
+
+			// send new path's to our pathWatcher
+			pathWatcher <- path
+		}
 	}
 
 	response := make(map[string]interface{})
@@ -103,6 +91,7 @@ func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) erro
 	if !ok {
 		return errors.New("path argument missing")
 	}
+
 	buf, err := ReadFile(path)
 	if err != nil {
 		return err
@@ -481,16 +470,42 @@ func CreateDirectory(name string, recursive bool) error {
 	return os.Mkdir(name, 0755)
 }
 
-func watcher() chan *fsnotify.FileEvent {
-	watcher, err := fsnotify.NewWatcher()
+func startWatcher(newPaths chan string) {
+	fmt.Println("starting watcher")
+	var err error
+	watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = watcher.Watch("/Users/fatih/Code")
-	if err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		for path := range newPaths {
+			fmt.Println("Adding path", path)
+			err := watcher.Watch(path)
+			if err != nil {
+				log.Println("watch adding", err)
+			}
+		}
+	}()
 
-	return watcher.Event
+	var event string
+	for change := range watcher.Event {
+		if change.IsCreate() {
+			event = "added"
+		} else if change.IsDelete() {
+			event = "removed"
+		} else {
+			continue
+		}
+
+		msg := struct {
+			Event string    `json:"event"`
+			File  FileEntry `json:"file"`
+		}{
+			event,
+			FileEntry{Name: path.Base(change.Name), FullPath: change.Name},
+		}
+
+		k.SendMsg("devrim", "onChange", msg)
+	}
 }

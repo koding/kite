@@ -126,19 +126,21 @@ SERVER
 ******************************************/
 
 type serverRequest struct {
-	Method   string           `json:"method"`
-	Params   *json.RawMessage `json:"params"`
-	Id       *json.RawMessage `json:"id"`
-	Username string           `json:"username"`
-	Kitename string           `json:"kitename"`
-	Token    string           `json:"token"`
-	Origin   string           `jsong:"-"`
+	Method    string           `json:"method"`
+	Params    *json.RawMessage `json:"params"`
+	Id        *json.RawMessage `json:"id"`
+	Callbacks []string         `json:"callbacks"`
+	Username  string           `json:"username"`
+	Kitename  string           `json:"kitename"`
+	Token     string           `json:"token"`
+	Origin    string           `jsong:"-"`
 }
 
 func (r *serverRequest) reset() {
 	r.Method = ""
 	r.Params = nil
 	r.Id = nil
+	r.Callbacks = nil
 	r.Username = ""
 	r.Kitename = ""
 	r.Token = ""
@@ -244,6 +246,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	a := x.(*protocol.KiteRequest)
 	a.Username = c.req.Username
 	a.Kitename = c.req.Kitename
+	a.Callbacks = c.req.Callbacks
 	a.Token = c.req.Token
 	a.Method = c.req.Method
 	a.Origin = c.req.Origin

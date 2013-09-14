@@ -654,7 +654,6 @@ func (w wsClients) add(lookup string, c *client) {
 	} else {
 		w[lookup] = append(w[lookup], c)
 	}
-	fmt.Println("After adding", w)
 }
 
 func (w wsClients) get(username string) []*client {

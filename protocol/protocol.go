@@ -42,9 +42,10 @@ type Base struct {
 
 type KiteRequest struct {
 	Base
-	Method string
-	Origin string
-	Args   interface{}
+	Method    string
+	Origin    string
+	Callbacks []string
+	Args      interface{}
 }
 
 type Request struct {
