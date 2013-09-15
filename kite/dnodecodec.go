@@ -8,13 +8,11 @@ import (
 	"koding/newkite/protocol"
 	"koding/tools/dnode"
 	"log"
+	"net/rpc"
 	"strconv"
-
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"net/rpc"
 )
 
 func NewDnodeClient(conn io.ReadWriteCloser) rpc.ClientCodec {
@@ -76,9 +74,10 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		return err
 	}
 
+	fmt.Printf("[received] <- %+v, %+v\n", c.req.Method, string(c.req.Arguments.Raw))
+
 	// m -> c.req
 	// m.Arguments -> c.req.Arguments
-
 	for id, path := range c.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
@@ -102,12 +101,11 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 				Callbacks: callbacks,
 			}
 
+			fmt.Printf("[sending] -> %+v, %+v\n", c.req.Method, message)
 			c.enc.Encode(message)
 		})
 		c.req.Arguments.Callbacks = append(c.req.Arguments.Callbacks, dnode.CallbackSpec{path, callback})
 	}
-
-	fmt.Printf("[received] <- %+v, %+v\n", c.req.Method, string(c.req.Arguments.Raw))
 
 	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
 

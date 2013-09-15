@@ -27,16 +27,18 @@ var port = flag.String("port", "", "port to bind itself")
 
 var k *kite.Kite
 var once sync.Once
-var watcher *fsnotify.Watcher
+var pathWatcher = make(chan string)
+var watchCallbacks = make([]func(*fsnotify.FileEvent), 0, 100) // Limit of callbacks
 
 func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
 	k = kite.New(o, new(Os))
+
+	// go startWatcher(pathWatcher)
+
 	k.Start()
 }
-
-var pathWatcher = make(chan string)
 
 func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
 	var params struct {
@@ -47,6 +49,36 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 
 	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string], onChange: [function], watchSubdirectories: [bool] }")
+	}
+
+	if params.OnChange != nil {
+
+		// go once.Do(func()
+		onceBody := func() { startWatcher(pathWatcher) }
+		go once.Do(onceBody)
+		// send new path's to our pathWatcher
+		pathWatcher <- params.Path
+
+		var event string
+		var fileEntry *FileEntry
+		changer := func(ev *fsnotify.FileEvent) {
+			fmt.Println("event", ev.Name)
+			if ev.IsCreate() {
+				event = "added"
+				fileEntry, _ = GetInfo(ev.Name)
+			} else if ev.IsDelete() {
+				event = "removed"
+				fileEntry = &FileEntry{Name: path.Base(ev.Name), FullPath: ev.Name}
+			}
+
+			params.OnChange(map[string]interface{}{
+				"event": event,
+				"file":  fileEntry,
+			})
+			return
+		}
+
+		watchCallbacks = append(watchCallbacks, changer)
 	}
 
 	response := make(map[string]interface{})
@@ -464,7 +496,7 @@ func CreateDirectory(name string, recursive bool) error {
 func startWatcher(newPaths chan string) {
 	fmt.Println("starting watcher")
 	var err error
-	watcher, err = fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -479,24 +511,9 @@ func startWatcher(newPaths chan string) {
 		}
 	}()
 
-	var event string
-	for change := range watcher.Event {
-		if change.IsCreate() {
-			event = "added"
-		} else if change.IsDelete() {
-			event = "removed"
-		} else {
-			continue
+	for event := range watcher.Event {
+		for _, f := range watchCallbacks {
+			f(event)
 		}
-
-		msg := struct {
-			Event string    `json:"event"`
-			File  FileEntry `json:"file"`
-		}{
-			event,
-			FileEntry{Name: path.Base(change.Name), FullPath: change.Name},
-		}
-
-		k.SendMsg("devrim", "onChange", msg)
 	}
 }
