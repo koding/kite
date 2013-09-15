@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"io/ioutil"
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
+	"koding/tools/dnode"
 	"log"
 	"os"
 	"path"
@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
-
 	"time"
 )
 
@@ -40,25 +39,18 @@ func main() {
 var pathWatcher = make(chan string)
 
 func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
-	fmt.Println(r.Args, r.Callbacks)
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path                string
+		OnChange            dnode.Callback
+		WatchSubdirectories bool
 	}
 
-	for _, callback := range r.Callbacks {
-		if callback == "onChange" {
-			onceBody := func() { startWatcher(pathWatcher) }
-			go once.Do(onceBody)
-
-			// send new path's to our pathWatcher
-			pathWatcher <- path
-		}
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string], onChange: [function], watchSubdirectories: [bool] }")
 	}
 
 	response := make(map[string]interface{})
-	files, err := ReadDirectory(path)
+	files, err := ReadDirectory(params.Path)
 	if err != nil {
 		return err
 	}
@@ -69,30 +61,32 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 }
 
 func (Os) Glob(r *protocol.KiteRequest, result *[]string) error {
-	params := r.Args.(map[string]interface{})
-	glob, ok := params["pattern"].(string)
-	if !ok {
-		return errors.New("pattern argument missing")
+	var params struct {
+		Pattern string
 	}
 
-	files, err := Glob(glob)
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Pattern == "" {
+		return errors.New("{ pattern: [string] }")
+	}
+
+	files, err := Glob(params.Pattern)
 	if err != nil {
 		return err
 	}
 
 	*result = files
-
 	return nil
 }
 
 func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path string
+	}
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string] }")
 	}
 
-	buf, err := ReadFile(path)
+	buf, err := ReadFile(params.Path)
 	if err != nil {
 		return err
 	}
@@ -102,39 +96,36 @@ func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) erro
 }
 
 func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path           string
+		Content        []byte
+		DoNotOverwrite bool
+		Append         bool
 	}
-	content, ok := params["content"].(string)
-	if !ok {
-		return errors.New("content argument missing")
-	}
-	doNotOverwrite, _ := params["doNotOverwrite"].(bool)
-	appendTo, _ := params["append"].(bool)
 
-	buf, err := base64.StdEncoding.DecodeString(content)
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" || params.Content == nil {
+		return errors.New("{ path: [string], content: [base64], doNotOverwrite: [bool], append: [bool] }")
+	}
+
+	err := WriteFile(params.Path, params.Content, params.DoNotOverwrite, params.Append)
 	if err != nil {
 		return err
 	}
 
-	err = WriteFile(path, buf, doNotOverwrite, appendTo)
-	if err != nil {
-		return err
-	}
-
-	*result = fmt.Sprintf("content written to %s", path)
+	*result = fmt.Sprintf("content written to %s", params.Path)
 	return nil
 }
 
 func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path string
 	}
-	name, err := EnsureNonexistentPath(path)
+
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string] }")
+	}
+
+	name, err := EnsureNonexistentPath(params.Path)
 	if err != nil {
 		return err
 	}
@@ -144,8 +135,14 @@ func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
 }
 
 func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
-	path := r.Args.(string)
-	fileEntry, err := GetInfo(path)
+	var params struct {
+		Path string
+	}
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string] }")
+	}
+
+	fileEntry, err := GetInfo(params.Path)
 	if err != nil {
 		return err
 	}
@@ -155,21 +152,16 @@ func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
 }
 
 func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path      string
+		Mode      os.FileMode
+		Recursive bool
 	}
-	mode, ok := params["mode"].(int)
-	if !ok {
-		return errors.New("mode argument missing")
-	}
-	recursive, ok := params["recursive"].(bool)
-	if !ok {
-		return errors.New("recursive argument missing")
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string], mode: [integer], recursive: [bool] }")
 	}
 
-	err := SetPermissions(path, os.FileMode(mode), recursive)
+	err := SetPermissions(params.Path, params.Mode, params.Recursive)
 	if err != nil {
 		return err
 	}
@@ -180,13 +172,16 @@ func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
 }
 
 func (Os) Remove(r *protocol.KiteRequest, result *bool) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path      string
+		Recursive bool
 	}
 
-	err := Remove(path)
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string], recursive: [bool] }")
+	}
+
+	err := Remove(params.Path)
 	if err != nil {
 		return err
 	}
@@ -196,18 +191,16 @@ func (Os) Remove(r *protocol.KiteRequest, result *bool) error {
 }
 
 func (Os) Rename(r *protocol.KiteRequest, result *bool) error {
-	params := r.Args.(map[string]interface{})
-	oldPath, ok := params["oldPath"].(string)
-	if !ok {
-		return errors.New("oldPath argument missing")
+	var params struct {
+		OldPath string
+		NewPath string
 	}
 
-	newPath, ok := params["newPath"].(string)
-	if !ok {
-		return errors.New("newPath argument missing")
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.OldPath == "" || params.NewPath == "" {
+		return errors.New("{ oldPath: [string], newPath: [string] }")
 	}
 
-	err := Rename(oldPath, newPath)
+	err := Rename(params.OldPath, params.NewPath)
 	if err != nil {
 		return err
 	}
@@ -217,17 +210,15 @@ func (Os) Rename(r *protocol.KiteRequest, result *bool) error {
 }
 
 func (Os) CreateDirectory(r *protocol.KiteRequest, result *bool) error {
-	params := r.Args.(map[string]interface{})
-	path, ok := params["path"].(string)
-	if !ok {
-		return errors.New("path argument missing")
+	var params struct {
+		Path      string
+		Recursive bool
 	}
-	recursive, ok := params["recursive"].(bool)
-	if !ok {
-		return errors.New("recursive argument missing")
+	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+		return errors.New("{ path: [string], recursive: [bool] }")
 	}
 
-	err := CreateDirectory(path, recursive)
+	err := CreateDirectory(params.Path, params.Recursive)
 	if err != nil {
 		return err
 	}

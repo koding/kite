@@ -246,7 +246,6 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	a := x.(*protocol.KiteRequest)
 	a.Username = c.req.Username
 	a.Kitename = c.req.Kitename
-	a.Callbacks = c.req.Callbacks
 	a.Token = c.req.Token
 	a.Method = c.req.Method
 	a.Origin = c.req.Origin

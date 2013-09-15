@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"koding/tools/dnode"
 	"labix.org/v2/mgo/bson"
 	"time"
 )
@@ -44,7 +45,7 @@ type KiteRequest struct {
 	Base
 	Method    string
 	Origin    string
-	Callbacks []string
+	ArgsDnode *dnode.Partial
 	Args      interface{}
 }
 
