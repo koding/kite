@@ -396,7 +396,8 @@ func (k *Kite) ServeWS(ws *websocket.Conn) {
 	bufClients.add(&client{Conn: ws, Addr: addr})
 	fmt.Println("number of buffered clients", bufClients.size())
 
-	k.Server.ServeCodec(NewJsonServerCodec(k, ws))
+	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
+	k.Server.ServeCodec(NewDnodeServerCodec(ws))
 }
 
 func (k *Kite) AddFunction(name string, method interface{}) {

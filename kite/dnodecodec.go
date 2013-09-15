@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"koding/tools/dnode"
-	"log"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
 	"net/rpc"
 )
 
@@ -45,45 +48,57 @@ func (c *DnodeClientCodec) Close() error {
 	return c.rwc.Close()
 }
 
-//
-
-type DnodeMessage struct {
-	Method    interface{}           `json:"method"`
-	Arguments *dnode.Partial        `json:"arguments"`
-	Callbacks map[string]([]string) `json:"callbacks"`
-}
-
-func (d *DnodeMessage) reset() {
-	d.Method = nil
-	d.Arguments = nil
-	d.Callbacks = nil
-}
-
 type DnodeServerCodec struct {
-	dec *json.Decoder // for reading JSON values
-	enc *json.Encoder // for writing JSON values
-	rwc io.ReadWriteCloser
-
-	// temporary work space
-	req  DnodeMessage
-	resp DnodeMessage
+	dec   *json.Decoder // for reading JSON values
+	enc   *json.Encoder // for writing JSON values
+	rwc   io.ReadWriteCloser
+	dnode *dnode.DNode
+	req   dnode.Message
 }
 
 func NewDnodeServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
+	d := dnode.New()
+
+	// For what is this used?
+	d.OnRootMethod = func(method string, args *dnode.Partial) {
+		var partials []*dnode.Partial
+		err := args.Unmarshal(&partials)
+		if err != nil {
+			panic(err)
+		}
+
+		var options struct {
+			WithArgs *dnode.Partial
+		}
+		err = partials[0].Unmarshal(&options)
+		if err != nil {
+			panic(err)
+		}
+		var resultCallback dnode.Callback
+		err = partials[1].Unmarshal(&resultCallback)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	return &DnodeServerCodec{
-		rwc: conn,
-		dec: json.NewDecoder(conn),
-		enc: json.NewEncoder(conn),
+		rwc:   conn,
+		dec:   json.NewDecoder(conn),
+		enc:   json.NewEncoder(conn),
+		dnode: d,
 	}
 }
 
 func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	err := c.dec.Decode(&c.req)
 	if err != nil {
-		log.Println(err)
+		return err
 	}
-	fmt.Printf("Dnode Message arguments %+v\n", c.req.Arguments)
-	fmt.Printf("Dnode Message arguments %+v\n", string(c.req.Arguments.Raw))
+	fmt.Printf("[received] <- %+v, %+v\n", c.req.Method, string(c.req.Arguments.Raw))
+
+	c.dnode.ProcessDnode(c.req)
+	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
+	r.ServiceMethod = method
 
 	return nil
 }
@@ -98,5 +113,14 @@ func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 }
 
 func (c *DnodeServerCodec) Close() error {
+	c.dnode.Close()
 	return c.rwc.Close()
+}
+
+func upperFirst(s string) string {
+	if s == "" {
+		return ""
+	}
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[n:]
 }
