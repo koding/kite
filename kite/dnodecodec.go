@@ -9,6 +9,7 @@ import (
 	"koding/tools/dnode"
 	"log"
 	"net/rpc"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -116,14 +117,8 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 }
 
 func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
-	if body == nil {
-		return nil
-	}
-
-	a := body.(*protocol.KiteRequest)
 	// args  is of type *dnode.Partial
 	var partials []*dnode.Partial
-
 	err := c.req.Arguments.Unmarshal(&partials)
 	if err != nil {
 		return err
@@ -137,21 +132,28 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	if err != nil {
 		return err
 	}
-	a.ArgsDnode = options.WithArgs
 
 	var resultCallback dnode.Callback
 	err = partials[1].Unmarshal(&resultCallback)
 	if err != nil {
 		return err
 	}
-
 	c.result = resultCallback
+
+	if body == nil {
+		return nil
+	}
+
+	a := body.(*protocol.KiteRequest)
+	a.ArgsDnode = options.WithArgs
+
 	return nil
 }
 
 func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {
 	if r.Error != "" {
-		return fmt.Errorf(r.Error)
+		c.result(CreateErrorObject(fmt.Errorf(r.Error)))
+		return nil
 	}
 
 	c.result(nil, body)
@@ -169,4 +171,14 @@ func upperFirst(s string) string {
 	}
 	r, n := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(r)) + s[n:]
+}
+
+// Got from kite package
+type ErrorObject struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
+}
+
+func CreateErrorObject(err error) *ErrorObject {
+	return &ErrorObject{Name: reflect.TypeOf(err).Elem().Name(), Message: err.Error()}
 }
