@@ -14,7 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
+
 	"regexp"
 	"strconv"
 	"sync"
@@ -34,9 +34,6 @@ func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
 	k = kite.New(o, new(Os))
-
-	// go startWatcher(pathWatcher)
-
 	k.Start()
 }
 
@@ -52,8 +49,6 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 	}
 
 	if params.OnChange != nil {
-
-		// go once.Do(func()
 		onceBody := func() { startWatcher(pathWatcher) }
 		go once.Do(onceBody)
 		// send new path's to our pathWatcher
@@ -263,31 +258,6 @@ func (Os) CreateDirectory(r *protocol.KiteRequest, result *bool) error {
 * Make the functions below to a seperate package
 *
 *****************************************/
-func unmarshal(a, s interface{}) {
-	t := reflect.TypeOf(s)
-	if t.Kind() != reflect.Struct {
-		fmt.Printf("%v type can't have attributes inspected\n", t.Kind())
-		return
-	}
-
-	params := make(map[string]reflect.Type)
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		params[field.Name] = field.Type
-	}
-
-	x := reflect.TypeOf(a)
-	if x.Kind() != reflect.Map {
-		fmt.Printf("%v type can't have attributes inspected\n", x.Kind())
-		return
-	}
-
-	for _, value := range reflect.ValueOf(a).MapKeys() {
-		v := reflect.ValueOf(a).MapIndex(value)
-		fmt.Println(v.Kind().String())
-	}
-}
-
 func ReadDirectory(p string) ([]FileEntry, error) {
 	files, err := ioutil.ReadDir(p)
 	if err != nil {
@@ -494,7 +464,6 @@ func CreateDirectory(name string, recursive bool) error {
 }
 
 func startWatcher(newPaths chan string) {
-	fmt.Println("starting watcher")
 	var err error
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -503,7 +472,6 @@ func startWatcher(newPaths chan string) {
 
 	go func() {
 		for path := range newPaths {
-			fmt.Println("Adding path", path)
 			err := watcher.Watch(path)
 			if err != nil {
 				log.Println("watch adding", err)
