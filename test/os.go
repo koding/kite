@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-
 	"regexp"
 	"strconv"
 	"sync"
@@ -23,17 +22,19 @@ import (
 
 type Os struct{}
 
-var port = flag.String("port", "", "port to bind itself")
+var (
+	port = flag.String("port", "", "port to bind itself")
 
-var k *kite.Kite
-var once sync.Once
-var pathWatcher = make(chan string)
-var watchCallbacks = make([]func(*fsnotify.FileEvent), 0, 100) // Limit of callbacks
+	// watcher variables
+	once               sync.Once
+	newPaths, oldPaths = make(chan string), make(chan string)
+	watchCallbacks     = make(map[string]func(*fsnotify.FileEvent), 100) // Limit of watching folders
+)
 
 func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
-	k = kite.New(o, new(Os))
+	k := kite.New(o, new(Os))
 	k.Start()
 }
 
@@ -48,11 +49,14 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 		return errors.New("{ path: [string], onChange: [function], watchSubdirectories: [bool] }")
 	}
 
+	response := make(map[string]interface{})
+
 	if params.OnChange != nil {
-		onceBody := func() { startWatcher(pathWatcher) }
+		onceBody := func() { startWatcher() }
 		go once.Do(onceBody)
-		// send new path's to our pathWatcher
-		pathWatcher <- params.Path
+
+		// notify new paths to the watcher
+		newPaths <- params.Path
 
 		var event string
 		var fileEntry *FileEntry
@@ -73,10 +77,15 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 			return
 		}
 
-		watchCallbacks = append(watchCallbacks, changer)
+		watchCallbacks[params.Path] = changer
+
+		// this callback is called whenever we receive a 'stopWatching' from the client
+		response["stopWatching"] = func() {
+			delete(watchCallbacks, params.Path)
+			oldPaths <- params.Path
+		}
 	}
 
-	response := make(map[string]interface{})
 	files, err := ReadDirectory(params.Path)
 	if err != nil {
 		return err
@@ -255,7 +264,7 @@ func (Os) CreateDirectory(r *protocol.KiteRequest, result *bool) error {
 
 /****************************************
 *
-* Make the functions below to a seperate package
+* Move the functions below to a seperate package
 *
 *****************************************/
 func ReadDirectory(p string) ([]FileEntry, error) {
@@ -463,7 +472,7 @@ func CreateDirectory(name string, recursive bool) error {
 	return os.Mkdir(name, 0755)
 }
 
-func startWatcher(newPaths chan string) {
+func startWatcher() {
 	var err error
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -471,17 +480,28 @@ func startWatcher(newPaths chan string) {
 	}
 
 	go func() {
-		for path := range newPaths {
-			err := watcher.Watch(path)
-			if err != nil {
-				log.Println("watch adding", err)
+		for {
+			select {
+			case p := <-newPaths:
+				err := watcher.Watch(p)
+				if err != nil {
+					log.Println("watch path adding", err)
+				}
+			case p := <-oldPaths:
+				err := watcher.RemoveWatch(p)
+				if err != nil {
+					log.Println("watch remove adding", err)
+				}
 			}
 		}
 	}()
 
 	for event := range watcher.Event {
-		for _, f := range watchCallbacks {
-			f(event)
+		f, ok := watchCallbacks[path.Dir(event.Name)]
+		if !ok {
+			continue
 		}
+
+		f(event)
 	}
 }

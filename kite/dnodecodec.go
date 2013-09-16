@@ -7,7 +7,6 @@ import (
 	"io"
 	"koding/newkite/protocol"
 	"koding/tools/dnode"
-	"log"
 	"net/rpc"
 	"reflect"
 	"strconv"
@@ -52,12 +51,13 @@ func (c *DnodeClientCodec) Close() error {
 }
 
 type DnodeServerCodec struct {
-	dec    *json.Decoder // for reading JSON values
-	enc    *json.Encoder // for writing JSON values
-	rwc    io.ReadWriteCloser
-	dnode  *dnode.DNode
-	req    dnode.Message
-	result dnode.Callback
+	dec            *json.Decoder
+	enc            *json.Encoder
+	rwc            io.ReadWriteCloser
+	dnode          *dnode.DNode
+	req            dnode.Message
+	resultCallback dnode.Callback
+	methodWithID   bool
 }
 
 func NewDnodeServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
@@ -70,53 +70,97 @@ func NewDnodeServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
+	// reset values
+	c.req = dnode.Message{}
+	c.methodWithID = false
+
+	// unmarshall incoming data to our dnode.Message struct
 	err := c.dec.Decode(&c.req)
 	if err != nil {
+		fmt.Printf("decode err \n", err)
 		return err
 	}
 
-	fmt.Printf("[received] <- %+v, %+v\n", c.req.Method, string(c.req.Arguments.Raw))
+	// for debugging: m -> c.req and m.Arguments -> c.req.Arguments
+	// fmt.Printf("[received] <- %+v %+v\n", c.req.Method, string(c.req.Arguments.Raw))
 
-	// m -> c.req
-	// m.Arguments -> c.req.Arguments
 	for id, path := range c.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
 			panic(err)
 		}
 
-		// TODO: dnode.Callback should return error
 		callback := dnode.Callback(func(args ...interface{}) {
 			callbacks := make(map[string]([]string))
 			c.dnode.CollectCallbacks(args, make([]string, 0), callbacks)
 
-			rawArgs, err := json.Marshal(args)
+			rawArgs, err := json.Marshal(&args)
 			if err != nil {
-				log.Println(err)
+				fmt.Printf("collect json unmarshal %+v\n", err)
 			}
 
 			message := dnode.Message{
 				Method:    methodId,
 				Arguments: &dnode.Partial{Raw: rawArgs},
-				Links:     []string{}, // Links is not used, send only for compatiblity
+				Links:     []string{},
 				Callbacks: callbacks,
 			}
 
-			fmt.Printf("[sending] -> %+v, %+v\n", c.req.Method, message)
-			c.enc.Encode(message)
+			err = c.enc.Encode(message)
+			if err != nil {
+				fmt.Printf("encode err %+v\n", err)
+			}
+
+			// for debugging
+			// fmt.Printf("[sending] -> %+v, %+v\n", c.req.Method, message)
 		})
-		c.req.Arguments.Callbacks = append(c.req.Arguments.Callbacks, dnode.CallbackSpec{path, callback})
+
+		c.req.Arguments.Callbacks = append(c.req.Arguments.Callbacks,
+			dnode.CallbackSpec{path, callback})
 	}
 
-	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
+	// received a dnode message with an method of type integer (ID), thus call our
+	// stored callback that is related with this incoming ID.
+	if index, err := strconv.Atoi(fmt.Sprint(c.req.Method)); err == nil {
+		c.methodWithID = true
 
+		// args can be zero or more
+		args, err := c.req.Arguments.Array()
+		if err != nil {
+			fmt.Printf(" 1 err \n", err)
+			return err
+		}
+
+		if index < 0 || index >= len(c.dnode.Callbacks) {
+			return nil
+		}
+
+		callArgs := make([]reflect.Value, len(args))
+		for i, v := range args {
+			callArgs[i] = reflect.ValueOf(v)
+		}
+
+		fmt.Printf("[%d] callback called\n", index)
+		c.dnode.Callbacks[index].Call(callArgs)
+		return nil
+	}
+
+	// This will be replaced with a kite protocol interface in front of net/rpc
+	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
 	r.ServiceMethod = "os-local." + method // TODO: don't make it hardcoded
-	r.Seq = 0                              // TODO: should have dnode callback id
+
+	// This is not used, we use our internal sequence store that is used inside
+	// the dnode package, we
+	// r.Seq = 0
 
 	return nil
 }
 
 func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
+	if c.methodWithID {
+		return nil
+	}
+
 	// args  is of type *dnode.Partial
 	var partials []*dnode.Partial
 	err := c.req.Arguments.Unmarshal(&partials)
@@ -138,7 +182,7 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.result = resultCallback
+	c.resultCallback = resultCallback
 
 	if body == nil {
 		return nil
@@ -151,12 +195,21 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 }
 
 func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {
-	if r.Error != "" {
-		c.result(CreateErrorObject(fmt.Errorf(r.Error)))
+	if c.methodWithID {
+		// net/rpc is complaining when we exit, with an error like:
+		// "rpc: service/method request ill-formed:", however this is OK. No
+		// need to worry.
 		return nil
 	}
 
-	c.result(nil, body)
+	//
+	if r.Error != "" {
+		c.resultCallback(CreateErrorObject(fmt.Errorf(r.Error)))
+		return nil
+	}
+
+	fmt.Printf("[%s] called\n", r.ServiceMethod)
+	c.resultCallback(nil, body)
 	return nil
 }
 
