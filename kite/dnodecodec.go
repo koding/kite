@@ -77,7 +77,6 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// unmarshall incoming data to our dnode.Message struct
 	err := c.dec.Decode(&c.req)
 	if err != nil {
-		fmt.Printf("decode err \n", err)
 		return err
 	}
 
