@@ -61,7 +61,6 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 		var event string
 		var fileEntry *FileEntry
 		changer := func(ev *fsnotify.FileEvent) {
-			fmt.Println("event", ev.Name)
 			if ev.IsCreate() {
 				event = "added"
 				fileEntry, _ = GetInfo(ev.Name)

@@ -87,7 +87,8 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	for id, path := range c.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
-			panic(err)
+			fmt.Println("WARNING: callback id should be an INTEGER: '%s', '%s'", id, path)
+			continue
 		}
 
 		callback := dnode.Callback(func(args ...interface{}) {
