@@ -65,8 +65,8 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 	}
 
 	server.SetSize(float64(params.SizeX), float64(params.SizeY))
-	fmt.Println("params size x and y", params.SizeX, params.SizeY)
 
+	// TODO: look for tmux resizing to
 	// cmd := exec.Command("/usr/bin/screen", "-e^Bb", "-S", "koding")
 	cmd := exec.Command("/bin/bash")
 
