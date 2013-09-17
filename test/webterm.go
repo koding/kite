@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,7 +30,8 @@ type WebtermServer struct {
 }
 
 type WebtermRemote struct {
-	Output dnode.Callback
+	Output       dnode.Callback
+	SessionEnded dnode.Callback
 }
 
 type Webterm struct{}
@@ -37,7 +40,9 @@ var port = flag.String("port", "", "port to bind itself")
 
 func main() {
 	flag.Parse()
+
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
+
 	k := kite.New(o, new(Webterm))
 	k.Start()
 }
@@ -50,6 +55,7 @@ func (Webterm) Info(r *protocol.KiteRequest, result *bool) error {
 func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 	var params struct {
 		Remote       WebtermRemote
+		Session      string
 		SizeX, SizeY int
 		NoScreen     bool
 	}
@@ -58,24 +64,51 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 		return errors.New("{ remote: [object], session: [string], sizeX: [integer], sizeY: [integer], noScreen: [boolean] }")
 	}
 
-	fmt.Printf("Connect details %#v\n", params)
+	if params.NoScreen && params.Session != "" {
+		return errors.New("The 'noScreen' and 'session' parameters can not be used together.")
+	}
+
+	newSession := false
+	if params.Session == "" {
+		params.Session = RandomString()
+		newSession = true
+	}
+
+	fmt.Printf("Connect details %+v\n", params)
 	server := &WebtermServer{
-		remote: params.Remote,
-		pty:    pty.New(),
+		Session: params.Session,
+		remote:  params.Remote,
+		pty:     pty.New(),
 	}
 
 	server.SetSize(float64(params.SizeX), float64(params.SizeY))
 
-	// TODO: look for tmux resizing to
-	// cmd := exec.Command("/usr/bin/screen", "-e^Bb", "-S", "koding")
-	cmd := exec.Command("/bin/bash")
+	var command struct {
+		name string
+		args []string
+	}
 
-	cmd.Stdout = server.pty.Slave
+	command.name = "/usr/bin/screen"
+	command.args = []string{"-e^Bb", "-S", "koding." + params.Session}
+
+	if !newSession {
+		command.args = append(command.args, "-x")
+	}
+
+	if params.NoScreen {
+		command.name = "/bin/bash"
+		command.args = []string{}
+	}
+
+	// TODO: look for tmux resizing to
+	cmd := exec.Command(command.name, command.args...)
+
 	cmd.Stdin = server.pty.Slave
-	cmd.Stderr = server.pty.Slave
+	// cmd.Stdout = server.pty.Slave
+	// cmd.Stderr = server.pty.Slave
 
 	// Open in background
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
+	// cmd.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
 
 	err := cmd.Start()
 	if err != nil {
@@ -86,6 +119,7 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 		cmd.Wait()
 		server.pty.Slave.Close()
 		server.pty.Master.Close()
+		server.remote.SessionEnded()
 	}()
 
 	go func() {
@@ -164,4 +198,12 @@ func FilterInvalidUTF8(buf []byte) []byte {
 		i += l
 	}
 	return buf[:j]
+}
+
+const RandomStringLength = 24 // 144 bit base64 encoded
+
+func RandomString() string {
+	r := make([]byte, RandomStringLength*6/8)
+	rand.Read(r)
+	return base64.URLEncoding.EncodeToString(r)
 }

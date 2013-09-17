@@ -34,19 +34,20 @@ var (
 )
 
 type Kite struct {
-	Username     string // user that calls/runs the kite
-	Kitename     string // kites of same name can share memory with each other
-	Uuid         string // unique Uuid of Kite, is generated on Start for now
-	Token        string // temporary token, can be changed anytime
-	Addr         string // RPC and GroupCache addresses
-	PublicKey    string
-	Hostname     string
-	LocalIP      string // local network interface
-	PublicIP     string // public reachable IP
-	Port         string // port, that the kite is going to be run
-	Version      string
-	Dependencies string // other kites that needs to be run, in order to run this one
-	Registered   bool   // registered is true if the Kite is registered to kontrol itself
+	Username       string // user that calls/runs the kite
+	Kitename       string // kites of same name can share memory with each other
+	Uuid           string // unique Uuid of Kite, is generated on Start for now
+	Token          string // temporary token, can be changed anytime
+	Addr           string // RPC and GroupCache addresses
+	PublicKey      string
+	Hostname       string
+	LocalIP        string // local network interface
+	PublicIP       string // public reachable IP
+	Port           string // port, that the kite is going to be run
+	Version        string
+	Dependencies   string // other kites that needs to be run, in order to run this one
+	Registered     bool   // registered is true if the Kite is registered to kontrol itself
+	KontrolEnabled bool   // by default yes, if disabled it bypasses kontrol
 
 	Pool       *groupcache.HTTPPool
 	Group      *groupcache.Group
@@ -125,6 +126,8 @@ func New(o *protocol.Options, method interface{}) *Kite {
 	if method != nil {
 		k.AddFunction(o.Kitename, method)
 	}
+
+	k.KontrolEnabled = true // don't expose this to outsiders.
 
 	return k
 }
@@ -236,20 +239,23 @@ func (k *Kite) Pong() {
 }
 
 func (k *Kite) InitializeKite() {
-	if !k.Registered {
-		debug("not registered, sending register request to kontrol...")
+	if k.Registered {
+		return
+	}
 
+	if k.KontrolEnabled {
+		debug("not registered, sending register request to kontrol...")
 		err := k.RegisterToKontrol()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-
-		onceBody := func() { k.Serve(k.Addr) }
-		go k.OnceServer.Do(onceBody)
-
-		k.Registered = true
 	}
+
+	onceBody := func() { k.Serve(k.Addr) }
+	go k.OnceServer.Do(onceBody)
+
+	k.Registered = true
 }
 
 func (k *Kite) RegisterToKontrol() error {
