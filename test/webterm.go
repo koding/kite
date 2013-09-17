@@ -67,22 +67,26 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 	server.SetSize(float64(params.SizeX), float64(params.SizeY))
 	fmt.Println("params size x and y", params.SizeX, params.SizeY)
 
-	c := exec.Command("/usr/bin/screen", "-e^Bb", "-S", "koding")
-	// c := exec.Command("/bin/zsh")
-	c.Stdout = server.pty.Slave
-	c.Stdin = server.pty.Slave
-	c.Stderr = server.pty.Slave
-	// c.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
+	// cmd := exec.Command("/usr/bin/screen", "-e^Bb", "-S", "koding")
+	cmd := exec.Command("/bin/bash")
 
-	err := c.Start()
+	cmd.Stdout = server.pty.Slave
+	cmd.Stdin = server.pty.Slave
+	cmd.Stderr = server.pty.Slave
+
+	// Open in background
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
+
+	err := cmd.Start()
 	if err != nil {
 		log.Println("could not start", err)
 	}
 
-	// go func() {
-	// 	server.pty.Slave.Close()
-	// 	server.pty.Master.Close()
-	// }()
+	go func() {
+		cmd.Wait()
+		server.pty.Slave.Close()
+		server.pty.Master.Close()
+	}()
 
 	go func() {
 		buf := make([]byte, (1<<12)-utf8.UTFMax, 1<<12)
