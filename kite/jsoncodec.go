@@ -274,7 +274,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	msg, _ := json.Marshal(&m)
 
 	debug("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
-	result := c.Kite.MakeRequest(msg)
+	result := c.Kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
 	json.Unmarshal(result, &resp)

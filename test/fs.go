@@ -34,7 +34,21 @@ var (
 func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "fs-local", Version: "1", Port: *port}
-	k := kite.New(o, new(Os))
+
+	methods := map[string]interface{}{
+		"fs.createDirectory":       Os.CreateDirectory,
+		"fs.ensureNonexistentPath": Os.EnsureNonexistentPath,
+		"fs.getInfo":               Os.GetInfo,
+		"fs.glob":                  Os.Glob,
+		"fs.readDirectory":         Os.ReadDirectory,
+		"fs.readFile":              Os.ReadFile,
+		"fs.remove":                Os.Remove,
+		"fs.rename ":               Os.Rename,
+		"fs.setPermissions":        Os.SetPermissions,
+		"fs.writeFile":             Os.WriteFile,
+	}
+
+	k := kite.New(o, new(Os), methods)
 	k.Start()
 }
 

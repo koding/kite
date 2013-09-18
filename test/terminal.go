@@ -33,23 +33,29 @@ type WebtermRemote struct {
 	SessionEnded dnode.Callback
 }
 
-type Webterm struct{}
+type Terminal struct{}
 
 var port = flag.String("port", "", "port to bind itself")
 
 func main() {
 	flag.Parse()
 	o := &protocol.Options{Username: "fatih", Kitename: "terminal-local", Version: "1", Port: *port}
-	k := kite.New(o, new(Webterm))
+
+	methods := map[string]interface{}{
+		"vm.info":         Terminal.Info,
+		"webterm.connect": Terminal.Connect,
+	}
+
+	k := kite.New(o, new(Terminal), methods)
 	k.Start()
 }
 
-func (Webterm) Info(r *protocol.KiteDnodeRequest, result *bool) error {
+func (Terminal) Info(r *protocol.KiteDnodeRequest, result *bool) error {
 	*result = true
 	return nil
 }
 
-func (Webterm) Connect(r *protocol.KiteDnodeRequest, result *WebtermServer) error {
+func (Terminal) Connect(r *protocol.KiteDnodeRequest, result *WebtermServer) error {
 	var params struct {
 		Remote       WebtermRemote
 		Session      string

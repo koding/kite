@@ -10,7 +10,6 @@ import (
 	"net/rpc"
 	"reflect"
 	"strconv"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -148,8 +147,15 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	}
 
 	// This will be replaced with a kite protocol interface in front of net/rpc
-	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
-	r.ServiceMethod = c.kite.Kitename + "." + method
+	// method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
+
+	// fmt.Println(c.kite.Methods)
+	method, ok := c.kite.Methods[c.req.Method.(string)]
+	if !ok {
+		return fmt.Errorf("method %s is not registered", c.req.Method)
+	}
+
+	r.ServiceMethod = method
 
 	// This is not used, we use our internal sequence store that is used inside
 	// the dnode package, we

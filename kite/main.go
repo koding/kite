@@ -21,17 +21,63 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	routerKontrol = "tcp://192.168.1.17:5556"
-	subKontrol    = "tcp://192.168.1.17:5557"
-	kites         = peers.New()
-	balance       = balancer.New()
+	kites   = peers.New()
+	balance = balancer.New()
 )
+
+// Messenger is used to implement various Messaging patterns on top of the
+// Kites.
+type Messenger interface {
+	// Send is makes a request to the endpoint and returns the response
+	Send([]byte) []byte
+
+	// Consumer is a subscriber/consumer that listens to the endpoint. Incoming
+	// data should be handler via the function that is passed.
+	Consumer(func([]byte))
+}
+
+// ZeroMQ is a struct that complies the Messenger interface.
+type ZeroMQ struct {
+	UUID     string
+	Kitename string
+	All      string
+
+	Subscriber *zmq.Socket
+	Dealer     *zmq.Socket
+	sync.Mutex // protects zmq send for DEALER socket
+}
+
+func NewZeroMQ(kiteID, kitename, all string) *ZeroMQ {
+	routerKontrol := "tcp://192.168.1.17:5556"
+	subKontrol := "tcp://192.168.1.17:5557"
+	sub, _ := zmq.NewSocket(zmq.SUB)
+	sub.Connect(subKontrol)
+
+	// set three filters
+	sub.SetSubscribe(kiteID)   // individual, just for me
+	sub.SetSubscribe(kitename) // same type, kites with the same name
+	sub.SetSubscribe(all)      // for all kites
+
+	dealer, _ := zmq.NewSocket(zmq.DEALER)
+	dealer.SetIdentity(kiteID) // use our ID also for zmq envelope
+	dealer.Connect(routerKontrol)
+
+	return &ZeroMQ{
+		Subscriber: sub,
+		Dealer:     dealer,
+		UUID:       kiteID,
+		Kitename:   kitename,
+		All:        all,
+	}
+}
 
 type Kite struct {
 	Username       string // user that calls/runs the kite
@@ -45,22 +91,20 @@ type Kite struct {
 	PublicIP       string // public reachable IP
 	Port           string // port, that the kite is going to be run
 	Version        string
-	Dependencies   string // other kites that needs to be run, in order to run this one
-	Registered     bool   // registered is true if the Kite is registered to kontrol itself
-	KontrolEnabled bool   // by default yes, if disabled it bypasses kontrol
+	Dependencies   string            // other kites that needs to be run, in order to run this one
+	Registered     bool              // registered is true if the Kite is registered to kontrol itself
+	KontrolEnabled bool              // by default yes, if disabled it bypasses kontrol
+	Methods        map[string]string // method map for shared methods
+	Messenger      Messenger
 
 	Pool       *groupcache.HTTPPool
 	Group      *groupcache.Group
 	Server     *rpc.Server
-	Subscriber *zmq.Socket
-	Dealer     *zmq.Socket
 	OnceServer sync.Once // used to start the server only once
 	OnceCall   sync.Once // used when multiple goroutines are requesting information from kontrol
-	sync.Mutex           // protects zmq send for DEALER socket
 }
 
-func New(o *protocol.Options, method interface{}) *Kite {
-
+func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) *Kite {
 	var err error
 	if o == nil {
 		o, err = readOptions("manifest.json")
@@ -77,18 +121,6 @@ func New(o *protocol.Options, method interface{}) *Kite {
 	hostname, _ := os.Hostname()
 	id, _ := uuid.NewV4()
 	kiteID := id.String()
-
-	sub, _ := zmq.NewSocket(zmq.SUB)
-	sub.Connect(subKontrol)
-
-	// set three filters
-	sub.SetSubscribe(kiteID)     // individual, just for me
-	sub.SetSubscribe(o.Kitename) // same type, kites with the same name
-	sub.SetSubscribe("all")      // for all kites
-
-	dealer, _ := zmq.NewSocket(zmq.DEALER)
-	dealer.SetIdentity(kiteID) // use our ID also for zmq envelope
-	dealer.Connect(routerKontrol)
 
 	publicKey, err := getKey("public")
 	if err != nil {
@@ -119,13 +151,13 @@ func New(o *protocol.Options, method interface{}) *Kite {
 		Port:           port,
 		Hostname:       hostname,
 		Server:         rpc.NewServer(),
-		Subscriber:     sub,
-		Dealer:         dealer,
 		KontrolEnabled: true,
+		Methods:        createMethodMap(o.Kitename, rcvr, methods),
+		Messenger:      NewZeroMQ(kiteID, o.Kitename, "all"),
 	}
 
-	if method != nil {
-		k.AddFunction(o.Kitename, method)
+	if rcvr != nil {
+		k.AddFunction(o.Kitename, rcvr)
 	}
 
 	return k
@@ -136,8 +168,24 @@ func (k *Kite) Start() {
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
 	// Latter is important to ensure robustness, if not we have to unmarshal or
 	// check every incoming message.
+	k.Messenger.Consumer(k.handle)
+}
+
+func (z *ZeroMQ) Send(msg []byte) []byte {
+	z.Lock()
+
+	z.Dealer.SendBytes([]byte(""), zmq.SNDMORE)
+	z.Dealer.SendBytes(msg, 0)
+
+	z.Dealer.RecvBytes(0) // envelope delimiter
+	reply, _ := z.Dealer.RecvBytes(0)
+	z.Unlock()
+	return reply
+}
+
+func (z *ZeroMQ) Consumer(handle func([]byte)) {
 	for {
-		msg, _ := k.Subscriber.RecvBytes(0)
+		msg, _ := z.Subscriber.RecvBytes(0)
 		frames := bytes.SplitN(msg, []byte(protocol.FRAME_SEPARATOR), 2)
 		if len(frames) != 2 { // msg is malformed
 			continue
@@ -145,9 +193,9 @@ func (k *Kite) Start() {
 
 		filter := frames[0] // either "all" or k.Uuid (just for this kite)
 		switch string(filter) {
-		case "all", k.Uuid, k.Kitename:
+		case z.All, z.UUID, z.Kitename:
 			msg = frames[1] // msg is in JSON format
-			k.handle(msg)
+			handle(msg)
 		default:
 			debug("not intended for me, dropping", string(filter))
 		}
@@ -231,7 +279,7 @@ func (k *Kite) Pong() {
 
 	msg, _ := json.Marshal(&m)
 
-	resp := k.MakeRequest(msg)
+	resp := k.Messenger.Send(msg)
 	if string(resp) == "UPDATE" {
 		k.Registered = false
 	}
@@ -282,7 +330,7 @@ func (k *Kite) RegisterToKontrol() error {
 		return err
 	}
 
-	result := k.MakeRequest(msg)
+	result := k.Messenger.Send(msg)
 	var resp protocol.RegisterResponse
 	err = json.Unmarshal(result, &resp)
 	if err != nil {
@@ -300,18 +348,6 @@ func (k *Kite) RegisterToKontrol() error {
 	}
 
 	return nil
-}
-
-func (k *Kite) MakeRequest(msg []byte) []byte {
-	k.Lock()
-
-	k.Dealer.SendBytes([]byte(""), zmq.SNDMORE)
-	k.Dealer.SendBytes(msg, 0)
-
-	k.Dealer.RecvBytes(0) // envelope delimiter
-	reply, _ := k.Dealer.RecvBytes(0)
-	k.Unlock()
-	return reply
 }
 
 /******************************************
@@ -462,7 +498,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 
 				onceBody := func() {
 					debug("sending requesting message...")
-					k.MakeRequest(msg)
+					k.Messenger.Send(msg)
 				}
 
 				k.OnceCall.Do(onceBody) // to prevent multiple get request when called conccurently
@@ -753,4 +789,20 @@ func (k *Kite) ConnectedUsers() []string {
 	clientsMu.Unlock()
 
 	return list
+}
+
+func createMethodMap(kitename string, rcvr interface{}, methods map[string]interface{}) map[string]string {
+	funcName := func(i interface{}) string {
+		return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+	}
+
+	t := reflect.TypeOf(rcvr)
+	structName := strings.TrimPrefix(t.String(), "*")
+
+	methodMap := make(map[string]string)
+	for name, method := range methods {
+		methodMap[name] = kitename + "." + strings.TrimPrefix(funcName(method), structName+".")
+	}
+
+	return methodMap
 }
