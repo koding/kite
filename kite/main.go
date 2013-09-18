@@ -108,26 +108,25 @@ func New(o *protocol.Options, method interface{}) *Kite {
 	// getDeps(pwd, o.Kitename)
 
 	k := &Kite{
-		Username:   o.Username,
-		Kitename:   o.Kitename,
-		Version:    o.Version,
-		Uuid:       kiteID,
-		PublicKey:  publicKey,
-		Addr:       localIP + ":" + port,
-		PublicIP:   publicIP,
-		LocalIP:    localIP,
-		Port:       port,
-		Hostname:   hostname,
-		Server:     rpc.NewServer(),
-		Subscriber: sub,
-		Dealer:     dealer,
+		Username:       o.Username,
+		Kitename:       o.Kitename,
+		Version:        o.Version,
+		Uuid:           kiteID,
+		PublicKey:      publicKey,
+		Addr:           localIP + ":" + port,
+		PublicIP:       publicIP,
+		LocalIP:        localIP,
+		Port:           port,
+		Hostname:       hostname,
+		Server:         rpc.NewServer(),
+		Subscriber:     sub,
+		Dealer:         dealer,
+		KontrolEnabled: true,
 	}
 
 	if method != nil {
 		k.AddFunction(o.Kitename, method)
 	}
-
-	k.KontrolEnabled = true // don't expose this to outsiders.
 
 	return k
 }

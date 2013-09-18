@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"flag"
-	"fmt"
+
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
 	"koding/tools/dnode"
@@ -40,9 +40,7 @@ var port = flag.String("port", "", "port to bind itself")
 
 func main() {
 	flag.Parse()
-
 	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
-
 	k := kite.New(o, new(Webterm))
 	k.Start()
 }
@@ -74,11 +72,10 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 		newSession = true
 	}
 
-	fmt.Printf("Connect details %+v\n", params)
 	server := &WebtermServer{
 		Session: params.Session,
 		remote:  params.Remote,
-		pty:     pty.New(),
+		pty:     pty.New("/dev"),
 	}
 
 	server.SetSize(float64(params.SizeX), float64(params.SizeY))
@@ -90,6 +87,9 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 
 	command.name = "/usr/bin/screen"
 	command.args = []string{"-e^Bb", "-S", "koding." + params.Session}
+	// tmux version, attach to an existing one, if not available it creates one
+	// command.name = "/usr/local/bin/tmux"
+	// command.args = []string{"tmux", "attach", "-t", "koding." + params.Session, "||", "tmux", "new-session", "-s", "koding." + params.Session}
 
 	if !newSession {
 		command.args = append(command.args, "-x")
@@ -100,9 +100,7 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 		command.args = []string{}
 	}
 
-	// TODO: look for tmux resizing to
 	cmd := exec.Command(command.name, command.args...)
-
 	cmd.Stdin = server.pty.Slave
 	// cmd.Stdout = server.pty.Slave
 	// cmd.Stderr = server.pty.Slave
