@@ -33,19 +33,19 @@ var (
 
 func main() {
 	flag.Parse()
-	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
+	o := &protocol.Options{Username: "fatih", Kitename: "fs-local", Version: "1", Port: *port}
 	k := kite.New(o, new(Os))
 	k.Start()
 }
 
-func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{}) error {
+func (Os) ReadDirectory(r *protocol.KiteDnodeRequest, result *map[string]interface{}) error {
 	var params struct {
 		Path                string
 		OnChange            dnode.Callback
 		WatchSubdirectories bool
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string], onChange: [function], watchSubdirectories: [bool] }")
 	}
 
@@ -95,12 +95,12 @@ func (Os) ReadDirectory(r *protocol.KiteRequest, result *map[string]interface{})
 	return nil
 }
 
-func (Os) Glob(r *protocol.KiteRequest, result *[]string) error {
+func (Os) Glob(r *protocol.KiteDnodeRequest, result *[]string) error {
 	var params struct {
 		Pattern string
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Pattern == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Pattern == "" {
 		return errors.New("{ pattern: [string] }")
 	}
 
@@ -113,11 +113,11 @@ func (Os) Glob(r *protocol.KiteRequest, result *[]string) error {
 	return nil
 }
 
-func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) error {
+func (Os) ReadFile(r *protocol.KiteDnodeRequest, result *map[string]interface{}) error {
 	var params struct {
 		Path string
 	}
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string] }")
 	}
 
@@ -130,7 +130,7 @@ func (Os) ReadFile(r *protocol.KiteRequest, result *map[string]interface{}) erro
 	return nil
 }
 
-func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
+func (Os) WriteFile(r *protocol.KiteDnodeRequest, result *string) error {
 	var params struct {
 		Path           string
 		Content        []byte
@@ -138,7 +138,7 @@ func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
 		Append         bool
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" || params.Content == nil {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" || params.Content == nil {
 		return errors.New("{ path: [string], content: [base64], doNotOverwrite: [bool], append: [bool] }")
 	}
 
@@ -151,12 +151,12 @@ func (Os) WriteFile(r *protocol.KiteRequest, result *string) error {
 	return nil
 }
 
-func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
+func (Os) EnsureNonexistentPath(r *protocol.KiteDnodeRequest, result *string) error {
 	var params struct {
 		Path string
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string] }")
 	}
 
@@ -169,11 +169,11 @@ func (Os) EnsureNonexistentPath(r *protocol.KiteRequest, result *string) error {
 	return nil
 }
 
-func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
+func (Os) GetInfo(r *protocol.KiteDnodeRequest, result *FileEntry) error {
 	var params struct {
 		Path string
 	}
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string] }")
 	}
 
@@ -186,13 +186,13 @@ func (Os) GetInfo(r *protocol.KiteRequest, result *FileEntry) error {
 	return nil
 }
 
-func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
+func (Os) SetPermissions(r *protocol.KiteDnodeRequest, result *bool) error {
 	var params struct {
 		Path      string
 		Mode      os.FileMode
 		Recursive bool
 	}
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string], mode: [integer], recursive: [bool] }")
 	}
 
@@ -206,13 +206,13 @@ func (Os) SetPermissions(r *protocol.KiteRequest, result *bool) error {
 
 }
 
-func (Os) Remove(r *protocol.KiteRequest, result *bool) error {
+func (Os) Remove(r *protocol.KiteDnodeRequest, result *bool) error {
 	var params struct {
 		Path      string
 		Recursive bool
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string], recursive: [bool] }")
 	}
 
@@ -225,13 +225,13 @@ func (Os) Remove(r *protocol.KiteRequest, result *bool) error {
 	return nil
 }
 
-func (Os) Rename(r *protocol.KiteRequest, result *bool) error {
+func (Os) Rename(r *protocol.KiteDnodeRequest, result *bool) error {
 	var params struct {
 		OldPath string
 		NewPath string
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.OldPath == "" || params.NewPath == "" {
+	if r.Args.Unmarshal(&params) != nil || params.OldPath == "" || params.NewPath == "" {
 		return errors.New("{ oldPath: [string], newPath: [string] }")
 	}
 
@@ -244,12 +244,12 @@ func (Os) Rename(r *protocol.KiteRequest, result *bool) error {
 	return nil
 }
 
-func (Os) CreateDirectory(r *protocol.KiteRequest, result *bool) error {
+func (Os) CreateDirectory(r *protocol.KiteDnodeRequest, result *bool) error {
 	var params struct {
 		Path      string
 		Recursive bool
 	}
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.Path == "" {
+	if r.Args.Unmarshal(&params) != nil || params.Path == "" {
 		return errors.New("{ path: [string], recursive: [bool] }")
 	}
 

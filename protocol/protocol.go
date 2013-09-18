@@ -43,10 +43,16 @@ type Base struct {
 
 type KiteRequest struct {
 	Base
-	Method    string
-	Origin    string
-	ArgsDnode *dnode.Partial
-	Args      interface{}
+	Method string
+	Origin string
+	Args   interface{}
+}
+
+type KiteDnodeRequest struct {
+	Base
+	Method string
+	Origin string
+	Args   *dnode.Partial
 }
 
 type Request struct {

@@ -58,14 +58,16 @@ type DnodeServerCodec struct {
 	req            dnode.Message
 	resultCallback dnode.Callback
 	methodWithID   bool
+	kite           *Kite
 }
 
-func NewDnodeServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
+func NewDnodeServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 	return &DnodeServerCodec{
 		rwc:   conn,
 		dec:   json.NewDecoder(conn),
 		enc:   json.NewEncoder(conn),
 		dnode: dnode.New(),
+		kite:  kite,
 	}
 }
 
@@ -147,7 +149,7 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 
 	// This will be replaced with a kite protocol interface in front of net/rpc
 	method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
-	r.ServiceMethod = "os-local." + method // TODO: don't make it hardcoded
+	r.ServiceMethod = c.kite.Kitename + "." + method
 
 	// This is not used, we use our internal sequence store that is used inside
 	// the dnode package, we
@@ -188,8 +190,8 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	a := body.(*protocol.KiteRequest)
-	a.ArgsDnode = options.WithArgs
+	a := body.(*protocol.KiteDnodeRequest)
+	a.Args = options.WithArgs
 
 	return nil
 }

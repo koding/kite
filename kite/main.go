@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	routerKontrol = "tcp://127.0.0.1:5556"
-	subKontrol    = "tcp://127.0.0.1:5557"
+	routerKontrol = "tcp://192.168.1.17:5556"
+	subKontrol    = "tcp://192.168.1.17:5557"
 	kites         = peers.New()
 	balance       = balancer.New()
 )
@@ -267,10 +267,11 @@ func (k *Kite) RegisterToKontrol() error {
 			Uuid:      k.Uuid,
 			PublicKey: k.PublicKey,
 			Hostname:  k.Hostname,
-			Addr:      k.Addr,
-			LocalIP:   k.LocalIP,
-			PublicIP:  k.PublicIP,
-			Port:      k.Port,
+			// Addr:      k.PublicIP + ":" + k.Port,
+			Addr:     k.Addr,
+			LocalIP:  k.LocalIP,
+			PublicIP: k.PublicIP,
+			Port:     k.Port,
 		},
 		Action: "register",
 	}
@@ -402,7 +403,7 @@ func (k *Kite) ServeWS(ws *websocket.Conn) {
 	fmt.Println("number of buffered clients", bufClients.size())
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
-	k.Server.ServeCodec(NewDnodeServerCodec(ws))
+	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
 }
 
 func (k *Kite) AddFunction(name string, method interface{}) {
