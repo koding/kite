@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"flag"
-
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
 	"koding/tools/dnode"
@@ -40,17 +39,17 @@ var port = flag.String("port", "", "port to bind itself")
 
 func main() {
 	flag.Parse()
-	o := &protocol.Options{Username: "fatih", Kitename: "os-local", Version: "1", Port: *port}
+	o := &protocol.Options{Username: "fatih", Kitename: "terminal-local", Version: "1", Port: *port}
 	k := kite.New(o, new(Webterm))
 	k.Start()
 }
 
-func (Webterm) Info(r *protocol.KiteRequest, result *bool) error {
+func (Webterm) Info(r *protocol.KiteDnodeRequest, result *bool) error {
 	*result = true
 	return nil
 }
 
-func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
+func (Webterm) Connect(r *protocol.KiteDnodeRequest, result *WebtermServer) error {
 	var params struct {
 		Remote       WebtermRemote
 		Session      string
@@ -58,7 +57,7 @@ func (Webterm) Connect(r *protocol.KiteRequest, result *WebtermServer) error {
 		NoScreen     bool
 	}
 
-	if r.ArgsDnode.Unmarshal(&params) != nil || params.SizeX <= 0 || params.SizeY <= 0 {
+	if r.Args.Unmarshal(&params) != nil || params.SizeX <= 0 || params.SizeY <= 0 {
 		return errors.New("{ remote: [object], session: [string], sizeX: [integer], sizeY: [integer], noScreen: [boolean] }")
 	}
 
