@@ -57,13 +57,15 @@ type KiteDnodeRequest struct {
 
 type Request struct {
 	Base
-	RemoteKite string
+	RemoteKite string `json:"remoteKite"`
+	SessionID  string `json:"sessionID"`
 	Action     string
 }
 
 type RegisterResponse struct {
-	Addr   string
-	Result string
+	Addr   string `json:"addr"`
+	Result string `json:"resut"`
+	Token  Token  `json:"token"`
 }
 
 type PubResponse struct {
@@ -79,4 +81,11 @@ type Options struct {
 	Port         string `json:"port"`
 	Version      string `json:"version"`
 	Dependencies string `json:"dependencies"`
+}
+
+type Token struct {
+	ID        string        `json:"id"`
+	Username  string        `json:"username"`
+	Expire    time.Duration `json:"expire"`
+	CreatedAt time.Time     `json:"createdAt"`
 }

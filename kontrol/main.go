@@ -74,7 +74,7 @@ type Kontrol struct {
 
 var (
 	self       string
-	tokens     = make(map[string]string)
+	tokens     = make(map[string]*protocol.Token)
 	storage    Storage
 	dependency Dependency
 )
@@ -169,7 +169,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("request  %+v\n", msg)
 
-	s, err := getSesion(msg.Token)
+	s, err := getSesion(msg.SessionID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 		return
@@ -180,7 +180,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.ClientId != msg.Token {
+	if s.ClientId != msg.SessionID {
 		http.Error(w, "{\"err\":\"not authorized 3\"}\n", http.StatusBadRequest)
 		return
 	}
@@ -190,6 +190,13 @@ func request(w http.ResponseWriter, r *http.Request) {
 	list := make([]protocol.PubResponse, 0)
 	for _, k := range storage.List() {
 		if k.Kitename == msg.RemoteKite {
+			var token *protocol.Token
+			token = getToken(s.Username)
+			if token == nil {
+				token = createToken(s.Username)
+			}
+
+			k.Token = token.ID // only token id is important for requester
 			pubResp := createResponse(protocol.AddKite, k)
 			list = append(list, pubResp)
 		}
@@ -264,7 +271,7 @@ func (k *Kontrol) HeartBeatChecker() {
 					}
 
 					if !found {
-						delete(tokens, kite.Kitename)
+						deleteToken(kite.Kitename)
 						dependency.Remove(kite.Kitename)
 					}
 				}
@@ -319,7 +326,10 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		fmt.Println(startLog)
 
 		// send response back that we published the necessary informations
-		response := protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite}
+		response := protocol.RegisterResponse{
+			Addr:   self,
+			Result: protocol.AllowKite,
+		}
 		resp, _ := json.Marshal(response)
 		return resp, nil
 	case "getKites":
@@ -352,16 +362,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		k.UpdateKite(req.Uuid)
 
 		result := protocol.AllowKite
-		token, ok := tokens[req.Kitename]
-		if !ok {
+
+		token := getToken(req.Username)
+		if token == nil {
 			result = protocol.PermitKite
 		}
 
-		if token != req.Token {
+		if token.ID != req.Token {
 			result = protocol.PermitKite
 		}
 
-		resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: result})
+		resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: result, Token: *token})
 		if err != nil {
 			return nil, err
 		}
@@ -433,19 +444,12 @@ func (k *Kontrol) Publish(filter string, msg []byte, logEnabled bool) {
 func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 	kite := storage.Get(req.Uuid)
 	if kite == nil {
-		token, ok := tokens[req.Kitename]
-		if !ok {
-			token = GenerateToken()
-			tokens[req.Kitename] = token
-		}
-
 		kite = &models.Kite{
 			Base: protocol.Base{
 				Username:  req.Username,
 				Kitename:  req.Kitename,
 				Version:   req.Version,
 				PublicKey: req.PublicKey,
-				Token:     token,
 				Uuid:      req.Uuid,
 				Hostname:  req.Hostname,
 				Addr:      req.Addr,
@@ -603,4 +607,32 @@ func addToProxy(kite *models.Kite) {
 		log.Println("err")
 	}
 
+}
+
+func NewToken(username string) *protocol.Token {
+	return &protocol.Token{
+		ID:        GenerateToken(),
+		Username:  username,
+		Expire:    0,
+		CreatedAt: time.Now(),
+	}
+}
+
+func getToken(username string) *protocol.Token {
+	token, ok := tokens[username]
+	if !ok {
+		return nil
+	}
+
+	return token
+}
+
+func createToken(username string) *protocol.Token {
+	t := NewToken(username)
+	tokens[username] = t
+	return t
+}
+
+func deleteToken(username string) {
+	delete(tokens, username)
 }

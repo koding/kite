@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fatih/goset"
 	"github.com/golang/groupcache"
 	uuid "github.com/nu7hatch/gouuid"
 	zmq "github.com/pebbe/zmq3"
@@ -29,8 +30,9 @@ import (
 )
 
 var (
-	kites   = peers.New()
-	balance = balancer.New()
+	kites       = peers.New()
+	balance     = balancer.New()
+	permissions = goset.New()
 )
 
 // Messenger is used to implement various Messaging patterns on top of the
@@ -44,7 +46,7 @@ type Messenger interface {
 	Consumer(func([]byte))
 }
 
-// ZeroMQ is a struct that complies the Messenger interface.
+// ZeroMQ is a struct that complies with the Messenger interface.
 type ZeroMQ struct {
 	UUID     string
 	Kitename string
@@ -56,8 +58,8 @@ type ZeroMQ struct {
 }
 
 func NewZeroMQ(kiteID, kitename, all string) *ZeroMQ {
-	routerKontrol := "tcp://192.168.1.17:5556"
-	subKontrol := "tcp://192.168.1.17:5557"
+	routerKontrol := "tcp://127.0.0.1:5556"
+	subKontrol := "tcp://127.0.0.1:5557"
 	sub, _ := zmq.NewSocket(zmq.SUB)
 	sub.Connect(subKontrol)
 
@@ -83,7 +85,6 @@ type Kite struct {
 	Username       string // user that calls/runs the kite
 	Kitename       string // kites of same name can share memory with each other
 	Uuid           string // unique Uuid of Kite, is generated on Start for now
-	Token          string // temporary token, can be changed anytime
 	Addr           string // RPC and GroupCache addresses
 	PublicKey      string
 	Hostname       string
@@ -246,7 +247,6 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 			Kitename: r.Kitename,
 			Version:  r.Version,
 			Uuid:     r.Uuid,
-			Token:    r.Token,
 			Hostname: r.Hostname,
 			Addr:     r.Addr,
 		},
@@ -264,7 +264,6 @@ func (k *Kite) RemoveKite(r protocol.PubResponse) {
 	}
 
 	kites.Remove(r.Uuid)
-	permissions.Remove(r.Kitename)
 	debug("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
 

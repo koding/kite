@@ -261,7 +261,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 
 	m := protocol.Request{
 		Base: protocol.Base{
-			Username: c.Kite.Username,
+			Username: a.Username,
 			Kitename: c.Kite.Kitename,
 			Token:    a.Token,
 			Hostname: c.Kite.Hostname,

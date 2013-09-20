@@ -7,7 +7,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"github.com/fatih/goset"
 	"io"
 	"koding/newkite/protocol"
 	"net/rpc"
@@ -26,8 +25,6 @@ type KiteClientCodec struct {
 	encBuf *bufio.Writer
 	Kite   *Kite
 }
-
-var permissions = goset.New()
 
 func NewKiteClientCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
 	buf := bufio.NewWriter(conn)
