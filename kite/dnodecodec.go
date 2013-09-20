@@ -59,6 +59,8 @@ type DnodeServerCodec struct {
 	req            dnode.Message
 	resultCallback dnode.Callback
 	methodWithID   bool
+	closed         bool
+	client         *client
 	kite           *Kite
 }
 
@@ -94,6 +96,10 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		}
 
 		callback := dnode.Callback(func(args ...interface{}) {
+			if c.closed {
+				return
+			}
+
 			callbacks := make(map[string]([]string))
 			c.dnode.CollectCallbacks(args, make([]string, 0), callbacks)
 
@@ -207,9 +213,10 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	a.Token = options.Token
 	a.Username = options.Username
 
-	fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
+	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		fmt.Printf("... already allowed to run\n")
+		updateClients(a.Username, c.rwc)
 		return nil
 	}
 
@@ -244,17 +251,7 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		// means this is not called when a connection is established
 		a.Username = resp.Token.Username
 		if a.Username != "" {
-			ws := c.rwc.(*websocket.Conn)
-			addr := ws.Request().RemoteAddr
-
-			client := bufClients.get(addr)
-			if client != nil {
-				fmt.Printf("removing addr %s from bufferclients. Adding username %s to clients\n", addr, a.Username)
-				client.Username = a.Username
-				clients.add(a.Username, client)
-				bufClients.remove(addr)
-				fmt.Printf("connected clients:\n\t buffered [%d] registered [%d]\n", bufClients.size(), clients.size())
-			}
+			c.client = updateClients(a.Username, c.rwc)
 		}
 
 		fmt.Println("... allowed to run\n")
@@ -289,7 +286,13 @@ func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 }
 
 func (c *DnodeServerCodec) Close() error {
-	c.dnode.Close()
+	fmt.Println("connection is closed")
+	c.closed = true
+
+	if c.client != nil {
+		clients.remove(c.client.Username)
+	}
+
 	return c.rwc.Close()
 }
 
@@ -309,4 +312,20 @@ type ErrorObject struct {
 
 func CreateErrorObject(err error) *ErrorObject {
 	return &ErrorObject{Name: reflect.TypeOf(err).Elem().Name(), Message: err.Error()}
+}
+
+func updateClients(username string, conn io.ReadWriteCloser) *client {
+	ws := conn.(*websocket.Conn)
+	addr := ws.Request().RemoteAddr
+
+	client := bufClients.get(addr)
+	if client != nil {
+		fmt.Printf("removing addr %s from bufferclients. Adding username %s to clients\n", addr, username)
+		client.Username = username
+		clients.add(username, client)
+		bufClients.remove(addr)
+		fmt.Printf("connected clients:\n\t buffered [%d] registered [%d]\n", bufClients.size(), clients.size())
+	}
+
+	return client
 }

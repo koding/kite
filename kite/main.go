@@ -683,18 +683,18 @@ func (t tempClients) get(addr string) *client {
 
 // Registered clients
 
-func (w wsClients) add(lookup string, c *client) {
+func (w wsClients) add(username string, c *client) {
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
 
-	lookup = strings.ToLower(lookup)
+	username = strings.ToLower(username)
 
-	_, ok := w[lookup]
+	_, ok := w[username]
 	if !ok {
-		w[lookup] = make([]*client, 0)
-		w[lookup] = append(w[lookup], c)
+		w[username] = make([]*client, 0)
+		w[username] = append(w[username], c)
 	} else {
-		w[lookup] = append(w[lookup], c)
+		w[username] = append(w[username], c)
 	}
 }
 
