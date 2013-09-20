@@ -361,18 +361,16 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		fmt.Println("getPermission request from: ", string(msg))
 		k.UpdateKite(req.Uuid)
 
-		result := protocol.AllowKite
+		msg := protocol.RegisterResponse{}
 
 		token := getToken(req.Username)
-		if token == nil {
-			result = protocol.PermitKite
+		if token == nil || token.ID != req.Token {
+			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
+		} else {
+			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
 		}
 
-		if token.ID != req.Token {
-			result = protocol.PermitKite
-		}
-
-		resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: result, Token: *token})
+		resp, err := json.Marshal(msg)
 		if err != nil {
 			return nil, err
 		}

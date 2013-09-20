@@ -2,6 +2,7 @@
 package kite
 
 import (
+	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -223,21 +224,40 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	msg, _ := json.Marshal(&m)
 
-	fmt.Printf("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
+	fmt.Printf("\nasking kontrol for permission, for '%s' with token '%s'\n", a.Kitename, a.Token)
 	result := c.kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
 	json.Unmarshal(result, &resp)
-	fmt.Println("got result")
-
-	if a.Token != resp.Token.ID {
-		return errors.New("token is invalid")
-	}
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		fmt.Println("... allowed to run\n")
+		if a.Token != resp.Token.ID {
+			return errors.New("token is invalid")
+		}
 		permissions.Add(a.Token) // can be changed in the future, for now cache the token
+
+		// get underlying websocket connection and update our clients with the
+		// request data. that means remove it from the buffer list(bufClients) and
+		// add it to the registered user list (clients).
+		// be aware that this method is called only when a RPC call is made, that
+		// means this is not called when a connection is established
+		a.Username = resp.Token.Username
+		if a.Username != "" {
+			ws := c.rwc.(*websocket.Conn)
+			addr := ws.Request().RemoteAddr
+
+			client := bufClients.get(addr)
+			if client != nil {
+				fmt.Printf("removing addr %s from bufferclients. Adding username %s to clients\n", addr, a.Username)
+				client.Username = a.Username
+				clients.add(a.Username, client)
+				bufClients.remove(addr)
+				fmt.Printf("connected clients:\n\t buffered [%d] registered [%d]\n", bufClients.size(), clients.size())
+			}
+		}
+
+		fmt.Println("... allowed to run\n")
 		return nil
 	case protocol.PermitKite:
 		fmt.Println("... not allowed. permission denied via Kontrol\n")
