@@ -11,15 +11,18 @@ import (
 
 var port = flag.String("port", "", "port to bind itself")
 
+type Exp2 struct {
+}
+
 func main() {
 	flag.Parse()
 	o := protocol.Options{
-		Username: "fatih",
+		Username: "huseyin",
 		Kitename: "application",
 		Port:     *port,
 	}
-
-	k := kite.New(&o, nil)
+	methods := map[string]interface{}{}
+	k := kite.New(&o, new(Exp2), methods)
 	go k.Start()
 
 	// this is needed that the goroutine k.Start() is been settled. We will

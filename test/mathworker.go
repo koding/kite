@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"koding/newkite/kite"
@@ -11,7 +12,13 @@ import (
 type Math struct{}
 
 func (Math) Square(r *protocol.KiteRequest, result *string) error {
-	*result = strconv.Itoa(int(r.Args.(float64)) * int(r.Args.(float64)))
+	a, ok := r.Args.(float64)
+	if !ok {
+		return errors.New("Send float64")
+	}
+	b := int(a)
+	*result = strconv.Itoa(b * b)
+
 	fmt.Printf("[%s] call, sending result '%s' back\n", r.Origin, *result)
 	return nil
 }
@@ -27,6 +34,9 @@ func main() {
 		Port:     *port,
 	}
 
-	k := kite.New(o, new(Math))
+	methods := map[string]interface{}{
+		"math.square": Math.Square,
+	}
+	k := kite.New(o, new(Math), methods)
 	k.Start()
 }
