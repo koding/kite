@@ -2,7 +2,6 @@ package kite
 
 import (
 	"bufio"
-	"bytes"
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
@@ -10,7 +9,6 @@ import (
 	"github.com/fatih/goset"
 	"github.com/golang/groupcache"
 	uuid "github.com/nu7hatch/gouuid"
-	zmq "github.com/pebbe/zmq3"
 	"io"
 	"koding/db/models"
 	"koding/newkite/balancer"
@@ -43,42 +41,25 @@ type Messenger interface {
 
 	// Consumer is a subscriber/consumer that listens to the endpoint. Incoming
 	// data should be handler via the function that is passed.
-	Consumer(func([]byte))
+	Consume(func([]byte))
 }
 
-// ZeroMQ is a struct that complies with the Messenger interface.
-type ZeroMQ struct {
-	UUID     string
-	Kitename string
-	All      string
+// Clients is an interface that encapsulates basic opertaions on incoming and connected clients.
+type Clients interface {
+	// Add inserts a new client into the storage.
+	Add(c *client)
 
-	Subscriber *zmq.Socket
-	Dealer     *zmq.Socket
-	sync.Mutex // protects zmq send for DEALER socket
-}
+	// Get returns a new client that matches the c.Addr field
+	Get(c *client) *client
 
-func NewZeroMQ(kiteID, kitename, all string) *ZeroMQ {
-	routerKontrol := "tcp://127.0.0.1:5556"
-	subKontrol := "tcp://127.0.0.1:5557"
-	sub, _ := zmq.NewSocket(zmq.SUB)
-	sub.Connect(subKontrol)
+	// Remove deletes the client that matches the c.Addr field
+	Remove(c *client)
 
-	// set three filters
-	sub.SetSubscribe(kiteID)   // individual, just for me
-	sub.SetSubscribe(kitename) // same type, kites with the same name
-	sub.SetSubscribe(all)      // for all kites
+	// Size returns the total number of clients connected currently
+	Size() int
 
-	dealer, _ := zmq.NewSocket(zmq.DEALER)
-	dealer.SetIdentity(kiteID) // use our ID also for zmq envelope
-	dealer.Connect(routerKontrol)
-
-	return &ZeroMQ{
-		Subscriber: sub,
-		Dealer:     dealer,
-		UUID:       kiteID,
-		Kitename:   kitename,
-		All:        all,
-	}
+	// List returns a slice of all clients
+	List() []*client
 }
 
 type Kite struct {
@@ -97,6 +78,7 @@ type Kite struct {
 	KontrolEnabled bool              // by default yes, if disabled it bypasses kontrol
 	Methods        map[string]string // method map for shared methods
 	Messenger      Messenger
+	Clients        Clients
 
 	Pool       *groupcache.HTTPPool
 	Group      *groupcache.Group
@@ -155,6 +137,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 		KontrolEnabled: true,
 		Methods:        createMethodMap(o.Kitename, rcvr, methods),
 		Messenger:      NewZeroMQ(kiteID, o.Kitename, "all"),
+		Clients:        NewClients(),
 	}
 
 	if rcvr != nil {
@@ -169,39 +152,7 @@ func (k *Kite) Start() {
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
 	// Latter is important to ensure robustness, if not we have to unmarshal or
 	// check every incoming message.
-	k.Messenger.Consumer(k.handle)
-}
-
-func (z *ZeroMQ) Send(msg []byte) []byte {
-	z.Lock()
-
-	z.Dealer.SendBytes([]byte(""), zmq.SNDMORE)
-	z.Dealer.SendBytes(msg, 0)
-
-	z.Dealer.RecvBytes(0) // envelope delimiter
-	reply, _ := z.Dealer.RecvBytes(0)
-	z.Unlock()
-	return reply
-}
-
-func (z *ZeroMQ) Consumer(handle func([]byte)) {
-	for {
-		msg, _ := z.Subscriber.RecvBytes(0)
-		frames := bytes.SplitN(msg, []byte(protocol.FRAME_SEPARATOR), 2)
-		if len(frames) != 2 { // msg is malformed
-			continue
-		}
-
-		filter := frames[0] // either "all" or k.Uuid (just for this kite)
-		switch string(filter) {
-		case z.All, z.UUID, z.Kitename:
-			msg = frames[1] // msg is in JSON format
-			handle(msg)
-		default:
-			debug("not intended for me, dropping", string(filter))
-		}
-
-	}
+	k.Messenger.Consume(k.handle)
 }
 
 func (k *Kite) handle(msg []byte) {
@@ -433,9 +384,9 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (k *Kite) ServeWS(ws *websocket.Conn) {
 	debug("client websocket connection from %v - %s \n", ws.RemoteAddr(), ws.Request().RemoteAddr)
 	addr := ws.Request().RemoteAddr
+	k.Clients.Add(&client{Conn: ws, Addr: addr})
 
-	bufClients.add(&client{Conn: ws, Addr: addr})
-	fmt.Println("number of buffered clients", bufClients.size())
+	fmt.Println("connected clients", k.Clients.Get(&client{Addr: addr}))
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
@@ -633,161 +584,19 @@ func (k *Kite) PeersAddr() []string {
 
 /******************************************
 
-WebSocket Clients
+Misc
 
 ******************************************/
 
-type wsClients map[string][]*client
-type tempClients map[string]*client
-
-type client struct {
-	Addr     string
-	Username string
-	Conn     *websocket.Conn
-}
-
-var clientsMu sync.Mutex // protectx wsClients, tempClients
-
-var clients = make(wsClients)      // registered clients
-var bufClients = make(tempClients) // unregistered clients
-
-// Temporary Buffered clients
-func (t tempClients) size() int {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	return len(t)
-}
-
-func (t tempClients) add(c *client) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	t[c.Addr] = c
-}
-
-func (t tempClients) remove(addr string) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	delete(t, addr)
-}
-
-func (t tempClients) get(addr string) *client {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	c, ok := t[addr]
-	if !ok {
-		return nil
-	}
-
-	return c
-}
-
-// Registered clients
-
-func (w wsClients) add(username string, c *client) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-
-	username = strings.ToLower(username)
-
-	_, ok := w[username]
-	if !ok {
-		w[username] = make([]*client, 0)
-		w[username] = append(w[username], c)
-	} else {
-		w[username] = append(w[username], c)
-	}
-}
-
-func (w wsClients) get(username string) []*client {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	c, ok := w[username]
-	if !ok {
-		return nil
-	}
-	return c
-}
-
-func (w wsClients) remove(username string) {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	_, ok := w[username]
-	if !ok {
-		return
-	}
-
-	delete(w, username)
-}
-
-func (w wsClients) has(username string) bool {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	_, ok := w[username]
-	return ok
-}
-
-func (w wsClients) size() int {
-	clientsMu.Lock()
-	defer clientsMu.Unlock()
-	return len(w)
-}
-
-func (w wsClients) broadcast(msg string) {
-	clientsMu.Lock()
-	for _, cs := range w {
-		go func(cs []*client) {
-			for _, c := range cs {
-				if err := websocket.Message.Send(c.Conn, msg); err != nil {
-					log.Println("Could not send message to ", c.Addr, err.Error())
-				}
-
-			}
-		}(cs)
-	}
-	clientsMu.Unlock()
-}
-
-func (k *Kite) IsLogged(user string) bool {
-	return clients.has(user)
-}
-
 func (k *Kite) Broadcast(msg string) {
-	clients.broadcast(msg)
-}
-
-type jsonrpc struct {
-	Method string         `json:"method"`
-	Params [1]interface{} `json:"params"`
-	Id     *string        `json:"id"`
-}
-
-func (k *Kite) SendMsg(user, method string, msg interface{}) {
-	for _, c := range clients.get(user) {
-		req := jsonrpc{
-			Method: method,
-			Id:     nil, // means notification
-		}
-		req.Params[0] = msg
-
-		if err := websocket.JSON.Send(c.Conn, req); err != nil {
-			log.Println("Could not send message to ", c.Addr, err.Error())
-		}
+	clients := k.Clients.List()
+	for _, client := range clients {
+		go func() {
+			if err := websocket.Message.Send(client.Conn, msg); err != nil {
+				fmt.Println("Could not send message to ", client.Addr, err.Error())
+			}
+		}()
 	}
-}
-
-func (k *Kite) ConnectedUsers() []string {
-	list := make([]string, 0)
-	clientsMu.Lock()
-	for user := range clients {
-		if user == "" {
-			continue
-		}
-
-		list = append(list, user)
-	}
-	clientsMu.Unlock()
-
-	return list
 }
 
 func createMethodMap(kitename string, rcvr interface{}, methods map[string]interface{}) map[string]string {

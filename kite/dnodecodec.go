@@ -12,8 +12,6 @@ import (
 	"net/rpc"
 	"reflect"
 	"strconv"
-	"unicode"
-	"unicode/utf8"
 )
 
 func NewDnodeClient(conn io.ReadWriteCloser) rpc.ClientCodec {
@@ -30,25 +28,25 @@ type DnodeClientCodec struct {
 	rwc io.ReadWriteCloser
 }
 
-func (c *DnodeClientCodec) WriteRequest(r *rpc.Request, body interface{}) error {
+func (d *DnodeClientCodec) WriteRequest(r *rpc.Request, body interface{}) error {
 	fmt.Println("Dnode WriteRequest")
 
 	return nil
 }
 
-func (c *DnodeClientCodec) ReadResponseHeader(r *rpc.Response) error {
+func (d *DnodeClientCodec) ReadResponseHeader(r *rpc.Response) error {
 	fmt.Println("Dnode ReadResponseHeader")
 	return nil
 }
 
-func (c *DnodeClientCodec) ReadResponseBody(x interface{}) error {
+func (d *DnodeClientCodec) ReadResponseBody(x interface{}) error {
 	fmt.Println("Dnode ReadResponseBody")
 	return nil
 }
 
-func (c *DnodeClientCodec) Close() error {
+func (d *DnodeClientCodec) Close() error {
 	fmt.Println("Dnode ClientClose")
-	return c.rwc.Close()
+	return d.rwc.Close()
 }
 
 type DnodeServerCodec struct {
@@ -74,13 +72,13 @@ func NewDnodeServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 	}
 }
 
-func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
+func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// reset values
-	c.req = dnode.Message{}
-	c.methodWithID = false
+	d.req = dnode.Message{}
+	d.methodWithID = false
 
 	// unmarshall incoming data to our dnode.Message struct
-	err := c.dec.Decode(&c.req)
+	err := d.dec.Decode(&d.req)
 	if err != nil {
 		return err
 	}
@@ -88,7 +86,7 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// for debugging: m -> c.req and m.Arguments -> c.req.Arguments
 	// fmt.Printf("[received] <- %+v %+v\n", c.req.Method, string(c.req.Arguments.Raw))
 
-	for id, path := range c.req.Callbacks {
+	for id, path := range d.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
 			fmt.Println("WARNING: callback id should be an INTEGER: '%s', '%s'", id, path)
@@ -96,12 +94,12 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		}
 
 		callback := dnode.Callback(func(args ...interface{}) {
-			if c.closed {
+			if d.closed {
 				return
 			}
 
 			callbacks := make(map[string]([]string))
-			c.dnode.CollectCallbacks(args, make([]string, 0), callbacks)
+			d.dnode.CollectCallbacks(args, make([]string, 0), callbacks)
 
 			rawArgs, err := json.Marshal(&args)
 			if err != nil {
@@ -115,32 +113,32 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 				Callbacks: callbacks,
 			}
 
-			err = c.enc.Encode(message)
+			err = d.enc.Encode(message)
 			if err != nil {
 				fmt.Printf("encode err %+v\n", err)
 			}
 
 			// for debugging
-			// fmt.Printf("[sending] -> %+v, %+v\n", c.req.Method, message)
+			// fmt.Printf("[sending] -> %+v, %+v\n", d.req.Method, message)
 		})
 
-		c.req.Arguments.Callbacks = append(c.req.Arguments.Callbacks,
+		d.req.Arguments.Callbacks = append(d.req.Arguments.Callbacks,
 			dnode.CallbackSpec{path, callback})
 	}
 
 	// received a dnode message with an method of type integer (ID), thus call our
 	// stored callback that is related with this incoming ID.
-	if index, err := strconv.Atoi(fmt.Sprint(c.req.Method)); err == nil {
-		c.methodWithID = true
+	if index, err := strconv.Atoi(fmt.Sprint(d.req.Method)); err == nil {
+		d.methodWithID = true
 
 		// args can be zero or more
-		args, err := c.req.Arguments.Array()
+		args, err := d.req.Arguments.Array()
 		if err != nil {
 			fmt.Printf(" 1 err \n", err)
 			return err
 		}
 
-		if index < 0 || index >= len(c.dnode.Callbacks) {
+		if index < 0 || index >= len(d.dnode.Callbacks) {
 			return nil
 		}
 
@@ -150,17 +148,14 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		}
 
 		fmt.Printf("[%d] callback called\n", index)
-		c.dnode.Callbacks[index].Call(callArgs)
+		d.dnode.Callbacks[index].Call(callArgs)
 		return nil
 	}
 
-	// This will be replaced with a kite protocol interface in front of net/rpc
-	// method := upperFirst(strings.Split(c.req.Method.(string), ".")[1])
-
-	// fmt.Println(c.kite.Methods)
-	method, ok := c.kite.Methods[c.req.Method.(string)]
+	// fmt.Println(d.kite.Methods)
+	method, ok := d.kite.Methods[d.req.Method.(string)]
 	if !ok {
-		return fmt.Errorf("method %s is not registered", c.req.Method)
+		return fmt.Errorf("method %s is not registered", d.req.Method)
 	}
 
 	r.ServiceMethod = method
@@ -172,14 +167,14 @@ func (c *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	return nil
 }
 
-func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
-	if c.methodWithID {
+func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
+	if d.methodWithID {
 		return nil
 	}
 
 	// args  is of type *dnode.Partial
 	var partials []*dnode.Partial
-	err := c.req.Arguments.Unmarshal(&partials)
+	err := d.req.Arguments.Unmarshal(&partials)
 	if err != nil {
 		return err
 	}
@@ -201,7 +196,7 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.resultCallback = resultCallback
+	d.resultCallback = resultCallback
 
 	if body == nil {
 		return nil
@@ -216,7 +211,16 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		fmt.Printf("... already allowed to run\n")
-		updateClients(a.Username, c.rwc)
+
+		ws := d.rwc.(*websocket.Conn)
+		addr := ws.Request().RemoteAddr
+		ct := d.kite.Clients.Get(&client{Addr: addr})
+		if ct != nil {
+			ct.Username = a.Username
+			d.kite.Clients.Add(ct)
+		}
+
+		fmt.Println("connected clients", d.kite.Clients.Get(&client{Addr: addr}))
 		return nil
 	}
 
@@ -232,7 +236,7 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	msg, _ := json.Marshal(&m)
 
 	fmt.Printf("\nasking kontrol for permission, for '%s' with token '%s'\n", a.Kitename, a.Token)
-	result := c.kite.Messenger.Send(msg)
+	result := d.kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
 	json.Unmarshal(result, &resp)
@@ -251,7 +255,14 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		// means this is not called when a connection is established
 		a.Username = resp.Token.Username
 		if a.Username != "" {
-			c.client = updateClients(a.Username, c.rwc)
+			ws := d.rwc.(*websocket.Conn)
+			addr := ws.Request().RemoteAddr
+			ct := d.kite.Clients.Get(&client{Addr: addr})
+			if ct != nil {
+				ct.Username = a.Username
+				d.kite.Clients.Add(ct)
+			}
+			fmt.Println("connected clients", d.kite.Clients.Get(&client{Addr: addr}))
 		}
 
 		fmt.Println("... allowed to run\n")
@@ -266,8 +277,8 @@ func (c *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	return nil
 }
 
-func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {
-	if c.methodWithID {
+func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {
+	if d.methodWithID {
 		// net/rpc is complaining when we exit, with an error like:
 		// "rpc: service/method request ill-formed:", however this is OK. No
 		// need to worry.
@@ -276,32 +287,24 @@ func (c *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 
 	//
 	if r.Error != "" {
-		c.resultCallback(CreateErrorObject(fmt.Errorf(r.Error)))
+		d.resultCallback(CreateErrorObject(fmt.Errorf(r.Error)))
 		return nil
 	}
 
 	fmt.Printf("[%s] called\n", r.ServiceMethod)
-	c.resultCallback(nil, body)
+	d.resultCallback(nil, body)
 	return nil
 }
 
-func (c *DnodeServerCodec) Close() error {
+func (d *DnodeServerCodec) Close() error {
 	fmt.Println("connection is closed")
-	c.closed = true
+	d.closed = true
 
-	if c.client != nil {
-		clients.remove(c.client.Username)
+	if d.client != nil {
+		d.kite.Clients.Remove(&client{Addr: d.client.Addr})
 	}
 
-	return c.rwc.Close()
-}
-
-func upperFirst(s string) string {
-	if s == "" {
-		return ""
-	}
-	r, n := utf8.DecodeRuneInString(s)
-	return string(unicode.ToUpper(r)) + s[n:]
+	return d.rwc.Close()
 }
 
 // Got from kite package
@@ -312,20 +315,4 @@ type ErrorObject struct {
 
 func CreateErrorObject(err error) *ErrorObject {
 	return &ErrorObject{Name: reflect.TypeOf(err).Elem().Name(), Message: err.Error()}
-}
-
-func updateClients(username string, conn io.ReadWriteCloser) *client {
-	ws := conn.(*websocket.Conn)
-	addr := ws.Request().RemoteAddr
-
-	client := bufClients.get(addr)
-	if client != nil {
-		fmt.Printf("removing addr %s from bufferclients. Adding username %s to clients\n", addr, username)
-		client.Username = username
-		clients.add(username, client)
-		bufClients.remove(addr)
-		fmt.Printf("connected clients:\n\t buffered [%d] registered [%d]\n", bufClients.size(), clients.size())
-	}
-
-	return client
 }

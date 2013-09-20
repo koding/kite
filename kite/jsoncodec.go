@@ -170,9 +170,7 @@ type JsonServerCodec struct {
 	mutex   sync.Mutex // protects seq, pending
 	seq     uint64
 	pending map[uint64]*json.RawMessage
-
-	// add our own information
-	Kite *Kite
+	kite    *Kite
 }
 
 func NewJsonServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
@@ -181,7 +179,7 @@ func NewJsonServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 		enc:     json.NewEncoder(conn),
 		c:       conn,
 		pending: make(map[uint64]*json.RawMessage),
-		Kite:    kite,
+		kite:    kite,
 	}
 }
 
@@ -203,12 +201,10 @@ func (c *JsonServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	if c.req.Username != "" {
 		ws := c.c.(*websocket.Conn)
 		addr := ws.Request().RemoteAddr
-
-		client := bufClients.get(addr)
+		client := c.kite.Clients.Get(&client{Addr: addr})
 		if client != nil {
 			client.Username = c.req.Username
-			clients.add(c.req.Username, client)
-			bufClients.remove(addr)
+			c.kite.Clients.Add(client)
 		}
 	}
 
@@ -262,10 +258,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	m := protocol.Request{
 		Base: protocol.Base{
 			Username: a.Username,
-			Kitename: c.Kite.Kitename,
 			Token:    a.Token,
-			Hostname: c.Kite.Hostname,
-			Addr:     c.Kite.Addr,
 		},
 		RemoteKite: a.Kitename,
 		Action:     "getPermission",
@@ -274,7 +267,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	msg, _ := json.Marshal(&m)
 
 	debug("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
-	result := c.Kite.Messenger.Send(msg)
+	result := c.kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
 	json.Unmarshal(result, &resp)
