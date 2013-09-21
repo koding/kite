@@ -14,7 +14,8 @@ import (
 	"strconv"
 )
 
-func NewDnodeClient(conn io.ReadWriteCloser) rpc.ClientCodec {
+// TODO: Needs to be implemented.
+func NewDnodeClient(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
 	return &DnodeClientCodec{
 		rwc: conn,
 		dec: json.NewDecoder(conn),
@@ -23,19 +24,33 @@ func NewDnodeClient(conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 type DnodeClientCodec struct {
-	dec *json.Decoder
-	enc *json.Encoder
-	rwc io.ReadWriteCloser
+	dec   *json.Decoder
+	enc   *json.Encoder
+	rwc   io.ReadWriteCloser
+	dnode *dnode.DNode
+
+	req  dnode.Message
+	resp dnode.Message
+
+	resultCallback  dnode.Callback
+	methodWithID    bool
+	closed          bool
+	connectedClient *client
+	kite            *Kite
 }
 
 func (d *DnodeClientCodec) WriteRequest(r *rpc.Request, body interface{}) error {
 	fmt.Println("Dnode WriteRequest")
-
-	return nil
+	return d.enc.Encode(&d.req)
 }
 
 func (d *DnodeClientCodec) ReadResponseHeader(r *rpc.Response) error {
 	fmt.Println("Dnode ReadResponseHeader")
+
+	if err := d.dec.Decode(&d.resp); err != nil {
+		return err
+
+	}
 	return nil
 }
 
