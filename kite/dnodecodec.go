@@ -50,16 +50,16 @@ func (d *DnodeClientCodec) Close() error {
 }
 
 type DnodeServerCodec struct {
-	dec            *json.Decoder
-	enc            *json.Encoder
-	rwc            io.ReadWriteCloser
-	dnode          *dnode.DNode
-	req            dnode.Message
-	resultCallback dnode.Callback
-	methodWithID   bool
-	closed         bool
-	client         *client
-	kite           *Kite
+	dec             *json.Decoder
+	enc             *json.Encoder
+	rwc             io.ReadWriteCloser
+	dnode           *dnode.DNode
+	req             dnode.Message
+	resultCallback  dnode.Callback
+	methodWithID    bool
+	closed          bool
+	connectedClient *client
+	kite            *Kite
 }
 
 func NewDnodeServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
@@ -147,7 +147,6 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 			callArgs[i] = reflect.ValueOf(v)
 		}
 
-		fmt.Printf("[%d] callback called\n", index)
 		d.dnode.Callbacks[index].Call(callArgs)
 		return nil
 	}
@@ -210,17 +209,18 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
-		fmt.Printf("... already allowed to run\n")
+		fmt.Printf("[%s] allowed token (cached) '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
 
-		ws := d.rwc.(*websocket.Conn)
-		addr := ws.Request().RemoteAddr
-		ct := d.kite.Clients.Get(&client{Addr: addr})
-		if ct != nil {
-			ct.Username = a.Username
-			d.kite.Clients.Add(ct)
+		if d.connectedClient == nil {
+			ws := d.rwc.(*websocket.Conn)
+			addr := ws.Request().RemoteAddr
+			ct := d.kite.Clients.Get(&client{Addr: addr})
+			if ct != nil {
+				ct.Username = a.Username
+				d.kite.Clients.Add(ct)
+				d.connectedClient = ct
+			}
 		}
-
-		fmt.Println("connected clients", d.kite.Clients.Get(&client{Addr: addr}))
 		return nil
 	}
 
@@ -234,8 +234,6 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	msg, _ := json.Marshal(&m)
-
-	fmt.Printf("\nasking kontrol for permission, for '%s' with token '%s'\n", a.Kitename, a.Token)
 	result := d.kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
@@ -261,14 +259,14 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 			if ct != nil {
 				ct.Username = a.Username
 				d.kite.Clients.Add(ct)
+				d.connectedClient = ct
 			}
-			fmt.Println("connected clients", d.kite.Clients.Get(&client{Addr: addr}))
 		}
 
-		fmt.Println("... allowed to run\n")
+		fmt.Printf("[%s] allowed token '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
 		return nil
 	case protocol.PermitKite:
-		fmt.Println("... not allowed. permission denied via Kontrol\n")
+		fmt.Printf("denied token '%s'\n", a.Token)
 		return errors.New("no permission to run")
 	default:
 		return errors.New("got a nonstandart response")
@@ -285,23 +283,21 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 		return nil
 	}
 
-	//
 	if r.Error != "" {
 		d.resultCallback(CreateErrorObject(fmt.Errorf(r.Error)))
 		return nil
 	}
 
-	fmt.Printf("[%s] called\n", r.ServiceMethod)
 	d.resultCallback(nil, body)
 	return nil
 }
 
 func (d *DnodeServerCodec) Close() error {
-	fmt.Println("connection is closed")
 	d.closed = true
 
-	if d.client != nil {
-		d.kite.Clients.Remove(&client{Addr: d.client.Addr})
+	if d.connectedClient != nil {
+		fmt.Printf("[%s] client disconnected \n", d.connectedClient.Addr)
+		d.kite.Clients.Remove(&client{Addr: d.connectedClient.Addr})
 	}
 
 	return d.rwc.Close()

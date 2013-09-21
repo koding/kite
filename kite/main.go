@@ -386,7 +386,7 @@ func (k *Kite) ServeWS(ws *websocket.Conn) {
 	addr := ws.Request().RemoteAddr
 	k.Clients.Add(&client{Conn: ws, Addr: addr})
 
-	fmt.Println("connected clients", k.Clients.Get(&client{Addr: addr}))
+	fmt.Printf("[%s] client connected\n", addr)
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
