@@ -87,6 +87,19 @@ type Kite struct {
 	OnceCall   sync.Once // used when multiple goroutines are requesting information from kontrol
 }
 
+/*
+
+TODO: Following should be done later or soon:
+
+1. Decide which functions of the Kite struct should be exported or not.
+2. Make Groupcache work with a simple exported api.
+3. Implement a pluggable AUTH mechanizm. Only allow and deny.
+4. A better way to register functions to go's net/rpc. Something like:
+	k.Register("methodName", func() error)
+5. MQ between peers.
+
+*/
+
 func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) *Kite {
 	var err error
 	if o == nil {
@@ -382,11 +395,10 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (k *Kite) ServeWS(ws *websocket.Conn) {
-	debug("client websocket connection from %v - %s \n", ws.RemoteAddr(), ws.Request().RemoteAddr)
 	addr := ws.Request().RemoteAddr
-	k.Clients.Add(&client{Conn: ws, Addr: addr})
-
 	fmt.Printf("[%s] client connected\n", addr)
+
+	k.Clients.Add(&client{Conn: ws, Addr: addr})
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))

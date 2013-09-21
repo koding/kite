@@ -72,6 +72,28 @@ func NewDnodeServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 	}
 }
 
+func (d *DnodeServerCodec) Send(method interface{}, arguments ...interface{}) {
+	callbacks := make(map[string]([]string))
+	d.dnode.CollectCallbacks(arguments, make([]string, 0), callbacks)
+
+	rawArgs, err := json.Marshal(arguments)
+	if err != nil {
+		fmt.Printf("collect json unmarshal %+v\n", err)
+	}
+
+	message := dnode.Message{
+		Method:    method,
+		Arguments: &dnode.Partial{Raw: rawArgs},
+		Links:     []string{},
+		Callbacks: callbacks,
+	}
+
+	err = d.enc.Encode(message)
+	if err != nil {
+		fmt.Printf("encode err %+v\n", err)
+	}
+}
+
 func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// reset values
 	d.req = dnode.Message{}
@@ -82,6 +104,10 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	if err != nil {
 		return err
 	}
+
+	// if d.req.Method.(string) == "ping" {
+	// 	return nil
+	// }
 
 	// for debugging: m -> c.req and m.Arguments -> c.req.Arguments
 	// fmt.Printf("[received] <- %+v %+v\n", c.req.Method, string(c.req.Arguments.Raw))
@@ -98,28 +124,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 				return
 			}
 
-			callbacks := make(map[string]([]string))
-			d.dnode.CollectCallbacks(args, make([]string, 0), callbacks)
-
-			rawArgs, err := json.Marshal(&args)
-			if err != nil {
-				fmt.Printf("collect json unmarshal %+v\n", err)
-			}
-
-			message := dnode.Message{
-				Method:    methodId,
-				Arguments: &dnode.Partial{Raw: rawArgs},
-				Links:     []string{},
-				Callbacks: callbacks,
-			}
-
-			err = d.enc.Encode(message)
-			if err != nil {
-				fmt.Printf("encode err %+v\n", err)
-			}
-
-			// for debugging
-			// fmt.Printf("[sending] -> %+v, %+v\n", d.req.Method, message)
+			d.Send(methodId, args...)
 		})
 
 		d.req.Arguments.Callbacks = append(d.req.Arguments.Callbacks,
