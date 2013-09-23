@@ -169,7 +169,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("request  %+v\n", msg)
 
-	s, err := getSesion(msg.SessionID)
+	s, err := getSession(msg.SessionID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 		return
@@ -514,7 +514,7 @@ type Session struct {
 	GuestId  int           `bson:"guestId"`
 }
 
-func getSesion(token string) (*Session, error) {
+func getSession(token string) (*Session, error) {
 	var session *Session
 
 	query := func(c *mgo.Collection) error {

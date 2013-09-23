@@ -44,7 +44,7 @@ type Messenger interface {
 	Consume(func([]byte))
 }
 
-// Clients is an interface that encapsulates basic opertaions on incoming and connected clients.
+// Clients is an interface that encapsulates basic operations on incoming and connected clients.
 type Clients interface {
 	// Add inserts a new client into the storage.
 	Add(c *client)
@@ -93,7 +93,7 @@ TODO: Following should be done later or soon:
 
 1. Decide which functions of the Kite struct should be exported or not.
 2. Make Groupcache work with a simple exported api.
-3. Implement a pluggable AUTH mechanizm. Only allow and deny.
+3. Implement a pluggable AUTH mechanism. Only allow and deny.
 4. A better way to register functions to go's net/rpc. Something like:
 	k.Register("methodName", func() error)
 5. MQ between peers.
@@ -186,7 +186,7 @@ func (k *Kite) handle(msg []byte) {
 	case protocol.RemoveKite:
 		k.RemoveKite(r)
 	case protocol.UpdateKite:
-		k.Registered = false //trigger reinilization
+		k.Registered = false //trigger reinitialization
 	case "ping":
 		// This is needed for Node Coordination, that means we register ourself
 		// only if we got an "hello" from one of the kontrol servers. This is
@@ -307,7 +307,7 @@ func (k *Kite) RegisterToKontrol() error {
 	case protocol.PermitKite:
 		return errors.New("no permission to run")
 	default:
-		return errors.New("got a nonstandart response")
+		return errors.New("got a nonstandard response")
 	}
 
 	return nil
@@ -463,7 +463,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 					k.Messenger.Send(msg)
 				}
 
-				k.OnceCall.Do(onceBody) // to prevent multiple get request when called conccurently
+				k.OnceCall.Do(onceBody) // to prevent multiple get request when called concurrently
 			} else {
 				ticker.Stop()
 				debug("making rpc call to '%s' with token '%s': -> ", remoteKite.Kitename, remoteKite.Token)
@@ -520,7 +520,7 @@ func (k *Kite) GetRemoteKite(kite string) (*models.Kite, error) {
 }
 
 func (k *Kite) RoundRobin(kite string) (*models.Kite, error) {
-	// TODO: use cointainer/ring :)
+	// TODO: use container/ring :)
 	remoteKites := k.RemoteKites(kite)
 	lenOfKites := len(remoteKites)
 	if lenOfKites == 0 {
