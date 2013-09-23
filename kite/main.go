@@ -147,7 +147,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 		Port:           port,
 		Hostname:       hostname,
 		Server:         rpc.NewServer(),
-		KontrolEnabled: true,
+		KontrolEnabled: false,
 		Methods:        createMethodMap(o.Kitename, rcvr, methods),
 		Messenger:      NewZeroMQ(kiteID, o.Kitename, "all"),
 		Clients:        NewClients(),
@@ -165,7 +165,13 @@ func (k *Kite) Start() {
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
 	// Latter is important to ensure robustness, if not we have to unmarshal or
 	// check every incoming message.
-	k.Messenger.Consume(k.handle)
+	if !k.KontrolEnabled {
+		k.Registered = true
+		k.Serve(k.Addr)
+	} else {
+		k.Messenger.Consume(k.handle)
+
+	}
 }
 
 func (k *Kite) handle(msg []byte) {
@@ -253,13 +259,11 @@ func (k *Kite) InitializeKite() {
 		return
 	}
 
-	if k.KontrolEnabled {
-		debug("not registered, sending register request to kontrol...")
-		err := k.RegisterToKontrol()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	debug("not registered, sending register request to kontrol...")
+	err := k.RegisterToKontrol()
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
 	onceBody := func() { k.Serve(k.Addr) }

@@ -227,6 +227,11 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	a.Token = options.Token
 	a.Username = options.Username
 
+	// Return when kontrol is not enabled
+	if !d.kite.KontrolEnabled {
+		return nil
+	}
+
 	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		fmt.Printf("[%s] allowed token (cached) '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
