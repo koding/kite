@@ -199,10 +199,12 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	var options struct {
-		Token    string `json:"token"`
-		Kitename string
-		Username string
-		WithArgs *dnode.Partial
+		Token           string `json:"token"`
+		Kitename        string
+		Username        string
+		VmName          string
+		CorrelationName string `json:"correlationName"`
+		WithArgs        *dnode.Partial
 	}
 
 	err = partials[0].Unmarshal(&options)
@@ -226,6 +228,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	a.Kitename = options.Kitename
 	a.Token = options.Token
 	a.Username = options.Username
+	a.Hostname = options.CorrelationName
 
 	// Return when kontrol is not enabled
 	if !d.kite.KontrolEnabled {
