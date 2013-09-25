@@ -13,7 +13,16 @@ First create a kite instance
 
 The message sent over the wire is:
 
-"{"arguments":[{"method":"fs.readDirectory","withArgs":{"path":"/Users/huseyinalb/Documents","watchSubDirectories":false,"onChange":"[Function]"}},"[Function]"],"callbacks":{"0":["0","withArgs","onChange"],"1":["1"]},"method":"fs.readDirectory"}"
+	"{"arguments":[{"method":"fs.readDirectory","withArgs":{"path":"/Users/huseyinalb/Documents","watchSubDirectories":false,"onChange":"[Function]"}},"[Function]"],"callbacks":{"0":["0","withArgs","onChange"],"1":["1"]},"method":"fs.readDirectory"}"
 
+# example usage for s3 kite
 
+	kite = new NewKite({kiteName:"s3-local"})
+	// store a file
+	kite.tell({method:"s3.store", withArgs:{name:"hede", content:"aGVsbG8gd29ybGQ="}}, function(err, hede){console.log(arguments); console.log("saddassad")})
+	// see the file, clicking the link given by s3.get
+	FSHelper.s3.get("hede")
+	// delete it, and click the link again to see "access denied"
+	kite.tell({method:"s3.delete", withArgs:{name:"hede"}}, function(err, hede){console.log(arguments); console.log("saddassad")})
 
+# example usage for fs kite
