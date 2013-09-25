@@ -358,6 +358,7 @@ func (k *Kite) Serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
 		log.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
+		os.Exit(1)
 		return
 	}
 
