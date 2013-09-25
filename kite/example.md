@@ -19,10 +19,11 @@ The message sent over the wire is:
 
 	kite = new NewKite({kiteName:"s3-local"})
 	// store a file
-	kite.tell({method:"s3.store", withArgs:{name:"hede", content:"aGVsbG8gd29ybGQ="}}, function(err, hede){console.log(arguments); console.log("saddassad")})
+	kite.tell({method:"s3.store", withArgs:{name:"hede", content:"aGVsbG8gd29ybGQ="}}, function(err, res){console.log(err, res); console.log("Done"})
 	// see the file, clicking the link given by s3.get
 	FSHelper.s3.get("hede")
 	// delete it, and click the link again to see "access denied"
-	kite.tell({method:"s3.delete", withArgs:{name:"hede"}}, function(err, hede){console.log(arguments); console.log("saddassad")})
+	kite.tell({method:"s3.delete", withArgs:{name:"hede"}}, function(err, res){console.log(err, res); console.log("Done")})
 
 # example usage for fs kite
+
