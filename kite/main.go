@@ -147,7 +147,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 		Port:           port,
 		Hostname:       hostname,
 		Server:         rpc.NewServer(),
-		KontrolEnabled: false,
+		KontrolEnabled: true,
 		Methods:        createMethodMap(o.Kitename, rcvr, methods),
 		Messenger:      NewZeroMQ(kiteID, o.Kitename, "all"),
 		Clients:        NewClients(),
