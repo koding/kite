@@ -1,12 +1,23 @@
-package core
+package module
+
+type Command interface {
+	Help() string
+	Exec() error
+}
 
 type Module struct {
 	SubModules map[string]*Module
-	Command    *Command
+	Command    Command
 	Definition string
 }
 
-func (m *Module) AddCommand(name string, command *Command) *Module {
+func NewModule() *Module {
+	return &Module{
+		SubModules: make(map[string]*Module, 0),
+	}
+}
+
+func (m *Module) AddCommand(name string, command Command) *Module {
 	subModule := &Module{Command: command}
 	m.SubModules[name] = subModule
 	return subModule

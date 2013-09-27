@@ -7,7 +7,6 @@ import (
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
-	"koding/newkite/cli/core"
 	"net/http"
 	"os/user"
 	"strings"
@@ -32,15 +31,17 @@ func NewKd() *Kd {
 	}
 }
 
-func New() *core.Command {
-	return &core.Command{Help: Help, Exec: Exec}
+type Register struct{}
+
+func NewRegister() *Register {
+	return &Register{}
 }
 
-func Help() string {
+func (r Register) Help() string {
 	return "Registers the kite system to kontrol"
 }
 
-func Exec() error {
+func (r Register) Exec() error {
 	k := NewKd()
 	err := k.Register()
 	if err != nil {

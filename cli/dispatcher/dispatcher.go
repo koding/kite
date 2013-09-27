@@ -1,25 +1,27 @@
-package modules
+package dispatcher
 
 import (
 	"flag"
 	"fmt"
-	"koding/newkite/cli/core"
+	"koding/newkite/cli/module"
 	"koding/newkite/cli/modules/hello"
-	kitecreate "koding/newkite/cli/modules/kite/create"
+	"koding/newkite/cli/modules/kite"
 	"koding/newkite/cli/modules/register"
 	"os"
 )
 
 type Dispatcher struct {
-	ModuleRoot *core.Module
+	ModuleRoot *module.Module
 }
 
 func NewDispatcher() *Dispatcher {
-	rootModule := &core.Module{SubModules: make(map[string]*core.Module, 0), Command: nil}
-	rootModule.AddCommand("hello", hello.New())
-	rootModule.AddCommand("register", register.New())
+	rootModule := &module.Module{SubModules: make(map[string]*module.Module, 0), Command: nil}
+	rootModule.AddCommand("hello", hello.NewHello())
+	rootModule.AddCommand("register", register.NewRegister())
 	kiteModule := rootModule.AddModule("kite", "Includes commands related to kites")
-	kiteModule.AddCommand("create", kitecreate.New())
+	kiteModule.AddCommand("create", kite.NewCreate())
+	kiteModule.AddCommand("run", kite.NewRun())
+
 	return &Dispatcher{ModuleRoot: rootModule}
 }
 
@@ -34,7 +36,7 @@ func (m *Dispatcher) Run() error {
 	return nil
 }
 
-func (m *Dispatcher) findCommand() *core.Command {
+func (m *Dispatcher) findCommand() module.Command {
 	flag.Parse()
 	treeWalker := m.ModuleRoot
 	args := flag.Args()
