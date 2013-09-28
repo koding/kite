@@ -316,6 +316,8 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 		return nil
 	}
 
+	fmt.Println("method called:", r.ServiceMethod)
+
 	d.resultCallback(nil, body)
 	return nil
 }
