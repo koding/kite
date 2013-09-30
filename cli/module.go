@@ -16,20 +16,22 @@ type Module struct {
 	Definition string
 }
 
-func NewModule() *Module {
-	return &Module{
-		Children: make(map[string]*Module, 0),
-	}
+func NewModule(name string, definition string) *Module {
+	return &Module{Children: make(map[string]*Module, 0), Definition: definition}
+}
+
+func NewCommandModule(command Command) *Module {
+	return &Module{Command: command}
 }
 
 func (m *Module) AddCommand(name string, command Command) *Module {
-	child := &Module{Command: command}
+	child := NewCommandModule(command)
 	m.Children[name] = child
 	return child
 }
 
 func (m *Module) AddModule(name string, definition string) *Module {
-	child := &Module{Children: make(map[string]*Module, 0), Definition: definition}
+	child := NewModule(name, definition)
 	m.Children[name] = child
 	return child
 }
