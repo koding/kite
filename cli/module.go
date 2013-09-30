@@ -6,7 +6,7 @@ import (
 )
 
 type Command interface {
-	Help() string
+	Definition() string
 	Exec() error
 }
 
@@ -64,7 +64,7 @@ func printPossibleCommands(module *Module) {
 	for n, m := range module.Children {
 		fmt.Printf("%s - ", n)
 		if m.Command != nil {
-			fmt.Printf("%s\n", m.Command.Help())
+			fmt.Printf("%s\n", m.Command.Definition())
 		} else {
 			fmt.Printf("%s\n", m.Definition)
 		}

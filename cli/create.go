@@ -15,7 +15,7 @@ func NewCreate() *Create {
 	return &Create{}
 }
 
-func (c Create) Help() string {
+func (c Create) Definition() string {
 	return "Creates a kite from kite skeleton"
 }
 

@@ -11,7 +11,7 @@ func NewHello() *Hello {
 	return &Hello{}
 }
 
-func (h Hello) Help() string {
+func (h Hello) Definition() string {
 	return "Hellos a world"
 }
 

@@ -14,7 +14,7 @@ func NewRun() *Run {
 	return &Run{}
 }
 
-func (r Run) Help() string {
+func (r Run) Definition() string {
 	return "Runs the kite"
 }
 

@@ -37,7 +37,7 @@ func NewRegister() *Register {
 	return &Register{}
 }
 
-func (r Register) Help() string {
+func (r Register) Definition() string {
 	return "Registers the kite system to kontrol"
 }
 
