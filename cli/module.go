@@ -1,30 +1,68 @@
 package cli
 
+import (
+	"fmt"
+	"os"
+)
+
 type Command interface {
 	Help() string
 	Exec() error
 }
 
 type Module struct {
-	SubModules map[string]*Module
+	Children   map[string]*Module
 	Command    Command
 	Definition string
 }
 
 func NewModule() *Module {
 	return &Module{
-		SubModules: make(map[string]*Module, 0),
+		Children: make(map[string]*Module, 0),
 	}
 }
 
 func (m *Module) AddCommand(name string, command Command) *Module {
-	subModule := &Module{Command: command}
-	m.SubModules[name] = subModule
-	return subModule
+	child := &Module{Command: command}
+	m.Children[name] = child
+	return child
 }
 
 func (m *Module) AddModule(name string, definition string) *Module {
-	subModule := &Module{SubModules: make(map[string]*Module, 0), Definition: definition}
-	m.SubModules[name] = subModule
-	return subModule
+	child := &Module{Children: make(map[string]*Module, 0), Definition: definition}
+	m.Children[name] = child
+	return child
+}
+
+func (m *Module) FindModule(args []string) *Module {
+	moduleWalker := m
+
+	for i := 0; i < len(args); i, moduleWalker = i+1, moduleWalker.Children[args[i]] {
+		module := moduleWalker.Children[args[i]]
+		if module == nil {
+			fmt.Printf("Command %s not found\n\n", args[i])
+			break
+		}
+		if module.Command == nil {
+			continue
+		}
+		temp := os.Args
+		os.Args = []string{temp[0]}
+		os.Args = append(os.Args, temp[i+2:]...)
+		return module
+	}
+	printPossibleCommands(moduleWalker)
+	return nil
+}
+
+func printPossibleCommands(module *Module) {
+	fmt.Println("Possible commands: ")
+	for n, m := range module.Children {
+		fmt.Printf("%s - ", n)
+		if m.Command != nil {
+			fmt.Printf("%s\n", m.Command.Help())
+		} else {
+			fmt.Printf("%s\n", m.Definition)
+		}
+	}
 }
