@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 )
 
@@ -60,7 +61,13 @@ func createManifest(folder string) error {
 }
 
 func createKite(folder, kiteName string) error {
-	return cp(os.Getenv("HOME")+"/.kd/skel.go", filepath.Join(folder, kiteName+".go"))
+	currUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+	skelPath := filepath.Join(currUser.HomeDir, "/.kd/skel.go")
+	kitePath := filepath.Join(folder, kiteName+".go")
+	return cp(skelPath, kitePath)
 }
 
 func cp(src, dst string) error {
