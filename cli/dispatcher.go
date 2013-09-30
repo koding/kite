@@ -19,8 +19,8 @@ func NewDispatcher() *Dispatcher {
 	return &Dispatcher{root: root}
 }
 
-func (m *Dispatcher) Run() error {
-	command := m.findCommand()
+func (d *Dispatcher) Run() error {
+	command := d.findCommand()
 	if command != nil {
 		err := command.Exec()
 		if err != nil {
@@ -30,10 +30,10 @@ func (m *Dispatcher) Run() error {
 	return nil
 }
 
-func (m *Dispatcher) findCommand() Command {
+func (d *Dispatcher) findCommand() Command {
 	flag.Parse()
 	args := flag.Args()
-	module := m.root.FindModule(args)
+	module := d.root.FindModule(args)
 	if module != nil {
 		return module.Command
 	}

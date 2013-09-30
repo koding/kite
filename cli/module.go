@@ -46,6 +46,8 @@ func (m *Module) FindModule(args []string) *Module {
 		if module.Command == nil {
 			continue
 		}
+		// command behaves like a subprocess, it will parse arguments again
+		// so we re discarding parsed arguments
 		temp := os.Args
 		os.Args = []string{temp[0]}
 		os.Args = append(os.Args, temp[i+2:]...)
