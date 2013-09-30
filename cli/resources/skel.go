@@ -6,8 +6,7 @@ import (
 	"koding/newkite/protocol"
 )
 
-type Sample struct {
-}
+type Sample struct{}
 
 func main() {
 	o := &protocol.Options{
@@ -21,9 +20,7 @@ func main() {
 		"sample.hello": Sample.Hello,
 	}
 
-	s := &Sample{}
-
-	k := kite.New(o, s, methods)
+	k := kite.New(o, &Sample{}, methods)
 	k.Start()
 }
 

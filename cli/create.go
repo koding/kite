@@ -24,8 +24,10 @@ func (c Create) Exec() error {
 	if len(flag.Args()) == 0 {
 		return errors.New("You should give a kite name")
 	}
+
 	kiteName := flag.Arg(0)
 	folder := kiteName + ".kite"
+
 	err := os.Mkdir(folder, 0755)
 	if os.IsExist(err) {
 		return errors.New("Kite already exists")
