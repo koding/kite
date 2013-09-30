@@ -11,7 +11,7 @@ type Dispatcher struct {
 func NewDispatcher() *Dispatcher {
 	root := &Module{Children: make(map[string]*Module, 0), Command: nil}
 	root.AddCommand("hello", NewHello())
-	root.AddCommand("register", NewRegister())
+	root.AddCommand("register", NewKd())
 	kite := root.AddModule("kite", "Includes commands related to kites")
 	kite.AddCommand("create", NewCreate())
 	kite.AddCommand("run", NewRun())

@@ -31,17 +31,11 @@ func NewKd() *Kd {
 	}
 }
 
-type Register struct{}
-
-func NewRegister() *Register {
-	return &Register{}
-}
-
-func (r Register) Definition() string {
+func (r *Kd) Definition() string {
 	return "Registers the kite system to kontrol"
 }
 
-func (r Register) Exec() error {
+func (r *Kd) Exec() error {
 	k := NewKd()
 	err := k.Register()
 	if err != nil {
