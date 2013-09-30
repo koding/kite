@@ -1,4 +1,4 @@
-package kite
+package cli
 
 import (
 	"errors"

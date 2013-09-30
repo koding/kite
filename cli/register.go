@@ -1,4 +1,4 @@
-package register
+package cli
 
 import (
 	"bytes"

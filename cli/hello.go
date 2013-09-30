@@ -1,4 +1,4 @@
-package hello
+package cli
 
 import (
 	"flag"

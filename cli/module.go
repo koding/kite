@@ -1,4 +1,4 @@
-package module
+package cli
 
 type Command interface {
 	Help() string
