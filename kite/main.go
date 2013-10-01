@@ -89,7 +89,7 @@ Following should be done later or soon:
 and testing.
 3. Implement a pluggable AUTH mechanism.
 4. A better way to register functions to go's net/rpc. Something like:
-	k.Register("methodName", func() error)
+k.Register("methodName", func() error)
 5. MQ between peers. Kites should have Pub/Sub integrated that can message
 with each other.
 6. Monitoring data of the HOST. Capture stats like CPU, Memory, Load.
@@ -161,7 +161,7 @@ type Kite struct {
 
 // New creates, initialize and then returns a new Kite instance. It accept
 // three  arguments. o is a config struct that needs to be filled with several
-// informations like Name, Port, IP and so on. rcvr is a type on which your
+// informations like Name, Port, IP and so on. rcvr is a struct on which your
 // exported method's are defined. methods is a map that expose your methods
 // with different names to the outside.
 func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) *Kite {

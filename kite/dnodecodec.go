@@ -230,6 +230,16 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	a.Username = options.Username
 	a.Hostname = options.CorrelationName
 
+	if d.connectedClient == nil {
+		addr := d.rwc.(*websocket.Conn).Request().RemoteAddr
+		ct := d.kite.Clients.Get(&client{Addr: addr})
+		if ct != nil {
+			ct.Username = a.Username
+			d.kite.Clients.Add(ct)
+			d.connectedClient = ct
+		}
+	}
+
 	// Return when kontrol is not enabled
 	if !d.kite.KontrolEnabled {
 		return nil
@@ -238,17 +248,6 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		fmt.Printf("[%s] allowed token (cached) '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
-
-		if d.connectedClient == nil {
-			ws := d.rwc.(*websocket.Conn)
-			addr := ws.Request().RemoteAddr
-			ct := d.kite.Clients.Get(&client{Addr: addr})
-			if ct != nil {
-				ct.Username = a.Username
-				d.kite.Clients.Add(ct)
-				d.connectedClient = ct
-			}
-		}
 		return nil
 	}
 
