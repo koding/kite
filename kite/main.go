@@ -102,28 +102,61 @@ things.
 other non-thinked things.
 */
 type Kite struct {
-	Username       string // user that calls/runs the kite
-	Kitename       string // kites of same name can share memory with each other
-	Uuid           string // unique Uuid of Kite, is generated on Start for now
-	Addr           string // RPC and GroupCache addresses
-	PublicKey      string
-	Hostname       string
-	LocalIP        string // local network interface
-	PublicIP       string // public reachable IP
-	Port           string // port, that the kite is going to be run
-	Version        string
-	Dependencies   string            // other kites that needs to be run, in order to run this one
-	Registered     bool              // registered is true if the Kite is registered to kontrol itself
-	KontrolEnabled bool              // by default yes, if disabled it bypasses kontrol
-	Methods        map[string]string // method map for shared methods
-	Messenger      Messenger
-	Clients        Clients
+	// user that calls/runs the kite
+	Username string
 
-	Pool       *groupcache.HTTPPool
-	Group      *groupcache.Group
-	Server     *rpc.Server
-	OnceServer sync.Once // used to start the server only once
-	OnceCall   sync.Once // used when multiple goroutines are requesting information from kontrol
+	// Kitename defines the name that a kite is running on. This field is also used
+	// for communicating with other kites with the same name.
+	Kitename string
+
+	// Uuid is a genereated unique id string that defines this Kite.
+	Uuid string
+
+	// RPC and GroupCache addresses, also expoxed to Kontrol
+	Addr string
+
+	// TODO: fill here
+	PublicKey string
+
+	// Hostname the kite is running on. Uses os.Hostname()
+	Hostname string
+	LocalIP  string // local network interface
+	PublicIP string // public reachable IP
+
+	// Port that the kite is going to be run.
+	Port string
+
+	// every kite should have version
+	Version string
+
+	// Registered is true if the Kite is registered to kontrol itself
+	Registered bool
+
+	// other kites that needs to be run, in order to run this one
+	Dependencies string
+
+	// by default yes, if disabled it bypasses kontrol
+	KontrolEnabled bool
+
+	// method map for shared methods
+	Methods map[string]string
+
+	// implements the Messenger interface
+	Messenger Messenger
+
+	// implements the Clients interface
+	Clients Clients
+
+	Pool   *groupcache.HTTPPool
+	Group  *groupcache.Group
+	Server *rpc.Server
+
+	// used to start the rpc server only once
+	OnceServer sync.Once
+
+	// used when multiple goroutines are requesting information from kontrol
+	// we only make on request to Kontrol.
+	OnceCall sync.Once
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
@@ -168,7 +201,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 
 	k := &Kite{
 		Username:       o.Username,
-		Kitename:       o.Kitename,
+		Kitename:       o.Username + "/" + o.Kitename,
 		Version:        o.Version,
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
@@ -201,7 +234,7 @@ func (k *Kite) Start() {
 	// check every incoming message.
 	if !k.KontrolEnabled {
 		k.Registered = true
-		k.Serve(k.Addr)
+		k.serve(k.Addr)
 	} else {
 		k.Messenger.Consume(k.handle)
 
@@ -310,7 +343,7 @@ func (k *Kite) InitializeKite() {
 		return
 	}
 
-	onceBody := func() { k.Serve(k.Addr) }
+	onceBody := func() { k.serve(k.Addr) }
 	go k.OnceServer.Do(onceBody)
 
 	k.Registered = true
