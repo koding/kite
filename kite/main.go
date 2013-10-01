@@ -73,10 +73,8 @@ process data), it could be a Chat kite that enables peer-to-peer chat. For examp
 we have FileSystem kite that expose the file system to a client.
 
 A Kite has several attributes:
-1. It's an RPC server with has (semi)support for codecs like:
-JSON-RPC, DNODE and GOB
-2. It's a GroupCache client and server, which enables distributed caching
-and data sharing amongst the peers it is connected.
+1. It's an RPC server with has (semi)support for codecs like: JSON-RPC, DNODE and GOB
+2. Distributed caching and data sharing amongst the peers it is connected.
 3. ZMQ messaging system, that allows to communicate with another ZMQ server.
 4. Distribute requests in RoundRobin fashion.
 
@@ -84,22 +82,13 @@ It's still under work and many parts are constantly changing.
 
 Following should be done later or soon:
 
-1. Decide which functions of the Kite struct should be exported or not.
-2. Make Groupcache work, method templates are written but need modification
-and testing.
-3. Implement a pluggable AUTH mechanism.
-4. A better way to register functions to go's net/rpc. Something like:
-k.Register("methodName", func() error)
-5. MQ between peers. Kites should have Pub/Sub integrated that can message
-with each other.
-6. Monitoring data of the HOST. Capture stats like CPU, Memory, Load.
-7. Limiter (or Firewall). Kite should have an Acess Control mechanism
-for incoming requests, for certain thresholds (like CPU, Memory), for certain
-kites, and so on.
-8. Tests, tests, tests... we need Unit tests, Benchmark tests, and many other
-things.
-9. Web Dashboard for controlling kites, starting them, stopping them and many
-other non-thinked things.
+*. Make Groupcache work, method templates are written but need modification and testing.
+*. A better way to register functions to go's net/rpc. Something like: k.Register("methodName", func() error)
+*. MQ between peers. Kites should have Pub/Sub integrated that can message with each other.
+*. Monitoring data of the HOST. Capture stats like CPU, Memory, Load.
+*. Limiter (or Firewall). Basicall an Acess Control mechanism.
+*. Tests, tests, tests... we need Unit tests, Benchmark tests, and many other things.
+*. Web Dashboard for kontrol kites, starting them, stopping them and many other hings.
 */
 type Kite struct {
 	// user that calls/runs the kite
@@ -449,8 +438,8 @@ func (k *Kite) serve(addr string) {
 	fmt.Println("serve addr is", k.Addr)
 
 	// GroupCache
-	k.NewPool(k.Addr)
-	k.NewGroup()
+	k.newPool(k.Addr)
+	k.newGroup()
 
 	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 	http.Serve(listener, k)
@@ -622,7 +611,7 @@ func (k *Kite) getRemoteKite(kite string) (*models.Kite, error) {
 
 func (k *Kite) roundRobin(kite string) (*models.Kite, error) {
 	// TODO: use container/ring :)
-	remoteKites := k.RemoteKites(kite)
+	remoteKites := k.remoteKites(kite)
 	lenOfKites := len(remoteKites)
 	if lenOfKites == 0 {
 		return nil, fmt.Errorf("kite %s does not exist", kite)
@@ -635,7 +624,7 @@ func (k *Kite) roundRobin(kite string) (*models.Kite, error) {
 	return remoteKites[n], nil
 }
 
-func (k *Kite) RemoteKites(kite string) []*models.Kite {
+func (k *Kite) remoteKites(kite string) []*models.Kite {
 	l := kites.List()
 	remoteKites := make([]*models.Kite, 0, len(l)-1) // allocate one less, it's the kite itself
 
@@ -653,11 +642,11 @@ func (k *Kite) RemoteKites(kite string) []*models.Kite {
 GroupCache
 
 ******************************************/
-func (k *Kite) NewPool(addr string) {
+func (k *Kite) newPool(addr string) {
 	k.Pool = groupcache.NewHTTPPool(addr)
 }
 
-func (k *Kite) NewGroup() {
+func (k *Kite) newGroup() {
 	k.Group = groupcache.NewGroup(k.Kitename, 64<<20, groupcache.GetterFunc(
 		func(ctx groupcache.Context, key string, dest groupcache.Sink) error {
 			dest.SetString("fatih")
@@ -700,17 +689,6 @@ func (k *Kite) PeersAddr() []string {
 Misc
 
 ******************************************/
-
-func (k *Kite) Broadcast(msg string) {
-	clients := k.Clients.List()
-	for _, client := range clients {
-		go func() {
-			if err := websocket.Message.Send(client.Conn, msg); err != nil {
-				fmt.Println("Could not send message to ", client.Addr, err.Error())
-			}
-		}()
-	}
-}
 
 func createMethodMap(kitename string, rcvr interface{}, methods map[string]interface{}) map[string]string {
 	funcName := func(i interface{}) string {
