@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -38,12 +39,12 @@ func (m *Module) AddModule(name string, definition string) *Module {
 }
 
 func (m *Module) FindModule(args []string) (*Module, error) {
-	var err error = nil
 	moduleWalker := m
+	var errStr bytes.Buffer
 	for i := 0; i < len(args); i, moduleWalker = i+1, moduleWalker.Children[args[i]] {
 		module := moduleWalker.Children[args[i]]
 		if module == nil {
-			err = errors.New(fmt.Sprintf("Command %s not found\n\n", args[i]))
+			errStr.WriteString(fmt.Sprintf("Command %s not found\n\n", args[i]))
 			break
 		}
 		if module.Command == nil {
@@ -54,20 +55,24 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 		temp := os.Args
 		os.Args = []string{temp[0]}
 		os.Args = append(os.Args, temp[i+2:]...)
-		return module, err
+		return module, nil
 	}
-	printPossibleCommands(moduleWalker)
-	return nil, err
+	errStr.WriteString(moduleWalker.printPossibleCommands())
+	return nil, errors.New(errStr.String())
 }
 
-func printPossibleCommands(module *Module) {
-	fmt.Println("Possible commands: ")
-	for n, m := range module.Children {
-		fmt.Printf("%s - ", n)
-		if m.Command != nil {
-			fmt.Printf("%s\n", m.Command.Definition())
+func (m *Module) printPossibleCommands() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("Possible commands: \n")
+	for n, module := range m.Children {
+		buffer.WriteString(fmt.Sprintf("  %-10s  ", n))
+		var definition string
+		if module.Command != nil {
+			definition = module.Command.Definition()
 		} else {
-			fmt.Printf("%s\n", m.Definition)
+			definition = module.Definition
 		}
+		buffer.WriteString(fmt.Sprintf("%s\n", definition))
 	}
+	return buffer.String()
 }
