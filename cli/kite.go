@@ -1,14 +1,46 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"koding/newkite/protocol"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 )
+
+type Run struct{}
+
+func NewRun() *Run {
+	return &Run{}
+}
+
+func (r Run) Definition() string {
+	return "Runs the kite"
+}
+
+func (r Run) Exec() error {
+	flag.Parse()
+	if len(flag.Args()) == 0 {
+		return errors.New("You should give a kite name")
+	}
+	kiteName := flag.Arg(0)
+	folder := kiteName + ".kite"
+	fmt.Println("go" + " run " + filepath.Join(folder, kiteName+".go"))
+	cmd := exec.Command("go", "run", filepath.Join(folder, kiteName+".go"))
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	// TODO status of kite should be checked
+	fmt.Println("Started kite")
+	return nil
+}
 
 type Create struct{}
 
@@ -44,7 +76,7 @@ func (c Create) Exec() error {
 	if err != nil {
 		return err
 	}
-	err = createManifest(folder)
+	err = createManifest(folder, kiteName)
 	if err != nil {
 		return err
 	}
@@ -55,9 +87,26 @@ func (c Create) Exec() error {
 	return nil
 }
 
-func createManifest(folder string) error {
+func createManifest(folder, kiteName string) error {
 	path := filepath.Join(folder, "manifest.json")
-	return ioutil.WriteFile(path, []byte("buff\n"), 0755)
+	currUser, err := user.Current()
+	if err != nil {
+		return err
+	}
+	options := &protocol.Options{
+		Username:     currUser.Name,
+		Kitename:     kiteName,
+		LocalIP:      "",
+		PublicIP:     "",
+		Port:         "",
+		Version:      "0.1",
+		Dependencies: "",
+	}
+	body, err := json.MarshalIndent(options, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path, []byte(body), 0755)
 }
 
 func createKite(folder, kiteName string) error {
