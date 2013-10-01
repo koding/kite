@@ -20,22 +20,25 @@ func NewDispatcher() *Dispatcher {
 }
 
 func (d *Dispatcher) Run() error {
-	command := d.findCommand()
+	command, err := d.findCommand()
+	if err != nil {
+		return err
+	}
 	if command != nil {
-		err := command.Exec()
-		if err != nil {
-			return err
-		}
+		return command.Exec()
 	}
 	return nil
 }
 
-func (d *Dispatcher) findCommand() Command {
+func (d *Dispatcher) findCommand() (Command, error) {
 	flag.Parse()
 	args := flag.Args()
-	module := d.root.FindModule(args)
-	if module != nil {
-		return module.Command
+	module, err := d.root.FindModule(args)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if module != nil {
+		return module.Command, nil
+	}
+	return nil, nil
 }

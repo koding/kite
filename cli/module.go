@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -36,13 +37,13 @@ func (m *Module) AddModule(name string, definition string) *Module {
 	return child
 }
 
-func (m *Module) FindModule(args []string) *Module {
+func (m *Module) FindModule(args []string) (*Module, error) {
+	var err error = nil
 	moduleWalker := m
-
 	for i := 0; i < len(args); i, moduleWalker = i+1, moduleWalker.Children[args[i]] {
 		module := moduleWalker.Children[args[i]]
 		if module == nil {
-			fmt.Printf("Command %s not found\n\n", args[i])
+			err = errors.New(fmt.Sprintf("Command %s not found\n\n", args[i]))
 			break
 		}
 		if module.Command == nil {
@@ -53,10 +54,10 @@ func (m *Module) FindModule(args []string) *Module {
 		temp := os.Args
 		os.Args = []string{temp[0]}
 		os.Args = append(os.Args, temp[i+2:]...)
-		return module
+		return module, err
 	}
 	printPossibleCommands(moduleWalker)
-	return nil
+	return nil, err
 }
 
 func printPossibleCommands(module *Module) {
