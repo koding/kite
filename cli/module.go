@@ -7,6 +7,9 @@ import (
 	"os"
 )
 
+// To add a module, implement this interface
+// Definition is the command definition
+// Exec is the behaviour that you want to implement as a command
 type Command interface {
 	Definition() string
 	Exec() error
