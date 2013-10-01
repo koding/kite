@@ -62,6 +62,45 @@ type Clients interface {
 	List() []*client
 }
 
+/*
+Kite defines a single process that enables distributed service messaging amongst
+the peers it is connected. A Kite process acts as a Client and as a Server. That
+means it can receive request, process them, but it also can make request to other
+kites.
+
+A Kite can be anything. It can be simple Image processing kite (which would
+process data), it could be a Chat kite that enables peer-to-peer chat. For examples
+we have FileSystem kite that expose the file system to a client.
+
+A Kite has several attributes:
+1. It's an RPC server with has (semi)support for codecs like:
+JSON-RPC, DNODE and GOB
+2. It's a GroupCache client and server, which enables distributed caching
+and data sharing amongst the peers it is connected.
+3. ZMQ messaging system, that allows to communicate with another ZMQ server.
+4. Distribute requests in RoundRobin fashion.
+
+It's still under work and many parts are constantly changing.
+
+Following should be done later or soon:
+
+1. Decide which functions of the Kite struct should be exported or not.
+2. Make Groupcache work, method templates are written but need modification
+and testing.
+3. Implement a pluggable AUTH mechanism.
+4. A better way to register functions to go's net/rpc. Something like:
+	k.Register("methodName", func() error)
+5. MQ between peers. Kites should have Pub/Sub integrated that can message
+with each other.
+6. Monitoring data of the HOST. Capture stats like CPU, Memory, Load.
+7. Limiter (or Firewall). Kite should have an Acess Control mechanism
+for incoming requests, for certain thresholds (like CPU, Memory), for certain
+kites, and so on.
+8. Tests, tests, tests... we need Unit tests, Benchmark tests, and many other
+things.
+9. Web Dashboard for controlling kites, starting them, stopping them and many
+other non-thinked things.
+*/
 type Kite struct {
 	Username       string // user that calls/runs the kite
 	Kitename       string // kites of same name can share memory with each other
@@ -87,19 +126,11 @@ type Kite struct {
 	OnceCall   sync.Once // used when multiple goroutines are requesting information from kontrol
 }
 
-/*
-
-TODO: Following should be done later or soon:
-
-1. Decide which functions of the Kite struct should be exported or not.
-2. Make Groupcache work with a simple exported api.
-3. Implement a pluggable AUTH mechanism. Only allow and deny.
-4. A better way to register functions to go's net/rpc. Something like:
-	k.Register("methodName", func() error)
-5. MQ between peers.
-
-*/
-
+// New creates, initialize and then returns a new Kite instance. It accept
+// three  arguments. o is a config struct that needs to be filled with several
+// informations like Name, Port, IP and so on. rcvr is a type on which your
+// exported method's are defined. methods is a map that expose your methods
+// with different names to the outside.
 func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) *Kite {
 	var err error
 	if o == nil {
@@ -160,6 +191,9 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 	return k
 }
 
+// Start is a blocking method. It runs the kite server and then accepts requests
+// asynchronously. It can be started in a goroutine if you wish to use kite as a
+// client too.
 func (k *Kite) Start() {
 	// Start our blocking subscriber loop. We except messages in the format of:
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
@@ -174,6 +208,8 @@ func (k *Kite) Start() {
 	}
 }
 
+// handle is a method that interprets the incoming message from Kontrol. The
+// incoming message is in form of protocol.PubResponse.
 func (k *Kite) handle(msg []byte) {
 	var r protocol.PubResponse
 	err := json.Unmarshal(msg, &r)
@@ -206,6 +242,8 @@ func (k *Kite) handle(msg []byte) {
 
 }
 
+// AddKite is executed when a protocol.AddKite message has been received
+// trough the handler.
 func (k *Kite) AddKite(r protocol.PubResponse) {
 	if !k.Registered {
 		return
@@ -228,6 +266,8 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	debug("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
 
+// RemoveKite is executed when a protocol.AddKite message has been received
+// trough the handler.
 func (k *Kite) RemoveKite(r protocol.PubResponse) {
 	if !k.Registered {
 		return
@@ -237,6 +277,8 @@ func (k *Kite) RemoveKite(r protocol.PubResponse) {
 	debug("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
 
+// Pong sends a 'pong' message whenever the kite receives a message from Kontrol.
+// This is used for node coordination and notifier Kontrol that the Kite is alive.
 func (k *Kite) Pong() {
 	m := protocol.Request{
 		Base: protocol.Base{
@@ -254,6 +296,8 @@ func (k *Kite) Pong() {
 	}
 }
 
+// InitializeKite runs the builtin RPC server and also registers itself to Kontrol
+// when the kite.KontrolEnabled flag is enabled. This method is non-blocking.
 func (k *Kite) InitializeKite() {
 	if k.Registered {
 		return
@@ -272,6 +316,8 @@ func (k *Kite) InitializeKite() {
 	k.Registered = true
 }
 
+// RegisterToKontrol sends a register message to Kontrol. It returns an error
+// when it is not allowed by Kontrol. If allowed, nil is returned.
 func (k *Kite) RegisterToKontrol() error {
 	// Wait until the servers are ready
 	m := protocol.Request{
@@ -326,7 +372,9 @@ RPC
 // Can connect to RPC service using HTTP CONNECT to rpcPath.
 var connected = "200 Connected to Go RPC"
 
-func (k *Kite) DialClient(kite *models.Kite) (*rpc.Client, error) {
+// dialClient is used to connect to a Remote Kite via the GOB codec. This is
+// used by other external kite methods.
+func (k *Kite) dialClient(kite *models.Kite) (*rpc.Client, error) {
 	debug("establishing HTTP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
 	var err error
 	conn, err := net.Dial("tcp4", kite.Addr)
@@ -354,7 +402,9 @@ func (k *Kite) DialClient(kite *models.Kite) (*rpc.Client, error) {
 	}
 }
 
-func (k *Kite) Serve(addr string) {
+// serve starts our rpc server with the given addr. Addr should be in form of
+// "ip:port"
+func (k *Kite) serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
 		log.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
@@ -373,9 +423,10 @@ func (k *Kite) Serve(addr string) {
 	http.Serve(listener, k)
 }
 
+// ServeHTTP interface for http package.
 func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == protocol.WEBSOCKET_PATH {
-		websocket.Handler(k.ServeWS).ServeHTTP(w, r)
+		websocket.Handler(k.serveWS).ServeHTTP(w, r)
 		return
 	}
 
@@ -399,7 +450,9 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (k *Kite) ServeWS(ws *websocket.Conn) {
+// serveWS is used serving content over WebSocket. Is used internally via
+// ServeHTTP method.
+func (k *Kite) serveWS(ws *websocket.Conn) {
 	addr := ws.Request().RemoteAddr
 	fmt.Printf("[%s] client connected\n", addr)
 
@@ -409,12 +462,17 @@ func (k *Kite) ServeWS(ws *websocket.Conn) {
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
 }
 
+// AddFunction is used to add new structs with exposed methods with a different
+// name.
 func (k *Kite) AddFunction(name string, method interface{}) {
 	k.Server.RegisterName(name, method)
 }
 
+// CallSync makes a blocking request to another kite. Kite should be in form of
+// "username/kitename", method should be known ahead of time. args and result is
+// used by the remote kite, therefore you should know what the kite is expecting.
 func (k *Kite) CallSync(kite, method string, args interface{}, result interface{}) error {
-	remoteKite, err := k.GetRemoteKite(kite)
+	remoteKite, err := k.getRemoteKite(kite)
 	if err != nil {
 		return err
 	}
@@ -429,6 +487,11 @@ func (k *Kite) CallSync(kite, method string, args interface{}, result interface{
 	return nil
 }
 
+// Call makes a non-blocking request to another kite. Kite should be in form of
+// "username/kitename", the method should be known ahead of time. args is
+// used by the remote kite, therefore you should know what the kite is expecting.
+// fn is a callback that is executed when the result and error has been received.
+// Currently only string as a result is supported, but it needs to be changed.
 func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, res string)) *rpc.Call {
 	rpcFunc := kite + "." + method
 	ticker := time.NewTicker(time.Second * 1)
@@ -441,7 +504,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 	for {
 		select {
 		case <-ticker.C:
-			remoteKite, err = k.GetRemoteKite(kite)
+			remoteKite, err = k.getRemoteKite(kite)
 			if err != nil {
 				debug("no remote kites available, requesting some ...")
 				m := protocol.Request{
@@ -506,15 +569,15 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 	}
 }
 
-func (k *Kite) GetRemoteKite(kite string) (*models.Kite, error) {
-	r, err := k.RoundRobin(kite)
+func (k *Kite) getRemoteKite(kite string) (*models.Kite, error) {
+	r, err := k.roundRobin(kite)
 	if err != nil {
 		return nil, err
 	}
 
 	if r.Client == nil {
 		var err error
-		r.Client, err = k.DialClient(r)
+		r.Client, err = k.dialClient(r)
 		if err != nil {
 			return nil, err
 		}
@@ -524,7 +587,7 @@ func (k *Kite) GetRemoteKite(kite string) (*models.Kite, error) {
 	return r, nil
 }
 
-func (k *Kite) RoundRobin(kite string) (*models.Kite, error) {
+func (k *Kite) roundRobin(kite string) (*models.Kite, error) {
 	// TODO: use container/ring :)
 	remoteKites := k.RemoteKites(kite)
 	lenOfKites := len(remoteKites)
