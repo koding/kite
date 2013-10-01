@@ -175,13 +175,8 @@ func request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.Username != msg.Username || s.Username == "" {
-		http.Error(w, "{\"err\":\"not authorized 2\"}\n", http.StatusBadRequest)
-		return
-	}
-
 	if s.ClientId != msg.SessionID {
-		http.Error(w, "{\"err\":\"not authorized 3\"}\n", http.StatusBadRequest)
+		http.Error(w, "{\"err\":\"not authorized 1\"}\n", http.StatusBadRequest)
 		return
 	}
 
@@ -210,7 +205,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 	l, err := json.Marshal(list)
 	if err != nil {
 		fmt.Println("marshalling kite list:", err)
-		http.Error(w, "{\"err\":\"not authorized 4\"}\n", http.StatusBadRequest)
+		http.Error(w, "{\"err\":\"not authorized 2\"}\n", http.StatusBadRequest)
 		return
 	}
 
