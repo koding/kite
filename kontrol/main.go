@@ -524,20 +524,12 @@ func getSession(token string) (*Session, error) {
 	return session, nil
 }
 
-// for now these fields are enough
-type KodingKey struct {
-	Id       bson.ObjectId `bson:"_id" json:"-"`
-	Key      string        `bson:"key"`
-	Hostname string        `bson:"hostname"`
-	Owner    string        `bson:"owner"`
-}
-
 // check whether the publicKey is available (registered) or not. return true if
 // available
 func checkKey(publicKey string) bool {
-	kodingKey := &KodingKey{}
+	kodingKey := new(models.KodingKeys)
 	query := func(c *mgo.Collection) error {
-		return c.Find(bson.M{"key": publicKey}).One(&kodingKey)
+		return c.Find(bson.M{"key": publicKey}).One(kodingKey)
 	}
 
 	err := mongodb.Run("jKodingKeys", query)

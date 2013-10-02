@@ -28,8 +28,13 @@ import (
 )
 
 var (
-	kites       = peers.New()
-	balance     = balancer.New()
+	// in-memory hash table for kites of same types
+	kites = peers.New()
+
+	// roundrobin load balancing helpers
+	balance = balancer.New()
+
+	// set data structure for caching tokens
 	permissions = goset.New()
 )
 
@@ -62,13 +67,13 @@ type Clients interface {
 	List() []*client
 }
 
-// Kite defines a single process that enables distributed service messaging amongst
-// the peers it is connected. A Kite process acts as a Client and as a Server. That
-// means it can receive request, process them, but it also can make request to other
-// kites.
-// A Kite can be anything. It can be simple Image processing kite (which would
-// process data), it could be a Chat kite that enables peer-to-peer chat. For examples
-// we have FileSystem kite that expose the file system to a client.
+// Kite defines a single process that enables distributed service messaging
+// amongst the peers it is connected. A Kite process acts as a Client and as a
+// Server. That means it can receive request, process them, but it also can
+// make request to other kites. A Kite can be anything. It can be simple Image
+// processing kite (which would process data), it could be a Chat kite that
+// enables peer-to-peer chat. For examples we have FileSystem kite that expose
+// the file system to a client, which in order build the filetree.
 type Kite struct {
 	// user that calls/runs the kite
 	Username string
@@ -83,11 +88,12 @@ type Kite struct {
 	// RPC and GroupCache addresses, also expoxed to Kontrol
 	Addr string
 
-	// TODO: fill here
+	// PublicKey is used for authenticate to Kontrol.
 	PublicKey string
 
 	// Hostname the kite is running on. Uses os.Hostname()
 	Hostname string
+
 	LocalIP  string // local network interface
 	PublicIP string // public reachable IP
 
@@ -115,8 +121,11 @@ type Kite struct {
 	// implements the Clients interface
 	Clients Clients
 
-	Pool   *groupcache.HTTPPool
-	Group  *groupcache.Group
+	// GroupCache variables
+	Pool  *groupcache.HTTPPool
+	Group *groupcache.Group
+
+	// RpcServer
 	Server *rpc.Server
 
 	// used to start the rpc server only once
@@ -160,10 +169,10 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 
 	port := o.Port
 	if o.Port == "" {
-		port = "0" // binds to an automatic port
+		port = "0" // go binds to an automatic port
 	}
 
-	// print dependencies
+	// print dependencies, not used currently
 	// pwd, _ := os.Getwd()
 	// getDeps(pwd, o.Kitename)
 
