@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -39,11 +38,11 @@ func (m *Module) AddModule(name string, definition string) *Module {
 
 func (m *Module) FindModule(args []string) (*Module, error) {
 	current := m
-	var errStr bytes.Buffer
+	var errStr = ""
 	for i, arg := range args {
 		sub := current.Children[arg]
 		if sub == nil {
-			errStr.WriteString(fmt.Sprintf("Command %s not found\n\n", arg))
+			errStr += fmt.Sprintf("Command %s not found\n\n", arg)
 			break
 		}
 		if sub.Command == nil {
@@ -57,22 +56,19 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 		os.Args = append(os.Args, temp[i+2:]...)
 		return sub, nil
 	}
-	errStr.WriteString(current.printPossibleCommands())
-	return nil, errors.New(errStr.String())
+	errStr += current.printPossibleCommands()
+	return nil, errors.New(errStr)
 }
 
 func (m *Module) printPossibleCommands() string {
-	var buffer bytes.Buffer
-	buffer.WriteString("Possible commands: \n")
+	prompt := "Possible commands: \n"
 	for n, module := range m.Children {
-		buffer.WriteString(fmt.Sprintf("  %-10s  ", n))
-		var definition string
+		prompt += fmt.Sprintf("  %-10s  ", n)
+		definition := module.Definition
 		if module.Command != nil {
 			definition = (*module.Command).Definition()
-		} else {
-			definition = module.Definition
 		}
-		buffer.WriteString(fmt.Sprintf("%s\n", definition))
+		prompt += fmt.Sprintf("%s\n", definition)
 	}
-	return buffer.String()
+	return prompt
 }
