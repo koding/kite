@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
 )
@@ -37,11 +36,11 @@ func (m *Module) AddModule(name string, definition string) *Module {
 }
 
 func (m *Module) FindModule(args []string) (*Module, error) {
-	var err string
+	var err error
 	for i, arg := range args {
 		sub := m.Children[arg]
 		if sub == nil {
-			err += fmt.Sprintf("Command %s not found\n\n", arg)
+			err = fmt.Errorf("Command %s not found\n\n", arg)
 			break
 		}
 		if sub.Command == nil {
@@ -55,8 +54,8 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 		os.Args = append(os.Args, temp[i+2:]...)
 		return sub, nil
 	}
-	err += m.printPossibleCommands()
-	return nil, errors.New(err)
+	err = fmt.Errorf("%s%s", err, m.printPossibleCommands())
+	return nil, err
 }
 
 func (m *Module) printPossibleCommands() string {
