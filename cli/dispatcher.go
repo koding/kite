@@ -9,7 +9,7 @@ type Dispatcher struct {
 }
 
 func NewDispatcher() *Dispatcher {
-	root := &Module{Children: make(map[string]*Module, 0), Command: nil}
+	root := NewModule(nil, "")
 	root.AddCommand("hello", NewHello())
 	root.AddCommand("register", NewKd())
 	kite := root.AddModule("kite", "Includes commands related to kites")
@@ -25,12 +25,12 @@ func (d *Dispatcher) Run() error {
 		return err
 	}
 	if command != nil {
-		return command.Exec()
+		return (*command).Exec()
 	}
 	return nil
 }
 
-func (d *Dispatcher) findCommand() (Command, error) {
+func (d *Dispatcher) findCommand() (*Command, error) {
 	flag.Parse()
 	args := flag.Args()
 	module, err := d.root.FindModule(args)

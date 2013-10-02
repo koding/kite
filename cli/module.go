@@ -17,26 +17,22 @@ type Command interface {
 
 type Module struct {
 	Children   map[string]*Module
-	Command    Command
+	Command    *Command
 	Definition string
 }
 
-func NewModule(name string, definition string) *Module {
-	return &Module{Children: make(map[string]*Module, 0), Definition: definition}
-}
-
-func NewCommandModule(command Command) *Module {
-	return &Module{Command: command}
+func NewModule(command *Command, definition string) *Module {
+	return &Module{Children: make(map[string]*Module, 0), Definition: definition, Command: command}
 }
 
 func (m *Module) AddCommand(name string, command Command) *Module {
-	child := NewCommandModule(command)
+	child := NewModule(&command, "")
 	m.Children[name] = child
 	return child
 }
 
 func (m *Module) AddModule(name string, definition string) *Module {
-	child := NewModule(name, definition)
+	child := NewModule(nil, definition)
 	m.Children[name] = child
 	return child
 }
@@ -72,7 +68,7 @@ func (m *Module) printPossibleCommands() string {
 		buffer.WriteString(fmt.Sprintf("  %-10s  ", n))
 		var definition string
 		if module.Command != nil {
-			definition = module.Command.Definition()
+			definition = (*module.Command).Definition()
 		} else {
 			definition = module.Definition
 		}
