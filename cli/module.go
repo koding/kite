@@ -37,16 +37,15 @@ func (m *Module) AddModule(name string, definition string) *Module {
 }
 
 func (m *Module) FindModule(args []string) (*Module, error) {
-	current := m
-	var errStr = ""
+	var err string
 	for i, arg := range args {
-		sub := current.Children[arg]
+		sub := m.Children[arg]
 		if sub == nil {
-			errStr += fmt.Sprintf("Command %s not found\n\n", arg)
+			err += fmt.Sprintf("Command %s not found\n\n", arg)
 			break
 		}
 		if sub.Command == nil {
-			current = current.Children[arg]
+			m = m.Children[arg]
 			continue
 		}
 		// command behaves like a subprocess, it will parse arguments again
@@ -56,8 +55,8 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 		os.Args = append(os.Args, temp[i+2:]...)
 		return sub, nil
 	}
-	errStr += current.printPossibleCommands()
-	return nil, errors.New(errStr)
+	err += m.printPossibleCommands()
+	return nil, errors.New(err)
 }
 
 func (m *Module) printPossibleCommands() string {
