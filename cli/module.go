@@ -42,15 +42,16 @@ func (m *Module) AddModule(name string, definition string) *Module {
 }
 
 func (m *Module) FindModule(args []string) (*Module, error) {
-	moduleWalker := m
+	current := m
 	var errStr bytes.Buffer
-	for i := 0; i < len(args); i, moduleWalker = i+1, moduleWalker.Children[args[i]] {
-		module := moduleWalker.Children[args[i]]
-		if module == nil {
-			errStr.WriteString(fmt.Sprintf("Command %s not found\n\n", args[i]))
+	for i, arg := range args {
+		sub := current.Children[arg]
+		if sub == nil {
+			errStr.WriteString(fmt.Sprintf("Command %s not found\n\n", arg))
 			break
 		}
-		if module.Command == nil {
+		if sub.Command == nil {
+			current = current.Children[arg]
 			continue
 		}
 		// command behaves like a subprocess, it will parse arguments again
@@ -58,9 +59,9 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 		temp := os.Args
 		os.Args = []string{temp[0]}
 		os.Args = append(os.Args, temp[i+2:]...)
-		return module, nil
+		return sub, nil
 	}
-	errStr.WriteString(moduleWalker.printPossibleCommands())
+	errStr.WriteString(current.printPossibleCommands())
 	return nil, errors.New(errStr.String())
 }
 
