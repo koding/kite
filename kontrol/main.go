@@ -155,7 +155,6 @@ func ip(w http.ResponseWriter, r *http.Request) {
 }
 
 func request(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("GOT A REQUEST")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	var msg protocol.Request
@@ -167,25 +166,28 @@ func request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("request  %+v\n", msg)
+	fmt.Printf("rx: sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
 
 	s, err := getSession(msg.SessionID)
 	if err != nil {
+		fmt.Printf("i : sessionID '%s' is not validated (err: 1)\n", msg.SessionID)
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 		return
 	}
 
 	if s.ClientId != msg.SessionID {
+		fmt.Printf("i : sessionID '%s' is not validated (err: 2)\n", msg.SessionID)
 		http.Error(w, "{\"err\":\"not authorized 1\"}\n", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("you are validated %s\n", s.Username)
+	fmt.Printf("i : sessionID '%s' is validated as: %s\n", msg.SessionID, s.Username)
 
 	list := make([]protocol.PubResponse, 0)
+	var token *protocol.Token
+
 	for _, k := range storage.List() {
 		if k.Kitename == msg.RemoteKite {
-			var token *protocol.Token
 			token = getToken(s.Username)
 			if token == nil {
 				token = createToken(s.Username)
@@ -204,11 +206,12 @@ func request(w http.ResponseWriter, r *http.Request) {
 
 	l, err := json.Marshal(list)
 	if err != nil {
-		fmt.Println("marshalling kite list:", err)
+		fmt.Println("i: marshalling kite list:", err)
 		http.Error(w, "{\"err\":\"not authorized 2\"}\n", http.StatusBadRequest)
 		return
 	}
 
+	fmt.Printf("tx: token '%s' for '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
 	w.Write([]byte(l))
 }
 
@@ -235,7 +238,7 @@ func (k *Kontrol) HeartBeatChecker() {
 					continue // still alive, pick up the next one
 				}
 
-				removeLog := fmt.Sprintf("[%s (%s)] dead at '%s' - '%s'",
+				removeLog := fmt.Sprintf("i : [%s (%s)] dead at '%s' - '%s'",
 					kite.Kitename,
 					kite.Version,
 					kite.Hostname,
@@ -312,7 +315,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		// then notify dependencies of this kite, if any available
 		k.NotifyDependencies(kite)
 
-		startLog := fmt.Sprintf("[%s (%s)] starting at '%s' - '%s'",
+		startLog := fmt.Sprintf("tx: [%s (%s)] starting at '%s' - '%s'",
 			kite.Kitename,
 			kite.Version,
 			kite.Hostname,
@@ -353,15 +356,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return resp, nil
 	case "getPermission":
-		fmt.Println("getPermission request from: ", string(msg))
+		fmt.Printf("rx: [%s] asks if token '%s' is valid\n", req.RemoteKite, req.Token)
 		k.UpdateKite(req.Uuid)
 
 		msg := protocol.RegisterResponse{}
 
 		token := getToken(req.Username)
 		if token == nil || token.ID != req.Token {
+			fmt.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.RemoteKite)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 		} else {
+			fmt.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.RemoteKite)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
 		}
 
@@ -453,10 +458,10 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 		}
 
 		if !validate(kite) {
-			return nil, fmt.Errorf("kite %s - %s is not validated", req.Kitename, req.Uuid)
+			return nil, fmt.Errorf("i : kite %s - %s is not validated", req.Kitename, req.Uuid)
 		}
 
-		startLog := fmt.Sprintf("[%s (%s)] public key '%s' is registered. ready to go..",
+		startLog := fmt.Sprintf("i : [%s (%s)] public key '%s' is registered. ready to go..",
 			kite.Kitename,
 			kite.Version,
 			kite.PublicKey,
