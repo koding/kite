@@ -31,12 +31,11 @@ func NewKd() *Kd {
 	}
 }
 
-func (r *Kd) Definition() string {
+func (k *Kd) Definition() string {
 	return "Registers the kite system to kontrol"
 }
 
-func (r *Kd) Exec() error {
-	k := NewKd()
+func (k *Kd) Exec() error {
 	err := k.Register()
 	if err != nil {
 		return errors.New(fmt.Sprint("\nregister error: %s\n", err.Error()))
