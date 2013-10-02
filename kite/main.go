@@ -62,34 +62,13 @@ type Clients interface {
 	List() []*client
 }
 
-/*
-Kite defines a single process that enables distributed service messaging amongst
-the peers it is connected. A Kite process acts as a Client and as a Server. That
-means it can receive request, process them, but it also can make request to other
-kites.
-
-A Kite can be anything. It can be simple Image processing kite (which would
-process data), it could be a Chat kite that enables peer-to-peer chat. For examples
-we have FileSystem kite that expose the file system to a client.
-
-A Kite has several attributes:
-1. It's an RPC server with has (semi)support for codecs like: JSON-RPC, DNODE and GOB
-2. Distributed caching and data sharing amongst the peers it is connected.
-3. ZMQ messaging system, that allows to communicate with another ZMQ server.
-4. Distribute requests in RoundRobin fashion.
-
-It's still under work and many parts are constantly changing.
-
-Following should be done later or soon:
-
-*. Make Groupcache work, method templates are written but need modification and testing.
-*. A better way to register functions to go's net/rpc. Something like: k.Register("methodName", func() error)
-*. MQ between peers. Kites should have Pub/Sub integrated that can message with each other.
-*. Monitoring data of the HOST. Capture stats like CPU, Memory, Load.
-*. Limiter (or Firewall). Basicall an Acess Control mechanism.
-*. Tests, tests, tests... we need Unit tests, Benchmark tests, and many other things.
-*. Web Dashboard for kontrol kites, starting them, stopping them and many other hings.
-*/
+// Kite defines a single process that enables distributed service messaging amongst
+// the peers it is connected. A Kite process acts as a Client and as a Server. That
+// means it can receive request, process them, but it also can make request to other
+// kites.
+// A Kite can be anything. It can be simple Image processing kite (which would
+// process data), it could be a Chat kite that enables peer-to-peer chat. For examples
+// we have FileSystem kite that expose the file system to a client.
 type Kite struct {
 	// user that calls/runs the kite
 	Username string
