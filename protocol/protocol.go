@@ -29,7 +29,6 @@ type Base struct {
 	Id        bson.ObjectId `bson:"_id" json:"-"`
 	Username  string        `bson:"username" json:"username"`
 	Kitename  string        `bson:"kitename" json:"kitename"`
-	Kind      string        `bson:"kind" json:"kind"`
 	Version   string        `bson:"version" json:"version"`
 	PublicKey string        `bson:"publicKey" json:"publicKey"`
 	Token     string        `bson:"token" json:"token"`
@@ -63,9 +62,10 @@ type Request struct {
 }
 
 type RegisterResponse struct {
-	Addr   string `json:"addr"`
-	Result string `json:"resut"`
-	Token  Token  `json:"token"`
+	Addr     string `json:"addr"`
+	Result   string `json:"result"`
+	Username string `json:"username"`
+	Token    Token  `json:"token"`
 }
 
 type PubResponse struct {

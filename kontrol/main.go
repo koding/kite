@@ -186,8 +186,11 @@ func request(w http.ResponseWriter, r *http.Request) {
 	list := make([]protocol.PubResponse, 0)
 	var token *protocol.Token
 
+	matchKite := s.Username + "/" + msg.RemoteKite
+
+	fmt.Printf("i : searching for kite '%s'\n", matchKite)
 	for _, k := range storage.List() {
-		if k.Kitename == msg.RemoteKite {
+		if k.Kitename == matchKite {
 			token = getToken(s.Username)
 			if token == nil {
 				token = createToken(s.Username)
@@ -211,7 +214,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("tx: token '%s' for '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
+	fmt.Printf("tx: sending token '%s' to be used with '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
 	w.Write([]byte(l))
 }
 
@@ -224,7 +227,7 @@ func (k *Kontrol) Ping() {
 	}
 
 	msg, _ := json.Marshal(&m)
-	k.Publish("all", msg, false)
+	k.Publish("all", msg)
 }
 
 func (k *Kontrol) HeartBeatChecker() {
@@ -251,11 +254,11 @@ func (k *Kontrol) HeartBeatChecker() {
 				// notify kites of the same type
 				pubResp := createResponse(protocol.RemoveKite, kite)
 				msg, _ := json.Marshal(pubResp)
-				k.Publish(kite.Kitename, msg, false)
+				k.Publish(kite.Kitename, msg)
 
 				// then notify kites that depends on me..
 				for _, c := range k.getRelationship(kite.Kitename) {
-					k.Publish(c.Kitename, msg, false)
+					k.Publish(c.Kitename, msg)
 				}
 
 				// Am I the latest of my kind ? if yes remove me from the dependencies list
@@ -295,6 +298,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return []byte("OK"), nil
 	case "register":
+		fmt.Printf("rx: [%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
 		kite, err := k.RegisterKite(req)
 		if err != nil {
 			response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
@@ -310,12 +314,12 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		// first notify myself
 		pubResp := createResponse(protocol.AddKite, kite)
 		msg, _ := json.Marshal(pubResp)
-		k.Publish(req.Uuid, msg, false)
+		k.Publish(req.Uuid, msg)
 
 		// then notify dependencies of this kite, if any available
 		k.NotifyDependencies(kite)
 
-		startLog := fmt.Sprintf("tx: [%s (%s)] starting at '%s' - '%s'",
+		startLog := fmt.Sprintf("i : [%s (%s)] starting at '%s' - '%s'",
 			kite.Kitename,
 			kite.Version,
 			kite.Hostname,
@@ -323,10 +327,11 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		)
 		fmt.Println(startLog)
 
-		// send response back that we published the necessary informations
+		// send response back to the kite, also identify him with the new name
 		response := protocol.RegisterResponse{
-			Addr:   self,
-			Result: protocol.AllowKite,
+			Addr:     self,
+			Result:   protocol.AllowKite,
+			Username: kite.Username,
 		}
 		resp, _ := json.Marshal(response)
 		return resp, nil
@@ -339,7 +344,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 			if r.Kitename == req.RemoteKite {
 				pubResp := createResponse(protocol.AddKite, r)
 				msg, _ := json.Marshal(pubResp)
-				k.Publish(req.Uuid, msg, true)
+				k.Publish(req.Uuid, msg)
 			}
 		}
 
@@ -356,17 +361,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return resp, nil
 	case "getPermission":
-		fmt.Printf("rx: [%s] asks if token '%s' is valid\n", req.RemoteKite, req.Token)
+		fmt.Printf("rx: [%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
 		k.UpdateKite(req.Uuid)
 
 		msg := protocol.RegisterResponse{}
 
 		token := getToken(req.Username)
 		if token == nil || token.ID != req.Token {
-			fmt.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.RemoteKite)
+			fmt.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 		} else {
-			fmt.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.RemoteKite)
+			fmt.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
 		}
 
@@ -410,12 +415,12 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 			// TODO: also send the len and compare it on the kite side
 			pubResp := createResponse(protocol.AddKite, r)
 			msg, _ := json.Marshal(pubResp)
-			k.Publish(kite.Uuid, msg, true)
+			k.Publish(kite.Uuid, msg)
 
 			// and then send myself to other kites
 			pubResp = createResponse(protocol.AddKite, kite)
 			msg, _ = json.Marshal(pubResp)
-			k.Publish(r.Uuid, msg, true) // don't send to kite.Kitename, it would send it also again to me
+			k.Publish(r.Uuid, msg) // don't send to kite.Kitename, it would send it also again to me
 		}
 	}
 
@@ -423,16 +428,12 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 	for _, c := range k.getRelationship(kite.Kitename) {
 		pubResp := createResponse(protocol.AddKite, kite)
 		msg, _ := json.Marshal(pubResp)
-		k.Publish(c.Uuid, msg, true)
+		k.Publish(c.Uuid, msg)
 	}
 }
 
-func (k *Kontrol) Publish(filter string, msg []byte, logEnabled bool) {
+func (k *Kontrol) Publish(filter string, msg []byte) {
 	msg = []byte(filter + protocol.FRAME_SEPARATOR + string(msg))
-	if logEnabled {
-		fmt.Printf("pub send: %s\n", string(msg))
-	}
-
 	k.Publisher.SendBytes(msg, 0)
 }
 
@@ -442,6 +443,12 @@ func (k *Kontrol) Publish(filter string, msg []byte, logEnabled bool) {
 func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 	kite := storage.Get(req.Uuid)
 	if kite == nil {
+		// in the future we'll check other things too, for now just make sure that
+		// the variables are not empty
+		if req.Kitename == "" && req.Version == "" && req.Addr == "" {
+			return nil, fmt.Errorf("kite fields are not initialized correctly")
+		}
+
 		kite = &models.Kite{
 			Base: protocol.Base{
 				Username:  req.Username,
@@ -457,17 +464,26 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 			},
 		}
 
-		if !validate(kite) {
-			return nil, fmt.Errorf("i : kite %s - %s is not validated", req.Kitename, req.Uuid)
+		kodingKey, err := modelhelper.GetKodingKeysByKey(kite.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("register kodingkey err %s", err)
 		}
 
-		startLog := fmt.Sprintf("i : [%s (%s)] public key '%s' is registered. ready to go..",
+		user, err := modelhelper.GetUserById(kodingKey.Owner)
+		if err != nil {
+			return nil, fmt.Errorf("register get user err %s", err)
+		}
+
+		startLog := fmt.Sprintf("i : [%s (%s)] belong to '%s'. ready to go..",
 			kite.Kitename,
 			kite.Version,
-			kite.PublicKey,
+			user.Name,
 		)
 		fmt.Println(startLog)
 
+		// update fields
+		kite.Username = user.Name
+		kite.Kitename = user.Name + "/" + kite.Kitename
 		storage.Add(kite)
 	}
 	return kite, nil
@@ -527,34 +543,6 @@ func getSession(token string) (*Session, error) {
 	}
 
 	return session, nil
-}
-
-// check whether the publicKey is available (registered) or not. return true if
-// available
-func checkKey(publicKey string) bool {
-	kodingKey := new(models.KodingKeys)
-	query := func(c *mgo.Collection) error {
-		return c.Find(bson.M{"key": publicKey}).One(kodingKey)
-	}
-
-	err := mongodb.Run("jKodingKeys", query)
-	if err != nil {
-		fmt.Println("public key is not registered", publicKey)
-		return false
-	}
-
-	return true
-}
-
-func validate(k *models.Kite) bool {
-	// in the future we'll check other things too, for now just make sure that
-	// the variables are not empty
-	if k.Username == "" && k.Kitename == "" && k.Version == "" && k.Addr == "" {
-		return false
-	}
-
-	// check if public key has permission to run
-	return checkKey(k.PublicKey)
 }
 
 func getIP(addr string) string {

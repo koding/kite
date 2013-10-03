@@ -151,7 +151,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 	}
 
 	// some simple validations for config
-	if o.Username == "" || o.Kitename == "" {
+	if o.Kitename == "" {
 		log.Fatal("error: options data is not set properly")
 	}
 
@@ -178,7 +178,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 
 	k := &Kite{
 		Username:       o.Username,
-		Kitename:       o.Username + "/" + o.Kitename,
+		Kitename:       o.Kitename,
 		Version:        o.Version,
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
@@ -363,6 +363,7 @@ func (k *Kite) RegisterToKontrol() error {
 	switch resp.Result {
 	case protocol.AllowKite:
 		fmt.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr, k.Version, k.Uuid)
+		k.Username = resp.Username // we know now which user that is
 		return nil
 	case protocol.PermitKite:
 		return errors.New("no permission to run")

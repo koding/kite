@@ -225,7 +225,6 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	a := body.(*protocol.KiteDnodeRequest)
 	a.Args = options.WithArgs
-	a.Kitename = options.Kitename
 	a.Token = options.Token
 	a.Username = options.Username
 	a.Hostname = options.CorrelationName
@@ -255,10 +254,11 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		Base: protocol.Base{
 			Username: a.Username,
 			Token:    a.Token,
+			Kitename: d.kite.Kitename + "/" + d.kite.Username,
 		},
-		RemoteKite: a.Kitename,
-		Action:     "getPermission",
+		Action: "getPermission",
 	}
+	fmt.Printf("asking kontrol if token '%s' from %s is valid\n", a.Token, a.Username)
 
 	msg, _ := json.Marshal(&m)
 	result := d.kite.Messenger.Send(msg)
