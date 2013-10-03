@@ -203,14 +203,16 @@ func request(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(list) == 0 {
-		http.Error(w, "{\"err\":\"not kites available\"}\n", http.StatusBadRequest)
+		res := fmt.Sprintf("'%s' not available", matchKite)
+		fmt.Printf("i : %s", res)
+		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", res), http.StatusBadRequest)
 		return
 	}
 
 	l, err := json.Marshal(list)
 	if err != nil {
 		fmt.Println("i: marshalling kite list:", err)
-		http.Error(w, "{\"err\":\"not authorized 2\"}\n", http.StatusBadRequest)
+		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
 		return
 	}
 
