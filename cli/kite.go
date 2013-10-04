@@ -8,10 +8,12 @@ import (
 	"io"
 	"io/ioutil"
 	"koding/newkite/protocol"
+	"koding/tools/process"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 )
 
 type Run struct{}
@@ -24,6 +26,87 @@ func (r Run) Definition() string {
 	return "Runs the kite"
 }
 
+func getKitePid(folder string) (int, error) {
+	pid, err := ioutil.ReadFile(filepath.Join(folder, ".pid"))
+	// This is not an error, pid is not written yet
+	if err != nil {
+		return 0, nil
+	}
+	p, err := strconv.Atoi(string(pid))
+	if err != nil {
+		return 0, err
+	}
+	return p, nil
+}
+
+func setKitePid(folder string, pid int) error {
+	p := strconv.Itoa(pid)
+	err := ioutil.WriteFile(filepath.Join(folder, ".pid"), []byte(p), 0755)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func startKite(folder, kiteName string) error {
+	cmd := exec.Command("go", "build", filepath.Join(folder, kiteName+".go"))
+	err := cmd.Run()
+	if err != nil {
+		return nil
+	}
+	cmd = exec.Command("mv", kiteName, filepath.Join(folder, kiteName))
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+	cmd = exec.Command("./" + filepath.Join(folder, kiteName))
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = setKitePid(folder, cmd.Process.Pid)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func kiteExists(folder string) bool {
+	inf, err := os.Stat(folder)
+	if err != nil {
+		return false
+	}
+	return inf.IsDir()
+}
+
+func kiteRunning(folder string) (error, bool) {
+	pid, err := getKitePid(folder)
+	if err != nil {
+		return err, false
+	}
+	if pid != 0 {
+		succ := process.CheckPid(pid)
+		if succ == nil {
+			return nil, true
+		}
+	}
+	return nil, false
+}
+
+func killKite(folder string) error {
+	pid, err := getKitePid(folder)
+	if err != nil {
+		return err
+	}
+	if pid != 0 {
+		err := process.KillPid(pid)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r Run) Exec() error {
 	flag.Parse()
 	if len(flag.Args()) == 0 {
@@ -31,14 +114,61 @@ func (r Run) Exec() error {
 	}
 	kiteName := flag.Arg(0)
 	folder := kiteName + ".kite"
-	fmt.Println("go" + " run " + filepath.Join(folder, kiteName+".go"))
-	cmd := exec.Command("go", "run", filepath.Join(folder, kiteName+".go"))
-	err := cmd.Start()
+	if !kiteExists(folder) {
+		return fmt.Errorf("There is no kite named %s", kiteName)
+	}
+	err, ok := kiteRunning(folder)
 	if err != nil {
 		return err
 	}
-	// TODO status of kite should be checked
+	if ok {
+		return fmt.Errorf("The kite is already running")
+	}
+	err = startKite(folder, kiteName)
+	if err != nil {
+		return nil
+	}
 	fmt.Println("Started kite")
+	return nil
+}
+
+type Stop struct{}
+
+func NewStop() *Stop {
+	return &Stop{}
+}
+
+func (s Stop) Definition() string {
+	return "Stops a running kite"
+}
+
+func (s Stop) Exec() error {
+	flag.Parse()
+	if len(flag.Args()) == 0 {
+		return errors.New("You should give a kite name")
+	}
+
+	kiteName := flag.Arg(0)
+	folder := kiteName + ".kite"
+	if !kiteExists(folder) {
+		return fmt.Errorf("There is no kite named %s", kiteName)
+	}
+	err, ok := kiteRunning(folder)
+	if err != nil {
+		return nil
+	}
+	if !ok {
+		return fmt.Errorf("Kite is not running")
+	}
+	err = killKite(folder)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Stopped kite")
+	err = setKitePid(folder, 0)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

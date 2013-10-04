@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -36,7 +37,7 @@ func (m *Module) AddModule(name string, definition string) *Module {
 }
 
 func (m *Module) FindModule(args []string) (*Module, error) {
-	var err error
+	var err = errors.New("")
 	for i, arg := range args {
 		sub := m.Children[arg]
 		if sub == nil {
