@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -31,13 +31,16 @@ func NewKd() *Kd {
 	}
 }
 
-func main() {
-	k := NewKd()
+func (k *Kd) Definition() string {
+	return "Registers the kite system to kontrol"
+}
+
+func (k *Kd) Exec() error {
 	err := k.Register()
 	if err != nil {
-		fmt.Printf("\nregister error: %s\n", err.Error())
+		return errors.New(fmt.Sprint("\nregister error: %s\n", err.Error()))
 	}
-
+	return nil
 }
 
 func (k *Kd) Register() error {
