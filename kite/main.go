@@ -135,26 +135,24 @@ type Kite struct {
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
-// three  arguments. o is a config struct that needs to be filled with several
-// informations like Name, Port, IP and so on. rcvr is a struct on which your
-// exported method's are defined. methods is a map that expose your methods
-// with different names to the outside.
-func New(o *protocol.Options, rcvr interface{}, methods map[string]string) *Kite {
+// three  arguments. options is a config struct that needs to be filled with several
+// informations like Name, Port, IP and so on.
+func New(options *protocol.Options) *Kite {
 	var err error
-	if o == nil {
-		o, err = readOptions("manifest.json")
+	if options == nil {
+		options, err = readOptions("manifest.json")
 		if err != nil {
 			slog.Fatal("error: could not read config file", err)
 		}
 	}
 
 	// some simple validations for config
-	if o.Kitename == "" {
+	if options.Kitename == "" {
 		slog.Fatal("error: options data is not set properly")
 	}
 
 	// define log settings
-	slog.SetPrefixName(o.Kitename)
+	slog.SetPrefixName(options.Kitename)
 	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
 
 	hostname, _ := os.Hostname()
@@ -166,22 +164,22 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]string) *Kite
 		slog.Fatal("public key reading:", err)
 	}
 
-	publicIP := getPublicIP(o.PublicIP)
-	localIP := getLocalIP(o.LocalIP)
+	publicIP := getPublicIP(options.PublicIP)
+	localIP := getLocalIP(options.LocalIP)
 
-	port := o.Port
-	if o.Port == "" {
+	port := options.Port
+	if options.Port == "" {
 		port = "0" // go binds to an automatic port
 	}
 
 	// print dependencies, not used currently
 	// pwd, _ := os.Getwd()
-	// getDeps(pwd, o.Kitename)
+	// getDeps(pwd, options.Kitename)
 
 	k := &Kite{
-		Username:       o.Username,
-		Kitename:       o.Kitename,
-		Version:        o.Version,
+		Username:       options.Username,
+		Kitename:       options.Kitename,
+		Version:        options.Version,
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
 		Addr:           localIP + ":" + port,
@@ -191,16 +189,23 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]string) *Kite
 		Hostname:       hostname,
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
-		Methods:        createMethodMap(o.Kitename, rcvr, methods),
-		Messenger:      NewZeroMQ(kiteID, o.Kitename, "all"),
+		Messenger:      NewZeroMQ(kiteID, options.Kitename, "all"),
 		Clients:        NewClients(),
 	}
 
-	if rcvr != nil {
-		k.AddFunction(o.Kitename, rcvr)
+	return k
+}
+
+// AddMethods is used to add new structs with exposed methods with a different
+// name. rcvr is a struct on which your exported method's are defined. methods
+// is a map that expose your methods with different names to the outside world.
+func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
+	if rcvr == nil {
+		return errors.New("method struct should not be nil")
 	}
 
-	return k
+	k.Methods = createMethodMap(k.Kitename, rcvr, methods)
+	return k.Server.RegisterName(k.Kitename, rcvr)
 }
 
 // Start is a blocking method. It runs the kite server and then accepts requests
@@ -472,12 +477,6 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
-}
-
-// AddFunction is used to add new structs with exposed methods with a different
-// name.
-func (k *Kite) AddFunction(name string, method interface{}) {
-	k.Server.RegisterName(name, method)
 }
 
 // CallSync makes a blocking request to another kite. Kite should be in form of
