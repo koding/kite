@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/db/mongodb"
+	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 	"net/http"
 )
 
@@ -38,7 +36,7 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 		}
 		slog.Printf("sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
 
-		session, err := getSession(msg.SessionID)
+		session, err := modelhelper.GetSession(msg.SessionID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
@@ -116,27 +114,4 @@ func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Reques
 		token.ID, msg.RemoteKite, msg.Username)
 
 	w.Write([]byte(kitesJSON))
-}
-
-// TODO: move following to models and modelhelpers
-type Session struct {
-	Id       bson.ObjectId `bson:"_id" json:"-"`
-	ClientId string        `bson:"clientId"`
-	Username string        `bson:"username"`
-	GuestId  int           `bson:"guestId"`
-}
-
-func getSession(token string) (*Session, error) {
-	var session *Session
-
-	query := func(c *mgo.Collection) error {
-		return c.Find(bson.M{"clientId": token}).One(&session)
-	}
-
-	err := mongodb.Run("jSessions", query)
-	if err != nil {
-		return nil, fmt.Errorf("sessionID '%s' is not validated", token)
-	}
-
-	return session, nil
 }
