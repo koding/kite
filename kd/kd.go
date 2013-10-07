@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"koding/newkite/cli"
+	"koding/newkite/kd/cli"
 	"os"
 )
 
