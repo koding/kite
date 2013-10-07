@@ -473,7 +473,7 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 			return nil, fmt.Errorf("register kodingkey err %s", err)
 		}
 
-		user, err := modelhelper.GetUserById(kodingKey.Owner)
+		account, err := modelhelper.GetAccountById(kodingKey.Owner)
 		if err != nil {
 			return nil, fmt.Errorf("register get user err %s", err)
 		}
@@ -481,13 +481,13 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 		startLog := fmt.Sprintf("i : [%s (%s)] belong to '%s'. ready to go..",
 			kite.Kitename,
 			kite.Version,
-			user.Name,
+			account.Profile.Nickname,
 		)
 		slog.Println(startLog)
 
 		// update fields
-		kite.Username = user.Name
-		kite.Kitename = user.Name + "/" + kite.Kitename
+		kite.Username = account.Profile.Nickname
+		kite.Kitename = account.Profile.Nickname + "/" + kite.Kitename
 		storage.Add(kite)
 	}
 	return kite, nil
