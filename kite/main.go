@@ -21,8 +21,6 @@ import (
 	"net/rpc"
 	"os"
 	"reflect"
-	"runtime"
-	"strings"
 	"sync"
 	"time"
 )
@@ -141,7 +139,7 @@ type Kite struct {
 // informations like Name, Port, IP and so on. rcvr is a struct on which your
 // exported method's are defined. methods is a map that expose your methods
 // with different names to the outside.
-func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) *Kite {
+func New(o *protocol.Options, rcvr interface{}, methods map[string]string) *Kite {
 	var err error
 	if o == nil {
 		o, err = readOptions("manifest.json")
@@ -154,6 +152,10 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 	if o.Kitename == "" {
 		slog.Fatal("error: options data is not set properly")
 	}
+
+	// define log settings
+	slog.SetPrefixName(o.Kitename)
+	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
 
 	hostname, _ := os.Hostname()
 	id, _ := uuid.NewV4()
@@ -197,10 +199,6 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 	if rcvr != nil {
 		k.AddFunction(o.Kitename, rcvr)
 	}
-
-	// define log settings
-	slog.SetPrefixName(o.Kitename)
-	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
 
 	return k
 }
@@ -422,8 +420,7 @@ func (k *Kite) dialClient(kite *models.Kite) (*rpc.Client, error) {
 func (k *Kite) serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
-		slog.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
-		os.Exit(1)
+		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
 		return
 	}
 
@@ -683,18 +680,20 @@ Misc
 
 ******************************************/
 
-func createMethodMap(kitename string, rcvr interface{}, methods map[string]interface{}) map[string]string {
-	funcName := func(i interface{}) string {
-		return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+func createMethodMap(kitename string, rcvr interface{}, methods map[string]string) map[string]string {
+	kiteStruct := reflect.TypeOf(rcvr)
+
+	methodsMapping := make(map[string]string)
+	for alternativeName, method := range methods {
+		m, ok := kiteStruct.MethodByName(method)
+		if !ok {
+			slog.Printf("warning: no method with name: %s\n", method)
+			continue
+		}
+
+		// map alternativeName to go's net/rpc methodname
+		methodsMapping[alternativeName] = kitename + "." + m.Name
 	}
 
-	t := reflect.TypeOf(rcvr)
-	structName := strings.TrimPrefix(t.String(), "*")
-
-	methodMap := make(map[string]string)
-	for name, method := range methods {
-		methodMap[name] = kitename + "." + strings.TrimPrefix(funcName(method), structName+".")
-	}
-
-	return methodMap
+	return methodsMapping
 }
