@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,10 @@ import (
 	"net/http"
 )
 
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "Hello world - kontrol!\n")
+}
+
 // preparHandler first checks if the incoming POST request is a valid session.
 // Every request made to kontrol should be in POST with protocol.Request in
 // their body.
@@ -20,47 +25,66 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		msg := new(protocol.Request)
-		body, _ := ioutil.ReadAll(r.Body)
-		err := json.Unmarshal(body, &msg)
+		msg, err := readPostRequest(r.Body)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
 
-		slog.Printf("rx: sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
-
-		s, err := getSession(msg.SessionID)
+		err = validatePostRequest(msg)
 		if err != nil {
-			slog.Printf("i : sessionID '%s' is not validated (err: 1)\n", msg.SessionID)
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
+		slog.Printf("sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
 
-		if s.ClientId != msg.SessionID {
-			slog.Printf("i : sessionID '%s' is not validated (err: 2)\n", msg.SessionID)
-			http.Error(w, "{\"err\":\"not authorized 1\"}\n", http.StatusBadRequest)
+		session, err := getSession(msg.SessionID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
+		slog.Printf("sessionID '%s' is validated as: %s\n", msg.SessionID, session.Username)
 
-		slog.Printf("i : sessionID '%s' is validated as: %s\n", msg.SessionID, s.Username)
-
-		msg.Username = s.Username
+		msg.Username = session.Username
 		fn(w, r, msg)
 	}
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello world - kontrol!\n")
+func readPostRequest(requestBody io.ReadCloser) (*protocol.Request, error) {
+	msg := new(protocol.Request)
+	body, err := ioutil.ReadAll(requestBody)
+	if err != nil {
+		return nil, err
+	}
+	defer requestBody.Close()
+
+	err = json.Unmarshal(body, &msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
+func validatePostRequest(msg *protocol.Request) error {
+	if msg.SessionID == "" {
+		return errors.New("sessionID field is empty")
+	}
+
+	if msg.RemoteKite == "" {
+		return errors.New("remoteKite field is not specified")
+	}
+
+	return nil
 }
 
 func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Request) {
-	list := make([]protocol.PubResponse, 0)
+	kites := make([]protocol.PubResponse, 0)
 	var token *protocol.Token
 
 	matchKite := msg.Username + "/" + msg.RemoteKite
 
-	slog.Printf("i : searching for kite '%s'\n", matchKite)
+	slog.Printf("searching for kite '%s'\n", matchKite)
 	for _, k := range storage.List() {
 		if k.Kitename == matchKite {
 			token = getToken(msg.Username)
@@ -70,29 +94,31 @@ func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Reques
 
 			k.Token = token.ID // only token id is important for requester
 			pubResp := createResponse(protocol.AddKite, k)
-			list = append(list, pubResp)
+			kites = append(kites, pubResp)
 		}
 	}
 
-	if len(list) == 0 {
-		res := fmt.Sprintf("'%s' not available", matchKite)
-		slog.Printf("i : %s", res)
+	if len(kites) == 0 {
+		res := fmt.Sprintf("'%s' not available\n", matchKite)
+		slog.Printf(res)
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", res), http.StatusBadRequest)
 		return
 	}
 
-	l, err := json.Marshal(list)
+	kitesJSON, err := json.Marshal(kites)
 	if err != nil {
-		slog.Println("i: marshalling kite list:", err)
+		slog.Println("marshalling kite list:", err)
 		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
 		return
 	}
 
-	slog.Printf("tx: sending token '%s' to be used with '%s' to '%s'\n", token.ID, msg.RemoteKite, msg.Username)
-	w.Write([]byte(l))
+	slog.Printf("sending token '%s' to be used with '%s' to '%s'\n",
+		token.ID, msg.RemoteKite, msg.Username)
+
+	w.Write([]byte(kitesJSON))
 }
 
-// for now these fields are enough
+// TODO: move following to models and modelhelpers
 type Session struct {
 	Id       bson.ObjectId `bson:"_id" json:"-"`
 	ClientId string        `bson:"clientId"`
@@ -100,7 +126,6 @@ type Session struct {
 	GuestId  int           `bson:"guestId"`
 }
 
-// TODO: move to models and modelhelpers
 func getSession(token string) (*Session, error) {
 	var session *Session
 
@@ -110,7 +135,7 @@ func getSession(token string) (*Session, error) {
 
 	err := mongodb.Run("jSessions", query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sessionID '%s' is not validated", token)
 	}
 
 	return session, nil

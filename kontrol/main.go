@@ -164,7 +164,7 @@ func (k *Kontrol) HeartBeatChecker() {
 					continue // still alive, pick up the next one
 				}
 
-				removeLog := fmt.Sprintf("i : [%s (%s)] dead at '%s' - '%s'",
+				removeLog := fmt.Sprintf("[%s (%s)] dead at '%s' - '%s'",
 					kite.Kitename,
 					kite.Version,
 					kite.Hostname,
@@ -221,7 +221,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return []byte("OK"), nil
 	case "register":
-		slog.Printf("rx: [%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
+		slog.Printf("[%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
 		kite, err := k.RegisterKite(req)
 		if err != nil {
 			response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
@@ -242,7 +242,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		// then notify dependencies of this kite, if any available
 		k.NotifyDependencies(kite)
 
-		startLog := fmt.Sprintf("i : [%s (%s)] starting at '%s' - '%s'",
+		startLog := fmt.Sprintf("[%s (%s)] starting at '%s' - '%s'",
 			kite.Kitename,
 			kite.Version,
 			kite.Hostname,
@@ -284,17 +284,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return resp, nil
 	case "getPermission":
-		slog.Printf("rx: [%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
+		slog.Printf("[%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
 		k.UpdateKite(req.Uuid)
 
 		msg := protocol.RegisterResponse{}
 
 		token := getToken(req.Username)
 		if token == nil || token.ID != req.Token {
-			slog.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
+			slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 		} else {
-			slog.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.Kitename)
+			slog.Printf("token '%s' is valid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
 		}
 
@@ -397,7 +397,7 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 			return nil, fmt.Errorf("register get user err %s", err)
 		}
 
-		startLog := fmt.Sprintf("i : [%s (%s)] belong to '%s'. ready to go..",
+		startLog := fmt.Sprintf("[%s (%s)] belong to '%s'. ready to go..",
 			kite.Kitename,
 			kite.Version,
 			account.Profile.Nickname,
