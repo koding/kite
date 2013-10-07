@@ -204,7 +204,7 @@ func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 		return errors.New("method struct should not be nil")
 	}
 
-	k.Methods = createMethodMap(k.Kitename, rcvr, methods)
+	k.Methods = k.createMethodMap(rcvr, methods)
 	return k.Server.RegisterName(k.Kitename, rcvr)
 }
 
@@ -679,7 +679,7 @@ Misc
 
 ******************************************/
 
-func createMethodMap(kitename string, rcvr interface{}, methods map[string]string) map[string]string {
+func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) map[string]string {
 	kiteStruct := reflect.TypeOf(rcvr)
 
 	methodsMapping := make(map[string]string)
@@ -691,7 +691,7 @@ func createMethodMap(kitename string, rcvr interface{}, methods map[string]strin
 		}
 
 		// map alternativeName to go's net/rpc methodname
-		methodsMapping[alternativeName] = kitename + "." + m.Name
+		methodsMapping[alternativeName] = k.Kitename + "." + m.Name
 	}
 
 	return methodsMapping
