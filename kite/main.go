@@ -14,7 +14,7 @@ import (
 	"koding/newkite/balancer"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
-	"log"
+	"koding/tools/slog"
 	"math"
 	"net"
 	"net/http"
@@ -146,13 +146,13 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 	if o == nil {
 		o, err = readOptions("manifest.json")
 		if err != nil {
-			log.Fatal("error: could not read config file", err)
+			slog.Fatal("error: could not read config file", err)
 		}
 	}
 
 	// some simple validations for config
 	if o.Kitename == "" {
-		log.Fatal("error: options data is not set properly")
+		slog.Fatal("error: options data is not set properly")
 	}
 
 	hostname, _ := os.Hostname()
@@ -161,7 +161,7 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 
 	publicKey, err := getKey("public")
 	if err != nil {
-		log.Fatal("public key reading:", err)
+		slog.Fatal("public key reading:", err)
 	}
 
 	publicIP := getPublicIP(o.PublicIP)
@@ -198,6 +198,10 @@ func New(o *protocol.Options, rcvr interface{}, methods map[string]interface{}) 
 		k.AddFunction(o.Kitename, rcvr)
 	}
 
+	// define log settings
+	slog.SetPrefixName(o.Kitename)
+	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
+
 	return k
 }
 
@@ -224,7 +228,7 @@ func (k *Kite) handle(msg []byte) {
 	var r protocol.PubResponse
 	err := json.Unmarshal(msg, &r)
 	if err != nil {
-		log.Println(err)
+		slog.Println(err)
 		return
 	}
 
@@ -316,7 +320,7 @@ func (k *Kite) InitializeKite() {
 	debug("not registered, sending register request to kontrol...")
 	err := k.RegisterToKontrol()
 	if err != nil {
-		fmt.Println(err)
+		slog.Println(err)
 		return
 	}
 
@@ -349,7 +353,7 @@ func (k *Kite) RegisterToKontrol() error {
 
 	msg, err := json.Marshal(&m)
 	if err != nil {
-		log.Println("kontrolRequest marshall err", err)
+		slog.Println("kontrolRequest marshall err", err)
 		return err
 	}
 
@@ -362,7 +366,7 @@ func (k *Kite) RegisterToKontrol() error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		fmt.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr, k.Version, k.Uuid)
+		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr, k.Version, k.Uuid)
 		k.Username = resp.Username // we know now which user that is
 		return nil
 	case protocol.PermitKite:
@@ -418,13 +422,13 @@ func (k *Kite) dialClient(kite *models.Kite) (*rpc.Client, error) {
 func (k *Kite) serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
-		log.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
+		slog.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
 		os.Exit(1)
 		return
 	}
 
 	k.Addr = listener.Addr().String()
-	fmt.Println("serve addr is", k.Addr)
+	slog.Println("serve addr is", k.Addr)
 
 	// GroupCache
 	k.newPool(k.Addr)
@@ -452,7 +456,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	debug("hijacking conn")
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		log.Print("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
+		slog.Printf("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
 		return
 	}
 
@@ -465,7 +469,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ServeHTTP method.
 func (k *Kite) serveWS(ws *websocket.Conn) {
 	addr := ws.Request().RemoteAddr
-	fmt.Printf("[%s] client connected\n", addr)
+	slog.Printf("[%s] client connected\n", addr)
 
 	k.Clients.Add(&client{Conn: ws, Addr: addr})
 
@@ -491,7 +495,7 @@ func (k *Kite) CallSync(kite, method string, args interface{}, result interface{
 	rpcFunc := kite + "." + method
 	err = remoteKite.Client.Call(rpcFunc, args, result)
 	if err != nil {
-		log.Println(err)
+		slog.Println(err)
 		return fmt.Errorf("[%s] call error: %s", kite, err.Error())
 	}
 
@@ -533,7 +537,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 
 				msg, err := json.Marshal(&m)
 				if err != nil {
-					log.Println("kontrolRequest marshall err", err)
+					slog.Println("kontrolRequest marshall err", err)
 					continue
 				}
 

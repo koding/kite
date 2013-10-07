@@ -13,9 +13,9 @@ import (
 	"koding/db/mongodb"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
+	"koding/tools/slog"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -100,7 +100,9 @@ func main() {
 		Router:    router,
 	}
 
-	fmt.Println("kontrol started")
+	slog.SetPrefixName("kontrol")
+	slog.SetPrefixTimeStamp(time.Stamp)
+	slog.Println("started")
 	k.Start()
 }
 
@@ -128,7 +130,7 @@ func (k *Kontrol) Start() {
 			identity := msg[0]
 			result, err := k.handle(msg[2])
 			if err != nil {
-				log.Println(err)
+				slog.Println(err)
 			}
 
 			k.Router.SendBytes(identity, zmq.SNDMORE)
@@ -142,7 +144,7 @@ func (k *Kontrol) Start() {
 	rout.HandleFunc("/ip", ip).Methods("GET")
 	rout.HandleFunc("/request", request).Methods("POST")
 	http.Handle("/", rout)
-	log.Println(http.ListenAndServe(":4000", nil))
+	slog.Println(http.ListenAndServe(":4000", nil))
 }
 
 func home(w http.ResponseWriter, r *http.Request) {
@@ -166,29 +168,29 @@ func request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("rx: sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
+	slog.Printf("rx: sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
 
 	s, err := getSession(msg.SessionID)
 	if err != nil {
-		fmt.Printf("i : sessionID '%s' is not validated (err: 1)\n", msg.SessionID)
+		slog.Printf("i : sessionID '%s' is not validated (err: 1)\n", msg.SessionID)
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 		return
 	}
 
 	if s.ClientId != msg.SessionID {
-		fmt.Printf("i : sessionID '%s' is not validated (err: 2)\n", msg.SessionID)
+		slog.Printf("i : sessionID '%s' is not validated (err: 2)\n", msg.SessionID)
 		http.Error(w, "{\"err\":\"not authorized 1\"}\n", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("i : sessionID '%s' is validated as: %s\n", msg.SessionID, s.Username)
+	slog.Printf("i : sessionID '%s' is validated as: %s\n", msg.SessionID, s.Username)
 
 	list := make([]protocol.PubResponse, 0)
 	var token *protocol.Token
 
 	matchKite := s.Username + "/" + msg.RemoteKite
 
-	fmt.Printf("i : searching for kite '%s'\n", matchKite)
+	slog.Printf("i : searching for kite '%s'\n", matchKite)
 	for _, k := range storage.List() {
 		if k.Kitename == matchKite {
 			token = getToken(s.Username)
@@ -204,19 +206,19 @@ func request(w http.ResponseWriter, r *http.Request) {
 
 	if len(list) == 0 {
 		res := fmt.Sprintf("'%s' not available", matchKite)
-		fmt.Printf("i : %s", res)
+		slog.Printf("i : %s", res)
 		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", res), http.StatusBadRequest)
 		return
 	}
 
 	l, err := json.Marshal(list)
 	if err != nil {
-		fmt.Println("i: marshalling kite list:", err)
+		slog.Println("i: marshalling kite list:", err)
 		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("tx: sending token '%s' to be used with '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
+	slog.Printf("tx: sending token '%s' to be used with '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
 	w.Write([]byte(l))
 }
 
@@ -249,7 +251,7 @@ func (k *Kontrol) HeartBeatChecker() {
 					kite.Hostname,
 					kite.Uuid,
 				)
-				fmt.Println(removeLog)
+				slog.Println(removeLog)
 
 				storage.Remove(kite.Uuid)
 
@@ -300,7 +302,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return []byte("OK"), nil
 	case "register":
-		fmt.Printf("rx: [%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
+		slog.Printf("rx: [%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
 		kite, err := k.RegisterKite(req)
 		if err != nil {
 			response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
@@ -327,7 +329,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 			kite.Hostname,
 			kite.Uuid,
 		)
-		fmt.Println(startLog)
+		slog.Println(startLog)
 
 		// send response back to the kite, also identify him with the new name
 		response := protocol.RegisterResponse{
@@ -338,7 +340,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		resp, _ := json.Marshal(response)
 		return resp, nil
 	case "getKites":
-		fmt.Println("getKites request from: ", string(msg))
+		slog.Println("getKites request from: ", string(msg))
 		k.UpdateKite(req.Uuid)
 
 		// publish all remoteKites to me, with a token appended to them
@@ -353,7 +355,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		// Add myself as an dependency to the kite itself (to the kite I
 		// request above). This is needed when new kites of that type appear
 		// on kites that exist dissapear.
-		fmt.Printf("adding '%s' as a dependency to '%s' \n", req.Kitename, req.RemoteKite)
+		slog.Printf("adding '%s' as a dependency to '%s' \n", req.Kitename, req.RemoteKite)
 		dependency.Add(req.RemoteKite, req.Kitename)
 
 		resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: "kitesPublished"})
@@ -363,17 +365,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 		return resp, nil
 	case "getPermission":
-		fmt.Printf("rx: [%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
+		slog.Printf("rx: [%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
 		k.UpdateKite(req.Uuid)
 
 		msg := protocol.RegisterResponse{}
 
 		token := getToken(req.Username)
 		if token == nil || token.ID != req.Token {
-			fmt.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
+			slog.Printf("tx: token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 		} else {
-			fmt.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.Kitename)
+			slog.Printf("tx: token '%s' is valid for '%s' \n", req.Token, req.Kitename)
 			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
 		}
 
@@ -481,7 +483,7 @@ func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
 			kite.Version,
 			user.Name,
 		)
-		fmt.Println(startLog)
+		slog.Println(startLog)
 
 		// update fields
 		kite.Username = user.Name
@@ -556,7 +558,7 @@ func getIP(addr string) string {
 }
 
 func checkServer(host string) error {
-	fmt.Println("checking host", host)
+	slog.Println("checking host", host)
 	c, err := net.DialTimeout("tcp", host, time.Second*5)
 	if err != nil {
 		return err
@@ -568,9 +570,9 @@ func checkServer(host string) error {
 func addToProxy(kite *models.Kite) {
 	err := checkServer(kite.Addr)
 	if err != nil {
-		fmt.Printf("server not reachable: %s (%s) \n", kite.Addr, err.Error())
+		slog.Printf("server not reachable: %s (%s) \n", kite.Addr, err.Error())
 	} else {
-		fmt.Println("checking ok..", kite.Addr)
+		slog.Println("checking ok..", kite.Addr)
 	}
 
 	err = modelhelper.UpsertKey(
@@ -584,7 +586,7 @@ func addToProxy(kite *models.Kite) {
 		"",                // rabbitkey, not used currently
 	)
 	if err != nil {
-		log.Println("err")
+		slog.Println("err")
 	}
 
 }
