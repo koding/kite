@@ -135,10 +135,10 @@ func (k *Kontrol) Start() {
 	}()
 
 	rout := mux.NewRouter()
-	rout.HandleFunc("/", homeHandler).Methods("GET") // everyone needs a place for home
+	rout.HandleFunc("/", homeHandler).Methods("GET")
 	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
 	http.Handle("/", rout)
-	slog.Println(http.ListenAndServe(":4000", nil))
+	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
 }
 
 func (k *Kontrol) Ping() {
@@ -212,6 +212,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// TODO: refactor the whole thing.
 	switch req.Action {
 	case "pong":
 		err := k.UpdateKite(req.Uuid)
@@ -440,11 +441,6 @@ func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	return targetKites
 }
 
-func generateToken() string {
-	id, _ := uuid.NewV4()
-	return id.String()
-}
-
 func checkServer(host string) error {
 	slog.Println("checking host", host)
 	c, err := net.DialTimeout("tcp", host, time.Second*5)
@@ -505,4 +501,9 @@ func createToken(username string) *protocol.Token {
 
 func deleteToken(username string) {
 	delete(tokens, username)
+}
+
+func generateToken() string {
+	id, _ := uuid.NewV4()
+	return id.String()
 }
