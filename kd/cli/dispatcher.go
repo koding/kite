@@ -1,8 +1,6 @@
 package cli
 
-import (
-	"flag"
-)
+import "flag"
 
 type Dispatcher struct {
 	root *Module
@@ -11,7 +9,8 @@ type Dispatcher struct {
 func NewDispatcher() *Dispatcher {
 	root := NewModule(nil, "")
 	root.AddCommand("hello", NewHello())
-	root.AddCommand("register", NewKd())
+	root.AddCommand("register", NewRegister())
+
 	kite := root.AddModule("kite", "Includes commands related to kites")
 	kite.AddCommand("create", NewCreate())
 	kite.AddCommand("run", NewRun())
@@ -26,12 +25,12 @@ func (d *Dispatcher) Run() error {
 		return err
 	}
 	if command != nil {
-		return (*command).Exec()
+		return command.Exec()
 	}
 	return nil
 }
 
-func (d *Dispatcher) findCommand() (*Command, error) {
+func (d *Dispatcher) findCommand() (Command, error) {
 	flag.Parse()
 	args := flag.Args()
 	module, err := d.root.FindModule(args)

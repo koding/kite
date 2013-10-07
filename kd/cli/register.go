@@ -14,43 +14,42 @@ import (
 )
 
 // var authSite = "https://koding.com"
-
 var authSite = "http://localhost:3020"
 
-type Kd struct {
+type Register struct {
 	ID         string
 	PublicKey  string
 	PrivateKey string
 	Username   string
 }
 
-func NewKd() *Kd {
+func NewRegister() *Register {
 	id, _ := uuid.NewV4()
-	return &Kd{
+	return &Register{
 		ID: "machineID-" + id.String(),
 	}
 }
 
-func (k *Kd) Definition() string {
-	return "Registers the kite system to kontrol"
+func (r *Register) Definition() string {
+	return "Registers the user's machine to kontrol"
 }
 
-func (k *Kd) Exec() error {
-	err := k.Register()
+func (r *Register) Exec() error {
+	err := r.Register()
 	if err != nil {
 		return errors.New(fmt.Sprint("\nregister error: %s\n", err.Error()))
 	}
 	return nil
 }
 
-func (k *Kd) Register() error {
-	err := k.GetConfig()
+func (r *Register) Register() error {
+	err := r.getConfig()
 	if err != nil {
 		return err
 	}
 
-	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", authSite, k.ID, k.PublicKey)
-	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", authSite, k.PublicKey)
+	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", authSite, r.ID, r.PublicKey)
+	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", authSite, r.PublicKey)
 
 	fmt.Printf("Please open the following url for authentication:\n\n")
 	// PrintBox(registerUrl)
@@ -112,22 +111,22 @@ func PrintBox(msg string) {
 	fmt.Printf("\n")
 }
 
-func (k *Kd) GetConfig() error {
+func (r *Register) getConfig() error {
 	var err error
 	// we except to read all of them, if one fails it should be abort
-	k.PublicKey, err = GetKey("public")
+	r.PublicKey, err = getKey("public")
 	if err != nil {
 		return err
 	}
 
-	k.PrivateKey, err = GetKey("private")
+	r.PrivateKey, err = getKey("private")
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func GetKey(key string) (string, error) {
+func getKey(key string) (string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return "", err

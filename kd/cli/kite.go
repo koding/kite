@@ -16,14 +16,45 @@ import (
 	"strconv"
 )
 
+/****************************************
+
+kd run
+
+****************************************/
+
 type Run struct{}
 
 func NewRun() *Run {
 	return &Run{}
 }
 
-func (r Run) Definition() string {
+func (Run) Definition() string {
 	return "Runs the kite"
+}
+
+func (Run) Exec() error {
+	flag.Parse()
+	if len(flag.Args()) == 0 {
+		return errors.New("You should give a kite name")
+	}
+	kiteName := flag.Arg(0)
+	folder := kiteName + ".kite"
+	if !kiteExists(folder) {
+		return fmt.Errorf("There is no kite named %s", kiteName)
+	}
+	err, ok := kiteRunning(folder)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return fmt.Errorf("The kite is already running")
+	}
+	err = startKite(folder, kiteName)
+	if err != nil {
+		return nil
+	}
+	fmt.Println("Started kite")
+	return nil
 }
 
 func getKitePid(folder string) (int, error) {
@@ -107,30 +138,11 @@ func killKite(folder string) error {
 	return nil
 }
 
-func (r Run) Exec() error {
-	flag.Parse()
-	if len(flag.Args()) == 0 {
-		return errors.New("You should give a kite name")
-	}
-	kiteName := flag.Arg(0)
-	folder := kiteName + ".kite"
-	if !kiteExists(folder) {
-		return fmt.Errorf("There is no kite named %s", kiteName)
-	}
-	err, ok := kiteRunning(folder)
-	if err != nil {
-		return err
-	}
-	if ok {
-		return fmt.Errorf("The kite is already running")
-	}
-	err = startKite(folder, kiteName)
-	if err != nil {
-		return nil
-	}
-	fmt.Println("Started kite")
-	return nil
-}
+/****************************************
+
+kd stop
+
+****************************************/
 
 type Stop struct{}
 
@@ -171,6 +183,12 @@ func (s Stop) Exec() error {
 	}
 	return nil
 }
+
+/****************************************
+
+kd create
+
+****************************************/
 
 type Create struct{}
 

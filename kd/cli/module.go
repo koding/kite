@@ -6,26 +6,29 @@ import (
 	"os"
 )
 
-// To add a module, implement this interface
-// Definition is the command definition
-// Exec is the behaviour that you want to implement as a command
+// To add a module, implement this interface. Definition is the command
+// definition. Exec is the behaviour that you want to implement as a command
 type Command interface {
-	Definition() string
+	Definition() string // usually it's the output for --help
 	Exec() error
 }
 
 type Module struct {
 	Children   map[string]*Module
-	Command    *Command
+	Command    Command
 	Definition string
 }
 
-func NewModule(command *Command, definition string) *Module {
-	return &Module{Children: make(map[string]*Module, 0), Definition: definition, Command: command}
+func NewModule(command Command, definition string) *Module {
+	return &Module{
+		Children:   make(map[string]*Module, 0),
+		Definition: definition,
+		Command:    command,
+	}
 }
 
 func (m *Module) AddCommand(name string, command Command) *Module {
-	child := NewModule(&command, "")
+	child := NewModule(command, "")
 	m.Children[name] = child
 	return child
 }
@@ -44,10 +47,12 @@ func (m *Module) FindModule(args []string) (*Module, error) {
 			err = fmt.Errorf("Command %s not found\n\n", arg)
 			break
 		}
+
 		if sub.Command == nil {
 			m = m.Children[arg]
 			continue
 		}
+
 		// command behaves like a subprocess, it will parse arguments again
 		// so we re discarding parsed arguments
 		temp := os.Args
@@ -65,7 +70,7 @@ func (m *Module) printPossibleCommands() string {
 		prompt += fmt.Sprintf("  %-10s  ", n)
 		definition := module.Definition
 		if module.Command != nil {
-			definition = (*module.Command).Definition()
+			definition = module.Command.Definition()
 		}
 		prompt += fmt.Sprintf("%s\n", definition)
 	}
