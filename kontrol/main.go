@@ -7,15 +7,10 @@ import (
 	"github.com/gorilla/mux"
 	uuid "github.com/nu7hatch/gouuid"
 	zmq "github.com/pebbe/zmq3"
-	"io"
-	"io/ioutil"
 	"koding/db/models"
-	"koding/db/mongodb"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 	"net"
 	"net/http"
 	"os"
@@ -140,86 +135,10 @@ func (k *Kontrol) Start() {
 	}()
 
 	rout := mux.NewRouter()
-	rout.HandleFunc("/", home).Methods("GET")
-	rout.HandleFunc("/ip", ip).Methods("GET")
-	rout.HandleFunc("/request", request).Methods("POST")
+	rout.HandleFunc("/", homeHandler).Methods("GET") // everyone needs a place for home
+	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
 	http.Handle("/", rout)
 	slog.Println(http.ListenAndServe(":4000", nil))
-}
-
-func home(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Hello world - kontrol!\n")
-}
-
-func ip(w http.ResponseWriter, r *http.Request) {
-	ip := getIP(r.RemoteAddr)
-	io.WriteString(w, ip)
-}
-
-func request(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	var msg protocol.Request
-
-	body, _ := ioutil.ReadAll(r.Body)
-	err := json.Unmarshal(body, &msg)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
-		return
-	}
-
-	slog.Printf("rx: sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
-
-	s, err := getSession(msg.SessionID)
-	if err != nil {
-		slog.Printf("i : sessionID '%s' is not validated (err: 1)\n", msg.SessionID)
-		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
-		return
-	}
-
-	if s.ClientId != msg.SessionID {
-		slog.Printf("i : sessionID '%s' is not validated (err: 2)\n", msg.SessionID)
-		http.Error(w, "{\"err\":\"not authorized 1\"}\n", http.StatusBadRequest)
-		return
-	}
-
-	slog.Printf("i : sessionID '%s' is validated as: %s\n", msg.SessionID, s.Username)
-
-	list := make([]protocol.PubResponse, 0)
-	var token *protocol.Token
-
-	matchKite := s.Username + "/" + msg.RemoteKite
-
-	slog.Printf("i : searching for kite '%s'\n", matchKite)
-	for _, k := range storage.List() {
-		if k.Kitename == matchKite {
-			token = getToken(s.Username)
-			if token == nil {
-				token = createToken(s.Username)
-			}
-
-			k.Token = token.ID // only token id is important for requester
-			pubResp := createResponse(protocol.AddKite, k)
-			list = append(list, pubResp)
-		}
-	}
-
-	if len(list) == 0 {
-		res := fmt.Sprintf("'%s' not available", matchKite)
-		slog.Printf("i : %s", res)
-		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", res), http.StatusBadRequest)
-		return
-	}
-
-	l, err := json.Marshal(list)
-	if err != nil {
-		slog.Println("i: marshalling kite list:", err)
-		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
-		return
-	}
-
-	slog.Printf("tx: sending token '%s' to be used with '%s' to '%s'\n", token.ID, msg.RemoteKite, s.Username)
-	w.Write([]byte(l))
 }
 
 func (k *Kontrol) Ping() {
@@ -521,40 +440,9 @@ func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	return targetKites
 }
 
-func GenerateToken() string {
+func generateToken() string {
 	id, _ := uuid.NewV4()
 	return id.String()
-}
-
-// for now these fields are enough
-type Session struct {
-	Id       bson.ObjectId `bson:"_id" json:"-"`
-	ClientId string        `bson:"clientId"`
-	Username string        `bson:"username"`
-	GuestId  int           `bson:"guestId"`
-}
-
-func getSession(token string) (*Session, error) {
-	var session *Session
-
-	query := func(c *mgo.Collection) error {
-		return c.Find(bson.M{"clientId": token}).One(&session)
-	}
-
-	err := mongodb.Run("jSessions", query)
-	if err != nil {
-		return nil, err
-	}
-
-	return session, nil
-}
-
-func getIP(addr string) string {
-	ip, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return ""
-	}
-	return ip
 }
 
 func checkServer(host string) error {
@@ -593,7 +481,7 @@ func addToProxy(kite *models.Kite) {
 
 func NewToken(username string) *protocol.Token {
 	return &protocol.Token{
-		ID:        GenerateToken(),
+		ID:        generateToken(),
 		Username:  username,
 		Expire:    0,
 		CreatedAt: time.Now(),
