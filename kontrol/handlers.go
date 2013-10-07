@@ -54,19 +54,18 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 // we assume that the incoming JSON data is in form of protocol.Request. Read
 // and return a new protocol.Request from the POST body if succesfull.
 func readPostRequest(requestBody io.ReadCloser) (*protocol.Request, error) {
-	msg := new(protocol.Request)
 	body, err := ioutil.ReadAll(requestBody)
 	if err != nil {
 		return nil, err
 	}
 	defer requestBody.Close()
 
-	err = json.Unmarshal(body, &msg)
+	req, err := convertRequest(body)
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return req, nil
 }
 
 // validate that incoming post request has all necessary (at least the one we

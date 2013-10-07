@@ -205,109 +205,131 @@ func (k *Kontrol) HeartBeatChecker() {
 }
 
 func (k *Kontrol) handle(msg []byte) ([]byte, error) {
-	// rest we assume that it complies with our protocol
-	var req protocol.Request
+	req, err := convertRequest(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	switch req.Action {
+	case "pong":
+		return k.handlePong(req)
+	case "register":
+		return k.handleRegister(req)
+	case "getKites":
+		return k.handleGetKites(req)
+	case "getPermission":
+		return k.handleGetPermission(req)
+	}
+
+	return []byte("handle error"), nil
+}
+
+func convertRequest(msg []byte) (*protocol.Request, error) {
+	req := new(protocol.Request)
 	err := json.Unmarshal(msg, &req)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: refactor the whole thing.
-	switch req.Action {
-	case "pong":
-		err := k.UpdateKite(req.Uuid)
-		if err != nil {
-			return []byte("UPDATE"), nil
-		}
+	return req, nil
+}
 
-		return []byte("OK"), nil
-	case "register":
-		slog.Printf("[%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
-		kite, err := k.RegisterKite(req)
-		if err != nil {
-			response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
-			resp, _ := json.Marshal(response)
-			return resp, err
-		}
-
-		k.UpdateKite(req.Uuid)
-
-		// disable this for now
-		// go addToProxy(kite)
-
-		// first notify myself
-		pubResp := createResponse(protocol.AddKite, kite)
-		msg, _ := json.Marshal(pubResp)
-		k.Publish(req.Uuid, msg)
-
-		// then notify dependencies of this kite, if any available
-		k.NotifyDependencies(kite)
-
-		startLog := fmt.Sprintf("[%s (%s)] starting at '%s' - '%s'",
-			kite.Kitename,
-			kite.Version,
-			kite.Hostname,
-			kite.Uuid,
-		)
-		slog.Println(startLog)
-
-		// send response back to the kite, also identify him with the new name
-		response := protocol.RegisterResponse{
-			Addr:     self,
-			Result:   protocol.AllowKite,
-			Username: kite.Username,
-		}
-		resp, _ := json.Marshal(response)
-		return resp, nil
-	case "getKites":
-		slog.Println("getKites request from: ", string(msg))
-		k.UpdateKite(req.Uuid)
-
-		// publish all remoteKites to me, with a token appended to them
-		for _, r := range storage.List() {
-			if r.Kitename == req.RemoteKite {
-				pubResp := createResponse(protocol.AddKite, r)
-				msg, _ := json.Marshal(pubResp)
-				k.Publish(req.Uuid, msg)
-			}
-		}
-
-		// Add myself as an dependency to the kite itself (to the kite I
-		// request above). This is needed when new kites of that type appear
-		// on kites that exist dissapear.
-		slog.Printf("adding '%s' as a dependency to '%s' \n", req.Kitename, req.RemoteKite)
-		dependency.Add(req.RemoteKite, req.Kitename)
-
-		resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: "kitesPublished"})
-		if err != nil {
-			return nil, err
-		}
-
-		return resp, nil
-	case "getPermission":
-		slog.Printf("[%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
-		k.UpdateKite(req.Uuid)
-
-		msg := protocol.RegisterResponse{}
-
-		token := getToken(req.Username)
-		if token == nil || token.ID != req.Token {
-			slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
-			msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
-		} else {
-			slog.Printf("token '%s' is valid for '%s' \n", req.Token, req.Kitename)
-			msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
-		}
-
-		resp, err := json.Marshal(msg)
-		if err != nil {
-			return nil, err
-		}
-
-		return resp, nil
+func (k *Kontrol) handlePong(req *protocol.Request) ([]byte, error) {
+	err := k.UpdateKite(req.Uuid)
+	if err != nil {
+		return []byte("UPDATE"), nil
 	}
 
-	return []byte("handle error"), nil
+	return []byte("OK"), nil
+}
+
+func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
+	slog.Printf("[%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
+	kite, err := k.RegisterKite(req)
+	if err != nil {
+		response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
+		resp, _ := json.Marshal(response)
+		return resp, err
+	}
+
+	k.UpdateKite(req.Uuid)
+
+	// disable this for now
+	// go addToProxy(kite)
+
+	// first notify myself
+	pubResp := createResponse(protocol.AddKite, kite)
+	msg, _ := json.Marshal(pubResp)
+	k.Publish(req.Uuid, msg)
+
+	// then notify dependencies of this kite, if any available
+	k.NotifyDependencies(kite)
+
+	startLog := fmt.Sprintf("[%s (%s)] starting at '%s' - '%s'",
+		kite.Kitename,
+		kite.Version,
+		kite.Hostname,
+		kite.Uuid,
+	)
+	slog.Println(startLog)
+
+	// send response back to the kite, also identify him with the new name
+	response := protocol.RegisterResponse{
+		Addr:     self,
+		Result:   protocol.AllowKite,
+		Username: kite.Username,
+	}
+	resp, _ := json.Marshal(response)
+	return resp, nil
+
+}
+func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
+	k.UpdateKite(req.Uuid)
+
+	// publish all remoteKites to me, with a token appended to them
+	for _, r := range storage.List() {
+		if r.Kitename == req.RemoteKite {
+			pubResp := createResponse(protocol.AddKite, r)
+			msg, _ := json.Marshal(pubResp)
+			k.Publish(req.Uuid, msg)
+		}
+	}
+
+	// Add myself as an dependency to the kite itself (to the kite I
+	// request above). This is needed when new kites of that type appear
+	// on kites that exist dissapear.
+	slog.Printf("adding '%s' as a dependency to '%s' \n", req.Kitename, req.RemoteKite)
+	dependency.Add(req.RemoteKite, req.Kitename)
+
+	resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: "kitesPublished"})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
+	slog.Printf("[%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
+	k.UpdateKite(req.Uuid)
+
+	msg := protocol.RegisterResponse{}
+
+	token := getToken(req.Username)
+	if token == nil || token.ID != req.Token {
+		slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
+		msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
+	} else {
+		slog.Printf("token '%s' is valid for '%s' \n", req.Token, req.Kitename)
+		msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
+	}
+
+	resp, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func createResponse(action string, kite *models.Kite) protocol.PubResponse {
@@ -364,7 +386,7 @@ func (k *Kontrol) Publish(filter string, msg []byte) {
 // RegisterKite returns true if the specified kite has been seen before.
 // If not, it first validates the kites. If the kite has permission to run, it
 // creates a new struct, stores it and returns it.
-func (k *Kontrol) RegisterKite(req protocol.Request) (*models.Kite, error) {
+func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 	kite := storage.Get(req.Uuid)
 	if kite == nil {
 		// in the future we'll check other things too, for now just make sure that
