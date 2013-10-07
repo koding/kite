@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	uuid "github.com/nu7hatch/gouuid"
 	zmq "github.com/pebbe/zmq3"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
@@ -69,7 +68,6 @@ type Kontrol struct {
 
 var (
 	self       string
-	tokens     = make(map[string]*protocol.Token)
 	storage    Storage
 	dependency Dependency
 )
@@ -84,8 +82,6 @@ func main() {
 	hostname, _ := os.Hostname()
 
 	// storage = peers.New()  // in-memory, map based, non-persistence storage
-	// storage = NewRethinkDB() // future
-	// storage = NewRedis() // future
 	storage = NewMongoDB()
 	dependency = NewDependency()
 
@@ -113,32 +109,35 @@ func (k *Kontrol) Start() {
 	}()
 
 	// HeartBeat pool checker. Checking for kites if they are live or dead.
-	go k.HeartBeatChecker()
+	go k.heartBeatChecker()
 
-	go func() {
-		for {
-			msg, _ := k.Router.RecvMessageBytes(0)
-			if len(msg) != 3 { // msg is malformed
-				continue
-			}
-
-			identity := msg[0]
-			result, err := k.handle(msg[2])
-			if err != nil {
-				slog.Println(err)
-			}
-
-			k.Router.SendBytes(identity, zmq.SNDMORE)
-			k.Router.SendBytes([]byte(""), zmq.SNDMORE)
-			k.Router.SendBytes(result, 0)
-		}
-	}()
+	// This is used for kite coordination. Will be replaced soon via an HTTP one.
+	go k.zmqMessageRouting()
 
 	rout := mux.NewRouter()
 	rout.HandleFunc("/", homeHandler).Methods("GET")
 	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
 	http.Handle("/", rout)
 	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
+}
+
+func (k *Kontrol) zmqMessageRouting() {
+	for {
+		msg, _ := k.Router.RecvMessageBytes(0)
+		if len(msg) != 3 { // msg is malformed
+			continue
+		}
+
+		identity := msg[0]
+		result, err := k.handle(msg[2])
+		if err != nil {
+			slog.Println(err)
+		}
+
+		k.Router.SendBytes(identity, zmq.SNDMORE)
+		k.Router.SendBytes([]byte(""), zmq.SNDMORE)
+		k.Router.SendBytes(result, 0)
+	}
 }
 
 func (k *Kontrol) Ping() {
@@ -153,7 +152,7 @@ func (k *Kontrol) Ping() {
 	k.Publish("all", msg)
 }
 
-func (k *Kontrol) HeartBeatChecker() {
+func (k *Kontrol) heartBeatChecker() {
 	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
 	go func() {
 		for _ = range ticker.C {
@@ -175,8 +174,7 @@ func (k *Kontrol) HeartBeatChecker() {
 				storage.Remove(kite.Uuid)
 
 				// notify kites of the same type
-				pubResp := createResponse(protocol.RemoveKite, kite)
-				msg, _ := json.Marshal(pubResp)
+				msg := createByteResponse(protocol.RemoveKite, kite)
 				k.Publish(kite.Kitename, msg)
 
 				// then notify kites that depends on me..
@@ -205,10 +203,12 @@ func (k *Kontrol) HeartBeatChecker() {
 }
 
 func (k *Kontrol) handle(msg []byte) ([]byte, error) {
-	req, err := convertRequest(msg)
+	req, err := unmarshalRequest(msg)
 	if err != nil {
 		return nil, err
 	}
+
+	k.updateKite(req.Uuid)
 
 	switch req.Action {
 	case "pong":
@@ -224,7 +224,17 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 	return []byte("handle error"), nil
 }
 
-func convertRequest(msg []byte) (*protocol.Request, error) {
+func (k *Kontrol) updateKite(Uuid string) error {
+	kite := storage.Get(Uuid)
+	if kite == nil {
+		return errors.New("not registered")
+	}
+	kite.UpdatedAt = time.Now().Add(protocol.HEARTBEAT_INTERVAL)
+	storage.Add(kite)
+	return nil
+}
+
+func unmarshalRequest(msg []byte) (*protocol.Request, error) {
 	req := new(protocol.Request)
 	err := json.Unmarshal(msg, &req)
 	if err != nil {
@@ -235,7 +245,7 @@ func convertRequest(msg []byte) (*protocol.Request, error) {
 }
 
 func (k *Kontrol) handlePong(req *protocol.Request) ([]byte, error) {
-	err := k.UpdateKite(req.Uuid)
+	err := k.updateKite(req.Uuid)
 	if err != nil {
 		return []byte("UPDATE"), nil
 	}
@@ -252,15 +262,11 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 		return resp, err
 	}
 
-	k.UpdateKite(req.Uuid)
-
 	// disable this for now
 	// go addToProxy(kite)
 
 	// first notify myself
-	pubResp := createResponse(protocol.AddKite, kite)
-	msg, _ := json.Marshal(pubResp)
-	k.Publish(req.Uuid, msg)
+	k.Publish(req.Uuid, createByteResponse(protocol.AddKite, kite))
 
 	// then notify dependencies of this kite, if any available
 	k.NotifyDependencies(kite)
@@ -284,14 +290,10 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 
 }
 func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
-	k.UpdateKite(req.Uuid)
-
 	// publish all remoteKites to me, with a token appended to them
 	for _, r := range storage.List() {
 		if r.Kitename == req.RemoteKite {
-			pubResp := createResponse(protocol.AddKite, r)
-			msg, _ := json.Marshal(pubResp)
-			k.Publish(req.Uuid, msg)
+			k.Publish(req.Uuid, createByteResponse(protocol.AddKite, r))
 		}
 	}
 
@@ -311,7 +313,6 @@ func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
 
 func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
 	slog.Printf("[%s] asks if token '%s' is valid\n", req.Kitename, req.Token)
-	k.UpdateKite(req.Uuid)
 
 	msg := protocol.RegisterResponse{}
 
@@ -330,6 +331,11 @@ func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
 	}
 
 	return resp, nil
+}
+
+func createByteResponse(action string, kite *models.Kite) []byte {
+	msg, _ := json.Marshal(createResponse(action, kite))
+	return msg // no way that this can produce an error
 }
 
 func createResponse(action string, kite *models.Kite) protocol.PubResponse {
@@ -358,23 +364,17 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 	for _, r := range storage.List() {
 		if r.Kitename == kite.Kitename && r.Uuid != kite.Uuid {
 			// send other kites to me
-			// TODO: also send the len and compare it on the kite side
-			pubResp := createResponse(protocol.AddKite, r)
-			msg, _ := json.Marshal(pubResp)
-			k.Publish(kite.Uuid, msg)
+			k.Publish(kite.Uuid, createByteResponse(protocol.AddKite, r))
 
-			// and then send myself to other kites
-			pubResp = createResponse(protocol.AddKite, kite)
-			msg, _ = json.Marshal(pubResp)
-			k.Publish(r.Uuid, msg) // don't send to kite.Kitename, it would send it also again to me
+			// and then send myself to other kites. but don't send to
+			// kite.Kitename, because it would send it again to me.
+			k.Publish(r.Uuid, createByteResponse(protocol.AddKite, kite))
 		}
 	}
 
-	// notify myself to kites that depends on me, attach also a token if I have one
+	// notify myself to kites that depends on me
 	for _, c := range k.getRelationship(kite.Kitename) {
-		pubResp := createResponse(protocol.AddKite, kite)
-		msg, _ := json.Marshal(pubResp)
-		k.Publish(c.Uuid, msg)
+		k.Publish(c.Uuid, createByteResponse(protocol.AddKite, kite))
 	}
 }
 
@@ -435,16 +435,6 @@ func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 	return kite, nil
 }
 
-func (k *Kontrol) UpdateKite(Uuid string) error {
-	kite := storage.Get(Uuid)
-	if kite == nil {
-		return errors.New("not registered")
-	}
-	kite.UpdatedAt = time.Now().Add(protocol.HEARTBEAT_INTERVAL)
-	storage.Add(kite)
-	return nil
-}
-
 // GetRelationship returns a slice of of kites that has a relationship to kite itself
 func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	targetKites := make([]*models.Kite, 0)
@@ -495,37 +485,4 @@ func addToProxy(kite *models.Kite) {
 		slog.Println("err")
 	}
 
-}
-
-func NewToken(username string) *protocol.Token {
-	return &protocol.Token{
-		ID:        generateToken(),
-		Username:  username,
-		Expire:    0,
-		CreatedAt: time.Now(),
-	}
-}
-
-func getToken(username string) *protocol.Token {
-	token, ok := tokens[username]
-	if !ok {
-		return nil
-	}
-
-	return token
-}
-
-func createToken(username string) *protocol.Token {
-	t := NewToken(username)
-	tokens[username] = t
-	return t
-}
-
-func deleteToken(username string) {
-	delete(tokens, username)
-}
-
-func generateToken() string {
-	id, _ := uuid.NewV4()
-	return id.String()
 }

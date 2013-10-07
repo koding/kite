@@ -44,7 +44,7 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 		}
 		slog.Printf("sessionID '%s' is validated as: %s\n", msg.SessionID, session.Username)
 
-		// username is used for matching kites and generating tokens
+		// username is used for matching kites and generating tokens in requestHandler
 		msg.Username = session.Username
 
 		fn(w, r, msg)
@@ -60,7 +60,7 @@ func readPostRequest(requestBody io.ReadCloser) (*protocol.Request, error) {
 	}
 	defer requestBody.Close()
 
-	req, err := convertRequest(body)
+	req, err := unmarshalRequest(body)
 	if err != nil {
 		return nil, err
 	}
