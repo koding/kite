@@ -10,6 +10,7 @@ import (
 	"io"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
+	"net"
 	"net/rpc"
 )
 
@@ -106,9 +107,13 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		return err
 	}
 
-	slog.Printf("got a call request from %s with token %s: -> \n", a.Kitename, a.Token)
+	// Return when kontrol is not enabled
+	if !c.Kite.KontrolEnabled {
+		return nil
+	}
+
 	if permissions.Has(a.Token) {
-		slog.Printf("... already allowed to run\n")
+		slog.Printf("[%s] allowed token (cached) '%s'\n", c.rwc.(net.Conn).RemoteAddr().String(), a.Token)
 		return nil
 	}
 
@@ -124,10 +129,9 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		RemoteKite: a.Kitename,
 		Action:     "getPermission",
 	}
+	slog.Printf("asking kontrol if token '%s' from %s is valid\n", a.Token, a.Username)
 
 	msg, _ := json.Marshal(&m)
-
-	slog.Printf("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
 	result := c.Kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
@@ -135,12 +139,12 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		slog.Printf("... allowed to run\n")
+		slog.Printf("[%s] allowed token '%s'\n", c.rwc.(net.Conn).RemoteAddr(), a.Token)
 		permissions.Add(a.Token)
 		return nil
 	case protocol.PermitKite:
-		slog.Printf("... not allowed. permission denied via Kontrol\n")
-		return errors.New("not allowed to start")
+		slog.Printf("denied token '%s'\n", a.Token)
+		return errors.New("no permission to run")
 	default:
 		return errors.New("got a nonstandart response")
 	}

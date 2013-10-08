@@ -274,9 +274,11 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	}
 
 	// Kontrol did send our updated name(i.e: fs-kite -> username/fs-kite).
-	// Therefore also update our subscriptions
+	// Therefore also update our subscriptions and name
 	k.Messenger.Unsubscribe(k.Kitename)
 	k.Messenger.Subscribe(r.Kitename)
+	k.Kitename = r.Kitename
+	slog.SetPrefixName(r.Kitename)
 
 	kite := &models.Kite{
 		Base: protocol.Base{

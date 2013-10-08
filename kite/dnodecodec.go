@@ -244,7 +244,6 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	// fmt.Printf("got a call request from %s with token %s", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		fmt.Printf("[%s] allowed token (cached) '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
 		return nil
