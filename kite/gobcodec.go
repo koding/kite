@@ -106,7 +106,7 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		return err
 	}
 
-	slog.Printf("got a call request from %s with token %s: -> ", a.Kitename, a.Token)
+	slog.Printf("got a call request from %s with token %s: -> \n", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
 		slog.Printf("... already allowed to run\n")
 		return nil

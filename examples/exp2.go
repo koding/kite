@@ -16,13 +16,13 @@ type Exp2 struct {
 
 func main() {
 	flag.Parse()
-	o := protocol.Options{
-		Username: "huseyin",
+	options := &protocol.Options{
 		Kitename: "application",
+		Version:  "1",
 		Port:     *port,
 	}
-	methods := map[string]interface{}{}
-	k := kite.New(&o, new(Exp2), methods)
+
+	k := kite.New(options)
 	go k.Start()
 
 	// this is needed that the goroutine k.Start() is been settled. We will
@@ -32,7 +32,7 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	squareOf := func(i float64) {
-		k.Call("mathworker", "Square", i, func(err error, res string) {
+		k.Call("devrim", "mathworker", "Square", i, func(err error, res string) {
 			if err != nil {
 				fmt.Println("call error:", err)
 			} else {

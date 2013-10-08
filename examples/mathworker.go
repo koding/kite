@@ -11,6 +11,25 @@ import (
 
 type Math struct{}
 
+var port = flag.String("port", "", "port to bind itself")
+
+func main() {
+	flag.Parse()
+	options := &protocol.Options{
+		Kitename: "mathworker",
+		Version:  "1",
+		Port:     *port,
+	}
+
+	methods := map[string]string{
+		"math.square": "Square",
+	}
+
+	k := kite.New(options)
+	k.AddMethods(new(Math), methods)
+	k.Start()
+}
+
 func (Math) Square(r *protocol.KiteRequest, result *string) error {
 	a, ok := r.Args.(float64)
 	if !ok {
@@ -21,22 +40,4 @@ func (Math) Square(r *protocol.KiteRequest, result *string) error {
 
 	fmt.Printf("[%s] call, sending result '%s' back\n", r.Origin, *result)
 	return nil
-}
-
-var port = flag.String("port", "", "port to bind itself")
-
-func main() {
-	flag.Parse()
-	o := &protocol.Options{
-		Username: "fatih",
-		Kitename: "mathworker",
-		Version:  "1",
-		Port:     *port,
-	}
-
-	methods := map[string]interface{}{
-		"math.square": Math.Square,
-	}
-	k := kite.New(o, new(Math), methods)
-	k.Start()
 }

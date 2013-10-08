@@ -282,6 +282,7 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 		Base: protocol.Base{
 			Username: r.Username,
 			Kitename: r.Kitename,
+			Token:    r.Token,
 			Version:  r.Version,
 			Uuid:     r.Uuid,
 			Hostname: r.Hostname,
@@ -514,11 +515,12 @@ func (k *Kite) CallSync(kite, method string, args interface{}, result interface{
 // used by the remote kite, therefore you should know what the kite is expecting.
 // fn is a callback that is executed when the result and error has been received.
 // Currently only string as a result is supported, but it needs to be changed.
-func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, res string)) *rpc.Call {
-	rpcFunc := kite + "." + method
+func (k *Kite) Call(username, kitename, method string, args interface{}, fn func(err error, res string)) *rpc.Call {
+
+	rpcFunc := kitename + "." + method
 	ticker := time.NewTicker(time.Second * 1)
 	runCall := make(chan bool, 1)
-	resetOnce := make(chan bool, 1)
+	remoteKiteName := username + "/" + kitename
 
 	var remoteKite *models.Kite
 	var err error
@@ -526,7 +528,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 	for {
 		select {
 		case <-ticker.C:
-			remoteKite, err = k.getRemoteKite(kite)
+			remoteKite, err = k.getRemoteKite(remoteKiteName)
 			if err != nil {
 				slog.Println("no remote kites available, requesting some ...")
 				m := protocol.Request{
@@ -538,7 +540,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 						Hostname: k.Hostname,
 						Addr:     k.Addr,
 					},
-					RemoteKite: kite,
+					RemoteKite: remoteKiteName,
 					Action:     "getKites",
 				}
 
@@ -558,7 +560,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 				ticker.Stop()
 				slog.Printf("making rpc call to '%s' with token '%s'\n", remoteKite.Kitename, remoteKite.Token)
 				runCall <- true
-				resetOnce <- true
+				k.OnceCall = sync.Once{}
 			}
 		case <-runCall:
 			var result string
@@ -585,8 +587,6 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 				fn(d.Error, result)
 			}
 			return d
-		case <-resetOnce:
-			k.OnceCall = sync.Once{}
 		}
 	}
 }

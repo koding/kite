@@ -86,14 +86,13 @@ func validatePostRequest(msg *protocol.Request) error {
 // It also generates a new one-way token that is used between the client and
 // kite and appends it to each kite struct
 func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
-	matchKite := username + "/" + kitename
 	kites := make([]protocol.PubResponse, 0)
 	token := new(protocol.Token)
 
-	slog.Printf("searching for kite '%s'\n", matchKite)
+	slog.Printf("searching for kite '%s'\n", kitename)
 
 	for _, k := range storage.List() {
-		if k.Kitename == matchKite {
+		if k.Kitename == kitename {
 			token = getToken(username)
 			if token == nil {
 				token = createToken(username)
@@ -106,7 +105,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 	}
 
 	if len(kites) == 0 {
-		return nil, fmt.Errorf("'%s' not available\n", matchKite)
+		return nil, fmt.Errorf("'%s' not available\n", kitename)
 	}
 
 	return kites, nil
@@ -115,7 +114,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 // requestHandler sends as response a list of kites that matches kites in form
 // of "username/kitename".
 func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Request) {
-	kites, err := searchForKites(msg.Username, msg.RemoteKite)
+	kites, err := searchForKites(msg.Username, msg.Username+"/"+msg.RemoteKite)
 	if err != nil {
 		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
 		return

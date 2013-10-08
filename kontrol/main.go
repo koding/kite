@@ -290,11 +290,14 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 
 }
 func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
-	// publish all remoteKites to me, with a token appended to them
-	for _, r := range storage.List() {
-		if r.Kitename == req.RemoteKite {
-			k.Publish(req.Uuid, createByteResponse(protocol.AddKite, r))
-		}
+	kites, err := searchForKites(req.Username, req.RemoteKite)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, kite := range kites {
+		msg, _ := json.Marshal(kite)
+		k.Publish(req.Uuid, msg)
 	}
 
 	// Add myself as an dependency to the kite itself (to the kite I
