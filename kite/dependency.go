@@ -3,6 +3,7 @@ package kite
 import (
 	"fmt"
 	"io/ioutil"
+	"koding/newkite/utils"
 	"log"
 	"os"
 	"strings"
@@ -42,7 +43,7 @@ func searchDir(root, sourceNode string) {
 			}
 		}
 
-		m, err := readOptions(kitepath + "/manifest.json")
+		m, err := utils.ReadKiteOptions(kitepath + "/manifest.json")
 		if err != nil {
 			fmt.Println("could not read manifest", err)
 			return

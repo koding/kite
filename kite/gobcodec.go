@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"koding/newkite/protocol"
+	"koding/tools/slog"
 	"net/rpc"
 )
 
@@ -40,7 +41,7 @@ func NewKiteClientCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 func (c *KiteClientCodec) WriteRequest(r *rpc.Request, body interface{}) (err error) {
-	debug("Client WriteRequest")
+	slog.Println("Client WriteRequest")
 	if err = c.enc.Encode(r); err != nil {
 		return
 	}
@@ -53,12 +54,12 @@ func (c *KiteClientCodec) WriteRequest(r *rpc.Request, body interface{}) (err er
 }
 
 func (c *KiteClientCodec) ReadResponseHeader(r *rpc.Response) error {
-	debug("Client ReadResponseHeader")
+	slog.Println("Client ReadResponseHeader")
 	return c.dec.Decode(r)
 }
 
 func (c *KiteClientCodec) ReadResponseBody(body interface{}) error {
-	debug("Client ReadResponseBody")
+	slog.Println("Client ReadResponseBody")
 	return c.dec.Decode(body)
 }
 
@@ -94,12 +95,12 @@ func NewKiteServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 func (c *KiteServerCodec) ReadRequestHeader(r *rpc.Request) error {
-	debug("Server ReadRequestHeader")
+	slog.Println("Server ReadRequestHeader")
 	return c.dec.Decode(r)
 }
 
 func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
-	debug("Server ReadRequestBody")
+	slog.Println("Server ReadRequestBody")
 	if body == nil {
 		return c.dec.Decode(body)
 	}
@@ -110,9 +111,9 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		return err
 	}
 
-	debug("got a call request from %s with token %s: -> ", a.Kitename, a.Token)
+	slog.Printf("got a call request from %s with token %s: -> ", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
-		debug("... already allowed to run\n")
+		slog.Printf("... already allowed to run\n")
 		return nil
 	}
 
@@ -131,7 +132,7 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 
 	msg, _ := json.Marshal(&m)
 
-	debug("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
+	slog.Printf("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
 	result := c.Kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
@@ -139,11 +140,11 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		debug("... allowed to run\n")
+		slog.Printf("... allowed to run\n")
 		permissions.Add(a.Token)
 		return nil
 	case protocol.PermitKite:
-		debug("... not allowed. permission denied via Kontrol\n")
+		slog.Printf("... not allowed. permission denied via Kontrol\n")
 		return errors.New("not allowed to start")
 	default:
 		return errors.New("got a nonstandart response")
@@ -153,7 +154,7 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 }
 
 func (c *KiteServerCodec) WriteResponse(r *rpc.Response, body interface{}) (err error) {
-	debug("Server WriteRequest")
+	slog.Println("Server WriteRequest")
 	if err = c.enc.Encode(r); err != nil {
 		return
 	}

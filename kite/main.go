@@ -13,6 +13,7 @@ import (
 	"koding/db/models"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
+	"koding/newkite/utils"
 	"koding/tools/slog"
 	"math"
 	"net"
@@ -139,7 +140,7 @@ type Kite struct {
 func New(options *protocol.Options) *Kite {
 	var err error
 	if options == nil {
-		options, err = readOptions("manifest.json")
+		options, err = utils.ReadKiteOptions("manifest.json")
 		if err != nil {
 			slog.Fatal("error: could not read config file", err)
 		}
@@ -158,13 +159,13 @@ func New(options *protocol.Options) *Kite {
 	id, _ := uuid.NewV4()
 	kiteID := id.String()
 
-	publicKey, err := getKey("public")
+	publicKey, err := utils.GetKodingKey("public")
 	if err != nil {
 		slog.Fatal("public key reading:", err)
 	}
 
-	publicIP := getPublicIP(options.PublicIP)
-	localIP := getLocalIP(options.LocalIP)
+	publicIP := utils.GetPublicIP(options.PublicIP)
+	localIP := utils.GetLocalIP(options.LocalIP)
 
 	port := options.Port
 	if options.Port == "" {
@@ -279,7 +280,7 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	kites.Add(kite)
 	k.SetPeers(k.PeersAddr()...)
 
-	debug("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
+	slog.Printf("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
 
 // RemoveKite is executed when a protocol.AddKite message has been received
@@ -290,7 +291,7 @@ func (k *Kite) RemoveKite(r protocol.PubResponse) {
 	}
 
 	kites.Remove(r.Uuid)
-	debug("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
+	slog.Printf("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
 
 // Pong sends a 'pong' message whenever the kite receives a message from Kontrol.
@@ -319,7 +320,7 @@ func (k *Kite) InitializeKite() {
 		return
 	}
 
-	debug("not registered, sending register request to kontrol...")
+	slog.Println("not registered, sending register request to kontrol...")
 	err := k.RegisterToKontrol()
 	if err != nil {
 		slog.Println(err)
@@ -392,7 +393,7 @@ var connected = "200 Connected to Go RPC"
 // dialClient is used to connect to a Remote Kite via the GOB codec. This is
 // used by other external kite methods.
 func (k *Kite) dialClient(kite *models.Kite) (*rpc.Client, error) {
-	debug("establishing HTTP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
+	slog.Printf("establishing HTTP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
 	var err error
 	conn, err := net.Dial("tcp4", kite.Addr)
 	if err != nil {
@@ -446,7 +447,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	debug("a new rpc call is done from", r.RemoteAddr)
+	slog.Println("a new rpc call is done from", r.RemoteAddr)
 	if r.Method != "CONNECT" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -454,7 +455,6 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	debug("hijacking conn")
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		slog.Printf("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
@@ -516,7 +516,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 		case <-ticker.C:
 			remoteKite, err = k.getRemoteKite(kite)
 			if err != nil {
-				debug("no remote kites available, requesting some ...")
+				slog.Println("no remote kites available, requesting some ...")
 				m := protocol.Request{
 					Base: protocol.Base{
 						Username: k.Username,
@@ -537,14 +537,14 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 				}
 
 				onceBody := func() {
-					debug("sending requesting message...")
+					slog.Println("sending requesting message...")
 					k.Messenger.Send(msg)
 				}
 
 				k.OnceCall.Do(onceBody) // to prevent multiple get request when called concurrently
 			} else {
 				ticker.Stop()
-				debug("making rpc call to '%s' with token '%s': -> ", remoteKite.Kitename, remoteKite.Token)
+				slog.Printf("making rpc call to '%s' with token '%s': -> ", remoteKite.Kitename, remoteKite.Token)
 				runCall <- true
 				resetOnce <- true
 			}

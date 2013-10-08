@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"koding/newkite/protocol"
+	"koding/tools/slog"
 	"net/rpc"
 	"sync"
 )
@@ -68,7 +69,7 @@ func NewJsonClientCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 func (c *JsonClientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
-	debug("JsonClient WriteRequest")
+	slog.Println("JsonClient WriteRequest")
 
 	c.mutex.Lock()
 	c.pending[r.Seq] = r.ServiceMethod
@@ -80,7 +81,7 @@ func (c *JsonClientCodec) WriteRequest(r *rpc.Request, param interface{}) error 
 }
 
 func (c *JsonClientCodec) ReadResponseHeader(r *rpc.Response) error {
-	debug("JsonClient ReadResponseHeader")
+	slog.Println("JsonClient ReadResponseHeader")
 
 	c.resp.reset()
 	if err := c.dec.Decode(&c.resp); err != nil {
@@ -108,7 +109,7 @@ func (c *JsonClientCodec) ReadResponseHeader(r *rpc.Response) error {
 }
 
 func (c *JsonClientCodec) ReadResponseBody(x interface{}) error {
-	debug("Client ReadResponseBody")
+	slog.Println("Client ReadResponseBody")
 	if x == nil {
 		return nil
 	}
@@ -184,7 +185,7 @@ func NewJsonServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 func (c *JsonServerCodec) ReadRequestHeader(r *rpc.Request) error {
-	debug("JsonServer ReadRequestHeader")
+	slog.Println("JsonServer ReadRequestHeader")
 
 	c.req.reset()
 	if err := c.dec.Decode(&c.req); err != nil {
@@ -225,7 +226,7 @@ func (c *JsonServerCodec) ReadRequestHeader(r *rpc.Request) error {
 var errMissingParams = errors.New("jsonrpc: request body missing params")
 
 func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
-	debug("JsonServer ReadRequestBody")
+	slog.Println("JsonServer ReadRequestBody")
 	if x == nil {
 		return nil
 	}
@@ -249,9 +250,9 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	var params [1]interface{}
 	params[0] = &a.Args
 
-	debug("got a call request from %s with token %s: -> ", a.Kitename, a.Token)
+	slog.Printf("got a call request from %s with token %s: -> ", a.Kitename, a.Token)
 	if permissions.Has(a.Token) {
-		debug("... already allowed to run\n")
+		slog.Printf("... already allowed to run\n")
 		return json.Unmarshal(*c.req.Params, &params)
 	}
 
@@ -266,7 +267,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 
 	msg, _ := json.Marshal(&m)
 
-	debug("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
+	slog.Printf("\nasking kontrol for permission, for '%s' with token '%s': -> ", a.Kitename, a.Token)
 	result := c.kite.Messenger.Send(msg)
 
 	var resp protocol.RegisterResponse
@@ -274,11 +275,11 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		debug("... allowed to run\n")
+		slog.Printf("... allowed to run\n")
 		permissions.Add(a.Token)
 		return json.Unmarshal(*c.req.Params, &params)
 	case protocol.PermitKite:
-		debug("... not allowed. permission denied via Kontrol\n")
+		slog.Printf("... not allowed. permission denied via Kontrol\n")
 		return errors.New("no permission to run")
 	default:
 		return errors.New("got a nonstandart response")
@@ -290,7 +291,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 var null = json.RawMessage([]byte("null"))
 
 func (c *JsonServerCodec) WriteResponse(r *rpc.Response, x interface{}) error {
-	debug("JsonServer WriteRequest")
+	slog.Println("JsonServer WriteRequest")
 	var resp serverResponse
 	c.mutex.Lock()
 	b, ok := c.pending[r.Seq]

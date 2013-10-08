@@ -1,4 +1,4 @@
-package kite
+package utils
 
 import (
 	"encoding/json"
@@ -15,8 +15,8 @@ import (
 
 // Listen returns a Listener that listens on the first available port on the
 // first available non-loopback IPv4 network interface.
-func listenExternal() (net.Listener, error) {
-	ip, err := externalIP()
+func ListenExternal() (net.Listener, error) {
+	ip, err := ExternalIP()
 	if err != nil {
 		return nil, fmt.Errorf("could not find active non-loopback address: %v", err)
 	}
@@ -24,7 +24,7 @@ func listenExternal() (net.Listener, error) {
 }
 
 // returns on of the local network interfaces IP
-func externalIP() (string, error) {
+func ExternalIP() (string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "", err
@@ -61,7 +61,7 @@ func externalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
-func getKey(key string) (string, error) {
+func GetKodingKey(key string) (string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return "", err
@@ -87,7 +87,7 @@ func getKey(key string) (string, error) {
 
 // return o.LocalIP back if assigned, otherwise it gets a local IP from on
 // of the local network interfaces
-func getLocalIP(ip string) string {
+func GetLocalIP(ip string) string {
 	// already assigned manually
 	if ip != "" {
 		return ip
@@ -95,7 +95,7 @@ func getLocalIP(ip string) string {
 
 	// if no assigned manually, then pick up one from the internal interfaces
 	var err error
-	ip, err = externalIP()
+	ip, err = ExternalIP()
 	if err != nil {
 		//	There is no ip assigned manually neither can we find any
 		//	external IP, therefore abort, because kite can't work in this
@@ -107,7 +107,7 @@ func getLocalIP(ip string) string {
 
 // returns o.PublicIP back if assigned, otherwise it gets a public IP from
 // a public service (like icanhazip.com)
-func getPublicIP(ip string) string {
+func GetPublicIP(ip string) string {
 	// already assigned manually
 	if ip != "" {
 		return ip
@@ -133,7 +133,7 @@ func getPublicIP(ip string) string {
 	return netIP.To4().String()
 }
 
-func readOptions(configfile string) (*protocol.Options, error) {
+func ReadKiteOptions(configfile string) (*protocol.Options, error) {
 	file, err := ioutil.ReadFile(configfile)
 	if err != nil {
 		return nil, err
@@ -146,10 +146,4 @@ func readOptions(configfile string) (*protocol.Options, error) {
 	}
 
 	return options, nil
-}
-
-func debug(args ...interface{}) {
-	if protocol.DEBUG_ENABLED {
-		fmt.Println(args...)
-	}
 }

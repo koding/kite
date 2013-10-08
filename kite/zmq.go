@@ -4,6 +4,7 @@ import (
 	"bytes"
 	zmq "github.com/pebbe/zmq3"
 	"koding/newkite/protocol"
+	"koding/tools/slog"
 	"sync"
 )
 
@@ -68,7 +69,7 @@ func (z *ZeroMQ) Consume(handle func([]byte)) {
 			msg = frames[1] // msg is in JSON format
 			handle(msg)
 		default:
-			debug("not intended for me, dropping", string(filter))
+			slog.Println("not intended for me, dropping", string(filter))
 		}
 
 	}
