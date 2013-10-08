@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/fatih/goset"
 	"github.com/golang/groupcache"
-	uuid "github.com/nu7hatch/gouuid"
 	"io"
 	"koding/db/models"
 	"koding/newkite/peers"
@@ -156,8 +155,7 @@ func New(options *protocol.Options) *Kite {
 	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
 
 	hostname, _ := os.Hostname()
-	id, _ := uuid.NewV4()
-	kiteID := id.String()
+	kiteID := utils.GenerateUUID()
 
 	publicKey, err := utils.GetKodingKey("public")
 	if err != nil {

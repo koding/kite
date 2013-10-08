@@ -9,8 +9,8 @@ import (
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
+	"koding/newkite/utils"
 	"koding/tools/slog"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -453,18 +453,8 @@ func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	return targetKites
 }
 
-func checkServer(host string) error {
-	slog.Println("checking host", host)
-	c, err := net.DialTimeout("tcp", host, time.Second*5)
-	if err != nil {
-		return err
-	}
-	c.Close()
-	return nil
-}
-
 func addToProxy(kite *models.Kite) {
-	err := checkServer(kite.Addr)
+	err := utils.IsServerAlive(kite.Addr)
 	if err != nil {
 		slog.Printf("server not reachable: %s (%s) \n", kite.Addr, err.Error())
 	} else {

@@ -1,8 +1,8 @@
 package main
 
 import (
-	uuid "github.com/nu7hatch/gouuid"
 	"koding/newkite/protocol"
+	"koding/newkite/utils"
 	"time"
 )
 
@@ -10,7 +10,7 @@ var tokens = make(map[string]*protocol.Token)
 
 func newToken(username string) *protocol.Token {
 	return &protocol.Token{
-		ID:        generateToken(),
+		ID:        utils.GenerateUUID(),
 		Username:  username,
 		Expire:    0,
 		CreatedAt: time.Now(),
@@ -34,9 +34,4 @@ func createToken(username string) *protocol.Token {
 
 func deleteToken(username string) {
 	delete(tokens, username)
-}
-
-func generateToken() string {
-	id, _ := uuid.NewV4()
-	return id.String()
 }

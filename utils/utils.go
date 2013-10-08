@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"koding/newkite/protocol"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os/user"
 	"strings"
+	"time"
 )
 
 // Listen returns a Listener that listens on the first available port on the
@@ -146,4 +148,18 @@ func ReadKiteOptions(configfile string) (*protocol.Options, error) {
 	}
 
 	return options, nil
+}
+
+func IsServerAlive(host string) error {
+	c, err := net.DialTimeout("tcp", host, time.Second*5)
+	if err != nil {
+		return err
+	}
+	c.Close()
+	return nil
+}
+
+func GenerateUUID() string {
+	id, _ := uuid.NewV4()
+	return id.String()
 }
