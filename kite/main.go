@@ -44,6 +44,12 @@ type Messenger interface {
 	// Consumer is a subscriber/consumer that listens to the endpoint. Incoming
 	// data should be handler via the function that is passed.
 	Consume(func([]byte))
+
+	// To subscribe to a certain topic
+	Subscribe(string) error
+
+	// Unsubscribe from a certain topic
+	Unsubscribe(string) error
 }
 
 // Clients is an interface that encapsulates basic operations on incoming and connected clients.
@@ -174,6 +180,10 @@ func New(options *protocol.Options) *Kite {
 	// pwd, _ := os.Getwd()
 	// getDeps(pwd, options.Kitename)
 
+	messenger := NewZeroMQ(kiteID)
+	messenger.Subscribe(kiteID)
+	messenger.Subscribe("all")
+
 	k := &Kite{
 		Username:       options.Username,
 		Kitename:       options.Kitename,
@@ -187,7 +197,7 @@ func New(options *protocol.Options) *Kite {
 		Hostname:       hostname,
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
-		Messenger:      NewZeroMQ(kiteID, options.Kitename, "all"),
+		Messenger:      messenger,
 		Clients:        NewClients(),
 	}
 
@@ -219,7 +229,6 @@ func (k *Kite) Start() {
 		k.serve(k.Addr)
 	} else {
 		k.Messenger.Consume(k.handle)
-
 	}
 }
 
@@ -263,6 +272,11 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	if !k.Registered {
 		return
 	}
+
+	// Kontrol did send our updated name(i.e: fs-kite -> username/fs-kite).
+	// Therefore also update our subscriptions
+	k.Messenger.Unsubscribe(k.Kitename)
+	k.Messenger.Subscribe(r.Kitename)
 
 	kite := &models.Kite{
 		Base: protocol.Base{
@@ -542,7 +556,7 @@ func (k *Kite) Call(kite, method string, args interface{}, fn func(err error, re
 				k.OnceCall.Do(onceBody) // to prevent multiple get request when called concurrently
 			} else {
 				ticker.Stop()
-				slog.Printf("making rpc call to '%s' with token '%s': -> ", remoteKite.Kitename, remoteKite.Token)
+				slog.Printf("making rpc call to '%s' with token '%s'\n", remoteKite.Kitename, remoteKite.Token)
 				runCall <- true
 				resetOnce <- true
 			}

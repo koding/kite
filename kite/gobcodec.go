@@ -41,7 +41,6 @@ func NewKiteClientCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 func (c *KiteClientCodec) WriteRequest(r *rpc.Request, body interface{}) (err error) {
-	slog.Println("Client WriteRequest")
 	if err = c.enc.Encode(r); err != nil {
 		return
 	}
@@ -54,12 +53,10 @@ func (c *KiteClientCodec) WriteRequest(r *rpc.Request, body interface{}) (err er
 }
 
 func (c *KiteClientCodec) ReadResponseHeader(r *rpc.Response) error {
-	slog.Println("Client ReadResponseHeader")
 	return c.dec.Decode(r)
 }
 
 func (c *KiteClientCodec) ReadResponseBody(body interface{}) error {
-	slog.Println("Client ReadResponseBody")
 	return c.dec.Decode(body)
 }
 
@@ -95,12 +92,10 @@ func NewKiteServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 func (c *KiteServerCodec) ReadRequestHeader(r *rpc.Request) error {
-	slog.Println("Server ReadRequestHeader")
 	return c.dec.Decode(r)
 }
 
 func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
-	slog.Println("Server ReadRequestBody")
 	if body == nil {
 		return c.dec.Decode(body)
 	}
@@ -154,7 +149,6 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 }
 
 func (c *KiteServerCodec) WriteResponse(r *rpc.Response, body interface{}) (err error) {
-	slog.Println("Server WriteRequest")
 	if err = c.enc.Encode(r); err != nil {
 		return
 	}
