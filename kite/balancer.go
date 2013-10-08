@@ -1,4 +1,4 @@
-package balancer
+package kite
 
 import "sync"
 
@@ -7,7 +7,7 @@ type Balancer struct {
 	sync.RWMutex
 }
 
-func New() *Balancer {
+func NewBalancer() *Balancer {
 	return &Balancer{
 		i: make(map[string]int),
 	}

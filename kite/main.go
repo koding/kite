@@ -11,7 +11,6 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 	"io"
 	"koding/db/models"
-	"koding/newkite/balancer"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
@@ -30,7 +29,7 @@ var (
 	kites = peers.New()
 
 	// roundrobin load balancing helpers
-	balance = balancer.New()
+	balance = NewBalancer()
 
 	// set data structure for caching tokens
 	permissions = goset.New()
