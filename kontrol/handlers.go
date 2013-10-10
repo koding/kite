@@ -116,7 +116,8 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Request) {
 	kites, err := searchForKites(msg.Username, msg.Username+"/"+msg.RemoteKite)
 	if err != nil {
-		http.Error(w, "{\"err\":\"malformed kite list\"}\n", http.StatusBadRequest)
+		msg := fmt.Sprintf("{\"err\":\"%s\"}\n", err)
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
