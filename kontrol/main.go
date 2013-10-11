@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	zmq "github.com/pebbe/zmq3"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
+	"koding/messaging/moh"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
 	"koding/tools/slog"
@@ -59,8 +59,8 @@ type Dependency interface {
 }
 
 type Kontrol struct {
-	Publisher *zmq.Socket
-	Router    *zmq.Socket
+	Publisher *moh.Publisher
+	Replier   *moh.Replier
 	PubAddr   string
 	RepAddr   string
 	Hostname  string
@@ -73,27 +73,30 @@ var (
 )
 
 func main() {
-	router, _ := zmq.NewSocket(zmq.ROUTER)
-	router.Bind("tcp://*:5556")
-
-	pub, _ := zmq.NewSocket(zmq.PUB)
-	pub.Bind("tcp://*:5557")
-
+	var err error
 	hostname, _ := os.Hostname()
+	k := &Kontrol{Hostname: hostname}
+
+	k.Replier, err = moh.NewReplier("127.0.0.1:5556", k.makeRequestHandler())
+	if err != nil {
+		fmt.Println("Cannot create replier: %s", err)
+		return
+	}
+
+	k.Publisher, err = moh.NewPublisher("127.0.0.1:5557")
+	if err != nil {
+		fmt.Println("Cannot create publisher: %s", err)
+		return
+	}
 
 	// storage = peers.New()  // in-memory, map based, non-persistence storage
 	storage = NewMongoDB()
 	dependency = NewDependency()
 
-	k := &Kontrol{
-		Hostname:  hostname,
-		Publisher: pub,
-		Router:    router,
-	}
-
 	slog.SetPrefixName("kontrol")
 	slog.SetPrefixTimeStamp(time.Stamp)
 	slog.Println("started")
+
 	k.Start()
 }
 
@@ -111,9 +114,6 @@ func (k *Kontrol) Start() {
 	// HeartBeat pool checker. Checking for kites if they are live or dead.
 	go k.heartBeatChecker()
 
-	// This is used for kite coordination. Will be replaced soon via an HTTP one.
-	go k.zmqMessageRouting()
-
 	rout := mux.NewRouter()
 	rout.HandleFunc("/", homeHandler).Methods("GET")
 	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
@@ -121,22 +121,15 @@ func (k *Kontrol) Start() {
 	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
 }
 
-func (k *Kontrol) zmqMessageRouting() {
-	for {
-		msg, _ := k.Router.RecvMessageBytes(0)
-		if len(msg) != 3 { // msg is malformed
-			continue
-		}
-
-		identity := msg[0]
-		result, err := k.handle(msg[2])
+func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
+	return func(msg []byte) []byte {
+		slog.Println("Request came in: %s", msg)
+		result, err := k.handle(msg)
 		if err != nil {
 			slog.Println(err)
 		}
 
-		k.Router.SendBytes(identity, zmq.SNDMORE)
-		k.Router.SendBytes([]byte(""), zmq.SNDMORE)
-		k.Router.SendBytes(result, 0)
+		return result
 	}
 }
 
@@ -382,8 +375,7 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 }
 
 func (k *Kontrol) Publish(filter string, msg []byte) {
-	msg = []byte(filter + protocol.FRAME_SEPARATOR + string(msg))
-	k.Publisher.SendBytes(msg, 0)
+	k.Publisher.Publish(filter, msg)
 }
 
 // RegisterKite returns true if the specified kite has been seen before.
