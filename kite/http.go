@@ -1,8 +1,6 @@
 package kite
 
-import (
-	"koding/messaging/moh"
-)
+import "koding/messaging/moh"
 
 // HTTPMessenger is a struct that complies with the Messenger interface.
 type HTTPMessenger struct {
@@ -14,7 +12,8 @@ type HTTPMessenger struct {
 }
 
 // NewHTTPMessenger returns a pointer to a new HTTPMessenger.
-// Created HTTPMessenger will keep an open connection to the other side for consuming messages asynchronously.
+// Created HTTPMessenger will keep an open connection to the other side for
+// consuming messages asynchronously.
 func NewHTTPMessenger(kiteID string) (*HTTPMessenger, error) {
 	const replierURL = "http://127.0.0.1:5556"
 	const publisherURL = "ws://127.0.0.1:5557"

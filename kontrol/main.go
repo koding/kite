@@ -123,7 +123,7 @@ func (k *Kontrol) Start() {
 
 func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
 	return func(msg []byte) []byte {
-		slog.Println("Request came in: %s", msg)
+		// slog.Printf("Request came in: %s\n", string(msg))
 		result, err := k.handle(msg)
 		if err != nil {
 			slog.Println(err)
