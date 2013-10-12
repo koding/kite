@@ -281,11 +281,9 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	case protocol.PermitKite:
 		slog.Printf("... not allowed. permission denied via Kontrol\n")
 		return errors.New("no permission to run")
-	default:
-		return errors.New("got a nonstandart response")
 	}
 
-	return json.Unmarshal(*c.req.Params, &params)
+	return errors.New("got a nonstandart response")
 }
 
 var null = json.RawMessage([]byte("null"))

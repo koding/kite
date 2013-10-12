@@ -38,7 +38,7 @@ func searchDir(root, sourceNode string) {
 		manifest := kitepath + "/manifest.json"
 		if _, err := os.Stat(manifest); err != nil {
 			if os.IsNotExist(err) {
-				fmt.Println("no manifest.json for %s", f.Name())
+				fmt.Printf("no manifest.json for %s\n", f.Name())
 				return
 			}
 		}

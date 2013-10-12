@@ -145,11 +145,9 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 	case protocol.PermitKite:
 		slog.Printf("denied token '%s'\n", a.Token)
 		return errors.New("no permission to run")
-	default:
-		return errors.New("got a nonstandart response")
 	}
 
-	return nil
+	return errors.New("got a nonstandart response")
 }
 
 func (c *KiteServerCodec) WriteResponse(r *rpc.Response, body interface{}) (err error) {

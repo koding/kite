@@ -130,7 +130,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	for id, path := range d.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
-			fmt.Println("WARNING: callback id should be an INTEGER: '%s', '%s'", id, path)
+			fmt.Printf("WARNING: callback id should be an INTEGER: '%s', '%s'\n", id, path)
 			continue
 		}
 
@@ -143,7 +143,10 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		})
 
 		d.req.Arguments.Callbacks = append(d.req.Arguments.Callbacks,
-			dnode.CallbackSpec{path, callback})
+			dnode.CallbackSpec{
+				Path:     path,
+				Callback: callback,
+			})
 	}
 
 	// received a dnode message with an method of type integer (ID), thus call our
@@ -154,7 +157,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		// args can be zero or more
 		args, err := d.req.Arguments.Array()
 		if err != nil {
-			fmt.Printf(" 1 err \n", err)
+			fmt.Printf("1 err: %s\n", err)
 			return err
 		}
 
@@ -294,11 +297,9 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	case protocol.PermitKite:
 		fmt.Printf("denied token '%s'\n", a.Token)
 		return errors.New("no permission to run")
-	default:
-		return errors.New("got a nonstandart response")
 	}
 
-	return nil
+	return errors.New("got a nonstandart response")
 }
 
 func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {

@@ -79,13 +79,13 @@ func main() {
 
 	k.Replier, err = moh.NewReplier("127.0.0.1:5556", k.makeRequestHandler())
 	if err != nil {
-		fmt.Println("Cannot create replier: %s", err)
+		fmt.Printf("Cannot create replier: %s\n", err)
 		return
 	}
 
 	k.Publisher, err = moh.NewPublisher("127.0.0.1:5557")
 	if err != nil {
-		fmt.Println("Cannot create publisher: %s", err)
+		fmt.Printf("Cannot create publisher: %s\n", err)
 		return
 	}
 

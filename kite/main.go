@@ -386,11 +386,9 @@ func (k *Kite) RegisterToKontrol() error {
 		return nil
 	case protocol.PermitKite:
 		return errors.New("no permission to run")
-	default:
-		return errors.New("got a nonstandard response")
 	}
 
-	return nil
+	return errors.New("got a nonstandard response")
 }
 
 /******************************************
@@ -469,7 +467,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		slog.Printf("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
+		slog.Println("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
 		return
 	}
 
