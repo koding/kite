@@ -443,11 +443,11 @@ func (k *Kite) serve(addr string) {
 	slog.Println("serve addr is", k.Addr)
 
 	// GroupCache
-	k.newPool(k.Addr)
+	k.newPool(k.Addr) // registers to http.DefaultServeMux
 	k.newGroup()
 
-	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-	http.Serve(listener, k)
+	http.Handle(rpc.DefaultRPCPath, k)
+	http.Serve(listener, nil)
 }
 
 // ServeHTTP interface for http package.
@@ -530,34 +530,18 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 			remoteKite, err = k.getRemoteKite(username, kitename)
 			if err != nil {
 				slog.Println("no remote kites available, requesting some ...")
-				m := protocol.Request{
-					Base: protocol.Base{
-						Username: username,
-						Kitename: k.Kitename,
-						Version:  k.Version,
-						Uuid:     k.Uuid,
-						Hostname: k.Hostname,
-						Addr:     k.Addr,
-					},
-					RemoteKite: kitename,
-					Action:     "getKites",
+				onceRequest := func() {
+					k.requestMoreKites(username, kitename)
 				}
 
-				msg, err := json.Marshal(&m)
-				if err != nil {
-					slog.Println("kontrolRequest marshall err", err)
-					continue
-				}
-
-				onceBody := func() {
-					slog.Println("sending requesting message...")
-					k.Messenger.Send(msg)
-				}
-
-				k.OnceCall.Do(onceBody) // to prevent multiple get request when called concurrently
+				// call once to prevent multiple get request via concurrent access
+				k.OnceCall.Do(onceRequest)
 			} else {
 				ticker.Stop()
-				slog.Printf("making rpc call to '%s' with token '%s'\n", remoteKite.Kitename, remoteKite.Token)
+
+				slog.Printf("making rpc call to '%s' with token '%s'\n",
+					remoteKite.Kitename, remoteKite.Token)
+
 				runCall <- true
 				k.OnceCall = sync.Once{}
 			}
@@ -588,6 +572,29 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 			return d
 		}
 	}
+}
+
+func (k *Kite) requestMoreKites(username, kitename string) {
+	m := protocol.Request{
+		Base: protocol.Base{
+			Username: username,
+			Kitename: k.Kitename,
+			Version:  k.Version,
+			Uuid:     k.Uuid,
+			Hostname: k.Hostname,
+			Addr:     k.Addr,
+		},
+		RemoteKite: kitename,
+		Action:     "getKites",
+	}
+
+	msg, err := json.Marshal(&m)
+	if err != nil {
+		slog.Println("requestMoreKites marshall err", err)
+	}
+
+	slog.Println("sending requesting message...")
+	k.Messenger.Send(msg)
 }
 
 func (k *Kite) getRemoteKite(username, kite string) (*models.Kite, error) {
