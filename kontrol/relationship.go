@@ -7,7 +7,7 @@ import (
 
 type KiteDependency struct {
 	r map[string]*goset.Set
-	sync.RWMutex
+	sync.Mutex
 }
 
 func NewDependency() *KiteDependency {
@@ -22,18 +22,14 @@ func (k *KiteDependency) Add(source, target string) {
 		return
 	}
 
-	k.RLock()
-	s := k.r[source]
-	k.RUnlock()
+	k.Lock()
+	defer k.Unlock()
 
-	if s == nil {
-		s = goset.New()
+	if k.r[source] == nil {
+		k.r[source] = goset.New()
 	}
 
-	k.Lock()
-	s.Add(target)
-	k.r[source] = s
-	k.Unlock()
+	k.r[source].Add(target)
 }
 
 func (k *KiteDependency) Remove(source string) {
@@ -41,28 +37,24 @@ func (k *KiteDependency) Remove(source string) {
 		return
 	}
 
-	k.RLock()
-	s := k.r[source]
-	k.RUnlock()
+	k.Lock()
+	defer k.Unlock()
 
-	if s == nil {
-		s = goset.New()
+	if k.r[source] == nil {
+		return
 	}
 
-	k.Lock()
-	s.Clear()
-	k.r[source] = s
-	k.Unlock()
+	k.r[source].Clear()
 }
 
 func (k *KiteDependency) Has(source string) bool {
 	if source == "" {
 		return false
 	}
+	k.Lock()
+	defer k.Unlock()
 
-	k.RLock()
 	s, ok := k.r[source]
-	k.RUnlock()
 	if !ok {
 		return false
 	}
@@ -77,8 +69,9 @@ func (k *KiteDependency) Has(source string) bool {
 // ListRelationship returns a slice of kite names that depends on "source"
 // It returns an empty slice if the kite doesn't have any relationships.
 func (k *KiteDependency) List(source string) []string {
-	k.RLock()
-	defer k.RUnlock()
+	k.Lock()
+	defer k.Unlock()
+
 	s, ok := k.r[source]
 	if !ok {
 		return make([]string, 0)
