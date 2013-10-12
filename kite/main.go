@@ -78,7 +78,7 @@ type Clients interface {
 // enables peer-to-peer chat. For examples we have FileSystem kite that expose
 // the file system to a client, which in order build the filetree.
 type Kite struct {
-	// user that calls/runs the kite
+	// User that calls/runs the kite
 	Username string
 
 	// Kitename defines the name that a kite is running on. This field is also used
@@ -276,13 +276,6 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	if !k.Registered {
 		return
 	}
-
-	// Kontrol did send our updated name(i.e: fs-kite -> username/fs-kite).
-	// Therefore also update our subscriptions and name
-	k.Messenger.Unsubscribe(k.Kitename)
-	k.Messenger.Subscribe(r.Kitename)
-	k.Kitename = r.Kitename
-	slog.SetPrefixName(r.Kitename)
 
 	kite := &models.Kite{
 		Base: protocol.Base{
@@ -500,17 +493,17 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 // CallSync makes a blocking request to another kite. Kite should be in form of
 // "username/kitename", method should be known ahead of time. args and result is
 // used by the remote kite, therefore you should know what the kite is expecting.
-func (k *Kite) CallSync(kite, method string, args interface{}, result interface{}) error {
-	remoteKite, err := k.getRemoteKite(kite)
+func (k *Kite) CallSync(username, kitename, method string, args interface{}, result interface{}) error {
+	remoteKite, err := k.getRemoteKite(username, kitename)
 	if err != nil {
 		return err
 	}
 
-	rpcFunc := kite + "." + method
+	rpcFunc := kitename + "." + method
 	err = remoteKite.Client.Call(rpcFunc, args, result)
 	if err != nil {
 		slog.Println(err)
-		return fmt.Errorf("[%s] call error: %s", kite, err.Error())
+		return fmt.Errorf("can't call '%s', err: %s", kitename, err.Error())
 	}
 
 	return nil
@@ -523,10 +516,12 @@ func (k *Kite) CallSync(kite, method string, args interface{}, result interface{
 // Currently only string as a result is supported, but it needs to be changed.
 func (k *Kite) Call(username, kitename, method string, args interface{}, fn func(err error, res string)) *rpc.Call {
 
+	// TODO: split this function. Make it two method, one should return a new
+	// call struct. another one that is doing the call on the returning
+	// struct (like k := call(username, kitename); k.call(method string, args))
 	rpcFunc := kitename + "." + method
 	ticker := time.NewTicker(time.Second * 1)
 	runCall := make(chan bool, 1)
-	remoteKiteName := username + "/" + kitename
 
 	var remoteKite *models.Kite
 	var err error
@@ -534,19 +529,19 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 	for {
 		select {
 		case <-ticker.C:
-			remoteKite, err = k.getRemoteKite(remoteKiteName)
+			remoteKite, err = k.getRemoteKite(username, kitename)
 			if err != nil {
 				slog.Println("no remote kites available, requesting some ...")
 				m := protocol.Request{
 					Base: protocol.Base{
-						Username: k.Username,
+						Username: username,
 						Kitename: k.Kitename,
 						Version:  k.Version,
 						Uuid:     k.Uuid,
 						Hostname: k.Hostname,
 						Addr:     k.Addr,
 					},
-					RemoteKite: remoteKiteName,
+					RemoteKite: kitename,
 					Action:     "getKites",
 				}
 
@@ -597,8 +592,8 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 	}
 }
 
-func (k *Kite) getRemoteKite(kite string) (*models.Kite, error) {
-	r, err := k.roundRobin(kite)
+func (k *Kite) getRemoteKite(username, kite string) (*models.Kite, error) {
+	r, err := k.roundRobin(username, kite)
 	if err != nil {
 		return nil, err
 	}
@@ -615,27 +610,26 @@ func (k *Kite) getRemoteKite(kite string) (*models.Kite, error) {
 	return r, nil
 }
 
-func (k *Kite) roundRobin(kite string) (*models.Kite, error) {
-	// TODO: use container/ring :)
-	remoteKites := k.remoteKites(kite)
-	lenOfKites := len(remoteKites)
-	if lenOfKites == 0 {
+func (k *Kite) roundRobin(username, kite string) (*models.Kite, error) {
+	remoteKites := k.getKitesBy(username, kite)
+	if len(remoteKites) == 0 {
 		return nil, fmt.Errorf("kite %s does not exist", kite)
 	}
 
+	// TODO: use container/ring :)
 	index := balance.GetIndex(kite)
-	N := float64(lenOfKites)
+	N := float64(len(remoteKites))
 	n := int(math.Mod(float64(index+1), N))
 	balance.AddOrUpdateIndex(kite, n)
 	return remoteKites[n], nil
 }
 
-func (k *Kite) remoteKites(kite string) []*models.Kite {
-	l := kites.List()
-	remoteKites := make([]*models.Kite, 0, len(l)-1) // allocate one less, it's the kite itself
+// return kites from the storage that matches username and kitename
+func (k *Kite) getKitesBy(username, kitename string) []*models.Kite {
+	remoteKites := make([]*models.Kite, 0)
 
-	for _, r := range l {
-		if r.Kitename == kite {
+	for _, r := range kites.List() {
+		if r.Username == username && r.Kitename == kitename {
 			remoteKites = append(remoteKites, r)
 		}
 	}

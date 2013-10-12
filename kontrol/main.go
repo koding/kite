@@ -89,7 +89,6 @@ func main() {
 		return
 	}
 
-	// storage = peers.New()  // in-memory, map based, non-persistence storage
 	storage = NewMongoDB()
 	dependency = NewDependency()
 
@@ -147,52 +146,53 @@ func (k *Kontrol) Ping() {
 
 func (k *Kontrol) heartBeatChecker() {
 	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
-	go func() {
-		for _ = range ticker.C {
-			for _, kite := range storage.List() {
-				// Delay is needed to fix network delays, otherwise kites are
-				// marked as death even if they are sending 'pongs' to us
-				if time.Now().Before(kite.UpdatedAt.Add(protocol.HEARTBEAT_DELAY)) {
-					continue // still alive, pick up the next one
+	for _ = range ticker.C {
+		for _, kite := range storage.List() {
+			// Delay is needed to fix network delays, otherwise kites are
+			// marked as death even if they are sending 'pongs' to us
+			if time.Now().Before(kite.UpdatedAt.Add(protocol.HEARTBEAT_DELAY)) {
+				continue // still alive, pick up the next one
+			}
+
+			removeLog := fmt.Sprintf("[%s (%s)] dead at '%s' - '%s'",
+				kite.Kitename,
+				kite.Version,
+				kite.Hostname,
+				kite.Uuid,
+			)
+			slog.Println(removeLog)
+
+			storage.Remove(kite.Uuid)
+
+			removeMsg := createByteResponse(protocol.RemoveKite, kite)
+
+			// notify kites of the same type
+			for _, kiteUUID := range k.getUUIDsForKites(kite.Kitename) {
+				k.Publish(kiteUUID, removeMsg)
+			}
+
+			// then notify kites that depends on me..
+			for _, c := range k.getRelationship(kite.Kitename) {
+				k.Publish(c.Uuid, removeMsg)
+			}
+
+			// Am I the latest of my kind ? if yes remove me from the dependencies list
+			// and remove any tokens if I have some
+			if dependency.Has(kite.Kitename) {
+				var found bool
+				for _, t := range storage.List() {
+					if t.Kitename == kite.Kitename {
+						found = true
+					}
 				}
 
-				removeLog := fmt.Sprintf("[%s (%s)] dead at '%s' - '%s'",
-					kite.Kitename,
-					kite.Version,
-					kite.Hostname,
-					kite.Uuid,
-				)
-				slog.Println(removeLog)
-
-				storage.Remove(kite.Uuid)
-
-				// notify kites of the same type
-				msg := createByteResponse(protocol.RemoveKite, kite)
-				k.Publish(kite.Kitename, msg)
-
-				// then notify kites that depends on me..
-				for _, c := range k.getRelationship(kite.Kitename) {
-					k.Publish(c.Kitename, msg)
-				}
-
-				// Am I the latest of my kind ? if yes remove me from the dependencies list
-				// and remove any tokens if I have some
-				if dependency.Has(kite.Kitename) {
-					var found bool
-					for _, t := range storage.List() {
-						if t.Kitename == kite.Kitename {
-							found = true
-						}
-					}
-
-					if !found {
-						deleteToken(kite.Kitename)
-						dependency.Remove(kite.Kitename)
-					}
+				if !found {
+					deleteToken(kite.Kitename)
+					dependency.Remove(kite.Kitename)
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (k *Kontrol) handle(msg []byte) ([]byte, error) {
@@ -283,7 +283,7 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 
 }
 func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
-	kites, err := searchForKites(req.Username, req.RemoteKite)
+	kites, err := searchForKites(req.Username, req.Username+"/"+req.RemoteKite)
 	if err != nil {
 		return nil, err
 	}
@@ -422,15 +422,17 @@ func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 		)
 		slog.Println(startLog)
 
-		// update fields
+		if account.Profile.Nickname == "" {
+			return nil, errors.New("nickname is empty, could not register kite")
+		}
+
 		kite.Username = account.Profile.Nickname
-		kite.Kitename = account.Profile.Nickname + "/" + kite.Kitename
 		storage.Add(kite)
 	}
 	return kite, nil
 }
 
-// GetRelationship returns a slice of of kites that has a relationship to kite itself
+// getRelationship returns a slice of of kites that has a relationship to kite itself.
 func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	targetKites := make([]*models.Kite, 0)
 	if storage.Size() == 0 {
@@ -446,6 +448,20 @@ func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	}
 
 	return targetKites
+}
+
+// getUUIDsForKites returns a list of uuids collected from kites that matches
+// the kitename argument.
+func (k *Kontrol) getUUIDsForKites(kitename string) []string {
+	uuids := make([]string, 0)
+
+	for _, s := range storage.List() {
+		if s.Kitename == kitename {
+			uuids = append(uuids, s.Uuid)
+		}
+	}
+
+	return uuids
 }
 
 func addToProxy(kite *models.Kite) {
