@@ -283,7 +283,7 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 
 }
 func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
-	kites, err := searchForKites(req.Username, req.Username+"/"+req.RemoteKite)
+	kites, err := searchForKites(req.Username, req.RemoteKite)
 	if err != nil {
 		return nil, err
 	}

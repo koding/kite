@@ -92,7 +92,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 	slog.Printf("searching for kite '%s'\n", kitename)
 
 	for _, k := range storage.List() {
-		if k.Kitename == kitename {
+		if k.Username == username && k.Kitename == kitename {
 			token = getToken(username)
 			if token == nil {
 				token = createToken(username)
@@ -114,7 +114,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 // requestHandler sends as response a list of kites that matches kites in form
 // of "username/kitename".
 func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Request) {
-	kites, err := searchForKites(msg.Username, msg.Username+"/"+msg.RemoteKite)
+	kites, err := searchForKites(msg.Username, msg.RemoteKite)
 	if err != nil {
 		msg := fmt.Sprintf("{\"err\":\"%s\"}\n", err)
 		http.Error(w, msg, http.StatusBadRequest)
