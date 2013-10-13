@@ -52,7 +52,8 @@ type Messenger interface {
 	Unsubscribe(string) error
 }
 
-// Clients is an interface that encapsulates basic operations on incoming and connected clients.
+// Clients is an interface that encapsulates basic operations on incoming and
+// connected clients.
 type Clients interface {
 	// Add inserts a new client into the storage.
 	Add(c *client)
@@ -81,8 +82,8 @@ type Kite struct {
 	// User that calls/runs the kite
 	Username string
 
-	// Kitename defines the name that a kite is running on. This field is also used
-	// for communicating with other kites with the same name.
+	// Kitename defines the name that a kite is running on. This field is also
+	// used for communicating with other kites with the same name.
 	Kitename string
 
 	// Uuid is a genereated unique id string that defines this Kite.
@@ -140,8 +141,8 @@ type Kite struct {
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
-// three  arguments. options is a config struct that needs to be filled with several
-// informations like Name, Port, IP and so on.
+// three  arguments. options is a config struct that needs to be filled with
+// several informations like Name, Port, IP and so on.
 func New(options *protocol.Options) *Kite {
 	var err error
 	if options == nil {
@@ -290,7 +291,9 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	}
 
 	kites.Add(kite)
-	k.SetPeers(k.PeersAddr()...)
+
+	// Groupache settings, enable when ready
+	// k.SetPeers(k.PeersAddr()...)
 
 	slog.Printf("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
 }
@@ -357,11 +360,10 @@ func (k *Kite) RegisterToKontrol() error {
 			Uuid:      k.Uuid,
 			PublicKey: k.PublicKey,
 			Hostname:  k.Hostname,
-			// Addr:      k.PublicIP + ":" + k.Port,
-			Addr:     k.Addr,
-			LocalIP:  k.LocalIP,
-			PublicIP: k.PublicIP,
-			Port:     k.Port,
+			Addr:      k.Addr,
+			LocalIP:   k.LocalIP,
+			PublicIP:  k.PublicIP,
+			Port:      k.Port,
 		},
 		Action: "register",
 	}
@@ -372,7 +374,9 @@ func (k *Kite) RegisterToKontrol() error {
 		return err
 	}
 
+	// what if it times out?
 	result := k.Messenger.Send(msg)
+
 	var resp protocol.RegisterResponse
 	err = json.Unmarshal(result, &resp)
 	if err != nil {
@@ -442,9 +446,9 @@ func (k *Kite) serve(addr string) {
 	k.Addr = listener.Addr().String()
 	slog.Println("serve addr is", k.Addr)
 
-	// GroupCache
-	k.newPool(k.Addr) // registers to http.DefaultServeMux
-	k.newGroup()
+	// GroupCache settings, enable it when ready
+	// k.newPool(k.Addr) // registers to http.DefaultServeMux
+	// k.newGroup()
 
 	http.Handle(rpc.DefaultRPCPath, k)
 	http.Serve(listener, nil)
@@ -534,7 +538,6 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 					k.requestMoreKites(username, kitename)
 				}
 
-				// call once to prevent multiple get request via concurrent access
 				k.OnceCall.Do(onceRequest)
 			} else {
 				ticker.Stop()
@@ -543,7 +546,7 @@ func (k *Kite) Call(username, kitename, method string, args interface{}, fn func
 					remoteKite.Kitename, remoteKite.Token)
 
 				runCall <- true
-				k.OnceCall = sync.Once{}
+				k.OnceCall = sync.Once{} // reset it
 			}
 		case <-runCall:
 			var result string

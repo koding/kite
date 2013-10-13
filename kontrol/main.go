@@ -222,6 +222,7 @@ func (k *Kontrol) updateKite(Uuid string) error {
 	if kite == nil {
 		return errors.New("not registered")
 	}
+
 	kite.UpdatedAt = time.Now().Add(protocol.HEARTBEAT_INTERVAL)
 	storage.Add(kite)
 	return nil
@@ -247,7 +248,9 @@ func (k *Kontrol) handlePong(req *protocol.Request) ([]byte, error) {
 }
 
 func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
-	slog.Printf("[%s (%s)] at '%s' wants to be registered\n", req.Kitename, req.Version, req.Hostname)
+	slog.Printf("[%s (%s)] at '%s' wants to be registered\n",
+		req.Kitename, req.Version, req.Hostname)
+
 	kite, err := k.RegisterKite(req)
 	if err != nil {
 		response := protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
@@ -278,6 +281,7 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 		Result:   protocol.AllowKite,
 		Username: kite.Username,
 	}
+
 	resp, _ := json.Marshal(response)
 	return resp, nil
 
