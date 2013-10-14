@@ -404,36 +404,6 @@ RPC
 // Can connect to RPC service using HTTP CONNECT to rpcPath.
 var connected = "200 Connected to Go RPC"
 
-// dialClient is used to connect to a Remote Kite via the GOB codec. This is
-// used by other external kite methods.
-func (k *Kite) dialClient(kite *models.Kite) (*rpc.Client, error) {
-	slog.Printf("establishing HTTP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
-	var err error
-	conn, err := net.Dial("tcp4", kite.Addr)
-	if err != nil {
-		return nil, err
-	}
-	io.WriteString(conn, "CONNECT "+rpc.DefaultRPCPath+" HTTP/1.0\n\n")
-
-	// Require successful HTTP response
-	// before switching to RPC protocol.
-	resp, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
-	if err == nil && resp.Status == connected {
-		c := NewKiteClientCodec(k, conn) // pass our custom codec
-		return rpc.NewClientWithCodec(c), nil
-	}
-	if err == nil {
-		err = errors.New("unexpected HTTP response: " + resp.Status)
-	}
-	conn.Close()
-	return nil, &net.OpError{
-		Op:   "dial-http",
-		Net:  "tcp " + kite.Addr,
-		Addr: nil,
-		Err:  err,
-	}
-}
-
 // serve starts our rpc server with the given addr. Addr should be in form of
 // "ip:port"
 func (k *Kite) serve(addr string) {
@@ -477,7 +447,6 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	io.WriteString(conn, "HTTP/1.0 "+connected+"\n\n")
 	k.Server.ServeCodec(NewKiteServerCodec(k, conn))
-
 }
 
 // serveWS is used serving content over WebSocket. Is used internally via
@@ -492,92 +461,82 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
 }
 
-// CallSync makes a blocking request to another kite. Kite should be in form of
-// "username/kitename", method should be known ahead of time. args and result is
-// used by the remote kite, therefore you should know what the kite is expecting.
-func (k *Kite) CallSync(username, kitename, method string, args interface{}, result interface{}) error {
-	remoteKite, err := k.getRemoteKite(username, kitename)
+type Remote struct {
+	Username string
+	Kitename string
+	Kites    []*models.Kite
+}
+
+// Remote is used to create a new remote struct that is used for remote
+// kite-to-kite calls.
+func (k *Kite) Remote(username, kitename string) *Remote {
+	var remoteKites []*models.Kite
+
+	remoteKites = getKitesBy(username, kitename)
+	if len(remoteKites) == 0 {
+		remoteKites = k.requestMoreKites(username, kitename)
+	}
+
+	return &Remote{
+		Username: username,
+		Kitename: kitename,
+		Kites:    remoteKites,
+	}
+}
+
+// CallSync makes a blocking request to another kite. args and result is used
+// by the remote kite, therefore you should know what the kite is expecting.
+func (r *Remote) CallSync(method string, args interface{}, result interface{}) error {
+	remoteKite, err := r.getClient()
 	if err != nil {
 		return err
 	}
 
-	rpcFunc := kitename + "." + method
-	err = remoteKite.Client.Call(rpcFunc, args, result)
+	rpcMethod := r.Kitename + "." + method
+	err = remoteKite.Client.Call(rpcMethod, args, result)
 	if err != nil {
 		slog.Println(err)
-		return fmt.Errorf("can't call '%s', err: %s", kitename, err.Error())
+		return fmt.Errorf("can't call '%s', err: %s", r.Kitename, err.Error())
 	}
 
 	return nil
 }
 
-// Call makes a non-blocking request to another kite. Kite should be in form of
-// "username/kitename", the method should be known ahead of time. args is
-// used by the remote kite, therefore you should know what the kite is expecting.
-// fn is a callback that is executed when the result and error has been received.
+// Call makes a non-blocking request to another kite. args is used by the
+// remote kite, therefore you should know what the kite is expecting.  fn is a
+// callback that is executed when the result and error has been received.
 // Currently only string as a result is supported, but it needs to be changed.
-func (k *Kite) Call(username, kitename, method string, args interface{}, fn func(err error, res string)) *rpc.Call {
-
-	// TODO: split this function. Make it two method, one should return a new
-	// call struct. another one that is doing the call on the returning
-	// struct (like k := call(username, kitename); k.call(method string, args))
-	rpcFunc := kitename + "." + method
-	ticker := time.NewTicker(time.Second * 1)
-	runCall := make(chan bool, 1)
-
-	var remoteKite *models.Kite
-	var err error
-
-	for {
-		select {
-		case <-ticker.C:
-			remoteKite, err = k.getRemoteKite(username, kitename)
-			if err != nil {
-				slog.Println("no remote kites available, requesting some ...")
-				onceRequest := func() {
-					k.requestMoreKites(username, kitename)
-				}
-
-				k.OnceCall.Do(onceRequest)
-			} else {
-				ticker.Stop()
-
-				slog.Printf("making rpc call to '%s' with token '%s'\n",
-					remoteKite.Kitename, remoteKite.Token)
-
-				runCall <- true
-				k.OnceCall = sync.Once{} // reset it
-			}
-		case <-runCall:
-			var result string
-
-			a := &protocol.KiteRequest{
-				Base: protocol.Base{
-					Username: k.Username,
-					Kitename: k.Kitename,
-					Version:  k.Version,
-					Token:    remoteKite.Token,
-					Uuid:     k.Uuid,
-					Hostname: k.Hostname,
-				},
-				Args:   args,
-				Origin: protocol.ORIGIN_GOB,
-			}
-
-			d := remoteKite.Client.Go(rpcFunc, a, &result, nil)
-
-			select {
-			case <-d.Done:
-				fn(d.Error, result)
-			case <-time.Tick(10 * time.Second):
-				fn(d.Error, result)
-			}
-			return d
-		}
+func (r *Remote) Call(method string, args interface{}, fn func(err error, res string)) (*rpc.Call, error) {
+	remoteKite, err := r.getClient()
+	if err != nil {
+		return nil, err
 	}
+
+	var response string
+
+	request := &protocol.KiteRequest{
+		Base: protocol.Base{
+			Token: remoteKite.Token,
+			Uuid:  remoteKite.Uuid,
+		},
+		Args:   args,
+		Origin: protocol.ORIGIN_GOB,
+	}
+
+	rpcMethod := r.Kitename + "." + method
+	d := remoteKite.Client.Go(rpcMethod, request, &response, nil)
+
+	select {
+	case <-d.Done:
+		fn(d.Error, response)
+	case <-time.Tick(10 * time.Second):
+		fn(d.Error, response)
+	}
+
+	return d, nil
 }
 
-func (k *Kite) requestMoreKites(username, kitename string) {
+func (k *Kite) requestMoreKites(username, kitename string) []*models.Kite {
 	m := protocol.Request{
 		Base: protocol.Base{
 			Username: username,
@@ -593,56 +552,103 @@ func (k *Kite) requestMoreKites(username, kitename string) {
 
 	msg, err := json.Marshal(&m)
 	if err != nil {
-		slog.Println("requestMoreKites marshall err", err)
+		slog.Println("requestMoreKites marshall err 1", err)
+		return nil
 	}
 
 	slog.Println("sending requesting message...")
-	k.Messenger.Send(msg)
+	result := k.Messenger.Send(msg)
+
+	var kitesResp []protocol.PubResponse
+	err = json.Unmarshal(result, &kitesResp)
+	if err != nil {
+		slog.Println("requestMoreKites marshall err 2", err)
+		return nil
+	}
+
+	for _, r := range kitesResp {
+		kite := &models.Kite{
+			Base: protocol.Base{
+				Username: r.Username,
+				Kitename: r.Kitename,
+				Token:    r.Token,
+				Version:  r.Version,
+				Uuid:     r.Uuid,
+				Hostname: r.Hostname,
+				Addr:     r.Addr,
+			},
+		}
+
+		kites.Add(kite)
+	}
+
+	return getKitesBy(username, kitename)
 }
 
-func (k *Kite) getRemoteKite(username, kite string) (*models.Kite, error) {
-	r, err := k.roundRobin(username, kite)
+func (r *Remote) getClient() (*models.Kite, error) {
+	kite, err := r.roundRobin()
 	if err != nil {
 		return nil, err
 	}
 
-	if r.Client == nil {
+	if kite.Client == nil {
 		var err error
-		r.Client, err = k.dialClient(r)
+
+		slog.Printf("establishing HTTP client conn for %s - %s on %s\n",
+			kite.Kitename, kite.Addr, kite.Hostname)
+
+		kite.Client, err = r.dialRemote(kite.Addr)
 		if err != nil {
 			return nil, err
 		}
-		kites.Add(r)
+
+		// update kite in storage after we have an established connection
+		kites.Add(kite)
 	}
 
-	return r, nil
+	return kite, nil
 }
 
-func (k *Kite) roundRobin(username, kite string) (*models.Kite, error) {
-	remoteKites := k.getKitesBy(username, kite)
-	if len(remoteKites) == 0 {
-		return nil, fmt.Errorf("kite %s does not exist", kite)
+func (r *Remote) roundRobin() (*models.Kite, error) {
+	if len(r.Kites) == 0 {
+		return nil, fmt.Errorf("kite %s/%s does not exist", r.Username, r.Kitename)
 	}
 
 	// TODO: use container/ring :)
-	index := balance.GetIndex(kite)
-	N := float64(len(remoteKites))
+	index := balance.GetIndex(r.Kitename)
+	N := float64(len(r.Kites))
 	n := int(math.Mod(float64(index+1), N))
-	balance.AddOrUpdateIndex(kite, n)
-	return remoteKites[n], nil
+	balance.AddOrUpdateIndex(r.Kitename, n)
+	return r.Kites[n], nil
 }
 
-// return kites from the storage that matches username and kitename
-func (k *Kite) getKitesBy(username, kitename string) []*models.Kite {
-	remoteKites := make([]*models.Kite, 0)
-
-	for _, r := range kites.List() {
-		if r.Username == username && r.Kitename == kitename {
-			remoteKites = append(remoteKites, r)
-		}
+// dialRemote is used to connect to a Remote Kite via the GOB codec. This is
+// used by other external kite methods.
+func (r *Remote) dialRemote(addr string) (*rpc.Client, error) {
+	var err error
+	conn, err := net.Dial("tcp4", addr)
+	if err != nil {
+		return nil, err
 	}
+	io.WriteString(conn, "CONNECT "+rpc.DefaultRPCPath+" HTTP/1.0\n\n")
 
-	return remoteKites
+	// Require successful HTTP response
+	// before switching to RPC protocol.
+	resp, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
+	if err == nil && resp.Status == connected {
+		codec := NewKiteClientCodec(conn) // pass our custom codec
+		return rpc.NewClientWithCodec(codec), nil
+	}
+	if err == nil {
+		err = errors.New("unexpected HTTP response: " + resp.Status)
+	}
+	conn.Close()
+	return nil, &net.OpError{
+		Op:   "dial-http",
+		Net:  "tcp " + addr,
+		Addr: nil,
+		Err:  err,
+	}
 }
 
 /******************************************
@@ -714,4 +720,17 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) map[
 	}
 
 	return methodsMapping
+}
+
+// return kites from the storage that matches username and kitename
+func getKitesBy(username, kitename string) []*models.Kite {
+	remoteKites := make([]*models.Kite, 0)
+
+	for _, r := range kites.List() {
+		if r.Username == username && r.Kitename == kitename {
+			remoteKites = append(remoteKites, r)
+		}
+	}
+
+	return remoteKites
 }

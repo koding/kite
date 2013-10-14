@@ -29,7 +29,7 @@ func (t *TCPKite) DialClient(kite *models.Kite) (*rpc.Client, error) {
 		return nil, err
 	}
 
-	c := NewKiteClientCodec(t.kite, conn)
+	c := NewKiteClientCodec(conn)
 	return rpc.NewClientWithCodec(c), nil
 }
 

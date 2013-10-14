@@ -28,14 +28,13 @@ type KiteClientCodec struct {
 	Kite   *Kite
 }
 
-func NewKiteClientCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ClientCodec {
+func NewKiteClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 	buf := bufio.NewWriter(conn)
 	c := &KiteClientCodec{
 		rwc:    conn,
 		dec:    gob.NewDecoder(conn),
 		enc:    gob.NewEncoder(buf),
 		encBuf: buf,
-		Kite:   kite,
 	}
 
 	return c
@@ -113,7 +112,8 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	if permissions.Has(a.Token) {
-		slog.Printf("[%s] allowed token (cached) '%s'\n", c.rwc.(net.Conn).RemoteAddr().String(), a.Token)
+		slog.Printf("[%s] allowed token (cached) '%s'\n",
+			c.rwc.(net.Conn).RemoteAddr().String(), a.Token)
 		return nil
 	}
 

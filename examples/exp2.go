@@ -11,9 +11,6 @@ import (
 
 var port = flag.String("port", "", "port to bind itself")
 
-type Exp2 struct {
-}
-
 func main() {
 	flag.Parse()
 	options := &protocol.Options{
@@ -31,8 +28,10 @@ func main() {
 	// rethought.
 	time.Sleep(1 * time.Second)
 
+	remote := k.Remote("devrim", "mathworker")
+
 	squareOf := func(i float64) {
-		k.Call("devrim", "mathworker", "Square", i, func(err error, res string) {
+		remote.Call("Square", i, func(err error, res string) {
 			if err != nil {
 				fmt.Println("call error:", err)
 			} else {
@@ -41,7 +40,7 @@ func main() {
 		})
 	}
 
-	ticker := time.NewTicker(time.Second * 2)
+	ticker := time.NewTicker(time.Millisecond * 400)
 
 	for {
 		select {

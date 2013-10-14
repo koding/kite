@@ -292,18 +292,13 @@ func (k *Kontrol) handleGetKites(req *protocol.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	for _, kite := range kites {
-		msg, _ := json.Marshal(kite)
-		k.Publish(req.Uuid, msg)
-	}
-
 	// Add myself as an dependency to the kite itself (to the kite I
 	// request above). This is needed when new kites of that type appear
 	// on kites that exist dissapear.
 	slog.Printf("adding '%s' as a dependency to '%s' \n", req.Kitename, req.RemoteKite)
 	dependency.Add(req.RemoteKite, req.Kitename)
 
-	resp, err := json.Marshal(protocol.RegisterResponse{Addr: self, Result: "kitesPublished"})
+	resp, err := json.Marshal(kites)
 	if err != nil {
 		return nil, err
 	}
