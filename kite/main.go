@@ -469,19 +469,17 @@ type Remote struct {
 
 // Remote is used to create a new remote struct that is used for remote
 // kite-to-kite calls.
-func (k *Kite) Remote(username, kitename string) *Remote {
-	var remoteKites []*models.Kite
-
-	remoteKites = getKitesBy(username, kitename)
+func (k *Kite) Remote(username, kitename string) (*Remote, error) {
+	remoteKites := k.requestKites(username, kitename)
 	if len(remoteKites) == 0 {
-		remoteKites = k.requestMoreKites(username, kitename)
+		return nil, fmt.Errorf("no remote kites available for %s/%s", username, kitename)
 	}
 
 	return &Remote{
 		Username: username,
 		Kitename: kitename,
 		Kites:    remoteKites,
-	}
+	}, nil
 }
 
 // CallSync makes a blocking request to another kite. args and result is used
@@ -495,7 +493,6 @@ func (r *Remote) CallSync(method string, args interface{}, result interface{}) e
 	rpcMethod := r.Kitename + "." + method
 	err = remoteKite.Client.Call(rpcMethod, args, result)
 	if err != nil {
-		slog.Println(err)
 		return fmt.Errorf("can't call '%s', err: %s", r.Kitename, err.Error())
 	}
 
@@ -536,7 +533,12 @@ func (r *Remote) Call(method string, args interface{}, fn func(err error, res st
 	return d, nil
 }
 
-func (k *Kite) requestMoreKites(username, kitename string) []*models.Kite {
+func (k *Kite) requestKites(username, kitename string) []*models.Kite {
+	remoteKites := getKitesBy(username, kitename)
+	if len(remoteKites) != 0 {
+		return remoteKites
+	}
+
 	m := protocol.Request{
 		Base: protocol.Base{
 			Username: username,
@@ -552,7 +554,7 @@ func (k *Kite) requestMoreKites(username, kitename string) []*models.Kite {
 
 	msg, err := json.Marshal(&m)
 	if err != nil {
-		slog.Println("requestMoreKites marshall err 1", err)
+		slog.Println("requestKites marshall err 1", err)
 		return nil
 	}
 
@@ -562,7 +564,7 @@ func (k *Kite) requestMoreKites(username, kitename string) []*models.Kite {
 	var kitesResp []protocol.PubResponse
 	err = json.Unmarshal(result, &kitesResp)
 	if err != nil {
-		slog.Println("requestMoreKites marshall err 2", err)
+		slog.Println("requestKites marshall err 2", err)
 		return nil
 	}
 
