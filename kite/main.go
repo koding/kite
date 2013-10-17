@@ -181,10 +181,7 @@ func New(options *protocol.Options) *Kite {
 	// pwd, _ := os.Getwd()
 	// getDeps(pwd, options.Kitename)
 
-	messenger, err := NewHTTPMessenger(kiteID)
-	if err != nil {
-		slog.Fatal("error: cannot initialize the messenger")
-	}
+	messenger := NewHTTPMessenger(kiteID)
 
 	messenger.Subscribe(kiteID)
 	messenger.Subscribe("all")

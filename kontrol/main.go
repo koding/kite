@@ -59,11 +59,8 @@ type Dependency interface {
 }
 
 type Kontrol struct {
-	Publisher *moh.Publisher
-	Replier   *moh.Replier
-	PubAddr   string
-	RepAddr   string
-	Hostname  string
+	MessagingServer *moh.MessagingServer
+	Hostname        string
 }
 
 var (
@@ -73,21 +70,12 @@ var (
 )
 
 func main() {
-	var err error
 	hostname, _ := os.Hostname()
 	k := &Kontrol{Hostname: hostname}
 
-	k.Replier, err = moh.NewReplier("127.0.0.1:5556", k.makeRequestHandler())
-	if err != nil {
-		fmt.Printf("Cannot create replier: %s\n", err)
-		return
-	}
-
-	k.Publisher, err = moh.NewPublisher("127.0.0.1:5557")
-	if err != nil {
-		fmt.Printf("Cannot create publisher: %s\n", err)
-		return
-	}
+	const addr = "127.0.0.1:5556"
+	k.MessagingServer = moh.NewMessagingServer(k.makeRequestHandler())
+	go k.MessagingServer.ListenAndServe(addr)
 
 	storage = NewMongoDB()
 	dependency = NewDependency()
@@ -374,7 +362,7 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 }
 
 func (k *Kontrol) Publish(filter string, msg []byte) {
-	k.Publisher.Publish(filter, msg)
+	k.MessagingServer.Publish(filter, msg)
 }
 
 // RegisterKite returns true if the specified kite has been seen before.
