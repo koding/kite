@@ -17,6 +17,7 @@ func NewHTTPMessenger(kiteID string) *HTTPMessenger {
 	const addr = "127.0.0.1:5556"
 	messages := make(chan *[]byte)
 	handler := makeHandler(messages)
+
 	return &HTTPMessenger{
 		Client:   moh.NewMessagingClient(addr, handler),
 		messages: messages,
