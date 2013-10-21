@@ -14,7 +14,7 @@ type HTTPMessenger struct {
 // Created HTTPMessenger will keep an open connection to the other side for
 // consuming messages asynchronously.
 func NewHTTPMessenger(kiteID string) *HTTPMessenger {
-	const addr = "127.0.0.1:5556"
+	const addr = "127.0.0.1:4000"
 	messages := make(chan *[]byte)
 	handler := makeHandler(messages)
 

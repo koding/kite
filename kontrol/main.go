@@ -59,8 +59,9 @@ type Dependency interface {
 }
 
 type Kontrol struct {
-	MessagingServer *moh.MessagingServer
-	Hostname        string
+	Replier   *moh.Replier
+	Publisher *moh.Publisher
+	Hostname  string
 }
 
 var (
@@ -72,10 +73,8 @@ var (
 func main() {
 	hostname, _ := os.Hostname()
 	k := &Kontrol{Hostname: hostname}
-
-	const addr = "127.0.0.1:5556"
-	k.MessagingServer = moh.NewMessagingServer(k.makeRequestHandler())
-	go k.MessagingServer.ListenAndServe(addr)
+	k.Replier = moh.NewReplier(k.makeRequestHandler())
+	k.Publisher = moh.NewPublisher()
 
 	storage = NewMongoDB()
 	dependency = NewDependency()
@@ -104,6 +103,8 @@ func (k *Kontrol) Start() {
 	rout := mux.NewRouter()
 	rout.HandleFunc("/", homeHandler).Methods("GET")
 	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
+	rout.Handle(moh.DefaultReplierPath, k.Replier)
+	rout.Handle(moh.DefaultPublisherPath, k.Publisher)
 	http.Handle("/", rout)
 	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
 }
@@ -362,7 +363,7 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 }
 
 func (k *Kontrol) Publish(filter string, msg []byte) {
-	k.MessagingServer.Publish(filter, msg)
+	k.Publisher.Publish(filter, msg)
 }
 
 // RegisterKite returns true if the specified kite has been seen before.
