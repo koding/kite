@@ -113,6 +113,9 @@ type Kite struct {
 	// other kites that needs to be run, in order to run this one
 	Dependencies string
 
+	// kind is temporary field that is used for Koding client side functionality
+	Kind string
+
 	// by default yes, if disabled it bypasses kontrol
 	KontrolEnabled bool
 
@@ -190,6 +193,7 @@ func New(options *protocol.Options) *Kite {
 		Username:       options.Username,
 		Kitename:       options.Kitename,
 		Version:        options.Version,
+		Kind:           options.Kind,
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
 		Addr:           localIP + ":" + port,
@@ -356,6 +360,7 @@ func (k *Kite) RegisterToKontrol() error {
 			Version:   k.Version,
 			Uuid:      k.Uuid,
 			PublicKey: k.PublicKey,
+			Kind:      k.Kind,
 			Hostname:  k.Hostname,
 			Addr:      k.Addr,
 			LocalIP:   k.LocalIP,

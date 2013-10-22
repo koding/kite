@@ -35,9 +35,14 @@ type Base struct {
 	Uuid      string        `bson:"uuid" json:"uuid"`
 	Hostname  string        `bson:"hostname" json:"hostname"`
 	Addr      string        `bson:"addr" json:"addr"`
-	LocalIP   string        `bson:"localIP" json:"localIP"`
-	PublicIP  string        `bson:"publicIP" json:"publicIP"`
-	Port      string        `bson:"port" json:"port"`
+
+	// this is used temporary to distinguish kites that are used for Koding
+	// client-side. An example is to use it with value "vm"
+	Kind string `bson:"kind" json:"kind"`
+
+	LocalIP  string `bson:"localIP" json:"localIP"`
+	PublicIP string `bson:"publicIP" json:"publicIP"`
+	Port     string `bson:"port" json:"port"`
 }
 
 type KiteRequest struct {
@@ -80,6 +85,7 @@ type Options struct {
 	PublicIP     string `json:"publicIP"`
 	Port         string `json:"port"`
 	Version      string `json:"version"`
+	Kind         string `json:"kind"`
 	Dependencies string `json:"dependencies"`
 }
 

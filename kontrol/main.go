@@ -416,11 +416,52 @@ func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 
 		kite.Username = account.Profile.Nickname
 		storage.Add(kite)
+
+		if req.Kind == "vm" {
+			err := addToVM(account.Profile.Nickname)
+			if err != nil {
+				fmt.Println("register  get user id err")
+			}
+		}
+
 	}
 	return kite, nil
 }
 
+func addToVM(username string) error {
+	newVM := modelhelper.NewVM()
+	newVM.HostnameAlias = "local-" + username
+	newVM.IsEnabled = true
+	newVM.WebHome = username
+
+	user, err := modelhelper.GetUser(username)
+	if err != nil {
+		return err
+	}
+
+	newVM.Users = []models.Permissions{
+		models.Permissions{
+			Id:    user.ObjectId,
+			Sudo:  true,
+			Owner: true,
+		}}
+
+	group, err := modelhelper.GetGroup("Koding")
+	if err != nil {
+		return err
+	}
+
+	newVM.Groups = []models.Permissions{
+		models.Permissions{
+			Id: group.ObjectId,
+		}}
+
+	modelhelper.AddVM(&newVM)
+	return nil
+}
+
 // getRelationship returns a slice of of kites that has a relationship to kite itself.
+
 func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	targetKites := make([]*models.Kite, 0)
 	if storage.Size() == 0 {
