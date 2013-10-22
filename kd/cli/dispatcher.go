@@ -15,6 +15,13 @@ func NewDispatcher() *Dispatcher {
 	kite.AddCommand("create", NewCreate())
 	kite.AddCommand("run", NewRun())
 	kite.AddCommand("stop", NewStop())
+	kite.AddCommand("status", NewStatus())
+
+	pack := kite.AddModule("pack", "Creates packages")
+	pack.AddCommand("pkg", NewPkg())
+
+	deploy := kite.AddModule("deploy", "Deploys kite")
+	deploy.AddCommand("remotessh", NewRemoteSSH())
 
 	return &Dispatcher{root: root}
 }

@@ -16,11 +16,12 @@ func main() {
 		Port:     "4005",
 	}
 
-	methods := map[string]interface{}{
-		"sample.hello": Sample.Hello,
+	methods := map[string]string{
+		"sample.hello": "Hello",
 	}
 
-	k := kite.New(o, &Sample{}, methods)
+	k := kite.New(o)
+	k.AddMethods(new(Sample), methods)
 	k.Start()
 }
 
