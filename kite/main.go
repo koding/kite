@@ -417,8 +417,8 @@ func (k *Kite) serve(addr string) {
 	// k.newPool(k.Addr) // registers to http.DefaultServeMux
 	// k.newGroup()
 
-	http.Handle(rpc.DefaultRPCPath, k)
-	http.Serve(listener, nil)
+	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
+	http.Serve(listener, k)
 }
 
 // ServeHTTP interface for http package.
