@@ -19,7 +19,9 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"os/exec"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -204,10 +206,42 @@ func New(options *protocol.Options) *Kite {
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
 		Messenger:      messenger,
+		Methods:        make(map[string]string),
 		Clients:        NewClients(),
 	}
 
+	// Register out internal method
+	k.Methods["vm.info"] = "status.Info"
+	k.Server.RegisterName("status", new(Status))
+	// k.AddMethods(new(Status), map[string]string{
+	// 	"vm.info": "Info",
+	// })
+
 	return k
+}
+
+type Status struct{}
+
+type Info struct {
+	State            string `json:"state"`
+	DiskUsage        string `json:"diskUsage"`
+	TotalMemoryLimit int    `json:"totalMemoryLimit"`
+	MemoryUsage      int    `json:"memoryUsage"`
+}
+
+func (Status) Info(r *protocol.KiteDnodeRequest, result *Info) error {
+	// Only for mac
+	out, _ := exec.Command("bash", "-c", "df | grep '\\/dev\\/'|  awk '{print $2, $3}'").CombinedOutput()
+
+	diskUsage := strings.TrimSpace(string(out))
+
+	info := new(Info)
+	info.State = "RUNNING"
+	info.DiskUsage = diskUsage
+	info.TotalMemoryLimit = 1024 * 1024 * 1024
+
+	*result = *info
+	return nil
 }
 
 // AddMethods is used to add new structs with exposed methods with a different
@@ -218,8 +252,23 @@ func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 		return errors.New("method struct should not be nil")
 	}
 
-	k.Methods = k.createMethodMap(rcvr, methods)
+	k.createMethodMap(rcvr, methods)
 	return k.Server.RegisterName(k.Kitename, rcvr)
+}
+
+func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
+	kiteStruct := reflect.TypeOf(rcvr)
+
+	for alternativeName, method := range methods {
+		m, ok := kiteStruct.MethodByName(method)
+		if !ok {
+			slog.Printf("warning: no method with name: %s\n", method)
+			continue
+		}
+
+		// map alternativeName to go's net/rpc methodname
+		k.Methods[alternativeName] = k.Kitename + "." + m.Name
+	}
 }
 
 // Start is a blocking method. It runs the kite server and then accepts requests
@@ -707,24 +756,6 @@ func (k *Kite) PeersAddr() []string {
 Misc
 
 ******************************************/
-
-func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) map[string]string {
-	kiteStruct := reflect.TypeOf(rcvr)
-
-	methodsMapping := make(map[string]string)
-	for alternativeName, method := range methods {
-		m, ok := kiteStruct.MethodByName(method)
-		if !ok {
-			slog.Printf("warning: no method with name: %s\n", method)
-			continue
-		}
-
-		// map alternativeName to go's net/rpc methodname
-		methodsMapping[alternativeName] = k.Kitename + "." + m.Name
-	}
-
-	return methodsMapping
-}
 
 // return kites from the storage that matches username and kitename
 func getKitesBy(username, kitename string) []*models.Kite {
