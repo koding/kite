@@ -3,17 +3,14 @@ package kite
 import (
 	"github.com/cloudfoundry/gosigar"
 	"koding/newkite/protocol"
-	"os/exec"
-	"runtime"
-	"strings"
 )
 
 type Status struct{}
 
 type Info struct {
 	State       string `json:"state"`
-	DiskUsage   string `json:"diskUsage"`
-	DiskTotal   string `json:"diskTotal"`
+	DiskUsage   uint64 `json:"diskUsage"`
+	DiskTotal   uint64 `json:"diskTotal"`
 	MemoryUsage uint64 `json:"memoryUsage"`
 	MemoryTotal uint64 `json:"totalMemoryLimit"`
 }
@@ -24,8 +21,8 @@ type memory struct {
 }
 
 type disk struct {
-	Usage string `json:"diskUsage"`
-	Total string `json:"diskTotal"`
+	Usage uint64 `json:"diskUsage"`
+	Total uint64 `json:"diskTotal"`
 }
 
 func memoryStats() *memory {
@@ -40,16 +37,12 @@ func memoryStats() *memory {
 }
 
 func diskStats() *disk {
-	if runtime.GOOS != "darwin" {
-		return nil // only darwin
-	}
-
-	out, _ := exec.Command("bash", "-c", "df -H | grep '\\/dev\\/'|  awk '{print $2, $3}'").CombinedOutput()
-	diskStats := strings.Split(strings.TrimSpace(string(out)), " ")
-
 	d := new(disk)
-	d.Total = diskStats[0]
-	d.Usage = diskStats[1]
+	space := sigar.FileSystemUsage{}
+	if err := space.Get("/"); err == nil {
+		d.Total = space.Total
+		d.Usage = space.Used
+	}
 	return d
 }
 
