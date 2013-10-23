@@ -8,7 +8,6 @@ type Dispatcher struct {
 
 func NewDispatcher() *Dispatcher {
 	root := NewModule(nil, "")
-	root.AddCommand("hello", NewHello())
 	root.AddCommand("register", NewRegister())
 
 	kite := root.AddModule("kite", "Includes commands related to kites")
