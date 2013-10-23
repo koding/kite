@@ -12,16 +12,16 @@ func NewDispatcher() *Dispatcher {
 	root.AddCommand("register", NewRegister())
 
 	kite := root.AddModule("kite", "Includes commands related to kites")
-	kite.AddCommand("create", NewCreate())
-	kite.AddCommand("run", NewRun())
-	kite.AddCommand("stop", NewStop())
-	kite.AddCommand("status", NewStatus())
+	// kite.AddCommand("create", NewCreate())
+	// kite.AddCommand("run", NewRun())
+	// kite.AddCommand("stop", NewStop())
+	// kite.AddCommand("status", NewStatus())
 
-	pack := kite.AddModule("pack", "Creates packages")
-	pack.AddCommand("pkg", NewPkg())
+	// pack := kite.AddModule("pack", "Creates packages")
+	// pack.AddCommand("pkg", NewPkg())
 
-	deploy := kite.AddModule("deploy", "Deploys kite")
-	deploy.AddCommand("remotessh", NewRemoteSSH())
+	// deploy := kite.AddModule("deploy", "Deploys kite")
+	// deploy.AddCommand("remotessh", NewRemoteSSH())
 
 	return &Dispatcher{root: root}
 }
