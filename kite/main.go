@@ -5,6 +5,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/fatih/goset"
 	"github.com/golang/groupcache"
@@ -226,6 +227,8 @@ func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 // asynchronously. It can be started in a goroutine if you wish to use kite as a
 // client too.
 func (k *Kite) Start() {
+	k.parseVersion()
+
 	// Start our blocking subscriber loop. We except messages in the format of:
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
 	// Latter is important to ensure robustness, if not we have to unmarshal or
@@ -237,6 +240,22 @@ func (k *Kite) Start() {
 		k.Messenger.Consume(k.handle)
 	}
 }
+
+// parseVersion prints the version number of the kite and exits with 0
+// if "-version" flag is enabled.
+// We did not use the "flag" package because it causes trouble if the user
+// also calls "flag.Parse()" in his code. flag.Parse() can be called only once.
+func (k *Kite) parseVersion() {
+	for _, flag := range os.Args {
+		if flag == "-version" {
+			fmt.Println(k.Version)
+			os.Exit(0)
+		}
+	}
+}
+
+// If the user wants to call flag.Parse() the flag must be defined in advance.
+var _ = flag.Bool("version", false, "show version")
 
 // handle is a method that interprets the incoming message from Kontrol. The
 // incoming message is in form of protocol.PubResponse.
