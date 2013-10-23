@@ -19,9 +19,7 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
-	"os/exec"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 )
@@ -213,35 +211,8 @@ func New(options *protocol.Options) *Kite {
 	// Register out internal method
 	k.Methods["vm.info"] = "status.Info"
 	k.Server.RegisterName("status", new(Status))
-	// k.AddMethods(new(Status), map[string]string{
-	// 	"vm.info": "Info",
-	// })
 
 	return k
-}
-
-type Status struct{}
-
-type Info struct {
-	State            string `json:"state"`
-	DiskUsage        string `json:"diskUsage"`
-	TotalMemoryLimit int    `json:"totalMemoryLimit"`
-	MemoryUsage      int    `json:"memoryUsage"`
-}
-
-func (Status) Info(r *protocol.KiteDnodeRequest, result *Info) error {
-	// Only for mac
-	out, _ := exec.Command("bash", "-c", "df | grep '\\/dev\\/'|  awk '{print $2, $3}'").CombinedOutput()
-
-	diskUsage := strings.TrimSpace(string(out))
-
-	info := new(Info)
-	info.State = "RUNNING"
-	info.DiskUsage = diskUsage
-	info.TotalMemoryLimit = 1024 * 1024 * 1024
-
-	*result = *info
-	return nil
 }
 
 // AddMethods is used to add new structs with exposed methods with a different
