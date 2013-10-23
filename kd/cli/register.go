@@ -2,63 +2,66 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
+	"math/big"
 	"net/http"
+	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-// var authSite = "https://koding.com"
-var authSite = "http://localhost:3020"
+const KeyLength = 64
 
-type Register struct {
-	ID         string
-	PublicKey  string
-	PrivateKey string
-	Username   string
-}
+// var AuthServer = "https://koding.com"
+var AuthServer = "http://localhost:3020"
+
+type Register struct{}
 
 func NewRegister() *Register {
-	id, err := uuid.NewV4()
-	if err != nil {
-		panic(err)
-	}
-
-	return &Register{
-		ID: "machineID-" + id.String(),
-	}
+	return &Register{}
 }
 
 func (r *Register) Definition() string {
-	return "Registers the user's machine to kontrol"
+	return "Register this host to Koding"
 }
 
 func (r *Register) Exec() error {
-	err := r.Register()
-	if err != nil {
-		return errors.New(fmt.Sprint("\nregister error: %s\n", err.Error()))
-	}
-	return nil
-}
-
-func (r *Register) Register() error {
-	err := r.getConfig()
+	id, err := uuid.NewV4()
 	if err != nil {
 		return err
 	}
 
-	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", authSite, r.ID, r.PublicKey)
-	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", authSite, r.PublicKey)
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	hostID := hostname + "-" + id.String()
+
+	key, err := getOrCreateKey()
+	if err != nil {
+		return err
+	}
+
+	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", AuthServer, hostID, key)
 
 	fmt.Printf("Please open the following url for authentication:\n\n")
-	// PrintBox(registerUrl)
 	fmt.Println(registerUrl)
 	fmt.Printf("\nwaiting . ")
+
+	return checker(key)
+}
+
+// checker checks if the user has browsed the register URL by polling the check URL.
+func checker(key string) error {
+	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", AuthServer, key)
 
 	// check the result every two seconds
 	ticker := time.NewTicker(time.Second * 2).C
@@ -101,55 +104,66 @@ func (r *Register) Register() error {
 			return errors.New("timeout")
 		}
 	}
-
-	return nil
 }
 
-func PrintBox(msg string) {
-	fmt.Printf("\n\n")
-	fmt.Println("╔" + strings.Repeat("═", len(msg)+2) + "╗")
-	fmt.Println("║" + strings.Repeat(" ", len(msg)+2) + "║")
-	fmt.Println("║ " + msg + " ║")
-	fmt.Println("║" + strings.Repeat(" ", len(msg)+2) + "║")
-	fmt.Println("╚" + strings.Repeat("═", len(msg)+2) + "╝")
-	fmt.Printf("\n")
-}
-
-func (r *Register) getConfig() error {
-	var err error
-	// we except to read all of them, if one fails it should be abort
-	r.PublicKey, err = getKey("public")
-	if err != nil {
-		return err
-	}
-
-	r.PrivateKey, err = getKey("private")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func getKey(key string) (string, error) {
+// getOrCreateKey combines the two functions: getKey and writeNewKey
+func getOrCreateKey() (key string, err error) {
 	usr, err := user.Current()
 	if err != nil {
-		return "", err
+		return
 	}
 
-	var keyfile string
-	switch key {
-	case "public":
-		keyfile = usr.HomeDir + "/.kd/koding.key.pub"
-	case "private":
-		keyfile = usr.HomeDir + "/.kd/koding.key"
-	default:
-		return "", fmt.Errorf("key is not recognized '%s'\n", key)
+	kdPath := filepath.Join(usr.HomeDir, ".kd")
+	keyPath := filepath.Join(kdPath, "koding.key")
+
+	key, err = getKey(keyPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file or directory") {
+			key, err = writeNewKey(kdPath, keyPath)
+		}
+	}
+	return
+}
+
+// getKey returns the Koding key from ~/.kd/koding.key
+func getKey(keyPath string) (key string, err error) {
+	data, err := ioutil.ReadFile(keyPath)
+	key = strings.TrimSpace(string(data))
+	return
+}
+
+// writeNewKey generates a new Koding key and writes to ~/.kd/koding.key
+func writeNewKey(kdPath, keyPath string) (key string, err error) {
+	fmt.Println("Koding key is not found on this host. A new key will be created.")
+
+	err = os.Mkdir(kdPath, 0700)
+	key, err = randString(KeyLength)
+	if err != nil {
+		return
 	}
 
-	file, err := ioutil.ReadFile(keyfile)
+	err = ioutil.WriteFile(keyPath, []byte(key), 0600)
+	return
+}
+
+// randString returns a random string of length n.
+// Taken from http://stackoverflow.com/a/12795389/242451
+func randString(n int) (string, error) {
+	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	symbols := big.NewInt(int64(len(alphanum)))
+	states := big.NewInt(0)
+	states.Exp(symbols, big.NewInt(int64(n)), nil)
+	r, err := rand.Int(rand.Reader, states)
 	if err != nil {
 		return "", err
 	}
-
-	return strings.TrimSpace(string(file)), nil
+	var bytes = make([]byte, n)
+	r2 := big.NewInt(0)
+	symbol := big.NewInt(0)
+	for i := range bytes {
+		r2.DivMod(r, symbols, symbol)
+		r, r2 = r2, r
+		bytes[i] = alphanum[symbol.Int64()]
+	}
+	return string(bytes), nil
 }
