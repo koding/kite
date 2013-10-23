@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"archive/tar"
 	"bufio"
 	"code.google.com/p/go.crypto/ssh/terminal"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +13,7 @@ import (
 	"io/ioutil"
 	"koding/newkite/protocol"
 	"koding/tools/process"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -228,6 +231,91 @@ func cp(src, dst string) error {
 		return err
 	}
 	return d.Close()
+}
+
+/****************************************
+
+kd kite install
+
+****************************************/
+
+type Install struct{}
+
+func NewInstall() *Install {
+	return &Install{}
+}
+
+func (*Install) Definition() string {
+	return "Install kite from Koding repository"
+}
+
+const s3URL = "http://koding-kites.s3.amazonaws.com/"
+
+func (*Install) Exec() error {
+	flag.Parse()
+	if flag.NArg() != 1 {
+		return errors.New("You should give a kite name")
+	}
+
+	// Generate download URL
+	kiteName := flag.Arg(0)
+	kiteURL := s3URL + kiteName + ".kite.tar.gz"
+	fmt.Println("Downloading from", kiteURL)
+
+	// Make download request
+	res, err := http.Get(kiteURL)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// Extract gzip
+	gz, err := gzip.NewReader(res.Body)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+
+	return extractTar(gz)
+}
+
+// extractTar reads from the io.Reader and writes the files into kites directory.
+func extractTar(r io.Reader) error {
+	kitesPath := filepath.Join(getKdPath(), "kites")
+
+	tr := tar.NewReader(r)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			// end of tar archive
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		fi := hdr.FileInfo()
+		name := fi.Name()
+		path := filepath.Join(kitesPath, name)
+
+		// TODO make the binary under /bin executable
+		// TODO extract to temp directory first, then move into ~/.kd/kites
+		// TODO assert contents of the tar file, it must contain online one directory named kitename-0.0.1.kite
+
+		if fi.IsDir() {
+			os.MkdirAll(path, 0700)
+		} else {
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+			if err != nil {
+				return err
+			}
+
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 /****************************************

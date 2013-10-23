@@ -108,14 +108,8 @@ func checker(key string) error {
 
 // getOrCreateKey combines the two functions: getKey and writeNewKey
 func getOrCreateKey() (key string, err error) {
-	usr, err := user.Current()
-	if err != nil {
-		return
-	}
-
-	kdPath := filepath.Join(usr.HomeDir, ".kd")
+	kdPath := getKdPath()
 	keyPath := filepath.Join(kdPath, "koding.key")
-
 	key, err = getKey(keyPath)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file or directory") {
@@ -144,6 +138,16 @@ func writeNewKey(kdPath, keyPath string) (key string, err error) {
 
 	err = ioutil.WriteFile(keyPath, []byte(key), 0600)
 	return
+}
+
+// getKdPath returns absolute of ~/.kd
+func getKdPath() string {
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+
+	return filepath.Join(usr.HomeDir, ".kd")
 }
 
 // randString returns a random string of length n.
