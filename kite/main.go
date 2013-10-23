@@ -233,7 +233,7 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 	for alternativeName, method := range methods {
 		m, ok := kiteStruct.MethodByName(method)
 		if !ok {
-			slog.Printf("warning: no method with name: %s\n", method)
+			panic(fmt.Sprintf("addmethods err: no method with name: %s\n", method))
 			continue
 		}
 

@@ -374,61 +374,78 @@ func (k *Kontrol) Publish(filter string, msg []byte) {
 // creates a new struct, stores it and returns it.
 func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 	kite := storage.Get(req.Uuid)
-	if kite == nil {
-		// in the future we'll check other things too, for now just make sure that
-		// the variables are not empty
-		if req.Kitename == "" && req.Version == "" && req.Addr == "" {
-			return nil, fmt.Errorf("kite fields are not initialized correctly")
-		}
-
-		kite = &models.Kite{
-			Base: protocol.Base{
-				Username:  req.Username,
-				Kitename:  req.Kitename,
-				Version:   req.Version,
-				PublicKey: req.PublicKey,
-				Uuid:      req.Uuid,
-				Hostname:  req.Hostname,
-				Addr:      req.Addr,
-				LocalIP:   req.LocalIP,
-				PublicIP:  req.PublicIP,
-				Port:      req.Port,
-			},
-		}
-
-		kodingKey, err := modelhelper.GetKodingKeysByKey(kite.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("register kodingkey err %s", err)
-		}
-
-		account, err := modelhelper.GetAccountById(kodingKey.Owner)
-		if err != nil {
-			return nil, fmt.Errorf("register get user err %s", err)
-		}
-
-		startLog := fmt.Sprintf("[%s (%s)] belong to '%s'. ready to go..",
-			kite.Kitename,
-			kite.Version,
-			account.Profile.Nickname,
-		)
-		slog.Println(startLog)
-
-		if account.Profile.Nickname == "" {
-			return nil, errors.New("nickname is empty, could not register kite")
-		}
-
-		kite.Username = account.Profile.Nickname
-		storage.Add(kite)
-
-		if req.Kind == "vm" {
-			err := addToVM(account.Profile.Nickname)
-			if err != nil {
-				fmt.Println("register get user id err")
-			}
-		}
-
+	if kite != nil {
+		return kite, nil
 	}
+
+	return createAndAddKite(req)
+}
+
+func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
+	// in the future we'll check other things too, for now just make sure that
+	// the variables are not empty
+	if req.Kitename == "" && req.Version == "" && req.Addr == "" {
+		return nil, fmt.Errorf("kite fields are not initialized correctly")
+	}
+
+	kite, err := createKiteModel(req)
+	if err != nil {
+		return nil, err
+	}
+
+	username, err := usernameFromKey(kite.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	kite.Username = username
+	storage.Add(kite)
+
+	slog.Printf("[%s (%s)] belong to '%s'. ready to go..\n", kite.Kitename, kite.Version, username)
+
+	if req.Kind == "vm" {
+		err := addToVM(username)
+		if err != nil {
+			fmt.Println("register get user id err")
+		}
+	}
+
 	return kite, nil
+}
+
+func createKiteModel(req *protocol.Request) (*models.Kite, error) {
+	return &models.Kite{
+		Base: protocol.Base{
+			Username:  req.Username,
+			Kitename:  req.Kitename,
+			Version:   req.Version,
+			PublicKey: req.PublicKey,
+			Uuid:      req.Uuid,
+			Hostname:  req.Hostname,
+			Addr:      req.Addr,
+			LocalIP:   req.LocalIP,
+			PublicIP:  req.PublicIP,
+			Port:      req.Port,
+		},
+	}, nil
+}
+
+func usernameFromKey(key string) (string, error) {
+	kodingKey, err := modelhelper.GetKodingKeysByKey(key)
+	if err != nil {
+		return "", fmt.Errorf("register kodingkey err %s", err)
+	}
+
+	account, err := modelhelper.GetAccountById(kodingKey.Owner)
+	if err != nil {
+		return "", fmt.Errorf("register get user err %s", err)
+	}
+
+	if account.Profile.Nickname == "" {
+		return "", errors.New("nickname is empty, could not register kite")
+	}
+
+	return account.Profile.Nickname, nil
 }
 
 func addToVM(username string) error {
