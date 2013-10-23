@@ -24,7 +24,11 @@ type Register struct {
 }
 
 func NewRegister() *Register {
-	id, _ := uuid.NewV4()
+	id, err := uuid.NewV4()
+	if err != nil {
+		panic(err)
+	}
+
 	return &Register{
 		ID: "machineID-" + id.String(),
 	}
