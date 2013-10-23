@@ -153,8 +153,11 @@ func (k *Kontrol) heartBeatChecker() {
 
 			storage.Remove(kite.Uuid)
 
-			removeMsg := createByteResponse(protocol.RemoveKite, kite)
+			if !kitesBelongingTo(kite.Username) {
+				deleteFromVM(kite.Username)
+			}
 
+			removeMsg := createByteResponse(protocol.RemoveKite, kite)
 			// notify kites of the same type
 			for _, kiteUUID := range k.getUUIDsForKites(kite.Kitename) {
 				k.Publish(kiteUUID, removeMsg)
@@ -420,7 +423,7 @@ func (k *Kontrol) RegisterKite(req *protocol.Request) (*models.Kite, error) {
 		if req.Kind == "vm" {
 			err := addToVM(account.Profile.Nickname)
 			if err != nil {
-				fmt.Println("register  get user id err")
+				fmt.Println("register get user id err")
 			}
 		}
 
@@ -458,6 +461,31 @@ func addToVM(username string) error {
 
 	modelhelper.AddVM(&newVM)
 	return nil
+}
+
+func deleteFromVM(username string) error {
+	if username == "" {
+		return errors.New("deleting local vm err: empty username is passed")
+	}
+
+	hostnameAlias := "local-" + username
+	err := modelhelper.DeleteVM(hostnameAlias)
+	if err != nil {
+		return fmt.Errorf("deleting local vm err:", err)
+	}
+	return nil
+}
+
+func kitesBelongingTo(username string) bool {
+	found := false
+
+	for _, kite := range storage.List() {
+		if kite.Username == username {
+			found = true
+		}
+	}
+
+	return found
 }
 
 // getRelationship returns a slice of of kites that has a relationship to kite itself.
