@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -63,28 +64,20 @@ func ExternalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
-func GetKodingKey(key string) (string, error) {
+func GetKodingKey() (key string, err error) {
 	usr, err := user.Current()
 	if err != nil {
-		return "", err
+		return
 	}
 
-	var keyfile string
-	switch key {
-	case "public":
-		keyfile = usr.HomeDir + "/.kd/koding.key.pub"
-	case "private":
-		keyfile = usr.HomeDir + "/.kd/koding.key"
-	default:
-		return "", fmt.Errorf("key is not recognized '%s'\n", key)
-	}
-
-	file, err := ioutil.ReadFile(keyfile)
+	keyfile := filepath.Join(usr.HomeDir, ".kd/", "koding.key")
+	data, err := ioutil.ReadFile(keyfile)
 	if err != nil {
-		return "", err
+		return
 	}
 
-	return strings.TrimSpace(string(file)), nil
+	key = strings.TrimSpace(string(data))
+	return
 }
 
 // return o.LocalIP back if assigned, otherwise it gets a local IP from on

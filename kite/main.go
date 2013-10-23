@@ -167,7 +167,7 @@ func New(options *protocol.Options) *Kite {
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
 
-	publicKey, err := utils.GetKodingKey("public")
+	publicKey, err := utils.GetKodingKey()
 	if err != nil {
 		slog.Fatal("public key reading:", err)
 	}
