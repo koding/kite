@@ -15,7 +15,7 @@ type Info struct {
 	DiskUsage   string `json:"diskUsage"`
 	DiskTotal   string `json:"diskTotal"`
 	MemoryUsage uint64 `json:"memoryUsage"`
-	MemoryTotal uint64 `json:"memoryTotal"`
+	MemoryTotal uint64 `json:"totalMemoryLimit"`
 }
 
 type memory struct {
@@ -32,8 +32,8 @@ func memoryStats() *memory {
 	m := new(memory)
 	mem := sigar.Mem{}
 	if err := mem.Get(); err == nil {
-		m.Usage = mem.ActualUsed / 1024 / 1024
-		m.Total = mem.Total / 1024 / 1024
+		m.Usage = mem.ActualUsed
+		m.Total = mem.Total
 	}
 
 	return m
@@ -58,7 +58,7 @@ func (Status) Info(r *protocol.KiteDnodeRequest, result *Info) error {
 	mem := memoryStats()
 
 	info := &Info{
-		State:       "Running", // needed for client side compatibility
+		State:       "RUNNING", // needed for client side compatibility
 		DiskUsage:   disk.Usage,
 		DiskTotal:   disk.Total,
 		MemoryUsage: mem.Usage,
