@@ -227,7 +227,7 @@ func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 // asynchronously. It can be started in a goroutine if you wish to use kite as a
 // client too.
 func (k *Kite) Start() {
-	k.parseVersion()
+	k.parseVersionFlag()
 
 	// Start our blocking subscriber loop. We except messages in the format of:
 	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
@@ -241,11 +241,11 @@ func (k *Kite) Start() {
 	}
 }
 
-// parseVersion prints the version number of the kite and exits with 0
+// parseVersionFlag prints the version number of the kite and exits with 0
 // if "-version" flag is enabled.
 // We did not use the "flag" package because it causes trouble if the user
 // also calls "flag.Parse()" in his code. flag.Parse() can be called only once.
-func (k *Kite) parseVersion() {
+func (k *Kite) parseVersionFlag() {
 	for _, flag := range os.Args {
 		if flag == "-version" {
 			fmt.Println(k.Version)
