@@ -302,6 +302,9 @@ func (k *Kite) handle(msg []byte) {
 		k.AddKite(r)
 	case protocol.RemoveKite:
 		k.RemoveKite(r)
+	case protocol.ExpireToken:
+		fmt.Printf("token '%s' has been invoked via kontrol\n", r.Token)
+		permissions.Remove(r.Token)
 	case protocol.UpdateKite:
 		k.Registered = false //trigger reinitialization
 	case "ping":

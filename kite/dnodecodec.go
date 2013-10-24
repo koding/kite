@@ -271,7 +271,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		if a.Token != resp.Token.ID.Hex() {
+		if a.Token != resp.Token.Token {
 			return errors.New("token is invalid")
 		}
 		permissions.Add(a.Token) // can be changed in the future, for now cache the token

@@ -15,11 +15,12 @@ const ORIGIN_JSON = "json"
 const ORIGIN_GOB = "gob"
 
 const (
-	AllowKite  = "AllowKite"
-	PermitKite = "PermitKite"
-	AddKite    = "AddKite"
-	RemoveKite = "RemoveKite"
-	UpdateKite = "UpdateKite"
+	AllowKite   = "AllowKite"
+	PermitKite  = "PermitKite"
+	AddKite     = "AddKite"
+	RemoveKite  = "RemoveKite"
+	UpdateKite  = "UpdateKite"
+	ExpireToken = "ExpireToken"
 )
 
 type KiteRequest struct {

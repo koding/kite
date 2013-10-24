@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"koding/db/models"
+	"koding/db/mongodb"
 	"koding/db/mongodb/modelhelper"
 	"koding/messaging/moh"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
 	"koding/tools/config"
 	"koding/tools/slog"
+	"labix.org/v2/mgo"
 	"net/http"
 	"os"
 	"strconv"
@@ -95,11 +97,10 @@ func main() {
 }
 
 func (k *Kontrol) Start() {
-	// ping all subscribers
+	// scheduler functions
 	go k.pinger()
-
-	// HeartBeat pool checker. Checking for kites if they are live or dead.
 	go k.heartBeatChecker()
+	go k.expireTokens()
 
 	rout := mux.NewRouter()
 	rout.HandleFunc("/", homeHandler).Methods("GET")
@@ -123,10 +124,52 @@ func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
 	}
 }
 
+// expireTokens checks every 10 seconds for all tokens if they are expired. If
+// a token has been expired, the kites that is associated with that token get
+// notified to revoke the token. Also the token is deleted from the db, which then
+// the clients need to re-request again.
+func (k *Kontrol) expireTokens() {
+	ticker := time.NewTicker(time.Second * 10)
+
+	queryFunc := func(c *mgo.Collection) error {
+		token := new(models.KiteToken)
+
+		iter := c.Find(nil).Iter()
+		for iter.Next(token) {
+			if time.Now().Before(token.ExpiresAt) {
+				continue // still alive, pick up the next one
+			}
+
+			for _, uuid := range token.Kites {
+				kite := storage.Get(uuid)
+				if kite == nil {
+					continue
+				}
+
+				kite.Token = token.Token
+				k.Publish(uuid, createByteResponse(protocol.ExpireToken, kite))
+				modelhelper.DeleteKiteToken(token.Username)
+
+				slog.Printf("token for username '%s' has been invoked.", token.Username)
+			}
+		}
+
+		if err := iter.Close(); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	for _ = range ticker.C {
+		mongodb.Run("jKiteTokens", queryFunc)
+	}
+}
+
+// This is used for two reasons:
+// 1. HeartBeat mechanism for kite (Node Coordination)
+// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
 func (k *Kontrol) pinger() {
-	// This is used for two reasons
-	// 1. HeartBeat mechanism for kite (Node Coordination)
-	// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
 	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
 	for _ = range ticker.C {
 		k.ping()
@@ -145,6 +188,8 @@ func (k *Kontrol) ping() {
 	k.Publish("all", msg)
 }
 
+// HeartBeat pool checker. Checking for kites if they are live or dead.
+// It removes kites from the DB if they are no more alive.
 func (k *Kontrol) heartBeatChecker() {
 	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
 	for _ = range ticker.C {
@@ -315,7 +360,7 @@ func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
 	msg := protocol.RegisterResponse{}
 
 	token, err := modelhelper.GetKiteToken(req.Username)
-	if err != nil || token.ID.Hex() != req.Token {
+	if err != nil || token.Token != req.Token {
 		slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 		msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 	} else {
