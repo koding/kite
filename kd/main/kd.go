@@ -11,5 +11,6 @@ func main() {
 	err := d.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(1)
 	}
 }
