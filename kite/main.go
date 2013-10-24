@@ -33,6 +33,12 @@ var (
 
 	// set data structure for caching tokens
 	permissions = goset.New()
+
+	// registers to kontrol in this interval
+	registerInterval = 700 * time.Millisecond
+
+	// after hitting the limit the register interval is no more increased
+	maxRegisterLimit = 30
 )
 
 // Messenger is used to implement various Messaging patterns on top of the
@@ -138,9 +144,11 @@ type Kite struct {
 	// used to start the rpc server only once
 	OnceServer sync.Once
 
-	// used when multiple goroutines are requesting information from kontrol
-	// we only make on request to Kontrol.
-	OnceCall sync.Once
+	// used to initialize the register process to kontrol just once
+	OnceRegister sync.Once
+
+	// number of register attempts to kontrol
+	registerAttempt int
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
@@ -162,7 +170,6 @@ func New(options *protocol.Options) *Kite {
 
 	// define log settings
 	slog.SetPrefixName(options.Kitename)
-	slog.SetPrefixTimeStamp(time.Kitchen) // let it be simple
 
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
@@ -284,7 +291,13 @@ func (k *Kite) handle(msg []byte) {
 		// needed in order to catch all PUB messages from Kontrol. For more
 		// information about this pattern read "Node Coordination" from the Zmq
 		// Guide.
-		k.InitializeKite()
+
+		if k.Registered {
+			return
+		}
+
+		f := func() { time.AfterFunc(registerInterval*time.Duration(k.registerAttempt), k.InitializeKite) }
+		k.OnceRegister.Do(f)
 	default:
 		return
 	}
@@ -351,20 +364,24 @@ func (k *Kite) Pong() {
 // InitializeKite runs the builtin RPC server and also registers itself to Kontrol
 // when the kite.KontrolEnabled flag is enabled. This method is non-blocking.
 func (k *Kite) InitializeKite() {
-	if k.Registered {
-		return
-	}
-
 	slog.Println("not registered, sending register request to kontrol...")
 	err := k.RegisterToKontrol()
 	if err != nil {
-		slog.Println(err)
+		slog.Printf("register err: %s. trying to register in %0.2f seconds again\n",
+			err, time.Duration(registerInterval*time.Duration(k.registerAttempt+1)).Seconds())
+
+		if k.registerAttempt <= maxRegisterLimit {
+			k.registerAttempt++
+		}
+
+		k.OnceRegister = sync.Once{}
 		return
 	}
 
 	onceBody := func() { k.serve(k.Addr) }
 	go k.OnceServer.Do(onceBody)
 
+	k.registerAttempt = 0
 	k.Registered = true
 }
 

@@ -13,8 +13,7 @@ type HTTPMessenger struct {
 // NewHTTPMessenger returns a pointer to a new HTTPMessenger.
 // Created HTTPMessenger will keep an open connection to the other side for
 // consuming messages asynchronously.
-func NewHTTPMessenger(kiteID string) *HTTPMessenger {
-	const addr = "127.0.0.1:4000"
+func NewHTTPMessenger(addr, kiteID string) *HTTPMessenger {
 	messages := make(chan *[]byte)
 	handler := makeHandler(messages)
 
