@@ -1,8 +1,8 @@
-package cli
+package kd
 
 import (
 	"flag"
-	"koding/newKite/kd/cli/kite"
+	"koding/newKite/kd/kite"
 )
 
 type Dispatcher struct {

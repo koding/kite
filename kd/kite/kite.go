@@ -2,20 +2,7 @@
 package kite
 
 import (
-	"encoding/json"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"koding/newkite/protocol"
-	"koding/tools/process"
-	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 type Kite struct {

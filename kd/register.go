@@ -1,4 +1,4 @@
-package cli
+package kd
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
-	"koding/newKite/kd/cli/util"
+	"koding/newKite/kd/util"
 	"math/big"
 	"net/http"
 	"os"

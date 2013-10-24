@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/newKite/kd/cli/util"
+	"koding/newKite/kd/util"
 	"log"
 	"net/http"
 	"os"
