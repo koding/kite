@@ -96,6 +96,9 @@ func (*Install) Exec() error {
 	if err != nil {
 		return errors.New("Invalid package: No version number in Kite bundle")
 	}
+	if foundKiteName != kiteName {
+		return fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s", foundKiteName, kiteName)
+	}
 	tempKitePath = filepath.Join(tempKitePath, foundKiteBundleName)
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	os.MkdirAll(kitesPath, 0700)
