@@ -5,7 +5,7 @@ import (
 )
 
 func testSplitVersion(t *testing.T) {
-	name, version, err := splitVersion("asdf-1.2.3")
+	name, version, err := splitVersion("asdf-1.2.3", false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -16,7 +16,7 @@ func testSplitVersion(t *testing.T) {
 		t.Error("Version is not ok:", version)
 	}
 
-	name, version, err = splitVersion("asdf")
+	name, version, err = splitVersion("asdf", false)
 	if err == nil {
 		t.Error(err)
 	}
