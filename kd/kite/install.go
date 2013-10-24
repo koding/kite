@@ -47,6 +47,9 @@ func (*Install) Exec() error {
 		return err
 	}
 	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("Unexpected response from server: %d", res.StatusCode)
+	}
 
 	// Extract gzip
 	gz, err := gzip.NewReader(res.Body)
