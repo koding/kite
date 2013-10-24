@@ -1,16 +1,20 @@
 package main
 
 import (
-	"fmt"
 	"koding/newkite/kd"
-	"os"
+	"koding/newkite/kd/cli"
+	"koding/newkite/kd/kite"
 )
 
 func main() {
-	d := kd.NewDispatcher()
-	err := d.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		os.Exit(1)
-	}
+	root := cli.NewCLI()
+	root.AddCommand("version", kd.NewVersion())
+	root.AddCommand("register", kd.NewRegister())
+
+	k := root.AddSubCommand("kite")
+	k.AddCommand("install", kite.NewInstall())
+	k.AddCommand("list", kite.NewList())
+	k.AddCommand("uninstall", kite.NewUninstall())
+
+	root.Run()
 }
