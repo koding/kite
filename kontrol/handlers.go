@@ -96,7 +96,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 	for _, k := range storage.List() {
 		if k.Username == username && k.Kitename == kitename {
 			token, err = modelhelper.GetKiteToken(username)
-			if err != nil {
+			if err != nil || token == nil {
 				token = modelhelper.NewKiteToken(username)
 				modelhelper.AddKiteToken(token)
 			}

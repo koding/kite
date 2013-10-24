@@ -215,7 +215,7 @@ func New(options *protocol.Options) *Kite {
 		Clients:        NewClients(),
 	}
 
-	// Register out internal method
+	// Register our internal method
 	k.Methods["vm.info"] = "status.Info"
 	k.Server.RegisterName("status", new(Status))
 

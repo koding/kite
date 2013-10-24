@@ -9,13 +9,10 @@ import (
 const HEARTBEAT_INTERVAL = time.Millisecond * 500
 const HEARTBEAT_DELAY = time.Millisecond * 500
 
-const FRAME_SEPARATOR = ":"
 const WEBSOCKET_PATH = "/sock"
 
 const ORIGIN_JSON = "json"
 const ORIGIN_GOB = "gob"
-
-const DEBUG_ENABLED = false
 
 const (
 	AllowKite  = "AllowKite"
