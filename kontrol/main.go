@@ -87,15 +87,8 @@ func main() {
 }
 
 func (k *Kontrol) Start() {
-	// This is used for two reasons
-	// 1. HeartBeat mechanism for kite (Node Coordination)
-	// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
-	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
-	go func() {
-		for _ = range ticker.C {
-			k.Ping()
-		}
-	}()
+	// ping all subscribers
+	go k.pinger()
 
 	// HeartBeat pool checker. Checking for kites if they are live or dead.
 	go k.heartBeatChecker()
@@ -106,6 +99,7 @@ func (k *Kontrol) Start() {
 	rout.Handle(moh.DefaultReplierPath, k.Replier)
 	rout.Handle(moh.DefaultPublisherPath, k.Publisher)
 	http.Handle("/", rout)
+
 	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
 }
 
@@ -121,7 +115,17 @@ func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
 	}
 }
 
-func (k *Kontrol) Ping() {
+func (k *Kontrol) pinger() {
+	// This is used for two reasons
+	// 1. HeartBeat mechanism for kite (Node Coordination)
+	// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
+	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
+	for _ = range ticker.C {
+		k.ping()
+	}
+}
+
+func (k *Kontrol) ping() {
 	m := protocol.Request{
 		Base: protocol.Base{
 			Hostname: k.Hostname,
