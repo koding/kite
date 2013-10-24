@@ -297,7 +297,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	case protocol.PermitKite:
 		fmt.Printf("denied token '%s'\n", a.Token)
-		return errors.New("no permission to run")
+		return errors.New("tokenInvalid")
 	}
 
 	return errors.New("got a nonstandart response")

@@ -150,7 +150,7 @@ func (k *Kontrol) expireTokens() {
 				k.Publish(uuid, createByteResponse(protocol.ExpireToken, kite))
 				modelhelper.DeleteKiteToken(token.Username)
 
-				slog.Printf("token for username '%s' has been invoked.", token.Username)
+				slog.Printf("token for username '%s' has been invoked.\n", token.Username)
 			}
 		}
 
