@@ -107,37 +107,51 @@ func checker(key string) error {
 }
 
 // getOrCreateKey combines the two functions: getKey and writeNewKey
-func getOrCreateKey() (key string, err error) {
+func getOrCreateKey() (string, error) {
 	kdPath := util.GetKdPath()
 	keyPath := filepath.Join(kdPath, "koding.key")
-	key, err = getKey(keyPath)
+	key, err := getKey(keyPath)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file or directory") {
 			key, err = writeNewKey(kdPath, keyPath)
+			if err != nil {
+				return "", err
+			}
+			return key, nil
 		}
+		return "", err
 	}
-	return
+	return key, nil
 }
 
 // getKey returns the Koding key from ~/.kd/koding.key
-func getKey(keyPath string) (key string, err error) {
+func getKey(keyPath string) (string, error) {
 	data, err := ioutil.ReadFile(keyPath)
-	key = strings.TrimSpace(string(data))
-	return
+	if err != nil {
+		return "", nil
+	}
+
+	key := strings.TrimSpace(string(data))
+
+	return key, nil
 }
 
 // writeNewKey generates a new Koding key and writes to ~/.kd/koding.key
-func writeNewKey(kdPath, keyPath string) (key string, err error) {
+func writeNewKey(kdPath, keyPath string) (string, error) {
 	fmt.Println("Koding key is not found on this host. A new key will be created.")
 
-	err = os.Mkdir(kdPath, 0700)
-	key, err = randString(KeyLength)
+	err := os.Mkdir(kdPath, 0700)
+	key, err := randString(KeyLength)
 	if err != nil {
-		return
+		return "", err
 	}
 
 	err = ioutil.WriteFile(keyPath, []byte(key), 0600)
-	return
+	if err != nil {
+		return "", err
+	}
+
+	return key, nil
 }
 
 // randString returns a random string of length n.
@@ -151,6 +165,7 @@ func randString(n int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	var bytes = make([]byte, n)
 	r2 := big.NewInt(0)
 	symbol := big.NewInt(0)
@@ -159,5 +174,6 @@ func randString(n int) (string, error) {
 		r, r2 = r2, r
 		bytes[i] = alphanum[symbol.Int64()]
 	}
+
 	return string(bytes), nil
 }
