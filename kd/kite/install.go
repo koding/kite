@@ -109,13 +109,11 @@ func extractTar(r io.Reader, dir string) error {
 			return err
 		}
 
-		fi := hdr.FileInfo()
-		name := fi.Name()
-		path := filepath.Join(dir, name)
+		path := filepath.Join(dir, hdr.Name)
 
 		// TODO make the binary under /bin executable
 
-		if fi.IsDir() {
+		if hdr.FileInfo().IsDir() {
 			os.MkdirAll(path, 0700)
 		} else {
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
