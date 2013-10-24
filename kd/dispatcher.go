@@ -16,6 +16,7 @@ func NewDispatcher() *Dispatcher {
 
 	k := root.AddModule("kite", "Includes commands related to kites")
 	k.AddCommand("install", kite.NewInstall())
+	k.AddCommand("list", kite.NewList())
 	// kite.AddCommand("create", NewCreate())
 	// kite.AddCommand("run", NewRun())
 	// kite.AddCommand("stop", NewStop())
