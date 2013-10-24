@@ -64,20 +64,19 @@ func ExternalIP() (string, error) {
 	return "", errors.New("are you connected to the network?")
 }
 
-func GetKodingKey() (key string, err error) {
+func GetKodingKey() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
-		return
+		return "", err
 	}
 
 	keyfile := filepath.Join(usr.HomeDir, ".kd/", "koding.key")
 	data, err := ioutil.ReadFile(keyfile)
 	if err != nil {
-		return
+		return "", err
 	}
 
-	key = strings.TrimSpace(string(data))
-	return
+	return strings.TrimSpace(string(data)), nil
 }
 
 // return o.LocalIP back if assigned, otherwise it gets a local IP from on

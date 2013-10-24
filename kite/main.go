@@ -267,6 +267,9 @@ func (k *Kite) Start() {
 	}
 }
 
+// If the user wants to call flag.Parse() the flag must be defined in advance.
+var _ = flag.Bool("version", false, "show version")
+
 // parseVersionFlag prints the version number of the kite and exits with 0
 // if "-version" flag is enabled.
 // We did not use the "flag" package because it causes trouble if the user
@@ -279,9 +282,6 @@ func (k *Kite) parseVersionFlag() {
 		}
 	}
 }
-
-// If the user wants to call flag.Parse() the flag must be defined in advance.
-var _ = flag.Bool("version", false, "show version")
 
 // handle is a method that interprets the incoming message from Kontrol. The
 // incoming message is in form of protocol.PubResponse.

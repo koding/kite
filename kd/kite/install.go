@@ -34,6 +34,7 @@ func (*Install) Exec() error {
 	if flag.NArg() != 1 {
 		return errors.New("You should give a kite name")
 	}
+
 	kiteFullName := flag.Arg(0)
 	kiteName, kiteVersion, err := splitVersion(kiteFullName, true)
 	if err != nil {
@@ -61,6 +62,7 @@ func (*Install) Exec() error {
 		return err
 	}
 	defer os.RemoveAll(tempKitePath)
+
 	err = extractTar(gz, tempKitePath)
 	if err != nil {
 		return err
@@ -85,14 +87,17 @@ func requestPackage(kiteName, kiteVersion string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if res.StatusCode == 404 {
 		res.Body.Close()
 		return nil, errors.New("Package is not found on the server.")
 	}
+
 	if res.StatusCode != 200 {
 		res.Body.Close()
 		return nil, fmt.Errorf("Unexpected response from server: %d", res.StatusCode)
 	}
+
 	return res.Body, nil
 }
 
@@ -137,31 +142,39 @@ func moveFromTempToHome(kiteName, tempKitePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if len(dirs) != 1 {
 		return "", errors.New("Invalid package: Package must contain only one directory.")
 	}
+
 	// found prefix means we got it from extracted tar.
 	// We should assert that they are expected.
 	foundKiteBundleName := dirs[0].Name() // Example: asdf-1.2.3.kite
 	if !strings.HasSuffix(foundKiteBundleName, ".kite") {
 		return "", errors.New("Invalid package: Direcory name must end with \".kite\".")
 	}
+
 	foundKiteFullName := strings.TrimSuffix(foundKiteBundleName, ".kite") // Example: asdf-1.2.3
 	foundKiteName, _, err := splitVersion(foundKiteFullName, false)
 	if err != nil {
 		return "", errors.New("Invalid package: No version number in Kite bundle")
 	}
+
 	if foundKiteName != kiteName {
-		return "", fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s", foundKiteName, kiteName)
+		return "", fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s",
+			foundKiteName, kiteName)
 	}
+
 	tempKitePath = filepath.Join(tempKitePath, foundKiteBundleName)
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	os.MkdirAll(kitesPath, 0700)
+
 	kitePath := filepath.Join(kitesPath, foundKiteBundleName)
 	err = os.Rename(tempKitePath, kitePath)
 	if err != nil {
 		return "", err
 	}
+
 	return foundKiteFullName, nil
 }
 
@@ -186,7 +199,7 @@ func splitVersion(fullname string, allowLatest bool) (name, version string, err 
 
 	versionParts := strings.Split(version, ".")
 	for _, v := range versionParts {
-		if _, err := strconv.ParseUint(v, 10, 64); err != nil {
+		if _, err := strconv.Atoi(v); err != nil {
 			return "", "", notFound
 		}
 	}
