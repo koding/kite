@@ -312,7 +312,7 @@ func (k *Kite) AddKite(r protocol.PubResponse) {
 	}
 
 	kite := &models.Kite{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: r.Username,
 			Kitename: r.Kitename,
 			Token:    r.Token,
@@ -346,7 +346,7 @@ func (k *Kite) RemoveKite(r protocol.PubResponse) {
 // This is used for node coordination and notifier Kontrol that the Kite is alive.
 func (k *Kite) Pong() {
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Kitename: k.Kitename,
 			Uuid:     k.Uuid,
 		},
@@ -381,6 +381,7 @@ func (k *Kite) InitializeKite() {
 	onceBody := func() { k.serve(k.Addr) }
 	go k.OnceServer.Do(onceBody)
 
+	k.OnceRegister = sync.Once{}
 	k.registerAttempt = 0
 	k.Registered = true
 }
@@ -390,7 +391,7 @@ func (k *Kite) InitializeKite() {
 func (k *Kite) RegisterToKontrol() error {
 	// Wait until the servers are ready
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username:  k.Username,
 			Kitename:  k.Kitename,
 			Version:   k.Version,
@@ -550,7 +551,7 @@ func (r *Remote) Call(method string, args interface{}, fn func(err error, res st
 	var response string
 
 	request := &protocol.KiteRequest{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Token: remoteKite.Token,
 			Uuid:  remoteKite.Uuid,
 		},
@@ -578,7 +579,7 @@ func (k *Kite) requestKites(username, kitename string) []*models.Kite {
 	}
 
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: username,
 			Kitename: k.Kitename,
 			Version:  k.Version,
@@ -608,7 +609,7 @@ func (k *Kite) requestKites(username, kitename string) []*models.Kite {
 
 	for _, r := range kitesResp {
 		kite := &models.Kite{
-			Base: protocol.Base{
+			KiteBase: models.KiteBase{
 				Username: r.Username,
 				Kitename: r.Kitename,
 				Token:    r.Token,

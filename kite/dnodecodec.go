@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"koding/db/models"
 	"koding/newkite/protocol"
 	"koding/tools/dnode"
 	"net/rpc"
@@ -253,7 +254,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: a.Username,
 			Token:    a.Token,
 			Kitename: d.kite.Kitename + "/" + d.kite.Username,
@@ -270,7 +271,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		if a.Token != resp.Token.ID {
+		if a.Token != resp.Token.ID.Hex() {
 			return errors.New("token is invalid")
 		}
 		permissions.Add(a.Token) // can be changed in the future, for now cache the token

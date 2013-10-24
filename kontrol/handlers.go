@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
@@ -86,19 +87,21 @@ func validatePostRequest(msg *protocol.Request) error {
 // It also generates a new one-way token that is used between the client and
 // kite and appends it to each kite struct
 func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
+	var err error
 	kites := make([]protocol.PubResponse, 0)
-	token := new(protocol.Token)
+	token := new(models.KiteToken)
 
 	slog.Printf("searching for kite '%s'\n", kitename)
 
 	for _, k := range storage.List() {
 		if k.Username == username && k.Kitename == kitename {
-			token = getToken(username)
-			if token == nil {
-				token = createToken(username)
+			token, err = modelhelper.GetKiteToken(username)
+			if err != nil {
+				token = modelhelper.NewKiteToken(username)
+				modelhelper.AddKiteToken(token)
 			}
 
-			k.Token = token.ID // only token id is important for client
+			k.Token = token.ID.Hex() // only token id is important for client
 			pubResp := createResponse(protocol.AddKite, k)
 			kites = append(kites, pubResp)
 		}

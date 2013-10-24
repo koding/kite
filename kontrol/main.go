@@ -135,7 +135,7 @@ func (k *Kontrol) pinger() {
 
 func (k *Kontrol) ping() {
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Hostname: k.Hostname,
 		},
 		Action: "ping",
@@ -191,7 +191,6 @@ func (k *Kontrol) heartBeatChecker() {
 				}
 
 				if !found {
-					deleteToken(kite.Kitename)
 					dependency.Remove(kite.Kitename)
 				}
 			}
@@ -262,7 +261,7 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 		return resp, err
 	}
 
-	// disable this for now
+	// disable this for now, we use it later
 	// go addToProxy(kite)
 
 	// first notify myself
@@ -315,13 +314,13 @@ func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
 
 	msg := protocol.RegisterResponse{}
 
-	token := getToken(req.Username)
-	if token == nil || token.ID != req.Token {
+	token, err := modelhelper.GetKiteToken(req.Username)
+	if err != nil || token.ID.Hex() != req.Token {
 		slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 		msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 	} else {
 		slog.Printf("token '%s' is valid for '%s' \n", req.Token, req.Kitename)
-		msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
+		msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: token}
 	}
 
 	resp, err := json.Marshal(msg)
@@ -339,7 +338,7 @@ func createByteResponse(action string, kite *models.Kite) []byte {
 
 func createResponse(action string, kite *models.Kite) protocol.PubResponse {
 	return protocol.PubResponse{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: kite.Username,
 			Kitename: kite.Kitename,
 			Version:  kite.Version,
@@ -427,10 +426,11 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 
 func createKiteModel(req *protocol.Request) (*models.Kite, error) {
 	return &models.Kite{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username:  req.Username,
 			Kitename:  req.Kitename,
 			Version:   req.Version,
+			Kind:      req.Kind,
 			PublicKey: req.PublicKey,
 			Uuid:      req.Uuid,
 			Hostname:  req.Hostname,
