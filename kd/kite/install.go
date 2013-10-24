@@ -128,7 +128,6 @@ func extractTar(r io.Reader, dir string) error {
 		path := filepath.Join(dir, name)
 
 		// TODO make the binary under /bin executable
-		// TODO assert contents of the tar file, it must contain online one directory named kitename-0.0.1.kite
 
 		if fi.IsDir() {
 			os.MkdirAll(path, 0700)
