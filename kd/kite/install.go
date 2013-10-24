@@ -68,8 +68,17 @@ func (*Install) Exec() error {
 		return err
 	}
 
-	// Move kite from tmp to kites folder (~/.kd/kites)
-	kiteFullName, err = moveFromTempToHome(kiteName, tempKitePath)
+	foundName, _, bundlePath, err := validateBundle(tempKitePath)
+	if err != nil {
+		return err
+	}
+
+	if foundName != kiteName {
+		return fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s",
+			foundName, kiteName)
+	}
+
+	err = installBundle(bundlePath)
 	if err != nil {
 		return err
 	}
@@ -134,48 +143,39 @@ func extractTar(r io.Reader, dir string) error {
 	return nil
 }
 
-// moveFromTempToHome make some assertions about the bundle extracted from
-// package, then it moves the .kite bundle into ~/kd/kites.
-// Returns the full kite name moved.
-func moveFromTempToHome(kiteName, tempKitePath string) (string, error) {
+// validateBundle returns the package name, version and bundle path.
+func validateBundle(tempKitePath string) (string, string, string, error) {
 	dirs, err := ioutil.ReadDir(tempKitePath)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
 	if len(dirs) != 1 {
-		return "", errors.New("Invalid package: Package must contain only one directory.")
+		return "", "", "", errors.New("Invalid package: Package must contain only one directory.")
 	}
 
-	// found prefix means we got it from extracted tar.
-	// We should assert that they are expected.
-	foundKiteBundleName := dirs[0].Name() // Example: asdf-1.2.3.kite
-	if !strings.HasSuffix(foundKiteBundleName, ".kite") {
-		return "", errors.New("Invalid package: Direcory name must end with \".kite\".")
+	bundleName := dirs[0].Name() // Example: asdf-1.2.3.kite
+	if !strings.HasSuffix(bundleName, ".kite") {
+		return "", "", "", errors.New("Invalid package: Direcory name must end with \".kite\".")
 	}
 
-	foundKiteFullName := strings.TrimSuffix(foundKiteBundleName, ".kite") // Example: asdf-1.2.3
-	foundKiteName, _, err := splitVersion(foundKiteFullName, false)
+	fullName := strings.TrimSuffix(bundleName, ".kite") // Example: asdf-1.2.3
+	kiteName, version, err := splitVersion(fullName, false)
 	if err != nil {
-		return "", errors.New("Invalid package: No version number in Kite bundle")
+		return "", "", "", errors.New("Invalid package: No version number in Kite bundle")
 	}
 
-	if foundKiteName != kiteName {
-		return "", fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s",
-			foundKiteName, kiteName)
-	}
+	return kiteName, version, filepath.Join(tempKitePath, bundleName), nil
+}
 
-	tempKitePath = filepath.Join(tempKitePath, foundKiteBundleName)
+// installBundle moves the .kite bundle into ~/kd/kites.
+func installBundle(bundlePath string) error {
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	os.MkdirAll(kitesPath, 0700)
 
-	kitePath := filepath.Join(kitesPath, foundKiteBundleName)
-	err = os.Rename(tempKitePath, kitePath)
-	if err != nil {
-		return "", err
-	}
-
-	return foundKiteFullName, nil
+	bundleName := filepath.Base(bundlePath)
+	kitePath := filepath.Join(kitesPath, bundleName)
+	return os.Rename(bundlePath, kitePath)
 }
 
 // splitVersion takes a name like "asdf-1.2.3" and
