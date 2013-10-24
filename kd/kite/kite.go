@@ -1,9 +1,7 @@
-// Package kite implements the "kd kite" commands.
+// Package kite implements the "kd kite" sub-commands.
 package kite
 
 import (
-	// "bufio"
-	// "code.google.com/p/go.crypto/ssh/terminal"
 	"encoding/json"
 	"errors"
 	"flag"
