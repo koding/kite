@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"koding/newkite/kd/cli"
+	"koding/newkite/kd"
 	"os"
 )
 
 func main() {
-	d := cli.NewDispatcher()
+	d := kd.NewDispatcher()
 	err := d.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
