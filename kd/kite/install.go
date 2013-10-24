@@ -36,8 +36,12 @@ func (*Install) Exec() error {
 	}
 
 	// Generate download URL
-	kiteName := flag.Arg(0)
-	kiteURL := s3URL + kiteName + ".kite.tar.gz"
+	kiteFullName := flag.Arg(0)
+	kiteName, kiteVersion, err := splitVersion(kiteFullName, true)
+	if err != nil {
+		kiteName, kiteVersion = kiteFullName, "latest"
+	}
+	kiteURL := s3URL + kiteName + "-" + kiteVersion + ".kite.tar.gz"
 	log.Println(kiteURL)
 
 	// Make download request
@@ -47,6 +51,9 @@ func (*Install) Exec() error {
 		return err
 	}
 	defer res.Body.Close()
+	if res.StatusCode == 404 {
+		return errors.New("Package is not found on the server.")
+	}
 	if res.StatusCode != 200 {
 		return fmt.Errorf("Unexpected response from server: %d", res.StatusCode)
 	}
@@ -59,7 +66,7 @@ func (*Install) Exec() error {
 	defer gz.Close()
 
 	// Extract tar
-	tempKitePath, err := ioutil.TempDir("", "koding-kite-")
+	tempKitePath, err := ioutil.TempDir("", "kd-kite-install-")
 	log.Println("Created temp dir:", tempKitePath)
 	if err != nil {
 		return err
@@ -71,17 +78,35 @@ func (*Install) Exec() error {
 	}
 
 	// Move kite from tmp to kites folder (~/.kd/kites)
-	tempKitePath = filepath.Join(tempKitePath, kiteName+".kite")
+	dirs, err := ioutil.ReadDir(tempKitePath)
+	if err != nil {
+		return err
+	}
+	if len(dirs) != 1 {
+		return errors.New("Invalid package: Package must contain only one directory.")
+	}
+	// found prefix means we got it from extracted tar.
+	// We should assert that they are expected.
+	foundKiteBundleName := dirs[0].Name() // Example: asdf-1.2.3.kite
+	if !strings.HasSuffix(foundKiteBundleName, ".kite") {
+		return errors.New("Invalid package: Direcory name must end with \".kite\".")
+	}
+	foundKiteFullName := strings.TrimSuffix(foundKiteBundleName, ".kite") // Example: asdf-1.2.3
+	foundKiteName, foundKiteVersion, err := splitVersion(foundKiteFullName, false)
+	if err != nil {
+		return errors.New("Invalid package: No version number in Kite bundle")
+	}
+	tempKitePath = filepath.Join(tempKitePath, foundKiteBundleName)
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	os.MkdirAll(kitesPath, 0700)
-	kitePath := filepath.Join(kitesPath, kiteName+".kite")
+	kitePath := filepath.Join(kitesPath, foundKiteBundleName)
 	log.Println("Moving from:", tempKitePath, "to:", kitePath)
 	err = os.Rename(tempKitePath, kitePath)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Done.")
+	fmt.Println("Installed successfully:", foundKiteName+"-"+foundKiteVersion)
 	return nil
 }
 
@@ -123,7 +148,8 @@ func extractTar(r io.Reader, dir string) error {
 
 // splitVersion takes a name like "asdf-1.2.3" and
 // returns the name "asdf" and version "1.2.3" seperately.
-func splitVersion(fullname string) (name, version string, err error) {
+// If allowLatest is true, then the version must not be numeric and can be "latest".
+func splitVersion(fullname string, allowLatest bool) (name, version string, err error) {
 	notFound := errors.New("name does not contain a version number")
 
 	parts := strings.Split(fullname, "-")
@@ -132,7 +158,13 @@ func splitVersion(fullname string) (name, version string, err error) {
 		return "", "", notFound
 	}
 
+	name = strings.Join(parts[:n-1], "-")
 	version = parts[n-1]
+
+	if allowLatest && version == "latest" {
+		return name, version, nil
+	}
+
 	versionParts := strings.Split(version, ".")
 	for _, v := range versionParts {
 		if _, err := strconv.ParseUint(v, 10, 64); err != nil {
@@ -140,6 +172,5 @@ func splitVersion(fullname string) (name, version string, err error) {
 		}
 	}
 
-	name = strings.Join(parts[:n-2], "-")
 	return name, version, nil
 }
