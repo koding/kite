@@ -86,6 +86,7 @@ type Options struct {
 	Port         string `json:"port"`
 	Version      string `json:"version"`
 	Kind         string `json:"kind"`
+	KontrolAddr  string `json:"kontrolAddr"`
 	Dependencies string `json:"dependencies"`
 }
 

@@ -80,6 +80,7 @@ func main() {
 		Hostname: hostname,
 		Port:     strconv.Itoa(config.Current.NewKontrol.Port),
 	}
+
 	k.Replier = moh.NewReplier(k.makeRequestHandler())
 	k.Publisher = moh.NewPublisher()
 

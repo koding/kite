@@ -180,12 +180,11 @@ func New(options *protocol.Options) *Kite {
 		port = "0" // go binds to an automatic port
 	}
 
-	// print dependencies, not used currently
-	// pwd, _ := os.Getwd()
-	// getDeps(pwd, options.Kitename)
+	if options.KontrolAddr == "" {
+		options.KontrolAddr = "127.0.0.1:4000" // local fallback address
+	}
 
-	messenger := NewHTTPMessenger(kiteID)
-
+	messenger := NewHTTPMessenger(options.KontrolAddr, kiteID)
 	messenger.Subscribe(kiteID)
 	messenger.Subscribe("all")
 
