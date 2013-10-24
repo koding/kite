@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"koding/newKite/kd/util"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,7 +57,6 @@ func (*Install) Exec() error {
 
 	// Extract tar
 	tempKitePath, err := ioutil.TempDir("", "kd-kite-install-")
-	log.Println("Created temp dir:", tempKitePath)
 	if err != nil {
 		return err
 	}
@@ -82,7 +80,6 @@ func (*Install) Exec() error {
 // a io.ReadCloser. The caller must close the returned io.ReadCloser.
 func requestPackage(kiteName, kiteVersion string) (io.ReadCloser, error) {
 	kiteURL := S3URL + kiteName + "-" + kiteVersion + ".kite.tar.gz"
-	log.Println(kiteURL)
 
 	res, err := http.Get(kiteURL)
 	if err != nil {
@@ -163,7 +160,6 @@ func moveFromTempToHome(kiteName, tempKitePath string) (string, error) {
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	os.MkdirAll(kitesPath, 0700)
 	kitePath := filepath.Join(kitesPath, foundKiteBundleName)
-	log.Println("Moving from:", tempKitePath, "to:", kitePath)
 	err = os.Rename(tempKitePath, kitePath)
 	if err != nil {
 		return "", err
