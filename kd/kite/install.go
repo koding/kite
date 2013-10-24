@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 type Install struct{}
@@ -114,4 +116,27 @@ func extractTar(r io.Reader, dir string) error {
 		}
 	}
 	return nil
+}
+
+// splitVersion takes a name like "asdf-1.2.3" and
+// returns the name "asdf" and version "1.2.3" seperately.
+func splitVersion(fullname string) (name, version string, err error) {
+	notFound := errors.New("name does not contain a version number")
+
+	parts := strings.Split(fullname, "-")
+	n := len(parts)
+	if n < 2 {
+		return "", "", notFound
+	}
+
+	version = parts[n-1]
+	versionParts := strings.Split(version, ".")
+	for _, v := range versionParts {
+		if _, err := strconv.ParseUint(v, 10, 64); err != nil {
+			return "", "", notFound
+		}
+	}
+
+	name = strings.Join(parts[:n-2], "-")
+	return name, version, nil
 }
