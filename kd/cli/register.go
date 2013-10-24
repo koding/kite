@@ -8,10 +8,10 @@ import (
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
+	"koding/newKite/kd/cli/util"
 	"math/big"
 	"net/http"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -108,7 +108,7 @@ func checker(key string) error {
 
 // getOrCreateKey combines the two functions: getKey and writeNewKey
 func getOrCreateKey() (key string, err error) {
-	kdPath := getKdPath()
+	kdPath := util.GetKdPath()
 	keyPath := filepath.Join(kdPath, "koding.key")
 	key, err = getKey(keyPath)
 	if err != nil {
@@ -138,16 +138,6 @@ func writeNewKey(kdPath, keyPath string) (key string, err error) {
 
 	err = ioutil.WriteFile(keyPath, []byte(key), 0600)
 	return
-}
-
-// getKdPath returns absolute of ~/.kd
-func getKdPath() string {
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-
-	return filepath.Join(usr.HomeDir, ".kd")
 }
 
 // randString returns a random string of length n.

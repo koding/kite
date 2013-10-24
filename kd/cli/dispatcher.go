@@ -1,6 +1,9 @@
 package cli
 
-import "flag"
+import (
+	"flag"
+	"koding/newKite/kd/cli/kite"
+)
 
 type Dispatcher struct {
 	root *Module
@@ -11,8 +14,8 @@ func NewDispatcher() *Dispatcher {
 	root.AddCommand("version", NewVersion())
 	root.AddCommand("register", NewRegister())
 
-	kite := root.AddModule("kite", "Includes commands related to kites")
-	kite.AddCommand("install", NewInstall())
+	k := root.AddModule("kite", "Includes commands related to kites")
+	k.AddCommand("install", kite.NewInstall())
 	// kite.AddCommand("create", NewCreate())
 	// kite.AddCommand("run", NewRun())
 	// kite.AddCommand("stop", NewStop())
