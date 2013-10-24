@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"koding/newkite/protocol"
 	"koding/tools/process"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -260,9 +261,10 @@ func (*Install) Exec() error {
 	// Generate download URL
 	kiteName := flag.Arg(0)
 	kiteURL := s3URL + kiteName + ".kite.tar.gz"
-	fmt.Println("Downloading from", kiteURL)
+	log.Println(kiteURL)
 
 	// Make download request
+	fmt.Println("Downloading...")
 	res, err := http.Get(kiteURL)
 	if err != nil {
 		return err
@@ -276,13 +278,35 @@ func (*Install) Exec() error {
 	}
 	defer gz.Close()
 
-	return extractTar(gz)
+	// Extract tar
+	tempKitePath, err := ioutil.TempDir("", "koding-kite-")
+	log.Println("Created temp dir:", tempKitePath)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tempKitePath)
+	err = extractTar(gz, tempKitePath)
+	if err != nil {
+		return err
+	}
+
+	// Move kite from tmp to kites folder (~/.kd/kites)
+	tempKitePath = filepath.Join(tempKitePath, kiteName+".kite")
+	kitesPath := filepath.Join(getKdPath(), "kites")
+	os.MkdirAll(kitesPath, 0700)
+	kitePath := filepath.Join(kitesPath, kiteName+".kite")
+	log.Println("Moving from:", tempKitePath, "to:", kitePath)
+	err = os.Rename(tempKitePath, kitePath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Done.")
+	return nil
 }
 
-// extractTar reads from the io.Reader and writes the files into kites directory.
-func extractTar(r io.Reader) error {
-	kitesPath := filepath.Join(getKdPath(), "kites")
-
+// extractTar reads from the io.Reader and writes the files into the directory.
+func extractTar(r io.Reader, dir string) error {
 	tr := tar.NewReader(r)
 	for {
 		hdr, err := tr.Next()
@@ -296,10 +320,9 @@ func extractTar(r io.Reader) error {
 
 		fi := hdr.FileInfo()
 		name := fi.Name()
-		path := filepath.Join(kitesPath, name)
+		path := filepath.Join(dir, name)
 
 		// TODO make the binary under /bin executable
-		// TODO extract to temp directory first, then move into ~/.kd/kites
 		// TODO assert contents of the tar file, it must contain online one directory named kitename-0.0.1.kite
 
 		if fi.IsDir() {
