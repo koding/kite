@@ -68,7 +68,7 @@ func (*Install) Exec() error {
 		return err
 	}
 
-	foundName, _, bundlePath, err := validateBundle(tempKitePath)
+	foundName, _, bundlePath, err := validatePackage(tempKitePath)
 	if err != nil {
 		return err
 	}
@@ -143,8 +143,8 @@ func extractTar(r io.Reader, dir string) error {
 	return nil
 }
 
-// validateBundle returns the package name, version and bundle path.
-func validateBundle(tempKitePath string) (string, string, string, error) {
+// validatePackage returns the package name, version and bundle path.
+func validatePackage(tempKitePath string) (string, string, string, error) {
 	dirs, err := ioutil.ReadDir(tempKitePath)
 	if err != nil {
 		return "", "", "", err
