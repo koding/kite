@@ -10,9 +10,11 @@ import (
 	"koding/messaging/moh"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
+	"koding/tools/config"
 	"koding/tools/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -61,6 +63,7 @@ type Dependency interface {
 type Kontrol struct {
 	Replier   *moh.Replier
 	Publisher *moh.Publisher
+	Port      string
 	Hostname  string
 }
 
@@ -72,7 +75,12 @@ var (
 
 func main() {
 	hostname, _ := os.Hostname()
-	k := &Kontrol{Hostname: hostname}
+
+	k := &Kontrol{
+		Hostname: hostname,
+		Port:     strconv.Itoa(config.Current.NewKontrol.Port),
+	}
+
 	k.Replier = moh.NewReplier(k.makeRequestHandler())
 	k.Publisher = moh.NewPublisher()
 
@@ -87,15 +95,8 @@ func main() {
 }
 
 func (k *Kontrol) Start() {
-	// This is used for two reasons
-	// 1. HeartBeat mechanism for kite (Node Coordination)
-	// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
-	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
-	go func() {
-		for _ = range ticker.C {
-			k.Ping()
-		}
-	}()
+	// ping all subscribers
+	go k.pinger()
 
 	// HeartBeat pool checker. Checking for kites if they are live or dead.
 	go k.heartBeatChecker()
@@ -106,7 +107,8 @@ func (k *Kontrol) Start() {
 	rout.Handle(moh.DefaultReplierPath, k.Replier)
 	rout.Handle(moh.DefaultPublisherPath, k.Publisher)
 	http.Handle("/", rout)
-	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
+
+	slog.Println(http.ListenAndServe(":"+k.Port, nil))
 }
 
 func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
@@ -121,9 +123,19 @@ func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
 	}
 }
 
-func (k *Kontrol) Ping() {
+func (k *Kontrol) pinger() {
+	// This is used for two reasons
+	// 1. HeartBeat mechanism for kite (Node Coordination)
+	// 2. Triggering kites to register themself to kontrol (Synchronize PUB/SUB)
+	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
+	for _ = range ticker.C {
+		k.ping()
+	}
+}
+
+func (k *Kontrol) ping() {
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Hostname: k.Hostname,
 		},
 		Action: "ping",
@@ -179,7 +191,6 @@ func (k *Kontrol) heartBeatChecker() {
 				}
 
 				if !found {
-					deleteToken(kite.Kitename)
 					dependency.Remove(kite.Kitename)
 				}
 			}
@@ -250,7 +261,7 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 		return resp, err
 	}
 
-	// disable this for now
+	// disable this for now, we use it later
 	// go addToProxy(kite)
 
 	// first notify myself
@@ -303,13 +314,13 @@ func (k *Kontrol) handleGetPermission(req *protocol.Request) ([]byte, error) {
 
 	msg := protocol.RegisterResponse{}
 
-	token := getToken(req.Username)
-	if token == nil || token.ID != req.Token {
+	token, err := modelhelper.GetKiteToken(req.Username)
+	if err != nil || token.ID.Hex() != req.Token {
 		slog.Printf("token '%s' is invalid for '%s' \n", req.Token, req.Kitename)
 		msg = protocol.RegisterResponse{Addr: self, Result: protocol.PermitKite}
 	} else {
 		slog.Printf("token '%s' is valid for '%s' \n", req.Token, req.Kitename)
-		msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: *token}
+		msg = protocol.RegisterResponse{Addr: self, Result: protocol.AllowKite, Token: token}
 	}
 
 	resp, err := json.Marshal(msg)
@@ -327,7 +338,7 @@ func createByteResponse(action string, kite *models.Kite) []byte {
 
 func createResponse(action string, kite *models.Kite) protocol.PubResponse {
 	return protocol.PubResponse{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: kite.Username,
 			Kitename: kite.Kitename,
 			Version:  kite.Version,
@@ -415,10 +426,11 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 
 func createKiteModel(req *protocol.Request) (*models.Kite, error) {
 	return &models.Kite{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username:  req.Username,
 			Kitename:  req.Kitename,
 			Version:   req.Version,
+			Kind:      req.Kind,
 			PublicKey: req.PublicKey,
 			Uuid:      req.Uuid,
 			Hostname:  req.Hostname,

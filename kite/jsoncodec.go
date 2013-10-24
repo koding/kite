@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"koding/db/models"
 	"koding/newkite/protocol"
 	"koding/tools/slog"
 	"net/rpc"
@@ -257,7 +258,7 @@ func (c *JsonServerCodec) ReadRequestBody(x interface{}) error {
 	}
 
 	m := protocol.Request{
-		Base: protocol.Base{
+		KiteBase: models.KiteBase{
 			Username: a.Username,
 			Token:    a.Token,
 		},
