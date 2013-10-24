@@ -112,7 +112,7 @@ func getOrCreateKey() (string, error) {
 	keyPath := filepath.Join(kdPath, "koding.key")
 	key, err := getKey(keyPath)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") {
+		if os.IsNotExist(err) {
 			key, err = writeNewKey(kdPath, keyPath)
 			if err != nil {
 				return "", err

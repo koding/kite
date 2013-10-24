@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"koding/newKite/kd/util"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -22,7 +23,7 @@ func (*List) Exec() error {
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	kites, err := ioutil.ReadDir(kitesPath)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") {
+		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
