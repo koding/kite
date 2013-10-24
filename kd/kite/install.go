@@ -112,6 +112,7 @@ func requestPackage(kiteName, kiteVersion string) (io.ReadCloser, error) {
 
 // extractTar reads from the io.Reader and writes the files into the directory.
 func extractTar(r io.Reader, dir string) error {
+	first := true // true if we are on the first entry of tarball
 	tr := tar.NewReader(r)
 	for {
 		hdr, err := tr.Next()
@@ -121,6 +122,20 @@ func extractTar(r io.Reader, dir string) error {
 		}
 		if err != nil {
 			return err
+		}
+
+		if first {
+			first = false
+			kiteName := strings.TrimSuffix(hdr.Name, ".kite/")
+
+			installed, err := isInstalled(kiteName)
+			if err != nil {
+				return err
+			}
+
+			if installed {
+				return fmt.Errorf("Already installed: %s", kiteName)
+			}
 		}
 
 		path := filepath.Join(dir, hdr.Name)
