@@ -10,9 +10,11 @@ import (
 	"koding/messaging/moh"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
+	"koding/tools/config"
 	"koding/tools/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -61,6 +63,7 @@ type Dependency interface {
 type Kontrol struct {
 	Replier   *moh.Replier
 	Publisher *moh.Publisher
+	Port      string
 	Hostname  string
 }
 
@@ -72,7 +75,11 @@ var (
 
 func main() {
 	hostname, _ := os.Hostname()
-	k := &Kontrol{Hostname: hostname}
+
+	k := &Kontrol{
+		Hostname: hostname,
+		Port:     strconv.Itoa(config.Current.NewKontrol.Port),
+	}
 	k.Replier = moh.NewReplier(k.makeRequestHandler())
 	k.Publisher = moh.NewPublisher()
 
@@ -100,7 +107,7 @@ func (k *Kontrol) Start() {
 	rout.Handle(moh.DefaultPublisherPath, k.Publisher)
 	http.Handle("/", rout)
 
-	slog.Println(http.ListenAndServe(":4000", nil)) // TODO: make port configurable
+	slog.Println(http.ListenAndServe(":"+k.Port, nil))
 }
 
 func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
