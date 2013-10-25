@@ -3,6 +3,7 @@ package kite
 import (
 	"errors"
 	"koding/newKite/kd/util"
+	"os"
 	"path/filepath"
 	"syscall"
 )
@@ -19,7 +20,7 @@ func (*Run) Definition() string {
 
 func (*Run) Exec(args []string) error {
 	// Parse kite name
-	if len(args) != 1 {
+	if len(args) == 0 {
 		return errors.New("You should give a kite name")
 	}
 
@@ -55,5 +56,5 @@ func (*Run) Exec(args []string) error {
 	}
 
 	binPath = filepath.Join(util.GetKdPath(), "kites", binPath)
-	return syscall.Exec(binPath, []string{"hello", "world"}, []string{})
+	return syscall.Exec(binPath, args, os.Environ())
 }

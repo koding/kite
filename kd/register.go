@@ -111,17 +111,21 @@ func getOrCreateKey() (string, error) {
 	kdPath := util.GetKdPath()
 	keyPath := filepath.Join(kdPath, "koding.key")
 	key, err := getKey(keyPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			key, err = writeNewKey(kdPath, keyPath)
-			if err != nil {
-				return "", err
-			}
-			return key, nil
-		}
+	if err == nil {
+		return key, nil
+	}
+
+	if !os.IsNotExist(err) {
 		return "", err
 	}
+
+	key, err = writeNewKey(kdPath, keyPath)
+	if err != nil {
+		return "", err
+	}
+
 	return key, nil
+
 }
 
 // getKey returns the Koding key from ~/.kd/koding.key

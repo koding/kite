@@ -60,7 +60,12 @@ func (m *Module) Run() {
 		exitErr(err)
 	}
 
-	os.Exit(0)
+	os.Exit(0) // just to be explicit
+}
+
+func exitErr(err error) {
+	fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+	os.Exit(1)
 }
 
 func (m *Module) findCommand(args []string) (Command, []string, error) {
@@ -68,12 +73,13 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 
 	// Iterate over args and update the module pointer "m"
 	for _, arg := range args {
-		if m.children != nil {
-			// m is a sub-command
-			m = m.children[arg]
-			newArgs = newArgs[1:]
-			continue
+		if m.children == nil {
+			// m is a command
+			break
 		}
+
+		m = m.children[arg]
+		newArgs = newArgs[1:]
 	}
 
 	if m == nil {
@@ -83,11 +89,6 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 	// m is a command or sub-command we don't care because we are
 	// returning Command interface
 	return m, newArgs, nil
-}
-
-func exitErr(err error) {
-	fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-	os.Exit(1)
 }
 
 ////////////////////////////////////////////////////////////////////////

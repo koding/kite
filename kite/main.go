@@ -178,7 +178,7 @@ func New(options *protocol.Options) *Kite {
 
 	publicKey, err := utils.GetKodingKey()
 	if err != nil {
-		slog.Fatal("public key reading:", err)
+		slog.Fatalln("Couldn't find koding.key. Please run 'kd register'.")
 	}
 
 	publicIP := utils.GetPublicIP(options.PublicIP)

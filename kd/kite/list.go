@@ -32,8 +32,9 @@ func (*List) Exec(args []string) error {
 	return nil
 }
 
+// getIntalledKites returns installed kites in .kd/kites folder.
+// an empty argument returns all kites.
 func getInstalledKites(kiteName string) ([]string, error) {
-	installedKites := []string{} // to be returned
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 
 	kites, err := ioutil.ReadDir(kitesPath)
@@ -45,6 +46,7 @@ func getInstalledKites(kiteName string) ([]string, error) {
 		return nil, err
 	}
 
+	installedKites := []string{} // to be returned
 	for _, fi := range kites {
 		name := fi.Name()
 		if !strings.HasSuffix(name, ".kite") {
@@ -53,10 +55,12 @@ func getInstalledKites(kiteName string) ([]string, error) {
 
 		fullName := strings.TrimSuffix(name, ".kite")
 		name, _, err := splitVersion(fullName, false)
-		if err == nil {
-			if kiteName == "" || kiteName == name {
-				installedKites = append(installedKites, fullName)
-			}
+		if err != nil {
+			continue
+		}
+
+		if kiteName == "" || kiteName == name {
+			installedKites = append(installedKites, fullName)
 		}
 	}
 

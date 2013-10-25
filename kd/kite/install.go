@@ -139,8 +139,6 @@ func extractTar(r io.Reader, dir string) error {
 
 		path := filepath.Join(dir, hdr.Name)
 
-		// TODO make the binary under /bin executable
-
 		if hdr.FileInfo().IsDir() {
 			os.MkdirAll(path, 0700)
 		} else {
@@ -243,6 +241,7 @@ func isBinaryFile(path string) bool {
 }
 
 // getBinPath takes a bundle name and return the path of the kite executable.
+// example: fs-0.0.1.kite -> fs-0.0.1/fs/bin
 func getBinPath(bundleName string) (string, error) {
 	if !strings.HasSuffix(bundleName, ".kite") {
 		return "", fmt.Errorf("Invalid bundle name: %s", bundleName)
