@@ -122,6 +122,7 @@ func extractTar(r io.Reader, dir string) error {
 			return err
 		}
 
+		// Check if the same kite version is installed before
 		if first {
 			first = false
 			kiteName := strings.TrimSuffix(hdr.Name, ".kite/")
@@ -143,7 +144,12 @@ func extractTar(r io.Reader, dir string) error {
 		if hdr.FileInfo().IsDir() {
 			os.MkdirAll(path, 0700)
 		} else {
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+			mode := 0600
+			if isBinaryFile(hdr.Name) {
+				mode = 0700
+			}
+
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(mode))
 			if err != nil {
 				return err
 			}
@@ -218,4 +224,26 @@ func splitVersion(fullname string, allowLatest bool) (name, version string, err 
 	}
 
 	return name, version, nil
+}
+
+// isBinaryFile returns true if the path is the path of the binary file
+// in aplication bundle. Example: fs-0.0.1.kite/bin/fs
+func isBinaryFile(path string) bool {
+	parts := strings.Split(path, string(os.PathSeparator))
+	if len(parts) != 3 {
+		return false
+	}
+
+	bundleName := parts[0]
+	if !strings.HasSuffix(bundleName, ".kite") {
+		return false
+	}
+
+	fullName := strings.TrimSuffix(bundleName, ".kite")
+	name, _, err := splitVersion(fullName, false)
+	if err != nil {
+		return false
+	}
+
+	return parts[1] == "bin" && parts[2] == name
 }
