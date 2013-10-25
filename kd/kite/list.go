@@ -19,7 +19,7 @@ func (*List) Definition() string {
 	return "List installed kites"
 }
 
-func (*List) Exec() error {
+func (*List) Exec(args []string) error {
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 	kites, err := ioutil.ReadDir(kitesPath)
 	if err != nil {

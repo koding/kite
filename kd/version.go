@@ -16,7 +16,7 @@ func (v Version) Definition() string {
 	return "Show version"
 }
 
-func (v Version) Exec() error {
+func (v Version) Exec(args []string) error {
 	fmt.Println(VERSION)
 	return nil
 }

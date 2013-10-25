@@ -2,7 +2,6 @@ package kite
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"koding/newKite/kd/util"
 	"os"
@@ -19,12 +18,11 @@ func (*Uninstall) Definition() string {
 	return "Uninstall a kite"
 }
 
-func (*Uninstall) Exec() error {
-	flag.Parse()
-	if flag.NArg() != 1 {
+func (*Uninstall) Exec(args []string) error {
+	if len(args) != 1 {
 		return errors.New("You should give a full kite name. Exampe: fs-1.0.0")
 	}
-	fullName := flag.Arg(0)
+	fullName := args[0]
 
 	if _, _, err := splitVersion(fullName, false); err != nil {
 		return err

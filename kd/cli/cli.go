@@ -11,7 +11,7 @@ import (
 // definition. Exec is the behaviour that you want to implement as a command
 type Command interface {
 	Definition() string // usually it's the output for --help
-	Exec() error
+	Exec(args []string) error
 }
 
 // Module is the shared structure of commands and sub-commands.
@@ -50,12 +50,12 @@ func (m *Module) Run() {
 	flag.Parse()
 	args := flag.Args()
 
-	command, err := m.findCommand(args)
+	command, args, err := m.findCommand(args)
 	if err != nil {
 		exitErr(err)
 	}
 
-	err = command.Exec()
+	err = command.Exec(args)
 	if err != nil {
 		exitErr(err)
 	}
@@ -63,29 +63,26 @@ func (m *Module) Run() {
 	os.Exit(0)
 }
 
-func (m *Module) findCommand(args []string) (Command, error) {
+func (m *Module) findCommand(args []string) (Command, []string, error) {
+	newArgs := args // this is the subset of args and will be returned with command
+
 	// Iterate over args and update the module pointer "m"
 	for _, arg := range args {
-		// Treat m as a module (sub-command)
-		sub := m.children[arg]
-		if sub == nil {
-			return nil, fmt.Errorf("Command not found")
-		}
-
-		// sub is another module here
-		if sub.command == nil {
+		if m.command == nil {
+			// m is a sub-command
 			m = m.children[arg]
+			newArgs = args[1:]
 			continue
 		}
-
-		args = args[1:]
-
-		// Returning command module
-		return sub, nil
 	}
 
-	// Returning sub-command module
-	return m, nil
+	if m == nil {
+		return nil, nil, fmt.Errorf("Command not found")
+	}
+
+	// m is a command or sub-command we don't care because we are
+	// returning Command interface
+	return m, newArgs, nil
 }
 
 func exitErr(err error) {
@@ -99,17 +96,21 @@ func exitErr(err error) {
 
 func (m *Module) Definition() string {
 	if m.command != nil {
+		// m is a command
 		return m.command.Definition()
 	}
 
+	// m is a sub-command
 	return fmt.Sprintf("Run to see sub-commands")
 }
 
-func (m *Module) Exec() error {
+func (m *Module) Exec(args []string) error {
 	if m.command != nil {
-		return m.command.Exec()
+		// m is a command
+		return m.command.Exec(args)
 	}
 
+	// m is a sub-command
 	// Print command list
 	fmt.Println("Possible commands:")
 	for n, module := range m.children {

@@ -13,7 +13,7 @@ func (h *Hello) Definition() string {
 	return "Say hello to " + h.name
 }
 
-func (h *Hello) Exec() error {
+func (h *Hello) Exec(args []string) error {
 	fmt.Println("hello")
 	return nil
 }
@@ -29,13 +29,13 @@ func TestFindCommand(t *testing.T) {
 	s.AddCommand("hello2", hello2)
 
 	println("==========")
-	_, err := root.findCommand([]string{"notExist"})
+	_, _, err := root.findCommand([]string{"notExist"})
 	if err == nil {
 		t.Error("error")
 	}
 
 	println("==========")
-	cmd, err := root.findCommand([]string{"hello"})
+	cmd, _, err := root.findCommand([]string{"hello"})
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -44,13 +44,13 @@ func TestFindCommand(t *testing.T) {
 	}
 
 	println("==========")
-	_, err = s.findCommand([]string{"notExist"})
+	_, _, err = s.findCommand([]string{"notExist"})
 	if err == nil {
 		t.Error("error")
 	}
 
 	println("==========")
-	cmd, err = root.findCommand([]string{"sub", "hello2"})
+	cmd, _, err = root.findCommand([]string{"sub", "hello2"})
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -59,7 +59,7 @@ func TestFindCommand(t *testing.T) {
 	}
 
 	println("==========")
-	_, err = root.findCommand([]string{"sub", "notExist"})
+	_, _, err = root.findCommand([]string{"sub", "notExist"})
 	if err == nil {
 		t.Error("error")
 	}

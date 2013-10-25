@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,14 +27,13 @@ func (*Install) Definition() string {
 
 const S3URL = "http://koding-kites.s3.amazonaws.com/"
 
-func (*Install) Exec() error {
+func (*Install) Exec(args []string) error {
 	// Parse kite name
-	flag.Parse()
-	if flag.NArg() != 1 {
+	if len(args) != 1 {
 		return errors.New("You should give a kite name")
 	}
 
-	kiteFullName := flag.Arg(0)
+	kiteFullName := args[0]
 	kiteName, kiteVersion, err := splitVersion(kiteFullName, true)
 	if err != nil {
 		kiteName, kiteVersion = kiteFullName, "latest"

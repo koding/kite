@@ -32,7 +32,7 @@ func (r *Register) Definition() string {
 	return "Register this host to Koding"
 }
 
-func (r *Register) Exec() error {
+func (r *Register) Exec(args []string) error {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return err
