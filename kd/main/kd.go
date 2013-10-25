@@ -14,6 +14,7 @@ func main() {
 	k := root.AddSubCommand("kite")
 	k.AddCommand("install", kite.NewInstall())
 	k.AddCommand("list", kite.NewList())
+	k.AddCommand("run", kite.NewRun())
 	k.AddCommand("uninstall", kite.NewUninstall())
 
 	root.Run()

@@ -22,7 +22,7 @@ func NewInstall() *Install {
 }
 
 func (*Install) Definition() string {
-	return "Install kite from Koding repository"
+	return "Install a kite from Koding repository"
 }
 
 const S3URL = "http://koding-kites.s3.amazonaws.com/"

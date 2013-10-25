@@ -20,7 +20,7 @@ func (*List) Definition() string {
 }
 
 func (*List) Exec(args []string) error {
-	kites, err := getInstalledKites()
+	kites, err := getInstalledKites("")
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (*List) Exec(args []string) error {
 	return nil
 }
 
-func getInstalledKites() ([]string, error) {
+func getInstalledKites(kiteName string) ([]string, error) {
 	installedKites := []string{} // to be returned
 	kitesPath := filepath.Join(util.GetKdPath(), "kites")
 
@@ -54,7 +54,9 @@ func getInstalledKites() ([]string, error) {
 		fullName := strings.TrimSuffix(name, ".kite")
 		name, _, err := splitVersion(fullName, false)
 		if err == nil {
-			installedKites = append(installedKites, fullName)
+			if kiteName == "" || kiteName == name {
+				installedKites = append(installedKites, fullName)
+			}
 		}
 	}
 
