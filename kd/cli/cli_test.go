@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -28,39 +29,42 @@ func TestFindCommand(t *testing.T) {
 	s := root.AddSubCommand("sub")
 	s.AddCommand("hello2", hello2)
 
-	println("==========")
-	_, _, err := root.findCommand([]string{"notExist"})
-	if err == nil {
-		t.Error("error")
+	type TestCase struct {
+		fullArgs    string
+		expectError bool
+		definition  string
+		args        string
 	}
 
-	println("==========")
-	cmd, _, err := root.findCommand([]string{"hello"})
-	if err != nil {
-		t.Error(err.Error())
-	}
-	if cmd.Definition() != hello.Definition() {
-		t.Error("error")
-	}
-
-	println("==========")
-	_, _, err = s.findCommand([]string{"notExist"})
-	if err == nil {
-		t.Error("error")
+	cases := []TestCase{
+		TestCase{"notExist", true, "", ""},
+		TestCase{"hello", false, hello.Definition(), ""},
+		TestCase{"hello asdf", false, hello.Definition(), "asdf"},
+		TestCase{"sub", false, "Run to see sub-commands", ""},
+		TestCase{"sub notExist", true, "", ""},
+		TestCase{"sub hello2", false, hello2.Definition(), ""},
+		TestCase{"sub hello2 asdf", false, hello2.Definition(), "asdf"},
 	}
 
-	println("==========")
-	cmd, _, err = root.findCommand([]string{"sub", "hello2"})
-	if err != nil {
-		t.Error(err.Error())
-	}
-	if cmd.Definition() != hello2.Definition() {
-		t.Error("error")
-	}
+	for _, c := range cases {
+		fmt.Println("======================================================================")
+		fmt.Println("Testing", c)
 
-	println("==========")
-	_, _, err = root.findCommand([]string{"sub", "notExist"})
-	if err == nil {
-		t.Error("error")
+		cmd, args, err := root.findCommand(strings.Split(c.fullArgs, " "))
+		if err != nil {
+			if !c.expectError {
+				t.Error("Error expected but not found")
+			}
+
+			continue
+		}
+
+		if cmd.Definition() != c.definition {
+			t.Error("Definition is not correct:", cmd.Definition())
+		}
+
+		if strings.Join(args, " ") != c.args {
+			t.Error("Invalid args:", args, "!=", c.args)
+		}
 	}
 }
