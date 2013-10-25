@@ -29,12 +29,11 @@ func NewCLI() *Module {
 }
 
 // AddCommand adds a new command this module.
-func (m *Module) AddCommand(name string, command Command) *Module {
+func (m *Module) AddCommand(name string, command Command) {
 	child := &Module{
 		command: command,
 	}
 	m.children[name] = child
-	return child
 }
 
 // AddSubCommand adds a new sub-command this module.
@@ -66,7 +65,7 @@ func (m *Module) Run() {
 
 func (m *Module) findCommand(args []string) (Command, error) {
 	// Iterate over args and update the module pointer "m"
-	for i, arg := range args {
+	for _, arg := range args {
 		// Treat m as a module (sub-command)
 		sub := m.children[arg]
 		if sub == nil {
@@ -79,11 +78,7 @@ func (m *Module) findCommand(args []string) (Command, error) {
 			continue
 		}
 
-		// command behaves like a subprocess, it will parse arguments again
-		// so we re discarding parsed arguments
-		temp := os.Args
-		os.Args = []string{temp[0]}
-		os.Args = append(os.Args, temp[i+2:]...)
+		args = args[1:]
 
 		// Returning command module
 		return sub, nil
