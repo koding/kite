@@ -68,10 +68,10 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 
 	// Iterate over args and update the module pointer "m"
 	for _, arg := range args {
-		if m.command == nil {
+		if m.children != nil {
 			// m is a sub-command
 			m = m.children[arg]
-			newArgs = args[1:]
+			newArgs = newArgs[1:]
 			continue
 		}
 	}
