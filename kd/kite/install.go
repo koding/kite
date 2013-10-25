@@ -66,7 +66,7 @@ func (*Install) Exec(args []string) error {
 		return err
 	}
 
-	foundName, _, bundlePath, err := validatePackage(tempKitePath)
+	foundName, foundVersion, bundlePath, err := validatePackage(tempKitePath)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (*Install) Exec(args []string) error {
 		return err
 	}
 
-	fmt.Println("Installed successfully:", kiteFullName)
+	fmt.Println("Installed successfully:", foundName+"-"+foundVersion)
 	return nil
 }
 
