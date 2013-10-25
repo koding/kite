@@ -3,7 +3,7 @@ package kite
 import (
 	"fmt"
 	"io/ioutil"
-	"koding/newKite/kd/util"
+	"koding/newkite/kd/util"
 	"os"
 	"path/filepath"
 	"strings"
