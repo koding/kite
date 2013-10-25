@@ -3,6 +3,9 @@ package kite
 import (
 	"github.com/cloudfoundry/gosigar"
 	"koding/newkite/protocol"
+	"log"
+	"os/user"
+	"runtime"
 )
 
 type Status struct{}
@@ -13,6 +16,8 @@ type Info struct {
 	DiskTotal   uint64 `json:"diskTotal"`
 	MemoryUsage uint64 `json:"memoryUsage"`
 	MemoryTotal uint64 `json:"totalMemoryLimit"`
+	HomeDir     string `json:"homeDir"`
+	Uname       string `json:"uname"`
 }
 
 type memory struct {
@@ -46,18 +51,32 @@ func diskStats() *disk {
 	return d
 }
 
-func (Status) Info(r *protocol.KiteDnodeRequest, result *Info) error {
+func homeDir() string {
+	usr, err := user.Current()
+	if err != nil {
+		log.Println("could not get homedir", err)
+		return ""
+	}
+
+	return usr.HomeDir
+}
+
+func systemInfo() *Info {
 	disk := diskStats()
 	mem := memoryStats()
 
-	info := &Info{
+	return &Info{
 		State:       "RUNNING", // needed for client side compatibility
 		DiskUsage:   disk.Usage,
 		DiskTotal:   disk.Total,
 		MemoryUsage: mem.Usage,
 		MemoryTotal: mem.Total,
+		HomeDir:     homeDir(),
+		Uname:       runtime.GOOS,
 	}
+}
 
-	*result = *info
+func (Status) Info(r *protocol.KiteDnodeRequest, result *Info) error {
+	*result = *systemInfo()
 	return nil
 }

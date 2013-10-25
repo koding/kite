@@ -271,7 +271,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		if a.Token != resp.Token.ID.Hex() {
+		if a.Token != resp.Token.Token {
 			return errors.New("token is invalid")
 		}
 		permissions.Add(a.Token) // can be changed in the future, for now cache the token
@@ -297,7 +297,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	case protocol.PermitKite:
 		fmt.Printf("denied token '%s'\n", a.Token)
-		return errors.New("no permission to run")
+		return errors.New("tokenInvalid")
 	}
 
 	return errors.New("got a nonstandart response")

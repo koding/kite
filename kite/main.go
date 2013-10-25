@@ -14,6 +14,7 @@ import (
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
+	"koding/tools/dnode"
 	"koding/tools/slog"
 	"math"
 	"net"
@@ -215,7 +216,7 @@ func New(options *protocol.Options) *Kite {
 		Clients:        NewClients(),
 	}
 
-	// Register out internal method
+	// Register our internal method
 	k.Methods["vm.info"] = "status.Info"
 	k.Server.RegisterName("status", new(Status))
 
@@ -302,6 +303,9 @@ func (k *Kite) handle(msg []byte) {
 		k.AddKite(r)
 	case protocol.RemoveKite:
 		k.RemoveKite(r)
+	case protocol.ExpireToken:
+		fmt.Printf("token '%s' has been invoked via kontrol\n", r.Token)
+		permissions.Remove(r.Token)
 	case protocol.UpdateKite:
 		k.Registered = false //trigger reinitialization
 	case "ping":
@@ -517,6 +521,27 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
+}
+
+// broadcast sends messages in dnode protocol to all connected websocket
+// clients method and arguments is mapped to dnode's method and arguments
+// fields.
+func (k *Kite) broadcast(method string, arguments interface{}) {
+	for _, client := range k.Clients.List() {
+		rawArgs, err := json.Marshal(arguments)
+		if err != nil {
+			fmt.Printf("collect json unmarshal %+v\n", err)
+		}
+
+		message := dnode.Message{
+			Method:    "info",
+			Arguments: &dnode.Partial{Raw: rawArgs},
+			Links:     []string{},
+			Callbacks: make(map[string][]string),
+		}
+
+		websocket.JSON.Send(client.Conn, message)
+	}
 }
 
 type Remote struct {

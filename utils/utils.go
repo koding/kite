@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -154,4 +156,10 @@ func IsServerAlive(host string) error {
 func GenerateUUID() string {
 	id, _ := uuid.NewV4()
 	return id.String()
+}
+
+func RandomStringLength(length int) string {
+	r := make([]byte, length*6/8)
+	rand.Read(r)
+	return base64.URLEncoding.EncodeToString(r)
 }

@@ -11,6 +11,7 @@ import (
 	"koding/newkite/protocol"
 	"koding/tools/slog"
 	"net/http"
+	"time"
 )
 
 // everyone needs a place for home
@@ -96,12 +97,15 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 	for _, k := range storage.List() {
 		if k.Username == username && k.Kitename == kitename {
 			token, err = modelhelper.GetKiteToken(username)
-			if err != nil {
-				token = modelhelper.NewKiteToken(username)
+			if err != nil || token == nil {
+
+				// Token expire duration needs to be talked, for now it's two hours
+				token = modelhelper.NewKiteToken(username, time.Now().Add(2*time.Hour))
+				token.Kites = append(token.Kites, k.Uuid)
 				modelhelper.AddKiteToken(token)
 			}
 
-			k.Token = token.ID.Hex() // only token id is important for client
+			k.Token = token.Token // only token id is important for client
 			pubResp := createResponse(protocol.AddKite, k)
 			kites = append(kites, pubResp)
 		}
