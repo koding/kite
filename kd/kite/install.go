@@ -234,16 +234,25 @@ func isBinaryFile(path string) bool {
 		return false
 	}
 
-	bundleName := parts[0]
-	if !strings.HasSuffix(bundleName, ".kite") {
+	binPath, err := getBinPath(parts[0])
+	if err != nil {
 		return false
+	}
+
+	return path == binPath
+}
+
+// getBinPath takes a bundle name and return the path of the kite executable.
+func getBinPath(bundleName string) (string, error) {
+	if !strings.HasSuffix(bundleName, ".kite") {
+		return "", fmt.Errorf("Invalid bundle name: %s", bundleName)
 	}
 
 	fullName := strings.TrimSuffix(bundleName, ".kite")
 	name, _, err := splitVersion(fullName, false)
 	if err != nil {
-		return false
+		return "", err
 	}
 
-	return parts[1] == "bin" && parts[2] == name
+	return strings.Join([]string{bundleName, "bin", name}, string(os.PathSeparator)), nil
 }
