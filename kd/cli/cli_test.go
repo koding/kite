@@ -22,12 +22,16 @@ func (h *Hello) Exec(args []string) error {
 func TestFindCommand(t *testing.T) {
 	hello := NewHello("hello")
 	hello2 := NewHello("hello2")
+	hello3 := NewHello("hello3")
 
 	root := NewCLI()
 	root.AddCommand("hello", hello)
 
 	s := root.AddSubCommand("sub")
 	s.AddCommand("hello2", hello2)
+
+	s2 := s.AddSubCommand("sub2")
+	s2.AddCommand("hello3", hello3)
 
 	type TestCase struct {
 		fullArgs    string
@@ -38,12 +42,13 @@ func TestFindCommand(t *testing.T) {
 
 	cases := []TestCase{
 		TestCase{"notExist", true, "", ""},
-		TestCase{"hello", false, hello.Definition(), ""},
+		TestCase{"hello", false, hello.Definition(), ""}, // test first level command
 		TestCase{"hello asdf", false, hello.Definition(), "asdf"},
 		TestCase{"sub", false, "Run to see sub-commands", ""},
 		TestCase{"sub notExist", true, "", ""},
-		TestCase{"sub hello2", false, hello2.Definition(), ""},
+		TestCase{"sub hello2", false, hello2.Definition(), ""}, // second level
 		TestCase{"sub hello2 asdf", false, hello2.Definition(), "asdf"},
+		TestCase{"sub sub2 hello3 asdf", false, hello3.Definition(), "asdf"}, // third level
 	}
 
 	for _, c := range cases {
