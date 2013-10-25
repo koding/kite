@@ -25,19 +25,26 @@ func (*Run) Exec(args []string) error {
 
 	// Guess full kite name if short name is given
 	var kiteFullName string
+
+	// User is allowed to enter kite name in these forms: "fs", "fs-0.0.1"
 	suppliedName := args[0]
-	_, _, err := splitVersion(kiteFullName, true)
+
+	_, _, err := splitVersion(suppliedName, false)
 	if err != nil {
 		allKites, err := getInstalledKites(suppliedName)
 		if err != nil {
 			return err
 		}
 
-		if len(allKites) == 1 {
-			kiteFullName = allKites[0]
-		} else {
+		if len(allKites) == 0 {
+			return errors.New("Kite not found")
+		}
+
+		if len(allKites) > 1 {
 			return errors.New("More than one version is installed. Please give a full kite name.")
 		}
+
+		kiteFullName = allKites[0]
 	} else {
 		kiteFullName = suppliedName
 	}
