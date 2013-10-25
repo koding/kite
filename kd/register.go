@@ -128,7 +128,7 @@ func getOrCreateKey() (string, error) {
 func getKey(keyPath string) (string, error) {
 	data, err := ioutil.ReadFile(keyPath)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	key := strings.TrimSpace(string(data))
