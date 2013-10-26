@@ -2,7 +2,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
@@ -47,8 +46,7 @@ func (m *Module) AddSubCommand(name string) *Module {
 
 // Run is the function that is intended to be run from main().
 func (m *Module) Run() {
-	flag.Parse()
-	args := flag.Args()
+	args := os.Args[1:]
 
 	command, args, err := m.findCommand(args)
 	if err != nil {
@@ -72,7 +70,8 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 	newArgs := args // this is the subset of args and will be returned with command
 
 	// Iterate over args and update the module pointer "m"
-	for _, arg := range args {
+	var arg string
+	for _, arg = range args {
 		if m == nil || m.children == nil {
 			// m is a command
 			break
@@ -83,7 +82,7 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 	}
 
 	if m == nil {
-		return nil, nil, fmt.Errorf("Command not found")
+		return nil, nil, fmt.Errorf("Command not found: %s", arg)
 	}
 
 	// m is a command or sub-command we don't care because we are
