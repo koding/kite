@@ -228,7 +228,7 @@ func New(options *protocol.Options) *Kite {
 // is a map that expose your methods with different names to the outside world.
 func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 	if rcvr == nil {
-		return errors.New("method struct should not be nil")
+		panic(errors.New("method struct should not be nil"))
 	}
 
 	k.createMethodMap(rcvr, methods)
