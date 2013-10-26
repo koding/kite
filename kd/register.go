@@ -8,7 +8,7 @@ import (
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
-	"koding/newKite/kd/util"
+	"koding/newkite/kd/util"
 	"math/big"
 	"net/http"
 	"os"
