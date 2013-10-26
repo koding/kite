@@ -140,9 +140,11 @@ func (k *Kontrol) expireTokens() {
 				continue // still alive, pick up the next one
 			}
 
+			foundCount := 0
 			for _, uuid := range token.Kites {
 				kite := storage.Get(uuid)
 				if kite == nil {
+					foundCount++
 					continue
 				}
 
@@ -151,6 +153,11 @@ func (k *Kontrol) expireTokens() {
 				modelhelper.DeleteKiteToken(token.Username)
 
 				slog.Printf("token for username '%s' has been invoked.\n", token.Username)
+			}
+
+			// if all kites for that token is dead or if there is no uuid, remove the token
+			if len(token.Kites) == foundCount || len(token.Kites) == 0 {
+				modelhelper.DeleteKiteToken(token.Username)
 			}
 		}
 
@@ -210,7 +217,11 @@ func (k *Kontrol) heartBeatChecker() {
 
 			storage.Remove(kite.Uuid)
 
-			if !kitesBelongingTo(kite.Username) {
+			// Remove the uuid from the token.Kites aray
+			modelhelper.DeleteKiteTokenUuid(kite.Username, kite.Uuid)
+
+			// only delete from jVMs when all kites to that user is died.
+			if !kitesExistsForUser(kite.Username) {
 				deleteFromVM(kite.Username)
 			}
 
@@ -455,6 +466,7 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 	}
 
 	kite.Username = username
+	appendToToken(username, kite.Uuid)
 	storage.Add(kite)
 
 	slog.Printf("[%s (%s)] belong to '%s'. ready to go..\n", kite.Kitename, kite.Version, username)
@@ -467,6 +479,17 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 	}
 
 	return kite, nil
+}
+
+// append uuid to token if the token exist
+func appendToToken(username, uuid string) {
+	token, err := modelhelper.GetKiteToken(username)
+	if err != nil || token == nil {
+		return
+	}
+
+	token.Kites = append(token.Kites, uuid)
+	modelhelper.AddKiteToken(token) // updates if document is available
 }
 
 func createKiteModel(req *protocol.Request) (*models.Kite, error) {
@@ -550,7 +573,7 @@ func deleteFromVM(username string) error {
 	return nil
 }
 
-func kitesBelongingTo(username string) bool {
+func kitesExistsForUser(username string) bool {
 	found := false
 
 	for _, kite := range storage.List() {
