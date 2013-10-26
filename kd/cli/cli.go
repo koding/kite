@@ -73,7 +73,7 @@ func (m *Module) findCommand(args []string) (Command, []string, error) {
 
 	// Iterate over args and update the module pointer "m"
 	for _, arg := range args {
-		if m.children == nil {
+		if m == nil || m.children == nil {
 			// m is a command
 			break
 		}
