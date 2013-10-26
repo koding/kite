@@ -114,7 +114,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 	}
 
 	if len(kites) == 0 {
-		return nil, fmt.Errorf("'%s' not available\n", kitename)
+		return nil, fmt.Errorf("'%s' not available", kitename)
 	}
 
 	return kites, nil
