@@ -471,7 +471,7 @@ var connected = "200 Connected to Go RPC"
 func (k *Kite) serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
-		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
+		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
 		return
 	}
 
