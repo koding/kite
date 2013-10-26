@@ -4,7 +4,7 @@ import "fmt"
 
 // Please use 3 digit versioning (major, minor, patch).
 // http://semver.org
-const VERSION = "0.0.5"
+const VERSION = "0.0.1"
 
 type Version struct{}
 
