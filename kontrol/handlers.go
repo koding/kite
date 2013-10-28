@@ -100,8 +100,7 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 			if err != nil || token == nil {
 
 				// Token expire duration needs to be talked, for now it's two hours
-				// token = modelhelper.NewKiteToken(username, time.Now().Add(2*time.Hour))
-				token = modelhelper.NewKiteToken(username, time.Now().Add(20*time.Second))
+				token = modelhelper.NewKiteToken(username, time.Now().Add(2*time.Hour))
 			}
 
 			token.Kites = append(token.Kites, k.Uuid)

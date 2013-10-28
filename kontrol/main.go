@@ -101,7 +101,6 @@ func (k *Kontrol) Start() {
 	go k.pinger()
 	go k.heartBeatChecker()
 	go k.expireTokens()
-
 	rout := mux.NewRouter()
 	rout.HandleFunc("/", homeHandler).Methods("GET")
 	rout.HandleFunc("/request", prepareHandler(requestHandler)).Methods("POST")
@@ -236,6 +235,8 @@ func (k *Kontrol) heartBeatChecker() {
 				k.Publish(c.Uuid, removeMsg)
 			}
 
+			k.Publish("kite.start."+kite.Username, removeMsg)
+
 			// Am I the latest of my kind ? if yes remove me from the dependencies list
 			// and remove any tokens if I have some
 			if dependency.Has(kite.Kitename) {
@@ -322,6 +323,9 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 
 	// first notify myself
 	k.Publish(req.Uuid, createByteResponse(protocol.AddKite, kite))
+
+	fmt.Println("publishing to", "kite.start."+kite.Username)
+	k.Publish("kite.start."+kite.Username, createByteResponse(protocol.AddKite, kite))
 
 	// then notify dependencies of this kite, if any available
 	k.NotifyDependencies(kite)
@@ -466,7 +470,17 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 	}
 
 	kite.Username = username
-	appendToToken(username, kite.Uuid)
+	token, err := modelhelper.GetKiteToken(username)
+	if err != nil || token == nil {
+		// Token expire duration needs to be talked, for now it's two hours
+		token = modelhelper.NewKiteToken(username, time.Now().Add(2*time.Hour))
+	}
+
+	token.Kites = append(token.Kites, kite.Uuid)
+	modelhelper.AddKiteToken(token) // updates if document is available
+
+	kite.Token = token.Token // only token id is important for client
+
 	storage.Add(kite)
 
 	slog.Printf("[%s (%s)] belong to '%s'. ready to go..\n", kite.Kitename, kite.Version, username)
@@ -479,17 +493,6 @@ func createAndAddKite(req *protocol.Request) (*models.Kite, error) {
 	}
 
 	return kite, nil
-}
-
-// append uuid to token if the token exist
-func appendToToken(username, uuid string) {
-	token, err := modelhelper.GetKiteToken(username)
-	if err != nil || token == nil {
-		return
-	}
-
-	token.Kites = append(token.Kites, uuid)
-	modelhelper.AddKiteToken(token) // updates if document is available
 }
 
 func createKiteModel(req *protocol.Request) (*models.Kite, error) {
