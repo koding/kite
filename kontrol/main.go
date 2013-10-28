@@ -84,7 +84,7 @@ func main() {
 	}
 
 	k.Replier = moh.NewReplier(k.makeRequestHandler())
-	k.Publisher = moh.NewPublisher()
+	k.Publisher = moh.NewPublisher(nil)
 
 	storage = NewMongoDB()
 	dependency = NewDependency()
