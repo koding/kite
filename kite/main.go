@@ -228,7 +228,7 @@ func New(options *protocol.Options) *Kite {
 // is a map that expose your methods with different names to the outside world.
 func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 	if rcvr == nil {
-		return errors.New("method struct should not be nil")
+		panic(errors.New("method struct should not be nil"))
 	}
 
 	k.createMethodMap(rcvr, methods)
@@ -471,7 +471,7 @@ var connected = "200 Connected to Go RPC"
 func (k *Kite) serve(addr string) {
 	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
-		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
+		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
 		return
 	}
 
