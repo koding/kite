@@ -589,7 +589,6 @@ func kitesExistsForUser(username string) bool {
 }
 
 // getRelationship returns a slice of of kites that has a relationship to kite itself.
-
 func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	targetKites := make([]*models.Kite, 0)
 	if storage.Size() == 0 {
