@@ -630,13 +630,13 @@ func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, er
 	}
 	sessionID := c.Protocol[0]
 
-	sess, err := modelhelper.GetSession(sessionID)
+	session, err := modelhelper.GetSession(sessionID)
 	if err != nil {
 		return "", err
 	}
-	slog.Println("Websocket is authenticated as:", sess.Username)
+	slog.Println("Websocket is authenticated as:", session.Username)
 
-	return sess.Username, nil
+	return session.Username, nil
 }
 
 func validateCommand(conn *websocket.Conn, cmd *moh.SubscriberCommand) bool {
