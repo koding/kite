@@ -33,7 +33,7 @@ type KodingKey []byte
 
 // NewKodingKey returns a new random generated KodingKey of length "BytesLength".
 func NewKodingKey() (KodingKey, error) {
-	key := make(KodingKey, BytesLength, BytesLength)
+	key := make(KodingKey, BytesLength)
 
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
 		return nil, err
