@@ -1,3 +1,5 @@
+// Package token implements the Token type used between Kites.
+// Kontrol service is the generator and distributor of these tokens.
 package token
 
 import (
@@ -13,6 +15,9 @@ import (
 
 const DefaultTokenDuration = 1 * time.Hour
 
+// Token is a type used between Kites and Kite clients.
+// When a process wants to talk with a kite it asks to Kontrol.
+// If the client is allowed, Kontrol gives a short lived token to it.
 type Token struct {
 	ValidUntil time.Time
 	// TODO Ideas for later
