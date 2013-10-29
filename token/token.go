@@ -26,8 +26,12 @@ type Token struct {
 }
 
 func NewToken() *Token {
+	return NewTokenWithDuration(DefaultTokenDuration)
+}
+
+func NewTokenWithDuration(d time.Duration) *Token {
 	return &Token{
-		ValidUntil: time.Now().UTC().Add(DefaultTokenDuration),
+		ValidUntil: time.Now().UTC().Add(d),
 	}
 }
 
