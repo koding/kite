@@ -19,7 +19,7 @@ const DefaultTokenDuration = 1 * time.Hour
 // When a process wants to talk with a kite it asks to Kontrol.
 // If the client is allowed, Kontrol gives a short lived token to it.
 type Token struct {
-	ValidUntil time.Time
+	ValidUntil time.Time `json:"validUntil"`
 	// TODO Ideas for later
 	// ValidFor int // allowed number of requests
 	// Access (access control list)
