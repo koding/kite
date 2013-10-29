@@ -6,7 +6,11 @@ import (
 )
 
 func TestKodingKey(t *testing.T) {
-	k := NewKodingKey()
+	k, err := NewKodingKey()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	fmt.Println("Koding key:", k)
 
 	if len(k.String()) != StringLength {
