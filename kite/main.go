@@ -181,12 +181,17 @@ func New(options *protocol.Options) *Kite {
 		slog.Fatalln("Couldn't find koding.key. Please run 'kd register'.")
 	}
 
-	publicIP := utils.GetPublicIP(options.PublicIP)
-	localIP := utils.GetLocalIP(options.LocalIP)
-
 	port := options.Port
 	if options.Port == "" {
 		port = "0" // go binds to an automatic port
+	}
+
+	localIP := utils.GetLocalIP(options.LocalIP)
+	var publicIP string
+	if options.PublicIP == "" {
+		publicIP = localIP + ":" + port
+	} else {
+		publicIP = options.PublicIP + ":" + port
 	}
 
 	if options.KontrolAddr == "" {
@@ -205,7 +210,7 @@ func New(options *protocol.Options) *Kite {
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
 		Addr:           localIP + ":" + port,
-		PublicIP:       publicIP + ":" + port,
+		PublicIP:       publicIP,
 		LocalIP:        localIP,
 		Port:           port,
 		Hostname:       hostname,
