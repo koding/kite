@@ -639,9 +639,7 @@ func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, er
 	return session.Username, nil
 }
 
-func validateCommand(conn *websocket.Conn, cmd *moh.SubscriberCommand) bool {
-	username := conn.Request().Header.Get("Koding-Username")
-
+func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
 	if cmd.Name != "subscribe" || cmd.Name != "unsubscribe" {
 		return true
 	}
