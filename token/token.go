@@ -7,11 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"koding/newkite/kodingkey"
 	"time"
 )
 
-// TODO assert key size
-const AESKeySize = 32 // bit
 const DefaultTokenDuration = 1 * time.Hour
 
 type Token struct {
@@ -30,13 +29,13 @@ func NewToken() *Token {
 // Encrypt converts the token to JSON, encrypts it with the key and prepends
 // the IV. Every encrypted token will be different because IV is randomly
 // generated at the encryption time.
-func (t Token) Encrypt(key []byte) ([]byte, error) {
+func (t Token) Encrypt(key kodingkey.KodingKey) ([]byte, error) {
 	data, err := json.Marshal(t)
 	if err != nil {
 		panic(err)
 	}
 
-	ciphertext, err := EncryptAESCFBwithIV(data, key)
+	ciphertext, err := EncryptAESCFBwithIV(data, key.Bytes32())
 	if err != nil {
 		return nil, err
 	}
@@ -45,9 +44,9 @@ func (t Token) Encrypt(key []byte) ([]byte, error) {
 }
 
 // Decrypt takes a slice of byte and decrypts it as a Token.
-func Decrypt(data, key []byte) (*Token, error) {
+func Decrypt(data, key kodingkey.KodingKey) (*Token, error) {
 	// Decrypt bytes
-	plaintext, err := DecryptAESCFBwithIV(data, key)
+	plaintext, err := DecryptAESCFBwithIV(data, key.Bytes32())
 	if err != nil {
 		return nil, err
 	}

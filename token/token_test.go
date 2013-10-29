@@ -3,13 +3,16 @@ package token
 import (
 	"crypto/aes"
 	"fmt"
-	"koding/newkite/kd"
-	"koding/newkite/utils"
+	"koding/newkite/kodingkey"
 	"testing"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
-	key := []byte(utils.RandomStringLength(kd.KeyLength))[:16]
+	key, err := kodingkey.NewKodingKey()
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
 	tok := NewToken()
 	fmt.Println("Generated new token:", *tok)
