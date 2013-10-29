@@ -318,13 +318,10 @@ func (k *Kontrol) handleRegister(req *protocol.Request) ([]byte, error) {
 		return resp, err
 	}
 
-	// disable this for now, we use it later
-	// go addToProxy(kite)
-
 	// first notify myself
 	k.Publish(req.Uuid, createByteResponse(protocol.AddKite, kite))
 
-	fmt.Println("publishing to", "kite.start."+kite.Username)
+	// notify browser clients ...
 	k.Publish("kite.start."+kite.Username, createByteResponse(protocol.AddKite, kite))
 
 	// then notify dependencies of this kite, if any available
