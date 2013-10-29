@@ -205,7 +205,7 @@ func New(options *protocol.Options) *Kite {
 		Uuid:           kiteID,
 		PublicKey:      publicKey,
 		Addr:           localIP + ":" + port,
-		PublicIP:       publicIP,
+		PublicIP:       publicIP + ":" + port,
 		LocalIP:        localIP,
 		Port:           port,
 		Hostname:       hostname,
