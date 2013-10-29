@@ -642,14 +642,17 @@ func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, er
 func validateCommand(conn *websocket.Conn, cmd *moh.SubscriberCommand) bool {
 	username := conn.Request().Header.Get("Koding-Username")
 
-	if cmd.Name == "subscribe" || cmd.Name == "unsubscribe" {
-		key := cmd.Args["key"].(string)
+	if cmd.Name != "subscribe" || cmd.Name != "unsubscribe" {
+		return true
+	}
 
-		if strings.HasPrefix(key, "kite.start.") {
-			if strings.TrimPrefix(key, "kite.start.") != username {
-				return false
-			}
-		}
+	key := cmd.Args["key"].(string)
+
+	if !strings.HasPrefix(key, "kite.start.") {
+		return true
+	}
+	if strings.TrimPrefix(key, "kite.start.") != username {
+		return false
 	}
 
 	return true
