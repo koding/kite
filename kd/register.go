@@ -2,14 +2,13 @@ package kd
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"koding/newkite/kd/util"
-	"math/big"
+	"koding/newkite/kodingkey"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -146,39 +145,16 @@ func writeNewKey(kdPath, keyPath string) (string, error) {
 	fmt.Println("Koding key is not found on this host. A new key will be created.")
 
 	err := os.Mkdir(kdPath, 0700)
-	key, err := randString(KeyLength)
+
+	key, err := kodingkey.NewKodingKey()
 	if err != nil {
 		return "", err
 	}
 
-	err = ioutil.WriteFile(keyPath, []byte(key), 0600)
+	err = ioutil.WriteFile(keyPath, key, 0600)
 	if err != nil {
 		return "", err
 	}
 
-	return key, nil
-}
-
-// randString returns a random string of length n.
-// Taken from http://stackoverflow.com/a/12795389/242451
-func randString(n int) (string, error) {
-	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	symbols := big.NewInt(int64(len(alphanum)))
-	states := big.NewInt(0)
-	states.Exp(symbols, big.NewInt(int64(n)), nil)
-	r, err := rand.Int(rand.Reader, states)
-	if err != nil {
-		return "", err
-	}
-
-	var bytes = make([]byte, n)
-	r2 := big.NewInt(0)
-	symbol := big.NewInt(0)
-	for i := range bytes {
-		r2.DivMod(r, symbols, symbol)
-		r, r2 = r2, r
-		bytes[i] = alphanum[symbol.Int64()]
-	}
-
-	return string(bytes), nil
+	return key.String(), nil
 }
