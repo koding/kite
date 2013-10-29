@@ -1,6 +1,7 @@
 package main
 
 import (
+	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -84,7 +86,9 @@ func main() {
 	}
 
 	k.Replier = moh.NewReplier(k.makeRequestHandler())
-	k.Publisher = moh.NewPublisher(nil)
+	k.Publisher = moh.NewPublisher()
+	k.Publisher.Authenticate = findUsernameFromSessionID
+	k.Publisher.ValidateCommand = validateCommand
 
 	storage = NewMongoDB()
 	dependency = NewDependency()
@@ -586,7 +590,6 @@ func kitesExistsForUser(username string) bool {
 }
 
 // getRelationship returns a slice of of kites that has a relationship to kite itself.
-
 func (k *Kontrol) getRelationship(kite string) []*models.Kite {
 	targetKites := make([]*models.Kite, 0)
 	if storage.Size() == 0 {
@@ -616,6 +619,41 @@ func (k *Kontrol) getUUIDsForKites(kitename string) []string {
 	}
 
 	return uuids
+}
+
+// findUsernameFromSessionID reads the session id from websocket's
+// protocol field and returns the username of the session.
+func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, error) {
+	// return an empty string if session id is not sent
+	if len(c.Protocol) < 1 {
+		return "", nil
+	}
+	sessionID := c.Protocol[0]
+
+	session, err := modelhelper.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	slog.Println("Websocket is authenticated as:", session.Username)
+
+	return session.Username, nil
+}
+
+func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
+	if cmd.Name != "subscribe" || cmd.Name != "unsubscribe" {
+		return true
+	}
+
+	key := cmd.Args["key"].(string)
+
+	if !strings.HasPrefix(key, "kite.start.") {
+		return true
+	}
+	if strings.TrimPrefix(key, "kite.start.") != username {
+		return false
+	}
+
+	return true
 }
 
 func addToProxy(kite *models.Kite) {
