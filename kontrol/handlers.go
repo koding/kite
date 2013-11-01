@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
+	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
+	"koding/newkite/token"
 	"koding/tools/slog"
 	"net/http"
-	"time"
 )
 
 // everyone needs a place for home
@@ -20,13 +20,13 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // preparHandler first checks if the incoming POST request is a valid session.
-// Every request made to kontrol should be in POST with protocol.Request in
+// Every request made to kontrol should be in POST with protocol.BrowserToKontrolRequest in
 // their body.
-func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protocol.Request)) http.HandlerFunc {
+func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protocol.BrowserToKontrolRequest)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		msg, err := readPostRequest(r.Body)
+		msg, err := readBrowserRequest(r.Body)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
@@ -37,7 +37,7 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
-		slog.Printf("sessionID '%s' wants '%s'\n", msg.SessionID, msg.RemoteKite)
+		slog.Printf("sessionID '%s' wants '%s'\n", msg.SessionID, msg.Kitename)
 
 		session, err := modelhelper.GetSession(msg.SessionID)
 		if err != nil {
@@ -53,32 +53,33 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 	}
 }
 
-// we assume that the incoming JSON data is in form of protocol.Request. Read
-// and return a new protocol.Request from the POST body if succesfull.
-func readPostRequest(requestBody io.ReadCloser) (*protocol.Request, error) {
+// we assume that the incoming JSON data is in form of protocol.BrowserToKontrolRequest. Read
+// and return a new protocol.BrowserToKontrolRequest from the POST body if succesfull.
+func readBrowserRequest(requestBody io.ReadCloser) (*protocol.BrowserToKontrolRequest, error) {
 	body, err := ioutil.ReadAll(requestBody)
 	if err != nil {
 		return nil, err
 	}
 	defer requestBody.Close()
 
-	req, err := unmarshalRequest(body)
+	var req protocol.BrowserToKontrolRequest
+	err = json.Unmarshal(body, &req)
 	if err != nil {
 		return nil, err
 	}
 
-	return req, nil
+	return &req, nil
 }
 
 // validate that incoming post request has all necessary (at least the one we
 // need) fields.
-func validatePostRequest(msg *protocol.Request) error {
+func validatePostRequest(msg *protocol.BrowserToKontrolRequest) error {
 	if msg.SessionID == "" {
 		return errors.New("sessionID field is empty")
 	}
 
-	if msg.RemoteKite == "" {
-		return errors.New("remoteKite field is not specified")
+	if msg.Kitename == "" {
+		return errors.New("kitename field is not specified")
 	}
 
 	return nil
@@ -87,28 +88,29 @@ func validatePostRequest(msg *protocol.Request) error {
 // searchForKites returns a list of kites that matches the variable matchKite
 // It also generates a new one-way token that is used between the client and
 // kite and appends it to each kite struct
-func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
-	var err error
-	kites := make([]protocol.PubResponse, 0)
-	token := new(models.KiteToken)
+func searchForKites(username, kitename string) ([]protocol.KiteWithToken, error) {
+	kites := make([]protocol.KiteWithToken, 0)
 
 	slog.Printf("searching for kite '%s'\n", kitename)
 
 	for _, k := range storage.List() {
-		if k.Username == username && k.Kitename == kitename {
-			token, err = modelhelper.GetKiteToken(username)
-			if err != nil || token == nil {
-
-				// Token expire duration needs to be talked, for now it's two hours
-				token = modelhelper.NewKiteToken(username, time.Now().Add(2*time.Hour))
+		if k.Username == username && k.Name == kitename {
+			key, err := kodingkey.FromString(k.KodingKey)
+			if err != nil {
+				return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", k.Name)
 			}
 
-			token.Kites = append(token.Kites, k.Uuid)
-			modelhelper.AddKiteToken(token) // updates if document is available
+			// username is from requester, key is from kite owner
+			tokenString, err := token.NewToken(username).EncryptString(key)
+			if err != nil {
+				return nil, errors.New("Server error: Cannot generate a token")
+			}
 
-			k.Token = token.Token // only token id is important for client
-			pubResp := createResponse(protocol.AddKite, k)
-			kites = append(kites, pubResp)
+			kwt := protocol.KiteWithToken{
+				Kite:  k.Kite,
+				Token: tokenString,
+			}
+			kites = append(kites, kwt)
 		}
 	}
 
@@ -121,8 +123,9 @@ func searchForKites(username, kitename string) ([]protocol.PubResponse, error) {
 
 // requestHandler sends as response a list of kites that matches kites in form
 // of "username/kitename".
-func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.Request) {
-	kites, err := searchForKites(msg.Username, msg.RemoteKite)
+// Request comes from a web browser.
+func requestHandler(w http.ResponseWriter, r *http.Request, msg *protocol.BrowserToKontrolRequest) {
+	kites, err := searchForKites(msg.Username, msg.Kitename)
 	if err != nil {
 		msg := fmt.Sprintf("{\"err\":\"%s\"}\n", err)
 		http.Error(w, msg, http.StatusBadRequest)

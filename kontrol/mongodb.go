@@ -1,11 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 )
 
 type MongoDB struct{}
@@ -15,8 +15,8 @@ func NewMongoDB() *MongoDB {
 }
 
 func (m *MongoDB) Add(kite *models.Kite) {
-	if kite.Id == "" {
-		kite.Id = bson.NewObjectId()
+	if kite.ID == "" {
+		panic(errors.New("Kite does not have an ID"))
 	}
 
 	err := modelhelper.UpsertKite(kite)

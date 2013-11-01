@@ -5,11 +5,11 @@ package kite
 import (
 	"bufio"
 	"encoding/gob"
-	"encoding/json"
 	"errors"
 	"io"
-	"koding/db/models"
+	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
+	"koding/newkite/token"
 	"koding/tools/slog"
 	"net"
 	"net/rpc"
@@ -112,43 +112,19 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	if permissions.Has(a.Token) {
-		slog.Printf("[%s] allowed token (cached) '%s'\n",
-			c.rwc.(net.Conn).RemoteAddr().String(), a.Token)
-		return nil
+	key, _ := kodingkey.FromString(c.Kite.KodingKey)
+	tkn, err := token.DecryptString(a.Token, key)
+	if err != nil {
+		return errors.New("Invalid token")
 	}
 
-	m := protocol.Request{
-		KiteBase: models.KiteBase{
-			Username: c.Kite.Username,
-			Kitename: c.Kite.Kitename,
-			Token:    a.Token,
-			Uuid:     a.Uuid,
-			Hostname: c.Kite.Hostname,
-			Addr:     c.Kite.Addr,
-		},
-		RemoteKite: a.Kitename,
-		Action:     "getPermission",
-	}
-	slog.Printf("asking kontrol if token '%s' from %s is valid\n", a.Token, a.Username)
-
-	msg, _ := json.Marshal(&m)
-	result := c.Kite.Messenger.Send(msg)
-
-	var resp protocol.RegisterResponse
-	json.Unmarshal(result, &resp)
-
-	switch resp.Result {
-	case protocol.AllowKite:
-		slog.Printf("[%s] allowed token '%s'\n", c.rwc.(net.Conn).RemoteAddr(), a.Token)
-		permissions.Add(a.Token)
-		return nil
-	case protocol.PermitKite:
-		slog.Printf("denied token '%s'\n", a.Token)
-		return errors.New("no permission to run")
+	if !tkn.IsValid() {
+		slog.Printf("Invalid token '%s'\n", a.Token)
+		return errors.New("Invalid token")
 	}
 
-	return errors.New("got a nonstandart response")
+	slog.Printf("[%s] allowed token '%s'\n", c.rwc.(net.Conn).RemoteAddr(), a.Token)
+	return nil
 }
 
 func (c *KiteServerCodec) WriteResponse(r *rpc.Response, body interface{}) (err error) {

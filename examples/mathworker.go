@@ -38,6 +38,6 @@ func (Math) Square(r *protocol.KiteRequest, result *string) error {
 	b := int(a)
 	*result = strconv.Itoa(b * b)
 
-	fmt.Printf("[%s] call, sending result '%s' back\n", r.Origin, *result)
+	fmt.Printf("Kite call, sending result '%s' back\n", *result)
 	return nil
 }

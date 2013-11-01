@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"koding/db/models"
+	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
+	"koding/newkite/token"
 	"koding/tools/dnode"
+	"net"
 	"net/rpc"
 	"reflect"
 	"strconv"
@@ -195,7 +197,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	// args  is of type *dnode.Partial
+	// args is of type *dnode.Partial
 	var partials []*dnode.Partial
 	err := d.req.Arguments.Unmarshal(&partials)
 	if err != nil {
@@ -223,13 +225,16 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 	d.resultCallback = resultCallback
 
+	if options.Token == "" {
+		return errors.New("Token is not sent")
+	}
+
 	if body == nil {
 		return nil
 	}
 
 	a := body.(*protocol.KiteDnodeRequest)
 	a.Args = options.WithArgs
-	a.Token = options.Token
 	a.Username = options.Username
 	a.Hostname = options.CorrelationName
 
@@ -248,59 +253,36 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	if permissions.Has(a.Token) {
-		fmt.Printf("[%s] allowed token (cached) '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
-		return nil
+	key, _ := kodingkey.FromString(d.kite.KodingKey)
+	tkn, err := token.DecryptString(options.Token, key)
+	if err != nil {
+		return errors.New("Invalid token")
 	}
 
-	m := protocol.Request{
-		KiteBase: models.KiteBase{
-			Username: a.Username,
-			Token:    a.Token,
-			Kitename: d.kite.Kitename + "/" + d.kite.Username,
-		},
-		Action: "getPermission",
+	if !tkn.IsValid() {
+		fmt.Printf("Invalid token '%s'\n", options.Token)
+		return errors.New("Invalid token")
 	}
-	fmt.Printf("asking kontrol if token '%s' from %s is valid\n", a.Token, a.Username)
 
-	msg, _ := json.Marshal(&m)
-	result := d.kite.Messenger.Send(msg)
-
-	var resp protocol.RegisterResponse
-	json.Unmarshal(result, &resp)
-
-	switch resp.Result {
-	case protocol.AllowKite:
-		if a.Token != resp.Token.Token {
-			return errors.New("token is invalid")
+	// get underlying websocket connection and update our clients with the
+	// request data. that means remove it from the buffer list(bufClients) and
+	// add it to the registered user list (clients).
+	// be aware that this method is called only when a RPC call is made, that
+	// means this is not called when a connection is established
+	a.Username = tkn.Username
+	if a.Username != "" {
+		ws := d.rwc.(*websocket.Conn)
+		addr := ws.Request().RemoteAddr
+		ct := d.kite.Clients.Get(&client{Addr: addr})
+		if ct != nil {
+			ct.Username = a.Username
+			d.kite.Clients.Add(ct)
+			d.connectedClient = ct
 		}
-		permissions.Add(a.Token) // can be changed in the future, for now cache the token
-
-		// get underlying websocket connection and update our clients with the
-		// request data. that means remove it from the buffer list(bufClients) and
-		// add it to the registered user list (clients).
-		// be aware that this method is called only when a RPC call is made, that
-		// means this is not called when a connection is established
-		a.Username = resp.Token.Username
-		if a.Username != "" {
-			ws := d.rwc.(*websocket.Conn)
-			addr := ws.Request().RemoteAddr
-			ct := d.kite.Clients.Get(&client{Addr: addr})
-			if ct != nil {
-				ct.Username = a.Username
-				d.kite.Clients.Add(ct)
-				d.connectedClient = ct
-			}
-		}
-
-		fmt.Printf("[%s] allowed token '%s'\n", d.rwc.(*websocket.Conn).Request().RemoteAddr, a.Token)
-		return nil
-	case protocol.PermitKite:
-		fmt.Printf("denied token '%s'\n", a.Token)
-		return errors.New("tokenInvalid")
 	}
 
-	return errors.New("got a nonstandart response")
+	fmt.Printf("[%s] allowed token '%s'\n", d.rwc.(net.Conn).RemoteAddr(), options.Token)
+	return nil
 }
 
 func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {

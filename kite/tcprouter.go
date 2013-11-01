@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"koding/db/models"
+	"koding/newkite/protocol"
 	"koding/tools/slog"
 	"log"
 	"net"
@@ -21,11 +21,12 @@ func NewTCPKite(k *Kite) *TCPKite {
 	}
 }
 
-func (t *TCPKite) DialClient(kite *models.Kite) (*rpc.Client, error) {
-	slog.Printf("establishing TCP client conn for %s - %s on %s\n", kite.Kitename, kite.Addr, kite.Hostname)
-	conn, err := net.Dial("tcp", kite.Addr)
+func (t *TCPKite) DialClient(kite *protocol.Kite) (*rpc.Client, error) {
+	addr := addr(*kite)
+	slog.Printf("establishing TCP client conn for %s - %s on %s\n", kite.Name, addr, kite.Hostname)
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Println(kite.Addr, err)
+		log.Println(addr, err)
 		return nil, err
 	}
 

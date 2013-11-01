@@ -6,6 +6,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,20 +20,54 @@ const DefaultTokenDuration = 1 * time.Hour
 // When a process wants to talk with a kite it asks to Kontrol.
 // If the client is allowed, Kontrol gives a short lived token to it.
 type Token struct {
+	// ValidUntil is the time this token expires
 	ValidUntil time.Time `json:"validUntil"`
+
+	// Username is the person that this token belongs to.
+	// It is the person who makes the request.
+	Username string `json:"username"`
+
+	// KiteID is the ID of the Kite that the request is sent to.
+	KiteID string `json:"kiteID"`
+
 	// TODO Ideas for later
 	// ValidFor int // allowed number of requests
 	// Access (access control list)
 }
 
-func NewToken() *Token {
-	return NewTokenWithDuration(DefaultTokenDuration)
+func NewToken(username string) *Token {
+	return NewTokenWithDuration(username, DefaultTokenDuration)
 }
 
-func NewTokenWithDuration(d time.Duration) *Token {
+func NewTokenWithDuration(username string, d time.Duration) *Token {
 	return &Token{
+		Username:   username,
 		ValidUntil: time.Now().UTC().Add(d),
 	}
+}
+
+func (t Token) IsValid() bool {
+	return t.ValidUntil.After(time.Now().UTC())
+}
+
+// EncryptString encrypts and URLencodes the token.
+func (t Token) EncryptString(key kodingkey.KodingKey) (string, error) {
+	ciphertext, err := t.Encrypt(key)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(ciphertext), nil
+}
+
+// DecryptString decrypts a URLencoded string and returns a pointer to token.
+func DecryptString(s string, key kodingkey.KodingKey) (*Token, error) {
+	ciphertext, err := base64.URLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return Decrypt(ciphertext, key)
 }
 
 // Encrypt converts the token to JSON, encrypts it with the key and prepends

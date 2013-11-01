@@ -28,7 +28,11 @@ func main() {
 	// rethought.
 	time.Sleep(1 * time.Second)
 
-	remote, _ := k.Remote("devrim", "mathworker")
+	remote, err := k.Remote("devrim", "mathworker")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	squareOf := func(i float64) {
 		remote.Call("Square", i, func(err error, res string) {

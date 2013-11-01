@@ -5,7 +5,45 @@ import (
 	"fmt"
 	"koding/newkite/kodingkey"
 	"testing"
+	"time"
 )
+
+func TestEncodeDecodeString(t *testing.T) {
+	key, err := kodingkey.NewKodingKey()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	tok := NewToken("cenk")
+	fmt.Println("Generated new token:", *tok)
+
+	enc, err := tok.EncryptString(key)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println("Token encrypted:", enc)
+
+	dec, err := DecryptString(enc, key)
+	if err != nil {
+		t.Error("Cannot decrypt token:", err)
+		return
+	}
+	fmt.Println("Token decrypted:", dec)
+
+	if dec.Username != "cenk" {
+		t.Error("oops")
+		return
+	}
+	fmt.Println("Username is correct")
+
+	if dec.ValidUntil != tok.ValidUntil {
+		t.Error("oops")
+		return
+	}
+	fmt.Println("Timestamps are correct")
+}
 
 func TestEncryptDecrypt(t *testing.T) {
 	key, err := kodingkey.NewKodingKey()
@@ -14,7 +52,7 @@ func TestEncryptDecrypt(t *testing.T) {
 		return
 	}
 
-	tok := NewToken()
+	tok := NewToken("cenk")
 	fmt.Println("Generated new token:", *tok)
 
 	enc, err := tok.Encrypt(key)
@@ -36,6 +74,22 @@ func TestEncryptDecrypt(t *testing.T) {
 		return
 	}
 	fmt.Println("Timestamps are correct")
+}
+
+func TestTimestamp(t *testing.T) {
+	tok := NewToken("cenk")
+
+	if !tok.IsValid() {
+		t.Error("Should be valid")
+		return
+	}
+
+	tok = NewTokenWithDuration("cenk", -10*time.Millisecond)
+
+	if tok.IsValid() {
+		t.Error("Should not be valid")
+		return
+	}
 }
 
 func TestAESCFB(t *testing.T) {

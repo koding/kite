@@ -7,10 +7,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/fatih/goset"
 	"github.com/golang/groupcache"
 	"io"
-	"koding/db/models"
+	"koding/messaging/moh"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
@@ -22,6 +21,7 @@ import (
 	"net/rpc"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,32 +33,12 @@ var (
 	// roundrobin load balancing helpers
 	balance = NewBalancer()
 
-	// set data structure for caching tokens
-	permissions = goset.New()
-
 	// registers to kontrol in this interval
 	registerInterval = 700 * time.Millisecond
 
 	// after hitting the limit the register interval is no more increased
 	maxRegisterLimit = 30
 )
-
-// Messenger is used to implement various Messaging patterns on top of the
-// Kites.
-type Messenger interface {
-	// Send is makes a request to the endpoint and returns the response
-	Send([]byte) []byte
-
-	// Consumer is a subscriber/consumer that listens to the endpoint. Incoming
-	// data should be handler via the function that is passed.
-	Consume(func([]byte))
-
-	// To subscribe to a certain topic
-	Subscribe(string) error
-
-	// Unsubscribe from a certain topic
-	Unsubscribe(string) error
-}
 
 // Clients is an interface that encapsulates basic operations on incoming and
 // connected clients.
@@ -87,33 +67,14 @@ type Clients interface {
 // enables peer-to-peer chat. For examples we have FileSystem kite that expose
 // the file system to a client, which in order build the filetree.
 type Kite struct {
-	// User that calls/runs the kite
-	Username string
+	protocol.Kite
 
-	// Kitename defines the name that a kite is running on. This field is also
-	// used for communicating with other kites with the same name.
-	Kitename string
+	// KodingKey is used for authenticate to Kontrol.
+	KodingKey string
 
-	// Uuid is a genereated unique id string that defines this Kite.
-	Uuid string
-
-	// RPC and GroupCache addresses, also expoxed to Kontrol
-	Addr string
-
-	// PublicKey is used for authenticate to Kontrol.
-	PublicKey string
-
-	// Hostname the kite is running on. Uses os.Hostname()
-	Hostname string
-
-	LocalIP  string // local network interface
-	PublicIP string // public reachable IP
-
-	// Port that the kite is going to be run.
-	Port string
-
-	// every kite should have version
-	Version string
+	// Local network interface address.
+	// It will be populated after registering with Kontrol.
+	LocalIP string
 
 	// Registered is true if the Kite is registered to kontrol itself
 	Registered bool
@@ -130,9 +91,6 @@ type Kite struct {
 	// method map for shared methods
 	Methods map[string]string
 
-	// implements the Messenger interface
-	Messenger Messenger
-
 	// implements the Clients interface
 	Clients Clients
 
@@ -143,14 +101,18 @@ type Kite struct {
 	// RpcServer
 	Server *rpc.Server
 
-	// used to start the rpc server only once
-	OnceServer sync.Once
+	// To allow only one register request at the same time
+	registerMutex sync.Mutex
 
-	// used to initialize the register process to kontrol just once
-	OnceRegister sync.Once
+	// Need it to get the address after starting to listen.
+	// The user may not specify a port and in this case we are
+	// listening on port "0" and the OS randomly assigns it.
+	// We have to tell the Kontrol to correct IP address and
+	//port number in order to be accessible from outside.
+	listener net.Listener
 
-	// number of register attempts to kontrol
-	registerAttempt int
+	// Used to talk with Kontrol server
+	kontrolClient *moh.MessagingClient
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
@@ -176,50 +138,48 @@ func New(options *protocol.Options) *Kite {
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
 
-	publicKey, err := utils.GetKodingKey()
+	kodingKey, err := utils.GetKodingKey()
 	if err != nil {
 		slog.Fatalln("Couldn't find koding.key. Please run 'kd register'.")
 	}
 
 	port := options.Port
 	if options.Port == "" {
-		port = "0" // go binds to an automatic port
+		port = "0" // OS binds to an automatic port
 	}
 
-	localIP := utils.GetLocalIP(options.LocalIP)
 	var publicIP string
 	if options.PublicIP == "" {
-		publicIP = localIP + ":" + port
+		publicIP = utils.GetLocalIP(options.LocalIP)
 	} else {
-		publicIP = options.PublicIP + ":" + port
+		publicIP = options.PublicIP
 	}
 
 	if options.KontrolAddr == "" {
 		options.KontrolAddr = "127.0.0.1:4000" // local fallback address
 	}
 
-	messenger := NewHTTPMessenger(options.KontrolAddr, kiteID)
-	messenger.Subscribe(kiteID)
-	messenger.Subscribe("all")
-
 	k := &Kite{
-		Username:       options.Username,
-		Kitename:       options.Kitename,
-		Version:        options.Version,
+		Kite: protocol.Kite{
+			Name:     options.Kitename,
+			Username: options.Username,
+			ID:       kiteID,
+			Version:  options.Version,
+			Hostname: hostname,
+			PublicIP: publicIP,
+			Port:     port,
+		},
 		Kind:           options.Kind,
-		Uuid:           kiteID,
-		PublicKey:      publicKey,
-		Addr:           localIP + ":" + port,
-		PublicIP:       publicIP,
-		LocalIP:        localIP,
-		Port:           port,
-		Hostname:       hostname,
+		KodingKey:      kodingKey,
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
-		Messenger:      messenger,
 		Methods:        make(map[string]string),
 		Clients:        NewClients(),
 	}
+
+	k.kontrolClient = moh.NewMessagingClient(options.KontrolAddr, k.handle)
+	k.kontrolClient.Subscribe(kiteID)
+	k.kontrolClient.Subscribe("all")
 
 	// Register our internal method
 	k.Methods["vm.info"] = "status.Info"
@@ -237,7 +197,7 @@ func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
 	}
 
 	k.createMethodMap(rcvr, methods)
-	return k.Server.RegisterName(k.Kitename, rcvr)
+	return k.Server.RegisterName(k.Name, rcvr)
 }
 
 func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
@@ -251,7 +211,7 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 		}
 
 		// map alternativeName to go's net/rpc methodname
-		k.Methods[alternativeName] = k.Kitename + "." + m.Name
+		k.Methods[alternativeName] = k.Name + "." + m.Name
 	}
 }
 
@@ -261,16 +221,35 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 func (k *Kite) Start() {
 	k.parseVersionFlag()
 
-	// Start our blocking subscriber loop. We except messages in the format of:
-	// filter:msg, where msg is in format JSON  of PubResponse protocol format.
-	// Latter is important to ensure robustness, if not we have to unmarshal or
-	// check every incoming message.
-	if !k.KontrolEnabled {
-		k.Registered = true
-		k.serve(k.Addr)
-	} else {
-		k.Messenger.Consume(k.handle)
+	// Start serving...
+	//
+	// This is blocking so we are starting to serve in a seperate goroutine
+	// and waiting 1 second for getting the error (if it gives an error)
+	// before we continue.
+	err := make(chan error, 1)
+	go k.serve(err)
+	select {
+	case <-err:
+		slog.Fatalln(err)
+	case <-time.After(time.Second):
 	}
+
+	if k.KontrolEnabled {
+		// Listen Kontrol messages
+		k.kontrolClient.Connect()
+	}
+
+	// If we are here, it means the server did not give an error in a second.
+	// Wait until the serving is finished.
+	select {
+	case <-err:
+		slog.Fatalln(err)
+	}
+}
+
+// addr returns the address to be listened on in "ip:port" format.
+func addr(k protocol.Kite) string {
+	return k.PublicIP + ":" + k.Port
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -290,149 +269,100 @@ func (k *Kite) parseVersionFlag() {
 }
 
 // handle is a method that interprets the incoming message from Kontrol. The
-// incoming message is in form of protocol.PubResponse.
+// incoming message must be in form of protocol.KontrolMessage.
 func (k *Kite) handle(msg []byte) {
-	var r protocol.PubResponse
+	var r protocol.KontrolMessage
 	err := json.Unmarshal(msg, &r)
 	if err != nil {
 		slog.Println(err)
 		return
 	}
+	// fmt.Printf("INCOMING KONTROL MSG: %+v\n", r)
 
-	// treat any incoming data as a ping, don't just rely on ping command
-	// this makes the kite more robust if we can't catch one of the pings.
-	k.Pong()
-
-	switch r.Action {
-	case protocol.AddKite:
+	switch r.Type {
+	case protocol.KiteRegistered:
 		k.AddKite(r)
-	case protocol.RemoveKite:
+	case protocol.KiteDisconnected:
 		k.RemoveKite(r)
-	case protocol.ExpireToken:
-		fmt.Printf("token '%s' has been invoked via kontrol\n", r.Token)
-		permissions.Remove(r.Token)
-	case protocol.UpdateKite:
+	case protocol.KiteUpdated:
 		k.Registered = false //trigger reinitialization
-	case "ping":
-		// This is needed for Node Coordination, that means we register ourself
-		// only if we got an "hello" from one of the kontrol servers. This is
-		// needed in order to catch all PUB messages from Kontrol. For more
-		// information about this pattern read "Node Coordination" from the Zmq
-		// Guide.
-
-		if k.Registered {
-			return
-		}
-
-		f := func() { time.AfterFunc(registerInterval*time.Duration(k.registerAttempt), k.InitializeKite) }
-		k.OnceRegister.Do(f)
+	case protocol.Ping:
+		k.Pong()
 	default:
 		return
 	}
 
 }
 
+func unmarshalKiteArg(r *protocol.KontrolMessage) protocol.Kite {
+	k := r.Args["kite"].(map[string]interface{})
+	// Must set all fields manually
+	return protocol.Kite{
+		Name:     k["name"].(string),
+		Username: k["username"].(string),
+		ID:       k["id"].(string),
+		Kind:     k["kind"].(string),
+		Version:  k["version"].(string),
+		Hostname: k["hostname"].(string),
+		PublicIP: k["publicIP"].(string),
+		Port:     k["port"].(string),
+	}
+}
+
 // AddKite is executed when a protocol.AddKite message has been received
 // trough the handler.
-func (k *Kite) AddKite(r protocol.PubResponse) {
-	if !k.Registered {
-		return
-	}
+func (k *Kite) AddKite(r protocol.KontrolMessage) {
+	kite := unmarshalKiteArg(&r)
 
-	kite := &models.Kite{
-		KiteBase: models.KiteBase{
-			Username: r.Username,
-			Kitename: r.Kitename,
-			Token:    r.Token,
-			Version:  r.Version,
-			Uuid:     r.Uuid,
-			Hostname: r.Hostname,
-			Addr:     r.Addr,
-		},
-	}
-
-	kites.Add(kite)
+	kites.Add(&kite)
 
 	// Groupache settings, enable when ready
 	// k.SetPeers(k.PeersAddr()...)
 
-	slog.Printf("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
+	slog.Printf("[%s] -> known peers -> %v\n", r.Type, k.PeersAddr())
 }
 
 // RemoveKite is executed when a protocol.AddKite message has been received
 // trough the handler.
-func (k *Kite) RemoveKite(r protocol.PubResponse) {
-	if !k.Registered {
-		return
-	}
+func (k *Kite) RemoveKite(r protocol.KontrolMessage) {
+	kite := unmarshalKiteArg(&r)
 
-	kites.Remove(r.Uuid)
-	slog.Printf("[%s] -> known peers -> %v\n", r.Action, k.PeersAddr())
+	kites.Remove(kite.ID)
+	slog.Printf("[%s] -> known peers -> %v\n", r.Type, k.PeersAddr())
 }
 
 // Pong sends a 'pong' message whenever the kite receives a message from Kontrol.
 // This is used for node coordination and notifier Kontrol that the Kite is alive.
 func (k *Kite) Pong() {
-	m := protocol.Request{
-		KiteBase: models.KiteBase{
-			Kitename: k.Kitename,
-			Uuid:     k.Uuid,
-		},
-		Action: "pong",
+	m := protocol.KiteToKontrolRequest{
+		Kite:   k.Kite,
+		Method: protocol.Pong,
 	}
 
 	msg, _ := json.Marshal(&m)
 
-	resp := k.Messenger.Send(msg)
+	resp, _ := k.kontrolClient.Request(msg)
 	if string(resp) == "UPDATE" {
 		k.Registered = false
+		k.registerToKontrol()
 	}
 }
 
-// InitializeKite runs the builtin RPC server and also registers itself to Kontrol
-// when the kite.KontrolEnabled flag is enabled. This method is non-blocking.
-func (k *Kite) InitializeKite() {
-	slog.Println("not registered, sending register request to kontrol...")
-	err := k.RegisterToKontrol()
-	if err != nil {
-		slog.Printf("register err: %s. trying to register in %0.2f seconds again\n",
-			err, time.Duration(registerInterval*time.Duration(k.registerAttempt+1)).Seconds())
-
-		if k.registerAttempt <= maxRegisterLimit {
-			k.registerAttempt++
-		}
-
-		k.OnceRegister = sync.Once{}
-		return
-	}
-
-	onceBody := func() { k.serve(k.Addr) }
-	go k.OnceServer.Do(onceBody)
-
-	k.OnceRegister = sync.Once{}
-	k.registerAttempt = 0
-	k.Registered = true
-}
-
-// RegisterToKontrol sends a register message to Kontrol. It returns an error
+// registerToKontrol sends a register message to Kontrol. It returns an error
 // when it is not allowed by Kontrol. If allowed, nil is returned.
-func (k *Kite) RegisterToKontrol() error {
+func (k *Kite) registerToKontrol() error {
+	k.registerMutex.Lock()
+	defer k.registerMutex.Unlock()
+
+	if k.Registered {
+		return nil
+	}
+
 	// Wait until the servers are ready
-	m := protocol.Request{
-		KiteBase: models.KiteBase{
-			Username:  k.Username,
-			Kitename:  k.Kitename,
-			Version:   k.Version,
-			Uuid:      k.Uuid,
-			PublicKey: k.PublicKey,
-			Kind:      k.Kind,
-			Hostname:  k.Hostname,
-			Addr:      k.Addr,
-			LocalIP:   k.LocalIP,
-			PublicIP:  k.PublicIP,
-			Port:      k.Port,
-		},
-		Action: "register",
+	m := protocol.KiteToKontrolRequest{
+		Method:    protocol.RegisterKite,
+		Kite:      k.Kite,
+		KodingKey: k.KodingKey,
 	}
 
 	msg, err := json.Marshal(&m)
@@ -441,8 +371,10 @@ func (k *Kite) RegisterToKontrol() error {
 		return err
 	}
 
-	// what if it times out?
-	result := k.Messenger.Send(msg)
+	result, err := k.kontrolClient.Request(msg)
+	if err != nil {
+		return err
+	}
 
 	var resp protocol.RegisterResponse
 	err = json.Unmarshal(result, &resp)
@@ -452,10 +384,11 @@ func (k *Kite) RegisterToKontrol() error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr, k.Version, k.Uuid)
+		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", addr(k.Kite), k.Version, k.ID)
 		k.Username = resp.Username // we know now which user that is
+		k.Registered = true
 		return nil
-	case protocol.PermitKite:
+	case protocol.RejectKite:
 		return errors.New("no permission to run")
 	}
 
@@ -473,22 +406,27 @@ var connected = "200 Connected to Go RPC"
 
 // serve starts our rpc server with the given addr. Addr should be in form of
 // "ip:port"
-func (k *Kite) serve(addr string) {
-	listener, err := net.Listen("tcp4", addr)
+func (k *Kite) serve(result chan error) {
+	var err error
+	k.listener, err = net.Listen("tcp4", addr(k.Kite))
 	if err != nil {
 		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
 		return
 	}
 
-	k.Addr = listener.Addr().String()
-	slog.Println("serve addr is", k.Addr)
+	slog.Println("serve addr is", addr(k.Kite))
+
+	// Port is known here if "0" is used as port number
+	address := strings.SplitN(k.listener.Addr().String(), ":", 2)
+	k.PublicIP = address[0]
+	k.Port = address[1]
 
 	// GroupCache settings, enable it when ready
 	// k.newPool(k.Addr) // registers to http.DefaultServeMux
 	// k.newGroup()
 
 	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-	http.Serve(listener, k)
+	result <- http.Serve(k.listener, k)
 }
 
 // ServeHTTP interface for http package.
@@ -549,10 +487,17 @@ func (k *Kite) broadcast(method string, arguments interface{}) {
 	}
 }
 
+// Remote encapsulates kites of specified type of specified user.
 type Remote struct {
 	Username string
 	Kitename string
-	Kites    []*models.Kite
+	Kites    []*RemoteKite
+}
+
+// RemoteKite is the structure representing other connected kites.
+type RemoteKite struct {
+	protocol.KiteWithToken
+	Client *rpc.Client
 }
 
 // Remote is used to create a new remote struct that is used for remote
@@ -600,12 +545,9 @@ func (r *Remote) Call(method string, args interface{}, fn func(err error, res st
 	var response string
 
 	request := &protocol.KiteRequest{
-		KiteBase: models.KiteBase{
-			Token: remoteKite.Token,
-			Uuid:  remoteKite.Uuid,
-		},
-		Args:   args,
-		Origin: protocol.ORIGIN_GOB,
+		Kite:  remoteKite.Kite,
+		Args:  args,
+		Token: remoteKite.Token,
 	}
 
 	rpcMethod := r.Kitename + "." + method
@@ -621,23 +563,15 @@ func (r *Remote) Call(method string, args interface{}, fn func(err error, res st
 	return d, nil
 }
 
-func (k *Kite) requestKites(username, kitename string) []*models.Kite {
-	remoteKites := getKitesBy(username, kitename)
-	if len(remoteKites) != 0 {
-		return remoteKites
-	}
-
-	m := protocol.Request{
-		KiteBase: models.KiteBase{
-			Username: username,
-			Kitename: k.Kitename,
-			Version:  k.Version,
-			Uuid:     k.Uuid,
-			Hostname: k.Hostname,
-			Addr:     k.Addr,
+func (k *Kite) requestKites(username, kitename string) []*RemoteKite {
+	m := protocol.KiteToKontrolRequest{
+		Kite:      k.Kite,
+		KodingKey: k.KodingKey,
+		Method:    protocol.GetKites,
+		Args: map[string]interface{}{
+			"username": username,
+			"kitename": kitename,
 		},
-		RemoteKite: kitename,
-		Action:     "getKites",
 	}
 
 	msg, err := json.Marshal(&m)
@@ -647,35 +581,30 @@ func (k *Kite) requestKites(username, kitename string) []*models.Kite {
 	}
 
 	slog.Println("sending requesting message...")
-	result := k.Messenger.Send(msg)
+	result, err := k.kontrolClient.Request(msg)
+	if err != nil {
+		return nil
+	}
 
-	var kitesResp []protocol.PubResponse
+	var kitesResp protocol.GetKitesResponse
 	err = json.Unmarshal(result, &kitesResp)
 	if err != nil {
 		slog.Println("requestKites marshall err 2", err)
 		return nil
 	}
 
-	for _, r := range kitesResp {
-		kite := &models.Kite{
-			KiteBase: models.KiteBase{
-				Username: r.Username,
-				Kitename: r.Kitename,
-				Token:    r.Token,
-				Version:  r.Version,
-				Uuid:     r.Uuid,
-				Hostname: r.Hostname,
-				Addr:     r.Addr,
-			},
+	remoteKites := make([]*RemoteKite, len(kitesResp))
+	for i, k := range kitesResp {
+		rk := &RemoteKite{
+			KiteWithToken: k,
 		}
-
-		kites.Add(kite)
+		remoteKites[i] = rk
 	}
 
-	return getKitesBy(username, kitename)
+	return remoteKites
 }
 
-func (r *Remote) getClient() (*models.Kite, error) {
+func (r *Remote) getClient() (*RemoteKite, error) {
 	kite, err := r.roundRobin()
 	if err != nil {
 		return nil, err
@@ -685,21 +614,21 @@ func (r *Remote) getClient() (*models.Kite, error) {
 		var err error
 
 		slog.Printf("establishing HTTP client conn for %s - %s on %s\n",
-			kite.Kitename, kite.Addr, kite.Hostname)
+			kite.Name, addr(kite.Kite), kite.Hostname)
 
-		kite.Client, err = r.dialRemote(kite.Addr)
+		kite.Client, err = r.dialRemote(addr(kite.Kite))
 		if err != nil {
 			return nil, err
 		}
 
 		// update kite in storage after we have an established connection
-		kites.Add(kite)
+		kites.Add(&kite.Kite)
 	}
 
 	return kite, nil
 }
 
-func (r *Remote) roundRobin() (*models.Kite, error) {
+func (r *Remote) roundRobin() (*RemoteKite, error) {
 	if len(r.Kites) == 0 {
 		return nil, fmt.Errorf("kite %s/%s does not exist", r.Username, r.Kitename)
 	}
@@ -751,7 +680,7 @@ func (k *Kite) newPool(addr string) {
 }
 
 func (k *Kite) newGroup() {
-	k.Group = groupcache.NewGroup(k.Kitename, 64<<20, groupcache.GetterFunc(
+	k.Group = groupcache.NewGroup(k.Name, 64<<20, groupcache.GetterFunc(
 		func(ctx groupcache.Context, key string, dest groupcache.Sink) error {
 			dest.SetString("fatih")
 			return nil
@@ -783,26 +712,7 @@ func (k *Kite) SetPeers(peers ...string) {
 func (k *Kite) PeersAddr() []string {
 	list := make([]string, 0)
 	for _, kite := range kites.List() {
-		list = append(list, kite.Addr)
+		list = append(list, addr(*kite))
 	}
 	return list
-}
-
-/******************************************
-
-Misc
-
-******************************************/
-
-// return kites from the storage that matches username and kitename
-func getKitesBy(username, kitename string) []*models.Kite {
-	remoteKites := make([]*models.Kite, 0)
-
-	for _, r := range kites.List() {
-		if r.Username == username && r.Kitename == kitename {
-			remoteKites = append(remoteKites, r)
-		}
-	}
-
-	return remoteKites
 }
