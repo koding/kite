@@ -104,13 +104,6 @@ type Kite struct {
 	// To allow only one register request at the same time
 	registerMutex sync.Mutex
 
-	// Need it to get the address after starting to listen.
-	// The user may not specify a port and in this case we are
-	// listening on port "0" and the OS randomly assigns it.
-	// We have to tell the Kontrol to correct IP address and
-	//port number in order to be accessible from outside.
-	listener net.Listener
-
 	// Used to talk with Kontrol server
 	kontrolClient *moh.MessagingClient
 }
@@ -388,8 +381,7 @@ var connected = "200 Connected to Go RPC"
 // serve starts our rpc server with the given addr. Addr should be in form of
 // "ip:port"
 func (k *Kite) serve() {
-	var err error
-	k.listener, err = net.Listen("tcp4", k.Addr())
+	listener, err := net.Listen("tcp4", k.Addr())
 	if err != nil {
 		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
 		return
@@ -398,7 +390,7 @@ func (k *Kite) serve() {
 	slog.Println("serve addr is", k.Addr())
 
 	// Port is known here if "0" is used as port number
-	address := strings.SplitN(k.listener.Addr().String(), ":", 2)
+	address := strings.SplitN(listener.Addr().String(), ":", 2)
 	k.PublicIP = address[0]
 	k.Port = address[1]
 
@@ -408,7 +400,7 @@ func (k *Kite) serve() {
 
 	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 
-	err = http.Serve(k.listener, k)
+	err = http.Serve(listener, k)
 	if err != nil {
 		slog.Fatalln(err)
 	}
