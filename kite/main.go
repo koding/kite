@@ -222,29 +222,15 @@ func (k *Kite) Start() {
 	k.parseVersionFlag()
 
 	// Start serving...
-	//
 	// This is blocking so we are starting to serve in a seperate goroutine
-	// and waiting 1 second for getting the error (if it gives an error)
-	// before we continue.
-	err := make(chan error, 1)
-	go k.serve(err)
-	select {
-	case <-err:
-		slog.Fatalln(err)
-	case <-time.After(time.Second):
-	}
+	go k.serve()
 
 	if k.KontrolEnabled {
 		// Listen Kontrol messages
 		k.kontrolClient.Connect()
 	}
 
-	// If we are here, it means the server did not give an error in a second.
-	// Wait until the serving is finished.
-	select {
-	case <-err:
-		slog.Fatalln(err)
-	}
+	select {}
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -401,7 +387,7 @@ var connected = "200 Connected to Go RPC"
 
 // serve starts our rpc server with the given addr. Addr should be in form of
 // "ip:port"
-func (k *Kite) serve(result chan error) {
+func (k *Kite) serve() {
 	var err error
 	k.listener, err = net.Listen("tcp4", k.Addr())
 	if err != nil {
@@ -421,7 +407,11 @@ func (k *Kite) serve(result chan error) {
 	// k.newGroup()
 
 	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-	result <- http.Serve(k.listener, k)
+
+	err = http.Serve(k.listener, k)
+	if err != nil {
+		slog.Fatalln(err)
+	}
 }
 
 // ServeHTTP interface for http package.
