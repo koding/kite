@@ -247,11 +247,6 @@ func (k *Kite) Start() {
 	}
 }
 
-// addr returns the address to be listened on in "ip:port" format.
-func addr(k protocol.Kite) string {
-	return k.PublicIP + ":" + k.Port
-}
-
 // If the user wants to call flag.Parse() the flag must be defined in advance.
 var _ = flag.Bool("version", false, "show version")
 
@@ -384,7 +379,7 @@ func (k *Kite) registerToKontrol() error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", addr(k.Kite), k.Version, k.ID)
+		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr(), k.Version, k.ID)
 		k.Username = resp.Username // we know now which user that is
 		k.Registered = true
 		return nil
@@ -408,13 +403,13 @@ var connected = "200 Connected to Go RPC"
 // "ip:port"
 func (k *Kite) serve(result chan error) {
 	var err error
-	k.listener, err = net.Listen("tcp4", addr(k.Kite))
+	k.listener, err = net.Listen("tcp4", k.Addr())
 	if err != nil {
 		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
 		return
 	}
 
-	slog.Println("serve addr is", addr(k.Kite))
+	slog.Println("serve addr is", k.Addr())
 
 	// Port is known here if "0" is used as port number
 	address := strings.SplitN(k.listener.Addr().String(), ":", 2)
@@ -614,9 +609,9 @@ func (r *Remote) getClient() (*RemoteKite, error) {
 		var err error
 
 		slog.Printf("establishing HTTP client conn for %s - %s on %s\n",
-			kite.Name, addr(kite.Kite), kite.Hostname)
+			kite.Name, kite.Addr(), kite.Hostname)
 
-		kite.Client, err = r.dialRemote(addr(kite.Kite))
+		kite.Client, err = r.dialRemote(kite.Addr())
 		if err != nil {
 			return nil, err
 		}
@@ -712,7 +707,7 @@ func (k *Kite) SetPeers(peers ...string) {
 func (k *Kite) PeersAddr() []string {
 	list := make([]string, 0)
 	for _, kite := range kites.List() {
-		list = append(list, addr(*kite))
+		list = append(list, kite.Addr())
 	}
 	return list
 }

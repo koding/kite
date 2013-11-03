@@ -51,6 +51,10 @@ type Kite struct {
 	Port     string `bson:"port" json:"port"`
 }
 
+func (k *Kite) Addr() string {
+	return k.PublicIP + ":" + k.Port
+}
+
 // KiteRequest is a structure that is used in Kite-to-Kite communication.
 type KiteRequest struct {
 	Kite   `json:"kite"`

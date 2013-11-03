@@ -22,7 +22,7 @@ func NewTCPKite(k *Kite) *TCPKite {
 }
 
 func (t *TCPKite) DialClient(kite *protocol.Kite) (*rpc.Client, error) {
-	addr := addr(*kite)
+	addr := kite.Addr()
 	slog.Printf("establishing TCP client conn for %s - %s on %s\n", kite.Name, addr, kite.Hostname)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
