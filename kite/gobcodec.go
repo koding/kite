@@ -113,6 +113,8 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	key, _ := kodingkey.FromString(c.Kite.KodingKey)
+	// Ignoring error because the key will be used in decrypt below.
+	// DecryptString will fail if the key is not valid.
 	tkn, err := token.DecryptString(a.Token, key)
 	if err != nil {
 		return errors.New("Invalid token")
