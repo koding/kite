@@ -266,6 +266,7 @@ func unmarshalKiteArg(r *protocol.KontrolMessage) (kite *protocol.Kite, err erro
 		if r := recover(); r != nil {
 			// Only type assertions below can panic with runtime.Error
 			if _, ok := r.(runtime.Error); ok {
+				// err will be returned at the end of this func (named returns)
 				err = errors.New("Invalid kite argument")
 			}
 		}

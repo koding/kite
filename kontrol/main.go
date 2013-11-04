@@ -406,6 +406,10 @@ func (k *Kontrol) RegisterKite(req *protocol.KiteToKontrolRequest) (*models.Kite
 		return nil, errors.New("Invalid Kite ID")
 	}
 
+	if req.KodingKey == "" {
+		return nil, errors.New("Invalid Koding Key")
+	}
+
 	kite := storage.Get(req.Kite.ID)
 	if kite != nil {
 		return kite, nil
