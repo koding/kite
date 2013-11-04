@@ -371,13 +371,11 @@ RPC
 // Can connect to RPC service using HTTP CONNECT to rpcPath.
 var connected = "200 Connected to Go RPC"
 
-// serve starts our rpc server with the given addr. Addr should be in form of
-// "ip:port"
-func (k *Kite) serve() {
+// listenAndServe starts our rpc server with the given addr.
+func (k *Kite) listenAndServe() error {
 	listener, err := net.Listen("tcp4", k.Addr())
 	if err != nil {
-		slog.Fatalln("PANIC!!!!! RPC SERVER COULD NOT BE INITIALIZED:", err)
-		return
+		return err
 	}
 
 	slog.Println("serve addr is", k.Addr())
@@ -403,10 +401,7 @@ func (k *Kite) serve() {
 
 	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 
-	err = http.Serve(listener, k)
-	if err != nil {
-		slog.Fatalln(err)
-	}
+	return http.Serve(listener, k)
 }
 
 // ServeHTTP interface for http package.
