@@ -214,7 +214,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("INCOMING KITE MSG req.Kite.ID: %+v req.Method: %+v\n", req.Kite.ID, req.Method)
+	// fmt.Printf("INCOMING KITE MSG req.Kite.ID: %#v req.Method: %#v\n", req.Kite.ID, req.Method)
 
 	err = k.validateKiteRequest(req)
 	if err != nil {

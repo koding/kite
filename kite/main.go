@@ -244,7 +244,7 @@ func (k *Kite) handle(msg []byte) {
 		slog.Println(err)
 		return
 	}
-	// fmt.Printf("INCOMING KONTROL MSG: %+v\n", r)
+	// fmt.Printf("INCOMING KONTROL MSG: %#v\n", r)
 
 	switch r.Type {
 	case protocol.KiteRegistered:
@@ -327,22 +327,27 @@ func (k *Kite) Pong() {
 
 	resp, _ := k.kontrolClient.Request(msg)
 	if string(resp) == "UPDATE" {
+		k.registerMutex.Lock()
+		defer k.registerMutex.Unlock()
+
+		if k.Registered {
+			return
+		}
+
 		k.Registered = false
-		k.registerToKontrol()
+
+		err := k.registerToKontrol()
+		if err != nil {
+			slog.Fatalln(err)
+		}
+
+		k.Registered = true
 	}
 }
 
 // registerToKontrol sends a register message to Kontrol. It returns an error
 // when it is not allowed by Kontrol. If allowed, nil is returned.
 func (k *Kite) registerToKontrol() error {
-	k.registerMutex.Lock()
-	defer k.registerMutex.Unlock()
-
-	if k.Registered {
-		return nil
-	}
-
-	// Wait until the servers are ready
 	m := protocol.KiteToKontrolRequest{
 		Method:    protocol.RegisterKite,
 		Kite:      k.Kite,
@@ -370,7 +375,6 @@ func (k *Kite) registerToKontrol() error {
 	case protocol.AllowKite:
 		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr(), k.Version, k.ID)
 		k.Username = resp.Username // we know now which user that is
-		k.Registered = true
 		return nil
 	case protocol.RejectKite:
 		return errors.New("no permission to run")
