@@ -15,6 +15,7 @@ import (
 	"koding/newkite/utils"
 	"koding/tools/config"
 	"koding/tools/slog"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -217,7 +218,7 @@ func (k *Kontrol) replyMohRequest(httpReq *http.Request, msg []byte) ([]byte, er
 	case protocol.Pong:
 		return k.handlePong(req)
 	case protocol.RegisterKite:
-		return k.handleRegister(req)
+		return k.handleRegister(httpReq, req)
 	case protocol.GetKites:
 		return k.handleGetKites(req)
 	}
@@ -269,11 +270,13 @@ func (k *Kontrol) handlePong(req *protocol.KiteToKontrolRequest) ([]byte, error)
 	return []byte("OK"), nil
 }
 
-func (k *Kontrol) handleRegister(req *protocol.KiteToKontrolRequest) ([]byte, error) {
+func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKontrolRequest) ([]byte, error) {
 	slog.Printf("[%s (%s)] at '%s' wants to be registered\n",
 		req.Kite.Name, req.Kite.Version, req.Kite.Hostname)
 
-	kite, err := k.RegisterKite(req)
+	remoteHost, _, _ := net.SplitHostPort(httpReq.RemoteAddr)
+
+	kite, err := k.RegisterKite(req, remoteHost)
 	if err != nil {
 		response := protocol.RegisterResponse{Result: protocol.RejectKite}
 		resp, _ := json.Marshal(response)
@@ -303,6 +306,7 @@ func (k *Kontrol) handleRegister(req *protocol.KiteToKontrolRequest) ([]byte, er
 	response := protocol.RegisterResponse{
 		Result:   protocol.AllowKite,
 		Username: kite.Username,
+		PublicIP: remoteHost,
 	}
 
 	resp, _ := json.Marshal(response)
@@ -389,7 +393,7 @@ func (k *Kontrol) Publish(filter string, msg []byte) {
 // RegisterKite returns true if the specified kite has been seen before.
 // If not, it first validates the kites. If the kite has permission to run, it
 // creates a new struct, stores it and returns it.
-func (k *Kontrol) RegisterKite(req *protocol.KiteToKontrolRequest) (*models.Kite, error) {
+func (k *Kontrol) RegisterKite(req *protocol.KiteToKontrolRequest, ip string) (*models.Kite, error) {
 	if req.Kite.ID == "" {
 		return nil, errors.New("Invalid Kite ID")
 	}
@@ -403,17 +407,23 @@ func (k *Kontrol) RegisterKite(req *protocol.KiteToKontrolRequest) (*models.Kite
 		return kite, nil
 	}
 
-	return createAndAddKite(req)
+	return createAndAddKite(req, ip)
 }
 
-func createAndAddKite(req *protocol.KiteToKontrolRequest) (*models.Kite, error) {
+func createAndAddKite(req *protocol.KiteToKontrolRequest, remoteIP string) (*models.Kite, error) {
 	// in the future we'll check other things too, for now just make sure that
 	// the variables are not empty
 	if req.Kite.Name == "" && req.Kite.Version == "" && req.Kite.PublicIP == "" && req.Kite.Port == "" {
 		return nil, fmt.Errorf("kite fields are not initialized correctly")
 	}
 
-	kite := createKiteModel(req)
+	kite := modelhelper.NewKite()
+	kite.Kite = req.Kite
+	kite.KodingKey = req.KodingKey
+
+	if req.Kite.PublicIP == "" {
+		kite.PublicIP = remoteIP
+	}
 
 	username, err := usernameFromKey(kite.KodingKey)
 	if err != nil {
@@ -434,13 +444,6 @@ func createAndAddKite(req *protocol.KiteToKontrolRequest) (*models.Kite, error) 
 	}
 
 	return kite, nil
-}
-
-func createKiteModel(req *protocol.KiteToKontrolRequest) *models.Kite {
-	k := modelhelper.NewKite()
-	k.Kite = req.Kite
-	k.KodingKey = req.KodingKey
-	return k
 }
 
 func usernameFromKey(key string) (string, error) {

@@ -103,6 +103,9 @@ type RegisterResponse struct {
 	// Username is sent in response because the kite does not know
 	// it's own user's name on start.
 	Username string `json:"username"`
+
+	// PublicIP is the IP address visible to Kontrol.
+	PublicIP string
 }
 
 type RegisterResult string

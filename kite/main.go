@@ -70,10 +70,6 @@ type Kite struct {
 	// KodingKey is used for authenticate to Kontrol.
 	KodingKey string
 
-	// Local network interface address.
-	// It will be populated after registering with Kontrol.
-	LocalIP string
-
 	// Registered is true if the Kite is registered to kontrol itself
 	Registered bool
 
@@ -136,13 +132,6 @@ func New(options *protocol.Options) *Kite {
 		port = "0" // OS binds to an automatic port
 	}
 
-	var publicIP string
-	if options.PublicIP == "" {
-		publicIP = utils.GetLocalIP(options.LocalIP)
-	} else {
-		publicIP = options.PublicIP
-	}
-
 	if options.KontrolAddr == "" {
 		options.KontrolAddr = "127.0.0.1:4000" // local fallback address
 	}
@@ -154,10 +143,12 @@ func New(options *protocol.Options) *Kite {
 			ID:       kiteID,
 			Version:  options.Version,
 			Hostname: hostname,
-			PublicIP: publicIP,
 			Port:     port,
+			Kind:     options.Kind,
+
+			// PublicIP will be set by Kontrol after registering if it is not set.
+			PublicIP: options.PublicIP,
 		},
-		Kind:           options.Kind,
 		KodingKey:      kodingKey,
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
@@ -373,6 +364,12 @@ func (k *Kite) registerToKontrol() error {
 	case protocol.AllowKite:
 		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr(), k.Version, k.ID)
 		k.Username = resp.Username // we know now which user that is
+
+		// Set the correct PublicIP if left empty in options.
+		if k.PublicIP == "" {
+			k.PublicIP = resp.PublicIP
+		}
+
 		return nil
 	case protocol.RejectKite:
 		return errors.New("no permission to run")
@@ -400,13 +397,10 @@ func (k *Kite) listenAndServe() error {
 	slog.Println("serve addr is", listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
-	host, port, err := net.SplitHostPort(listener.Addr().String())
+	_, k.Port, err = net.SplitHostPort(listener.Addr().String())
 	if err != nil {
 		slog.Fatalln("Invalid address")
 	}
-
-	k.PublicIP = host
-	k.Port = port
 
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
