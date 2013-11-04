@@ -17,6 +17,7 @@ package protocol
 
 import (
 	"koding/tools/dnode"
+	"net"
 	"time"
 )
 
@@ -51,7 +52,7 @@ type Kite struct {
 }
 
 func (k *Kite) Addr() string {
-	return k.PublicIP + ":" + k.Port
+	return net.JoinHostPort(k.PublicIP, k.Port)
 }
 
 // KiteRequest is a structure that is used in Kite-to-Kite communication.
