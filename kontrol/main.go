@@ -328,10 +328,8 @@ func (k *Kontrol) handleGetKites(req *protocol.KiteToKontrolRequest) ([]byte, er
 }
 
 func newKiteMessageBytes(msgType protocol.MessageType, kite *models.Kite) []byte {
-	msg, err := json.Marshal(newKiteMessage(msgType, kite))
-	if err != nil {
-		panic(err)
-	}
+	// Cannot fail
+	msg, _ := json.Marshal(newKiteMessage(msgType, kite))
 	return msg
 }
 
