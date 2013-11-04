@@ -267,10 +267,10 @@ func (k *Kite) handle(msg []byte) {
 
 }
 
-func unmarshalKiteArg(r *protocol.KontrolMessage) protocol.Kite {
+func unmarshalKiteArg(r *protocol.KontrolMessage) *protocol.Kite {
 	k := r.Args["kite"].(map[string]interface{})
 	// Must set all fields manually
-	return protocol.Kite{
+	return &protocol.Kite{
 		Name:     k["name"].(string),
 		Username: k["username"].(string),
 		ID:       k["id"].(string),
@@ -287,7 +287,7 @@ func unmarshalKiteArg(r *protocol.KontrolMessage) protocol.Kite {
 func (k *Kite) AddKite(r protocol.KontrolMessage) {
 	kite := unmarshalKiteArg(&r)
 
-	kites.Add(&kite)
+	kites.Add(kite)
 
 	// Groupache settings, enable when ready
 	// k.SetPeers(k.PeersAddr()...)
