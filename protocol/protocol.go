@@ -29,7 +29,6 @@ const WEBSOCKET_PATH = "/sock"
 // Kite is the base struct containing the public fields.
 // It is usually embeded in other structs, including the db model.
 type Kite struct {
-
 	// Short name identifying the type of the kite. Example: fs, terminal...
 	Name string `bson:"name" json:"name"`
 
