@@ -151,7 +151,7 @@ func (k *Kontrol) heartBeatChecker() {
 		for _, kite := range storage.List() {
 			// Delay is needed to fix network delays, otherwise kites are
 			// marked as death even if they are sending 'pongs' to us
-			if time.Now().Before(kite.UpdatedAt.Add(protocol.HEARTBEAT_DELAY)) {
+			if time.Now().UTC().Before(kite.UpdatedAt.Add(protocol.HEARTBEAT_DELAY)) {
 				continue // still alive, pick up the next one
 			}
 
@@ -256,7 +256,7 @@ func (k *Kontrol) updateKite(id string) error {
 		return errors.New("not registered")
 	}
 
-	kite.UpdatedAt = time.Now().Add(protocol.HEARTBEAT_INTERVAL)
+	kite.UpdatedAt = time.Now().UTC().Add(protocol.HEARTBEAT_INTERVAL)
 	storage.Add(kite)
 	return nil
 }
@@ -449,10 +449,10 @@ func createAndAddKite(req *protocol.KiteToKontrolRequest) (*models.Kite, error) 
 }
 
 func createKiteModel(req *protocol.KiteToKontrolRequest) *models.Kite {
-	return &models.Kite{
-		Kite:      req.Kite,
-		KodingKey: req.KodingKey,
-	}
+	k := modelhelper.NewKite()
+	k.Kite = req.Kite
+	k.KodingKey = req.KodingKey
+	return k
 }
 
 func usernameFromKey(key string) (string, error) {

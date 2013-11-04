@@ -20,8 +20,8 @@ import (
 	"time"
 )
 
-const HEARTBEAT_INTERVAL = time.Millisecond * 500
-const HEARTBEAT_DELAY = time.Millisecond * 500
+const HEARTBEAT_INTERVAL = time.Millisecond * 1000
+const HEARTBEAT_DELAY = time.Millisecond * 1000
 
 // Kite's HTTP server runs a RPC server here
 const WEBSOCKET_PATH = "/sock"
