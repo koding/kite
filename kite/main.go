@@ -19,6 +19,7 @@ import (
 	"net/rpc"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -260,10 +261,19 @@ func (k *Kite) handle(msg []byte) {
 
 }
 
-func unmarshalKiteArg(r *protocol.KontrolMessage) *protocol.Kite {
+func unmarshalKiteArg(r *protocol.KontrolMessage) (kite *protocol.Kite, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Only type assertions below can panic with runtime.Error
+			if _, ok := r.(runtime.Error); ok {
+				err = errors.New("Invalid kite argument")
+			}
+		}
+	}()
+
 	k := r.Args["kite"].(map[string]interface{})
 	// Must set all fields manually
-	return &protocol.Kite{
+	kite = &protocol.Kite{
 		Name:     k["name"].(string),
 		Username: k["username"].(string),
 		ID:       k["id"].(string),
@@ -273,12 +283,16 @@ func unmarshalKiteArg(r *protocol.KontrolMessage) *protocol.Kite {
 		PublicIP: k["publicIP"].(string),
 		Port:     k["port"].(string),
 	}
+	return
 }
 
 // AddKite is executed when a protocol.AddKite message has been received
 // trough the handler.
 func (k *Kite) AddKite(r protocol.KontrolMessage) {
-	kite := unmarshalKiteArg(&r)
+	kite, err := unmarshalKiteArg(&r)
+	if err != nil {
+		return
+	}
 
 	kites.Add(kite)
 
@@ -291,7 +305,10 @@ func (k *Kite) AddKite(r protocol.KontrolMessage) {
 // RemoveKite is executed when a protocol.AddKite message has been received
 // trough the handler.
 func (k *Kite) RemoveKite(r protocol.KontrolMessage) {
-	kite := unmarshalKiteArg(&r)
+	kite, err := unmarshalKiteArg(&r)
+	if err != nil {
+		return
+	}
 
 	kites.Remove(kite.ID)
 	slog.Printf("[%s] -> known peers -> %v\n", r.Type, k.PeersAddr())
