@@ -84,7 +84,7 @@ func main() {
 		Port:     strconv.Itoa(config.Current.NewKontrol.Port),
 	}
 
-	k.Replier = moh.NewReplier(k.makeRequestHandler())
+	k.Replier = moh.NewReplier(k.replyMohRequest)
 	k.Publisher = moh.NewPublisher()
 	k.Publisher.Authenticate = findUsernameFromSessionID
 	k.Publisher.ValidateCommand = validateCommand
@@ -111,18 +111,6 @@ func (k *Kontrol) Start() {
 	http.Handle("/", rout)
 
 	slog.Println(http.ListenAndServe(":"+k.Port, nil))
-}
-
-func (k *Kontrol) makeRequestHandler() func([]byte) []byte {
-	return func(msg []byte) []byte {
-		// slog.Printf("Request came in: %s\n", string(msg))
-		result, err := k.handle(msg)
-		if err != nil {
-			slog.Println(err)
-		}
-
-		return result
-	}
 }
 
 // This is used for two reasons:
@@ -208,8 +196,8 @@ func (k *Kontrol) heartBeatChecker() {
 	}
 }
 
-// handle handles the messages coming from Kites.
-func (k *Kontrol) handle(msg []byte) ([]byte, error) {
+// replyMohRequest handles the messages coming from Kites.
+func (k *Kontrol) replyMohRequest(httpReq *http.Request, msg []byte) ([]byte, error) {
 	req, err := unmarshalRequest(msg)
 	if err != nil {
 		return nil, err
@@ -234,7 +222,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 		return k.handleGetKites(req)
 	}
 
-	return []byte("handle error"), nil
+	return nil, errors.New("Invalid method")
 }
 
 func (k *Kontrol) validateKiteRequest(req *protocol.KiteToKontrolRequest) error {
