@@ -395,12 +395,12 @@ var connected = "200 Connected to Go RPC"
 
 // listenAndServe starts our rpc server with the given addr.
 func (k *Kite) listenAndServe() error {
-	listener, err := net.Listen("tcp4", k.Addr())
+	listener, err := net.Listen("tcp4", ":"+k.Port)
 	if err != nil {
 		return err
 	}
 
-	slog.Println("serve addr is", k.Addr())
+	slog.Println("serve addr is", listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
 	host, port, err := net.SplitHostPort(listener.Addr().String())
