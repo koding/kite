@@ -15,7 +15,7 @@ func TestEncodeDecodeString(t *testing.T) {
 		return
 	}
 
-	tok := NewToken("cenk")
+	tok := NewToken("cenk", "1")
 	fmt.Println("Generated new token:", *tok)
 
 	enc, err := tok.EncryptString(key)
@@ -52,7 +52,7 @@ func TestEncryptDecrypt(t *testing.T) {
 		return
 	}
 
-	tok := NewToken("cenk")
+	tok := NewToken("cenk", "1")
 	fmt.Println("Generated new token:", *tok)
 
 	enc, err := tok.Encrypt(key)
@@ -77,16 +77,16 @@ func TestEncryptDecrypt(t *testing.T) {
 }
 
 func TestTimestamp(t *testing.T) {
-	tok := NewToken("cenk")
+	tok := NewToken("cenk", "1")
 
-	if !tok.IsValid() {
+	if !tok.IsValid("1") {
 		t.Error("Should be valid")
 		return
 	}
 
-	tok = NewTokenWithDuration("cenk", -10*time.Millisecond)
+	tok = NewTokenWithDuration("cenk", "1", -10*time.Millisecond)
 
-	if tok.IsValid() {
+	if tok.IsValid("1") {
 		t.Error("Should not be valid")
 		return
 	}

@@ -35,19 +35,20 @@ type Token struct {
 	// Access (access control list)
 }
 
-func NewToken(username string) *Token {
-	return NewTokenWithDuration(username, DefaultTokenDuration)
+func NewToken(username, kiteID string) *Token {
+	return NewTokenWithDuration(username, kiteID, DefaultTokenDuration)
 }
 
-func NewTokenWithDuration(username string, d time.Duration) *Token {
+func NewTokenWithDuration(username, kiteID string, d time.Duration) *Token {
 	return &Token{
 		Username:   username,
+		KiteID:     kiteID,
 		ValidUntil: time.Now().UTC().Add(d),
 	}
 }
 
-func (t Token) IsValid() bool {
-	return t.ValidUntil.After(time.Now().UTC())
+func (t Token) IsValid(kiteID string) bool {
+	return t.ValidUntil.After(time.Now().UTC()) && t.KiteID == kiteID
 }
 
 // EncryptString encrypts and URLencodes the token.
