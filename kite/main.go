@@ -213,16 +213,8 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 func (k *Kite) Start() {
 	k.parseVersionFlag()
 
-	// Start serving...
-	// This is blocking so we are starting to serve in a seperate goroutine
-	go k.serve()
-
-	if k.KontrolEnabled {
-		// Listen Kontrol messages
-		k.kontrolClient.Connect()
-	}
-
-	select {}
+	// This is blocking
+	k.serve()
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -396,6 +388,12 @@ func (k *Kite) serve() {
 
 	k.PublicIP = host
 	k.Port = port
+
+	// We must connect to Kontrol after starting to listen on port
+	if k.KontrolEnabled {
+		// Listen Kontrol messages
+		k.kontrolClient.Connect()
+	}
 
 	// GroupCache settings, enable it when ready
 	// k.newPool(k.Addr) // registers to http.DefaultServeMux
