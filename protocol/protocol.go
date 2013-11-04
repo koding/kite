@@ -95,7 +95,7 @@ const (
 	GetKites     Method = "GET_KITES"
 )
 
-// RegisterResponse is a response to RegisterRequest.
+// RegisterResponse is a response to Register request from Kite to Kontrol.
 type RegisterResponse struct {
 	Result RegisterResult `json:"result"`
 
