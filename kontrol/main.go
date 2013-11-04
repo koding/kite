@@ -216,6 +216,11 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 	}
 	// fmt.Printf("INCOMING KITE MSG req.Kite.ID: %+v req.Method: %+v\n", req.Kite.ID, req.Method)
 
+	err = k.validateKiteRequest(req)
+	if err != nil {
+		return nil, error
+	}
+
 	// treat any incoming data as a ping, don't just rely on ping command
 	// this makes the kite more robust if we can't catch one of the pings.
 	k.updateKite(req.Kite.ID)
@@ -230,6 +235,24 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 	}
 
 	return []byte("handle error"), nil
+}
+
+func (k *Kontrol) validateKiteRequest(req *protocol.KiteToKontrolRequest) error {
+	username := usernameFromKey(req.KodingKey)
+	if req.Kite.Username != usernameFromKey(key) {
+		return errors.New("Invalid username")
+	}
+
+	kite := storage.Get(req.Kite.ID)
+	if kite == nil {
+		return nil
+	}
+
+	if req.Kite.ID != kite.ID {
+		return errors.New("Invalid Kite ID")
+	}
+
+	return nil
 }
 
 func (k *Kontrol) updateKite(id string) error {
