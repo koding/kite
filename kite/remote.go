@@ -31,9 +31,12 @@ type RemoteKite struct {
 // Remote is used to create a new remote struct that is used for remote
 // kite-to-kite calls.
 func (k *Kite) Remote(username, kitename string) (*Remote, error) {
-	remoteKites := k.requestKites(username, kitename)
+	remoteKites, err := k.requestKites(username, kitename)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get remote kites: %s", err.Error())
+	}
 	if len(remoteKites) == 0 {
-		return nil, fmt.Errorf("no remote kites available for %s/%s", username, kitename)
+		return nil, fmt.Errorf("No remote kites available for %s/%s", username, kitename)
 	}
 
 	return &Remote{
@@ -43,7 +46,7 @@ func (k *Kite) Remote(username, kitename string) (*Remote, error) {
 	}, nil
 }
 
-func (k *Kite) requestKites(username, kitename string) []*RemoteKite {
+func (k *Kite) requestKites(username, kitename string) ([]*RemoteKite, error) {
 	m := protocol.KiteToKontrolRequest{
 		Kite:      k.Kite,
 		KodingKey: k.KodingKey,
@@ -57,20 +60,20 @@ func (k *Kite) requestKites(username, kitename string) []*RemoteKite {
 	msg, err := json.Marshal(&m)
 	if err != nil {
 		slog.Println("requestKites marshall err 1", err)
-		return nil
+		return nil, err
 	}
 
 	slog.Println("sending requesting message...")
 	result, err := k.kontrolClient.Request(msg)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var kitesResp protocol.GetKitesResponse
 	err = json.Unmarshal(result, &kitesResp)
 	if err != nil {
 		slog.Println("requestKites marshall err 2", err)
-		return nil
+		return nil, err
 	}
 
 	remoteKites := make([]*RemoteKite, len(kitesResp))
@@ -81,7 +84,7 @@ func (k *Kite) requestKites(username, kitename string) []*RemoteKite {
 		remoteKites[i] = rk
 	}
 
-	return remoteKites
+	return remoteKites, nil
 }
 
 // CallSync makes a blocking request to another kite. args and result is used
