@@ -21,7 +21,6 @@ import (
 	"net/rpc"
 	"os"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 )
@@ -390,9 +389,13 @@ func (k *Kite) serve() {
 	slog.Println("serve addr is", k.Addr())
 
 	// Port is known here if "0" is used as port number
-	address := strings.SplitN(listener.Addr().String(), ":", 2)
-	k.PublicIP = address[0]
-	k.Port = address[1]
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		slog.Fatalln("Invalid address")
+	}
+
+	k.PublicIP = host
+	k.Port = port
 
 	// GroupCache settings, enable it when ready
 	// k.newPool(k.Addr) // registers to http.DefaultServeMux
