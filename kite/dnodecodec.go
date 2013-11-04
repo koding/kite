@@ -261,7 +261,7 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return errors.New("Invalid token")
 	}
 
-	if !tkn.IsValid() {
+	if !tkn.IsValid(d.kite.ID) {
 		fmt.Printf("Invalid token '%s'\n", options.Token)
 		return errors.New("Invalid token")
 	}

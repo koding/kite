@@ -101,7 +101,7 @@ func searchForKites(username, kitename string) ([]protocol.KiteWithToken, error)
 			}
 
 			// username is from requester, key is from kite owner
-			tokenString, err := token.NewToken(username).EncryptString(key)
+			tokenString, err := token.NewToken(username, k.ID).EncryptString(key)
 			if err != nil {
 				return nil, errors.New("Server error: Cannot generate a token")
 			}

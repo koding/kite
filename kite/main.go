@@ -212,7 +212,10 @@ func (k *Kite) Start() {
 	k.parseVersionFlag()
 
 	// This is blocking
-	k.serve()
+	err := k.listenAndServe()
+	if err != nil {
+		slog.Fatalln(err)
+	}
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -298,8 +301,9 @@ func (k *Kite) RemoveKite(r protocol.KontrolMessage) {
 // This is used for node coordination and notifier Kontrol that the Kite is alive.
 func (k *Kite) Pong() {
 	m := protocol.KiteToKontrolRequest{
-		Kite:   k.Kite,
-		Method: protocol.Pong,
+		Kite:      k.Kite,
+		Method:    protocol.Pong,
+		KodingKey: k.KodingKey,
 	}
 
 	msg, _ := json.Marshal(&m)

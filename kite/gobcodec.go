@@ -120,7 +120,7 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 		return errors.New("Invalid token")
 	}
 
-	if !tkn.IsValid() {
+	if !tkn.IsValid(c.Kite.ID) {
 		slog.Printf("Invalid token '%s'\n", a.Token)
 		return errors.New("Invalid token")
 	}

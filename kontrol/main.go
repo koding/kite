@@ -218,7 +218,7 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 
 	err = k.validateKiteRequest(req)
 	if err != nil {
-		return nil, error
+		return nil, err
 	}
 
 	// treat any incoming data as a ping, don't just rely on ping command
@@ -238,11 +238,6 @@ func (k *Kontrol) handle(msg []byte) ([]byte, error) {
 }
 
 func (k *Kontrol) validateKiteRequest(req *protocol.KiteToKontrolRequest) error {
-	username := usernameFromKey(req.KodingKey)
-	if req.Kite.Username != usernameFromKey(key) {
-		return errors.New("Invalid username")
-	}
-
 	kite := storage.Get(req.Kite.ID)
 	if kite == nil {
 		return nil
@@ -365,7 +360,7 @@ func newKiteMessage(msgType protocol.MessageType, kite *models.Kite) protocol.Ko
 	}
 
 	// username is from requester, key is from kite owner
-	tokenString, err := token.NewToken(kite.Username).EncryptString(key)
+	tokenString, err := token.NewToken(kite.Username, kite.ID).EncryptString(key)
 	if err != nil {
 		panic(err)
 	}
