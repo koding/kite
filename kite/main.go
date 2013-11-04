@@ -316,14 +316,14 @@ func (k *Kite) Pong() {
 
 	resp, _ := k.kontrolClient.Request(msg)
 	if string(resp) == "UPDATE" {
+		k.Registered = false
+
 		k.registerMutex.Lock()
 		defer k.registerMutex.Unlock()
 
 		if k.Registered {
 			return
 		}
-
-		k.Registered = false
 
 		err := k.registerToKontrol()
 		if err != nil {

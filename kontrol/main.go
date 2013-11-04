@@ -135,6 +135,10 @@ func (k *Kontrol) ping() {
 // HeartBeat pool checker. Checking for kites if they are live or dead.
 // It removes kites from the DB if they are no more alive.
 func (k *Kontrol) heartBeatChecker() {
+	// Wait for a while before removing dead kites.
+	// It is required to maintain old kites on db in case of Kontrol restart.
+	time.Sleep(protocol.HEARTBEAT_DELAY)
+
 	ticker := time.NewTicker(protocol.HEARTBEAT_INTERVAL)
 	for _ = range ticker.C {
 		for _, kite := range storage.List() {
