@@ -352,18 +352,11 @@ func newKiteMessageBytes(msgType protocol.MessageType, kite *models.Kite) []byte
 }
 
 func newKiteMessage(msgType protocol.MessageType, kite *models.Kite) protocol.KontrolMessage {
-	key, err := kodingkey.FromString(kite.KodingKey)
-	if err != nil {
-		// This cannot happen because we are not registering the kite
-		// if it's koding key is invalid.
-		panic(err)
-	}
+	// Error is omitted because we do not register kites with invalid ID
+	key, _ := kodingkey.FromString(kite.KodingKey)
 
 	// username is from requester, key is from kite owner
-	tokenString, err := token.NewToken(kite.Username, kite.ID).EncryptString(key)
-	if err != nil {
-		panic(err)
-	}
+	tokenString, _ := token.NewToken(kite.Username, kite.ID).EncryptString(key)
 
 	msg := protocol.KontrolMessage{
 		Type: msgType,
@@ -409,6 +402,10 @@ func (k *Kontrol) Publish(filter string, msg []byte) {
 // If not, it first validates the kites. If the kite has permission to run, it
 // creates a new struct, stores it and returns it.
 func (k *Kontrol) RegisterKite(req *protocol.KiteToKontrolRequest) (*models.Kite, error) {
+	if req.Kite.ID == "" {
+		return nil, errors.New("Invalid Kite ID")
+	}
+
 	kite := storage.Get(req.Kite.ID)
 	if kite != nil {
 		return kite, nil
