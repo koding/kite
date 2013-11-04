@@ -80,9 +80,6 @@ type Kite struct {
 	// other kites that needs to be run, in order to run this one
 	Dependencies string
 
-	// kind is temporary field that is used for Koding client side functionality
-	Kind string
-
 	// by default yes, if disabled it bypasses kontrol
 	KontrolEnabled bool
 
