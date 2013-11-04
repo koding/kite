@@ -11,7 +11,6 @@ import (
 	"koding/newkite/protocol"
 	"koding/newkite/token"
 	"koding/tools/dnode"
-	"net"
 	"net/rpc"
 	"reflect"
 	"strconv"
@@ -68,16 +67,18 @@ func (d *DnodeClientCodec) Close() error {
 }
 
 type DnodeServerCodec struct {
-	dec             *json.Decoder
-	enc             *json.Encoder
-	rwc             io.ReadWriteCloser
-	dnode           *dnode.DNode
-	req             dnode.Message
-	resultCallback  dnode.Callback
-	methodWithID    bool
-	closed          bool
+	dec            *json.Decoder
+	enc            *json.Encoder
+	rwc            io.ReadWriteCloser
+	dnode          *dnode.DNode
+	req            dnode.Message
+	resultCallback dnode.Callback
+	methodWithID   bool
+	closed         bool
+	kite           *Kite
+
+	// connectedClient is setup once for every client.
 	connectedClient *client
-	kite            *Kite
 }
 
 func NewDnodeServerCodec(kite *Kite, conn io.ReadWriteCloser) rpc.ServerCodec {
@@ -233,28 +234,19 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return nil
 	}
 
-	a := body.(*protocol.KiteDnodeRequest)
-	a.Args = options.WithArgs
-	a.Username = options.Username
-	a.Hostname = options.CorrelationName
-
-	if d.connectedClient == nil {
-		addr := d.rwc.(*websocket.Conn).Request().RemoteAddr
-		ct := d.kite.Clients.Get(&client{Addr: addr})
-		if ct != nil {
-			ct.Username = a.Username
-			d.kite.Clients.Add(ct)
-			d.connectedClient = ct
-		}
-	}
+	req := body.(*protocol.KiteDnodeRequest)
+	req.Args = options.WithArgs
+	req.Username = options.Username
+	req.Hostname = options.CorrelationName
 
 	// Return when kontrol is not enabled
 	if !d.kite.KontrolEnabled {
 		return nil
 	}
 
-	key, _ := kodingkey.FromString(d.kite.KodingKey)
 	// Ignoring error because the key will be used in decrypt below.
+	key, _ := kodingkey.FromString(d.kite.KodingKey)
+
 	// DecryptString will fail if the key is not valid.
 	tkn, err := token.DecryptString(options.Token, key)
 	if err != nil {
@@ -266,25 +258,39 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		return errors.New("Invalid token")
 	}
 
-	// get underlying websocket connection and update our clients with the
-	// request data. that means remove it from the buffer list(bufClients) and
-	// add it to the registered user list (clients).
-	// be aware that this method is called only when a RPC call is made, that
-	// means this is not called when a connection is established
-	a.Username = tkn.Username
-	if a.Username != "" {
-		ws := d.rwc.(*websocket.Conn)
-		addr := ws.Request().RemoteAddr
-		ct := d.kite.Clients.Get(&client{Addr: addr})
-		if ct != nil {
-			ct.Username = a.Username
-			d.kite.Clients.Add(ct)
-			d.connectedClient = ct
-		}
+	req.Username = tkn.Username
+	d.UpdateClient(tkn.Username)
+
+	fmt.Printf("[%s] allowed token for: '%s'\n", d.ClientAddr(), req.Username)
+	return nil
+}
+
+// update our clients map with the request data (for now only with username).
+// Be aware that this method is called only when a RPC call is made, that
+// means this is not called when a connection is established.
+func (d *DnodeServerCodec) UpdateClient(username string) {
+	if d.connectedClient != nil {
+		return // we already got every detail
 	}
 
-	fmt.Printf("[%s] allowed token '%s'\n", d.rwc.(net.Conn).RemoteAddr(), options.Token)
-	return nil
+	client := d.kite.clients.GetClient(d.ClientAddr())
+	if client == nil {
+		return
+
+	}
+
+	if username == "" {
+		return
+	}
+
+	client.Username = username
+	d.connectedClient = client
+
+	d.kite.clients.AddAddresses(username, d.ClientAddr())
+
+	// update username within client struct
+	d.kite.clients.AddClient(d.ClientAddr(), client)
+
 }
 
 func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) error {
@@ -307,14 +313,40 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 }
 
 func (d *DnodeServerCodec) Close() error {
+	fmt.Printf("[%s] user '%s' disconnected \n", d.ClientAddr(), d.connectedClient.Username)
 	d.closed = true
-
-	if d.connectedClient != nil {
-		fmt.Printf("[%s] client disconnected \n", d.connectedClient.Addr)
-		d.kite.Clients.Remove(&client{Addr: d.connectedClient.Addr})
-	}
+	d.CallOnDisconnectFuncs()
 
 	return d.rwc.Close()
+}
+
+func (d *DnodeServerCodec) CallOnDisconnectFuncs() {
+	if d.connectedClient == nil {
+		return
+	}
+
+	client := d.kite.clients.GetClient(d.ClientAddr())
+	if client == nil {
+		return
+	}
+
+	d.kite.clients.RemoveAddresses(client.Username, d.ClientAddr())
+	addrs := d.kite.clients.GetAddresses(client.Username)
+
+	if len(addrs) > 0 {
+		return
+	}
+
+	for _, f := range client.onDisconnect {
+		f()
+	}
+
+	d.kite.clients.RemoveClient(d.ClientAddr())
+}
+
+// Addr returns the connected clients addres
+func (d *DnodeServerCodec) ClientAddr() string {
+	return d.rwc.(*websocket.Conn).Request().RemoteAddr
 }
 
 // Got from kite package

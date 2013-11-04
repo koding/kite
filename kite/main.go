@@ -38,25 +38,6 @@ var (
 	maxRegisterLimit = 30
 )
 
-// Clients is an interface that encapsulates basic operations on incoming and
-// connected clients.
-type Clients interface {
-	// Add inserts a new client into the storage.
-	Add(c *client)
-
-	// Get returns a new client that matches the c.Addr field
-	Get(c *client) *client
-
-	// Remove deletes the client that matches the c.Addr field
-	Remove(c *client)
-
-	// Size returns the total number of clients connected currently
-	Size() int
-
-	// List returns a slice of all clients
-	List() []*client
-}
-
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
 // Server. That means it can receive request, process them, but it also can
@@ -83,7 +64,7 @@ type Kite struct {
 	Methods map[string]string
 
 	// implements the Clients interface
-	Clients Clients
+	clients *clients
 
 	// GroupCache variables
 	Pool  *groupcache.HTTPPool
@@ -153,7 +134,7 @@ func New(options *protocol.Options) *Kite {
 		Server:         rpc.NewServer(),
 		KontrolEnabled: true,
 		Methods:        make(map[string]string),
-		Clients:        NewClients(),
+		clients:        NewClients(),
 	}
 
 	k.kontrolClient = moh.NewMessagingClient(options.KontrolAddr, k.handle)
@@ -448,17 +429,33 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 	addr := ws.Request().RemoteAddr
 	slog.Printf("[%s] client connected\n", addr)
 
-	k.Clients.Add(&client{Conn: ws, Addr: addr})
+	client := NewClient()
+	client.Conn = ws
+	client.Addr = addr
+	k.clients.AddClient(addr, client)
 
 	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
+}
+
+func (k *Kite) OnDisconnect(username string, f func()) {
+	addrs := k.clients.GetAddresses(username)
+	if addrs == nil {
+		return
+	}
+
+	for _, addr := range addrs {
+		client := k.clients.GetClient(addr)
+		client.onDisconnect = append(client.onDisconnect, f)
+		k.clients.AddClient(addr, client)
+	}
 }
 
 // broadcast sends messages in dnode protocol to all connected websocket
 // clients method and arguments is mapped to dnode's method and arguments
 // fields.
 func (k *Kite) broadcast(method string, arguments interface{}) {
-	for _, client := range k.Clients.List() {
+	for _, client := range k.clients.List() {
 		rawArgs, err := json.Marshal(arguments)
 		if err != nil {
 			fmt.Printf("collect json unmarshal %+v\n", err)
