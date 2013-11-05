@@ -313,7 +313,7 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 }
 
 func (d *DnodeServerCodec) Close() error {
-	fmt.Printf("[%s] user '%s' disconnected \n", d.ClientAddr(), d.connectedClient.Username)
+	fmt.Printf("[%s] disconnected \n", d.ClientAddr())
 	d.closed = true
 	d.CallOnDisconnectFuncs()
 
