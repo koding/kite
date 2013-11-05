@@ -188,7 +188,7 @@ func (k *Kite) Start() {
 	}
 }
 
-// setLogging is used to setup the logging format, destination and level.
+// setupLogging is used to setup the logging format, destination and level.
 func (k *Kite) setupLogging() {
 	log.Module = k.Name
 	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
