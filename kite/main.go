@@ -189,6 +189,13 @@ func (k *Kite) Start() {
 	syslogBackend, _ := logging.NewSyslogBackend(k.Name)
 	logging.SetBackend(stderrBackend, syslogBackend)
 
+	// Set logging level. Default level is INFO.
+	level := logging.INFO
+	if k.hasDebugFlag() {
+		level = logging.DEBUG
+	}
+	logging.SetLevel(level, log.Module)
+
 	// This is blocking
 	err := k.listenAndServe()
 	if err != nil {
@@ -210,6 +217,19 @@ func (k *Kite) parseVersionFlag() {
 			os.Exit(0)
 		}
 	}
+}
+
+// If the user wants to call flag.Parse() the flag must be defined in advance.
+var _ = flag.Bool("debug", false, "print debug logs")
+
+// hasDebugFlag returns true if -debug flag is present in os.Args.
+func (k *Kite) hasDebugFlag() bool {
+	for _, flag := range os.Args {
+		if flag == "-debug" {
+			return true
+		}
+	}
+	return false
 }
 
 // handle is a method that interprets the incoming message from Kontrol. The
