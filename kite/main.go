@@ -191,9 +191,9 @@ func (k *Kite) Start() {
 // setupLogging is used to setup the logging format, destination and level.
 func (k *Kite) setupLogging() {
 	log.Module = k.Name
-	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
+	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
 
-	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
+	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags)
 	stderrBackend.Color = true
 
 	syslogBackend, _ := logging.NewSyslogBackend(k.Name)
