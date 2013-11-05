@@ -183,7 +183,7 @@ func (k *Kite) Start() {
 
 	// Setup logging.
 	log.Module = k.Name
-	logging.SetFormatter(logging.MustStringFormatter("▶ %{level:.1s} %{message}"))
+	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
 	stderrBackend.Color = true
 	syslogBackend, _ := logging.NewSyslogBackend(k.Name)

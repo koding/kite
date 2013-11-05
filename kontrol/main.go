@@ -98,7 +98,7 @@ func main() {
 
 	// Setup logging.
 	log.Module = "Kontrol"
-	logging.SetFormatter(logging.MustStringFormatter("▶ %{level:.1s} %{message}"))
+	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
 	stderrBackend.Color = true
 	syslogBackend, _ := logging.NewSyslogBackend(log.Module)
@@ -448,14 +448,6 @@ func createAndAddKite(req *protocol.KiteToKontrolRequest, remoteIP string) (*mod
 	storage.Add(kite)
 
 	log.Info("[%s (%s)] belong to '%s'. ready to go..", kite.Name, kite.Version, username)
-
-	if req.Kite.Kind == "vm" {
-		err := addToVM(username)
-		if err != nil {
-			log.Info("register get user id err")
-		}
-	}
-
 	return kite, nil
 }
 
@@ -475,38 +467,6 @@ func usernameFromKey(key string) (string, error) {
 	}
 
 	return account.Profile.Nickname, nil
-}
-
-func addToVM(username string) error {
-	newVM := modelhelper.NewVM()
-	newVM.HostnameAlias = "local-" + username
-	newVM.IsEnabled = true
-	newVM.WebHome = username
-
-	user, err := modelhelper.GetUser(username)
-	if err != nil {
-		return err
-	}
-
-	newVM.Users = []models.Permissions{
-		models.Permissions{
-			Id:    user.ObjectId,
-			Sudo:  true,
-			Owner: true,
-		}}
-
-	group, err := modelhelper.GetGroup("Koding")
-	if err != nil {
-		return err
-	}
-
-	newVM.Groups = []models.Permissions{
-		models.Permissions{
-			Id: group.ObjectId,
-		}}
-
-	modelhelper.AddVM(&newVM)
-	return nil
 }
 
 func deleteFromVM(username string) error {
