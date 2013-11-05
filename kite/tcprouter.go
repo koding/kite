@@ -2,8 +2,6 @@ package kite
 
 import (
 	"koding/newkite/protocol"
-	"koding/tools/slog"
-	"log"
 	"net"
 	"net/rpc"
 )
@@ -23,10 +21,10 @@ func NewTCPKite(k *Kite) *TCPKite {
 
 func (t *TCPKite) DialClient(kite *protocol.Kite) (*rpc.Client, error) {
 	addr := kite.Addr()
-	slog.Printf("establishing TCP client conn for %s - %s on %s\n", kite.Name, addr, kite.Hostname)
+	log.Info("establishing TCP client conn for %s - %s on %s\n", kite.Name, addr, kite.Hostname)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Println(addr, err)
+		log.Info(addr, err)
 		return nil, err
 	}
 
@@ -37,7 +35,7 @@ func (t *TCPKite) DialClient(kite *protocol.Kite) (*rpc.Client, error) {
 func (t *TCPKite) Serve(addr string) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Println("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
+		log.Info("PANIC!!!!! RPC SERVER COULD NOT INITIALIZED:", err)
 		return
 	}
 

@@ -10,7 +10,6 @@ import (
 	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
 	"koding/newkite/token"
-	"koding/tools/slog"
 	"net"
 	"net/rpc"
 )
@@ -121,11 +120,11 @@ func (c *KiteServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	if !tkn.IsValid(c.Kite.ID) {
-		slog.Printf("Invalid token '%s'\n", a.Token)
+		log.Info("Invalid token '%s'\n", a.Token)
 		return errors.New("Invalid token")
 	}
 
-	slog.Printf("[%s] allowed token '%s'\n", c.rwc.(net.Conn).RemoteAddr(), a.Token)
+	log.Info("[%s] allowed token '%s'\n", c.rwc.(net.Conn).RemoteAddr(), a.Token)
 	return nil
 }
 

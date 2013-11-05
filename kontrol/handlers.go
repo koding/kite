@@ -10,7 +10,6 @@ import (
 	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
 	"koding/newkite/token"
-	"koding/tools/slog"
 	"net/http"
 )
 
@@ -37,14 +36,14 @@ func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, msg *protoco
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
-		slog.Printf("sessionID '%s' wants '%s'\n", msg.SessionID, msg.Kitename)
+		log.Info("sessionID '%s' wants '%s'", msg.SessionID, msg.Kitename)
 
 		session, err := modelhelper.GetSession(msg.SessionID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
 			return
 		}
-		slog.Printf("sessionID '%s' is validated as: %s\n", msg.SessionID, session.Username)
+		log.Info("sessionID '%s' is validated as: %s", msg.SessionID, session.Username)
 
 		// username is used for matching kites and generating tokens in requestHandler
 		msg.Username = session.Username
@@ -91,7 +90,7 @@ func validatePostRequest(msg *protocol.BrowserToKontrolRequest) error {
 func searchForKites(username, kitename string) ([]protocol.KiteWithToken, error) {
 	kites := make([]protocol.KiteWithToken, 0)
 
-	slog.Printf("searching for kite '%s'\n", kitename)
+	log.Info("searching for kite '%s'", kitename)
 
 	for _, k := range storage.List() {
 		if k.Username == username && k.Name == kitename {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/op/go-logging"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/messaging/moh"
@@ -14,7 +15,7 @@ import (
 	"koding/newkite/token"
 	"koding/newkite/utils"
 	"koding/tools/config"
-	"koding/tools/slog"
+	stdlog "log"
 	"net"
 	"net/http"
 	"os"
@@ -73,6 +74,8 @@ type Kontrol struct {
 }
 
 var (
+	log = logging.MustGetLogger("Kontrol")
+
 	storage    Storage
 	dependency Dependency
 )
@@ -93,9 +96,15 @@ func main() {
 	storage = NewMongoDB()
 	dependency = NewDependency()
 
-	slog.SetPrefixName("kontrol")
-	slog.SetPrefixTimeStamp(time.Stamp)
-	slog.Println("started")
+	// Setup logging.
+	log.Module = "Kontrol"
+	logging.SetFormatter(logging.MustStringFormatter("▶ %{level:.1s} %{message}"))
+	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
+	stderrBackend.Color = true
+	syslogBackend, _ := logging.NewSyslogBackend(log.Module)
+	logging.SetBackend(stderrBackend, syslogBackend)
+
+	log.Info("started")
 
 	k.Start()
 }
@@ -111,7 +120,7 @@ func (k *Kontrol) Start() {
 	rout.Handle(moh.DefaultPublisherPath, k.Publisher)
 	http.Handle("/", rout)
 
-	slog.Println(http.ListenAndServe(":"+k.Port, nil))
+	log.Error(http.ListenAndServe(":"+k.Port, nil).Error())
 }
 
 // This is used for two reasons:
@@ -154,7 +163,7 @@ func (k *Kontrol) heartBeatChecker() {
 				kite.Hostname,
 				kite.ID,
 			)
-			slog.Println(removeLog)
+			log.Info(removeLog)
 
 			storage.Remove(kite.ID)
 
@@ -207,7 +216,7 @@ func (k *Kontrol) replyMohRequest(httpReq *http.Request, msg []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("INCOMING KITE MSG req.Kite.ID: %#v req.Method: %#v\n", req.Kite.ID, req.Method)
+	// log.Debug("INCOMING KITE MSG req.Kite.ID: %#v req.Method: %#v", req.Kite.ID, req.Method)
 
 	err = k.validateKiteRequest(req)
 	if err != nil {
@@ -275,7 +284,7 @@ func (k *Kontrol) handlePong(req *protocol.KiteToKontrolRequest) ([]byte, error)
 }
 
 func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKontrolRequest) ([]byte, error) {
-	slog.Printf("[%s (%s)] at '%s' wants to be registered\n",
+	log.Info("[%s (%s)] at '%s' wants to be registered",
 		req.Kite.Name, req.Kite.Version, req.Kite.Hostname)
 
 	remoteHost, _, _ := net.SplitHostPort(httpReq.RemoteAddr)
@@ -304,7 +313,7 @@ func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKont
 		kite.Hostname,
 		kite.ID,
 	)
-	slog.Println(startLog)
+	log.Info(startLog)
 
 	// send response back to the kite, also identify him with the new name
 	response := protocol.RegisterResponse{
@@ -330,7 +339,7 @@ func (k *Kontrol) handleGetKites(req *protocol.KiteToKontrolRequest) ([]byte, er
 	// Add myself as an dependency to the kite itself (to the kite I
 	// request above). This is needed when new kites of that type appear
 	// on kites that exist dissapear.
-	slog.Printf("adding '%s' as a dependency to '%s' \n", req.Kite.Name, kitename)
+	log.Info("adding '%s' as a dependency to '%s'", req.Kite.Name, kitename)
 	dependency.Add(kitename, req.Kite.Name)
 
 	resp, err := json.Marshal(kites)
@@ -438,12 +447,12 @@ func createAndAddKite(req *protocol.KiteToKontrolRequest, remoteIP string) (*mod
 
 	storage.Add(kite)
 
-	slog.Printf("[%s (%s)] belong to '%s'. ready to go..\n", kite.Name, kite.Version, username)
+	log.Info("[%s (%s)] belong to '%s'. ready to go..", kite.Name, kite.Version, username)
 
 	if req.Kite.Kind == "vm" {
 		err := addToVM(username)
 		if err != nil {
-			fmt.Println("register get user id err")
+			log.Info("register get user id err")
 		}
 	}
 
@@ -567,7 +576,7 @@ func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, er
 	if err != nil {
 		return "", err
 	}
-	slog.Println("Websocket is authenticated as:", session.Username)
+	log.Info("Websocket is authenticated as:", session.Username)
 
 	return session.Username, nil
 }
@@ -592,9 +601,9 @@ func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
 func addToProxy(kite *models.Kite) {
 	err := utils.IsServerAlive(kite.Addr())
 	if err != nil {
-		slog.Printf("server not reachable: %s (%s) \n", kite.Addr(), err.Error())
+		log.Info("server not reachable: %s (%s)", kite.Addr(), err.Error())
 	} else {
-		slog.Println("checking ok..", kite.Addr())
+		log.Info("checking ok..", kite.Addr())
 	}
 
 	err = modelhelper.UpsertKey(
@@ -608,7 +617,7 @@ func addToProxy(kite *models.Kite) {
 		"",                // rabbitkey, not used currently
 	)
 	if err != nil {
-		slog.Println("err")
+		log.Info("err")
 	}
 
 }

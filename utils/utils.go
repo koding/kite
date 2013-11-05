@@ -96,7 +96,7 @@ func GetLocalIP(ip string) string {
 		//	There is no ip assigned manually neither can we find any
 		//	external IP, therefore abort, because kite can't work in this
 		//	state.
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 	return ip
 }

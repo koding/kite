@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"koding/newkite/protocol"
-	"koding/tools/slog"
 	"math"
 	"net"
 	"net/http"
@@ -59,11 +58,11 @@ func (k *Kite) requestKites(username, kitename string) ([]*RemoteKite, error) {
 
 	msg, err := json.Marshal(&m)
 	if err != nil {
-		slog.Println("requestKites marshall err 1", err)
+		log.Info("requestKites marshall err 1", err)
 		return nil, err
 	}
 
-	slog.Println("sending requesting message...")
+	log.Info("sending requesting message...")
 	result, err := k.kontrolClient.Request(msg)
 	if err != nil {
 		return nil, err
@@ -72,7 +71,7 @@ func (k *Kite) requestKites(username, kitename string) ([]*RemoteKite, error) {
 	var kitesResp protocol.GetKitesResponse
 	err = json.Unmarshal(result, &kitesResp)
 	if err != nil {
-		slog.Println("requestKites marshall err 2", err)
+		log.Info("requestKites marshall err 2", err)
 		return nil, err
 	}
 
@@ -144,7 +143,7 @@ func (r *Remote) getClient() (*RemoteKite, error) {
 	if kite.Client == nil {
 		var err error
 
-		slog.Printf("establishing HTTP client conn for %s - %s on %s\n",
+		log.Info("establishing HTTP client conn for %s - %s on %s\n",
 			kite.Name, kite.Addr(), kite.Hostname)
 
 		kite.Client, err = r.dialRemote(kite.Addr())

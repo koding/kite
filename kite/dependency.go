@@ -1,10 +1,8 @@
 package kite
 
 import (
-	"fmt"
 	"io/ioutil"
 	"koding/newkite/utils"
-	"log"
 	"os"
 	"strings"
 )
@@ -20,8 +18,8 @@ func getDeps(root, startPoint string) {
 	resolve(n, resolved, unresolved)
 
 	for _, node := range resolved {
-		fmt.Printf("%s -> ", node.Name)
-		fmt.Println(node.Path)
+		log.Info("%s -> ", node.Name)
+		log.Info(node.Path)
 	}
 }
 
@@ -38,14 +36,14 @@ func searchDir(root, sourceNode string) {
 		manifest := kitepath + "/manifest.json"
 		if _, err := os.Stat(manifest); err != nil {
 			if os.IsNotExist(err) {
-				fmt.Printf("no manifest.json for %s\n", f.Name())
+				log.Info("no manifest.json for %s\n", f.Name())
 				return
 			}
 		}
 
 		m, err := utils.ReadKiteOptions(kitepath + "/manifest.json")
 		if err != nil {
-			fmt.Println("could not read manifest", err)
+			log.Info("could not read manifest", err)
 			return
 		}
 

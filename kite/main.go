@@ -7,13 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/golang/groupcache"
+	"github.com/op/go-logging"
 	"io"
 	"koding/messaging/moh"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
 	"koding/tools/dnode"
-	"koding/tools/slog"
+	stdlog "log"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -25,6 +26,8 @@ import (
 )
 
 var (
+	log = logging.MustGetLogger("Kite")
+
 	// in-memory hash table for kites of same types
 	kites = peers.New()
 
@@ -88,24 +91,21 @@ func New(options *protocol.Options) *Kite {
 	if options == nil {
 		options, err = utils.ReadKiteOptions("manifest.json")
 		if err != nil {
-			slog.Fatal("error: could not read config file", err)
+			log.Fatal("error: could not read config file", err)
 		}
 	}
 
 	// some simple validations for config
 	if options.Kitename == "" {
-		slog.Fatal("error: options data is not set properly")
+		log.Fatal("error: options data is not set properly")
 	}
-
-	// define log settings
-	slog.SetPrefixName(options.Kitename)
 
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
 
 	kodingKey, err := utils.GetKodingKey()
 	if err != nil {
-		slog.Fatalln("Couldn't find koding.key. Please run 'kd register'.")
+		log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
 	}
 
 	port := options.Port
@@ -166,7 +166,7 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 	for alternativeName, method := range methods {
 		m, ok := kiteStruct.MethodByName(method)
 		if !ok {
-			panic(fmt.Sprintf("addmethods err: no method with name: %s\n", method))
+			panic(fmt.Sprintf("addmethods err: no method with name: %s", method))
 			continue
 		}
 
@@ -181,10 +181,18 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 func (k *Kite) Start() {
 	k.parseVersionFlag()
 
+	// Setup logging.
+	log.Module = k.Name
+	logging.SetFormatter(logging.MustStringFormatter("▶ %{level:.1s} %{message}"))
+	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
+	stderrBackend.Color = true
+	syslogBackend, _ := logging.NewSyslogBackend(k.Name)
+	logging.SetBackend(stderrBackend, syslogBackend)
+
 	// This is blocking
 	err := k.listenAndServe()
 	if err != nil {
-		slog.Fatalln(err)
+		log.Fatal(err)
 	}
 }
 
@@ -198,7 +206,7 @@ var _ = flag.Bool("version", false, "show version")
 func (k *Kite) parseVersionFlag() {
 	for _, flag := range os.Args {
 		if flag == "-version" {
-			fmt.Println(k.Version)
+			log.Info(k.Version)
 			os.Exit(0)
 		}
 	}
@@ -210,10 +218,10 @@ func (k *Kite) handle(msg []byte) {
 	var r protocol.KontrolMessage
 	err := json.Unmarshal(msg, &r)
 	if err != nil {
-		slog.Println(err)
+		log.Info(err.Error())
 		return
 	}
-	// fmt.Printf("INCOMING KONTROL MSG: %#v\n", r)
+	// log.Debug("INCOMING KONTROL MSG: %#v", r)
 
 	switch r.Type {
 	case protocol.KiteRegistered:
@@ -269,7 +277,7 @@ func (k *Kite) AddKite(r protocol.KontrolMessage) {
 	// Groupache settings, enable when ready
 	// k.SetPeers(k.PeersAddr()...)
 
-	slog.Printf("[%s] -> known peers -> %v\n", r.Type, k.PeersAddr())
+	log.Info("[%s] -> known peers -> %v", r.Type, k.PeersAddr())
 }
 
 // RemoveKite is executed when a protocol.AddKite message has been received
@@ -281,7 +289,7 @@ func (k *Kite) RemoveKite(r protocol.KontrolMessage) {
 	}
 
 	kites.Remove(kite.ID)
-	slog.Printf("[%s] -> known peers -> %v\n", r.Type, k.PeersAddr())
+	log.Info("[%s] -> known peers -> %v", r.Type, k.PeersAddr())
 }
 
 // Pong sends a 'pong' message whenever the kite receives a message from Kontrol.
@@ -308,7 +316,7 @@ func (k *Kite) Pong() {
 
 		err := k.registerToKontrol()
 		if err != nil {
-			slog.Fatalln(err)
+			log.Fatal(err)
 		}
 
 		k.Registered = true
@@ -326,7 +334,7 @@ func (k *Kite) registerToKontrol() error {
 
 	msg, err := json.Marshal(&m)
 	if err != nil {
-		slog.Println("kontrolRequest marshall err", err)
+		log.Info("kontrolRequest marshall err", err)
 		return err
 	}
 
@@ -343,7 +351,7 @@ func (k *Kite) registerToKontrol() error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		slog.Printf("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n\n", k.Addr(), k.Version, k.ID)
+		log.Info("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n", k.Addr(), k.Version, k.ID)
 		k.Username = resp.Username // we know now which user that is
 
 		// Set the correct PublicIP if left empty in options.
@@ -375,12 +383,12 @@ func (k *Kite) listenAndServe() error {
 		return err
 	}
 
-	slog.Println("serve addr is", listener.Addr().String())
+	log.Info("serve addr is: %s", listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
 	_, k.Port, err = net.SplitHostPort(listener.Addr().String())
 	if err != nil {
-		slog.Fatalln("Invalid address")
+		log.Fatal("Invalid address")
 	}
 
 	// We must connect to Kontrol after starting to listen on port
@@ -405,7 +413,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Println("a new rpc call is done from", r.RemoteAddr)
+	log.Info("a new rpc call is done from", r.RemoteAddr)
 	if r.Method != "CONNECT" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -415,7 +423,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		slog.Println("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
+		log.Info("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
 		return
 	}
 
@@ -427,7 +435,7 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ServeHTTP method.
 func (k *Kite) serveWS(ws *websocket.Conn) {
 	addr := ws.Request().RemoteAddr
-	slog.Printf("[%s] client connected\n", addr)
+	log.Info("[%s] client connected", addr)
 
 	client := NewClient()
 	client.Conn = ws
@@ -458,7 +466,7 @@ func (k *Kite) broadcast(method string, arguments interface{}) {
 	for _, client := range k.clients.List() {
 		rawArgs, err := json.Marshal(arguments)
 		if err != nil {
-			fmt.Printf("collect json unmarshal %+v\n", err)
+			log.Info("collect json unmarshal %+v", err)
 		}
 
 		message := dnode.Message{

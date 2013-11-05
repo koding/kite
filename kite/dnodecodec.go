@@ -42,12 +42,12 @@ type DnodeClientCodec struct {
 }
 
 func (d *DnodeClientCodec) WriteRequest(r *rpc.Request, body interface{}) error {
-	fmt.Println("Dnode WriteRequest")
+	log.Info("Dnode WriteRequest")
 	return d.enc.Encode(&d.req)
 }
 
 func (d *DnodeClientCodec) ReadResponseHeader(r *rpc.Response) error {
-	fmt.Println("Dnode ReadResponseHeader")
+	log.Info("Dnode ReadResponseHeader")
 
 	if err := d.dec.Decode(&d.resp); err != nil {
 		return err
@@ -57,12 +57,12 @@ func (d *DnodeClientCodec) ReadResponseHeader(r *rpc.Response) error {
 }
 
 func (d *DnodeClientCodec) ReadResponseBody(x interface{}) error {
-	fmt.Println("Dnode ReadResponseBody")
+	log.Info("Dnode ReadResponseBody")
 	return nil
 }
 
 func (d *DnodeClientCodec) Close() error {
-	fmt.Println("Dnode ClientClose")
+	log.Info("Dnode ClientClose")
 	return d.rwc.Close()
 }
 
@@ -97,7 +97,7 @@ func (d *DnodeServerCodec) Send(method interface{}, arguments ...interface{}) {
 
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		fmt.Printf("collect json unmarshal %+v\n", err)
+		log.Info("collect json unmarshal %+v\n", err)
 	}
 
 	message := dnode.Message{
@@ -109,7 +109,7 @@ func (d *DnodeServerCodec) Send(method interface{}, arguments ...interface{}) {
 
 	err = d.enc.Encode(message)
 	if err != nil {
-		fmt.Printf("encode err %+v\n", err)
+		log.Info("encode err %+v\n", err)
 	}
 }
 
@@ -129,12 +129,12 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// }
 
 	// for debugging: m -> c.req and m.Arguments -> c.req.Arguments
-	// fmt.Printf("[received] <- %+v %+v\n", c.req.Method, string(c.req.Arguments.Raw))
+	// log.Info("[received] <- %+v %+v\n", c.req.Method, string(c.req.Arguments.Raw))
 
 	for id, path := range d.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
-			fmt.Printf("WARNING: callback id should be an INTEGER: '%s', '%s'\n", id, path)
+			log.Info("WARNING: callback id should be an INTEGER: '%s', '%s'\n", id, path)
 			continue
 		}
 
@@ -161,7 +161,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		// args can be zero or more
 		args, err := d.req.Arguments.Array()
 		if err != nil {
-			fmt.Printf("1 err: %s\n", err)
+			log.Info("1 err: %s\n", err)
 			return err
 		}
 
@@ -178,7 +178,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		return nil
 	}
 
-	// fmt.Println(d.kite.Methods)
+	// log.Info(d.kite.Methods)
 	method, ok := d.kite.Methods[d.req.Method.(string)]
 	if !ok {
 		return fmt.Errorf("method %s is not registered", d.req.Method)
@@ -254,14 +254,14 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	if !tkn.IsValid(d.kite.ID) {
-		fmt.Printf("Invalid token '%s'\n", options.Token)
+		log.Info("Invalid token '%s'\n", options.Token)
 		return errors.New("Invalid token")
 	}
 
 	req.Username = tkn.Username
 	d.UpdateClient(tkn.Username)
 
-	fmt.Printf("[%s] allowed token for: '%s'\n", d.ClientAddr(), req.Username)
+	log.Info("[%s] allowed token for: '%s'\n", d.ClientAddr(), req.Username)
 	return nil
 }
 
@@ -306,14 +306,14 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 		return nil
 	}
 
-	fmt.Println("method called:", r.ServiceMethod)
+	log.Info("method called:", r.ServiceMethod)
 
 	d.resultCallback(nil, body)
 	return nil
 }
 
 func (d *DnodeServerCodec) Close() error {
-	fmt.Printf("[%s] user '%s' disconnected \n", d.ClientAddr(), d.connectedClient.Username)
+	log.Info("[%s] user '%s' disconnected \n", d.ClientAddr(), d.connectedClient.Username)
 	d.closed = true
 	d.CallOnDisconnectFuncs()
 
