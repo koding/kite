@@ -308,7 +308,7 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 		return nil
 	}
 
-	log.Info("method called: %s", r.ServiceMethod)
+	log.Debug("method called: %s", r.ServiceMethod)
 
 	d.resultCallback(nil, body)
 	return nil
@@ -322,6 +322,7 @@ func (d *DnodeServerCodec) Close() error {
 	return d.rwc.Close()
 }
 
+// CallOnDisconnectFuncs is calling the callbacks that are collected via k.OnDisconnect method
 func (d *DnodeServerCodec) CallOnDisconnectFuncs() {
 	if d.connectedClient == nil {
 		return
