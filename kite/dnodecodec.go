@@ -97,7 +97,7 @@ func (d *DnodeServerCodec) Send(method interface{}, arguments ...interface{}) {
 
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		log.Info("collect json unmarshal %+v\n", err)
+		log.Info("collect json unmarshal %+v", err)
 	}
 
 	message := dnode.Message{
@@ -134,7 +134,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	for id, path := range d.req.Callbacks {
 		methodId, err := strconv.Atoi(id)
 		if err != nil {
-			log.Info("WARNING: callback id should be an INTEGER: '%s', '%s'\n", id, path)
+			log.Info("WARNING: callback id should be an INTEGER: '%s', '%s'", id, path)
 			continue
 		}
 
@@ -161,7 +161,7 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 		// args can be zero or more
 		args, err := d.req.Arguments.Array()
 		if err != nil {
-			log.Info("1 err: %s\n", err)
+			log.Info("1 err: %s", err)
 			return err
 		}
 
@@ -181,7 +181,10 @@ func (d *DnodeServerCodec) ReadRequestHeader(r *rpc.Request) error {
 	// log.Info(d.kite.Methods)
 	method, ok := d.kite.Methods[d.req.Method.(string)]
 	if !ok {
-		return fmt.Errorf("method %s is not registered", d.req.Method)
+		// don't return an error here, net/rpc is invoking the Close() method
+		// otherwise.
+		log.Notice("client '%s' has called a method that is not registered: %s",
+			d.ClientAddr(), d.req.Method)
 	}
 
 	r.ServiceMethod = method
@@ -253,14 +256,14 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 	}
 
 	if !tkn.IsValid(d.kite.ID) {
-		log.Info("Invalid token '%s'\n", options.Token)
+		log.Info("Invalid token '%s'", options.Token)
 		return errors.New("Invalid token")
 	}
 
 	req.Username = tkn.Username
 	d.UpdateClient(tkn.Username)
 
-	log.Info("[%s] allowed token for: '%s'\n", d.ClientAddr(), req.Username)
+	log.Info("[%s] allowed token for: '%s'", d.ClientAddr(), req.Username)
 	return nil
 }
 
@@ -305,14 +308,14 @@ func (d *DnodeServerCodec) WriteResponse(r *rpc.Response, body interface{}) erro
 		return nil
 	}
 
-	log.Info("method called:", r.ServiceMethod)
+	log.Info("method called: %s", r.ServiceMethod)
 
 	d.resultCallback(nil, body)
 	return nil
 }
 
 func (d *DnodeServerCodec) Close() error {
-	log.Info("[%s] disconnected \n", d.ClientAddr())
+	log.Info("[%s] disconnected", d.ClientAddr())
 	d.closed = true
 	d.CallOnDisconnectFuncs()
 

@@ -207,6 +207,12 @@ func (k *Kite) setupLogging() {
 	logging.SetLevel(level, log.Module)
 }
 
+// GetLogger returns a new logger which is used within the application itsel
+// (in main package).
+func GetLogger() *logging.Logger {
+	return log
+}
+
 // If the user wants to call flag.Parse() the flag must be defined in advance.
 var _ = flag.Bool("version", false, "show version")
 var _ = flag.Bool("debug", false, "print debug logs")
