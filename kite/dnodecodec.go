@@ -209,7 +209,6 @@ func (d *DnodeServerCodec) ReadRequestBody(body interface{}) error {
 		Token           string `json:"token"`
 		Kitename        string
 		Username        string
-		VmName          string
 		CorrelationName string `json:"correlationName"`
 		WithArgs        *dnode.Partial
 	}
