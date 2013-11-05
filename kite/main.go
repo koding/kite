@@ -180,12 +180,22 @@ func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
 // client too.
 func (k *Kite) Start() {
 	k.parseVersionFlag()
+	k.setupLogging()
 
-	// Setup logging.
+	err := k.listenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// setLogging is used to setup the logging format, destination and level.
+func (k *Kite) setupLogging() {
 	log.Module = k.Name
 	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
+
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
 	stderrBackend.Color = true
+
 	syslogBackend, _ := logging.NewSyslogBackend(k.Name)
 	logging.SetBackend(stderrBackend, syslogBackend)
 
@@ -195,16 +205,11 @@ func (k *Kite) Start() {
 		level = logging.DEBUG
 	}
 	logging.SetLevel(level, log.Module)
-
-	// This is blocking
-	err := k.listenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
 var _ = flag.Bool("version", false, "show version")
+var _ = flag.Bool("debug", false, "print debug logs")
 
 // parseVersionFlag prints the version number of the kite and exits with 0
 // if "-version" flag is enabled.
@@ -218,9 +223,6 @@ func (k *Kite) parseVersionFlag() {
 		}
 	}
 }
-
-// If the user wants to call flag.Parse() the flag must be defined in advance.
-var _ = flag.Bool("debug", false, "print debug logs")
 
 // hasDebugFlag returns true if -debug flag is present in os.Args.
 func (k *Kite) hasDebugFlag() bool {
