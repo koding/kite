@@ -27,8 +27,9 @@ const HEARTBEAT_DELAY = time.Millisecond * 1000
 // Kite's HTTP server runs a RPC server here
 const WEBSOCKET_PATH = "/sock"
 
-// Kite is the base struct containing the public fields.
-// It is usually embeded in other structs, including the db model.
+// Kite is the base struct containing the public fields. It is usually embeded
+// in other structs, including the db model. The access model is in the form:
+// username.environment.name.version.region.hostname.id
 type Kite struct {
 	// Short name identifying the type of the kite. Example: fs, terminal...
 	Name string `bson:"name" json:"name"`
@@ -41,9 +42,14 @@ type Kite struct {
 	// This is generated on the Kite.
 	ID string `bson:"_id" json:"id"`
 
-	// This is used temporary to distinguish kites that are used for Koding
-	// client-side. An example is to use it with value "vm"
-	Kind string `bson:"kind" json:"kind"`
+	// Environment is defines as something like "production", "testing",
+	// "staging" or whatever.  This allows you to differentiate between a
+	// cluster of kites.
+	Environment string `bson:"environment" json:"environment"`
+
+	// Region of the kite it is running. Like "Europe", "Asia" or some other
+	// locations.
+	Region string `bson:"region" json:"region"`
 
 	Version  string `bson:"version" json:"version"`
 	Hostname string `bson:"hostname" json:"hostname"`
@@ -78,14 +84,6 @@ type KiteToKontrolRequest struct {
 	KodingKey string                 `json:"kodingKey"`
 	Method    Method                 `json:"method"`
 	Args      map[string]interface{} `json:"args"`
-}
-
-// BrowserToKontrolRequest is a structure of message sent
-// from Browser to Kontrol.
-type BrowserToKontrolRequest struct {
-	Username  string `json:"username"`
-	Kitename  string `json:"kitename"`
-	SessionID string `json:"sessionID"`
 }
 
 type Method string
@@ -148,4 +146,29 @@ type Options struct {
 	Kind         string `json:"kind"`
 	KontrolAddr  string `json:"kontrolAddr"`
 	Dependencies string `json:"dependencies"`
+}
+
+// KontrolQuery is a structure of message sent to Kontrol. It is used for
+// querying kites based on the incoming field parameters. Missing fields are
+// not counted during the query (for example if the "version" field is empty,
+// any kite with different version is going to be matched).
+type KontrolQuery struct {
+	Username    string `json:"username"`
+	Environment string `json:"environment"`
+	Kitename    string `json:"kitename"`
+	Version     string `json:"version"`
+	Region      string `json:"region"`
+	Hostname    string `json:"hostname"`
+	ID          string `json:"id"`
+
+	// Authentication is used to autenticate the client who made the
+	// KontrolQuery. The authentication process is based on the type.
+	// Currently there are two types of authentication flows. One is "browser"
+	// other one is "kite". If "browser" is set the key should be the session
+	// id of the koding user. If "kite" is set the key should be the content
+	// of the kite's kodingkey.
+	Authentication struct {
+		Type string `json:"type"`
+		Key  string `json:"key"`
+	} `json:"authentication"`
 }
