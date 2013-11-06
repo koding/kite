@@ -379,7 +379,9 @@ func (k *Kite) registerToKontrol() error {
 
 	switch resp.Result {
 	case protocol.AllowKite:
-		log.Info("registered to kontrol: \n  Addr\t\t: %s\n  Version\t: %s\n  Uuid\t\t: %s\n", k.Addr(), k.Version, k.ID)
+		log.Info("registered to kontrol with addr: %s version: %s uuid: %s",
+			k.Addr(), k.Version, k.ID)
+
 		k.Username = resp.Username // we know now which user that is
 
 		// Set the correct PublicIP if left empty in options.

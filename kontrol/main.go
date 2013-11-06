@@ -96,17 +96,20 @@ func main() {
 	storage = NewMongoDB()
 	dependency = NewDependency()
 
-	// Setup logging.
+	k.setupLogging()
+
+	k.Start()
+}
+
+func (k *Kontrol) setupLogging() {
 	log.Module = "Kontrol"
-	logging.SetFormatter(logging.MustStringFormatter("▶ %{level} %{message}"))
+	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
 	stderrBackend.Color = true
 	syslogBackend, _ := logging.NewSyslogBackend(log.Module)
 	logging.SetBackend(stderrBackend, syslogBackend)
 
 	log.Info("started")
-
-	k.Start()
 }
 
 func (k *Kontrol) Start() {
