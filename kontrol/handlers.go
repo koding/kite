@@ -17,41 +17,53 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Hello world - kontrol!\n")
 }
 
-// preparHandler first checks if the incoming POST request is a valid session.
-// Every request made to kontrol should be in POST with protocol.KontrolQuery in
-// their body.
-func prepareHandler(fn func(w http.ResponseWriter, r *http.Request, q *query)) http.HandlerFunc {
+// errHandler is a convienent handler for not writing lots of duplicate http.Errro codes
+func errHandler(fn func(http.ResponseWriter, *http.Request) ([]byte, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		q, err := readBrowserRequest(r.Body)
+		kites, err := queryHandler(w, r)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
-			return
+			errMsg := fmt.Sprintf("{\"err\":\"%s\"}\n", err)
+			http.Error(w, errMsg, http.StatusBadRequest)
 		}
 
-		err = q.Validate()
-		if err != nil {
-			http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
-			return
-		}
-
-		log.Info("sessionID '%s' is validated as: %s", q.Authentication.Key, q.Username)
-		fn(w, r, q)
+		w.Write([]byte(kites))
 	}
+}
+
+// queryHandler sends as response a list of kites that matches kites specified
+// with the incoming KontrolQuery struct.
+func queryHandler(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	query, err := readBrowserRequest(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	kites, err := query.ValidateQueryAndGetKites()
+	if err != nil {
+		return nil, err
+	}
+
+	kitesJSON, err := json.Marshal(kites)
+	if err != nil {
+		return nil, err
+	}
+
+	return kitesJSON, nil
 }
 
 // we assume that the incoming JSON data is in form of protocol.KontrolQuery.
 // Read and return a new protocol.KontrolQuery from the POST body if
-// succesfull.
-func readBrowserRequest(requestBody io.ReadCloser) (*query, error) {
+// successful.
+func readBrowserRequest(requestBody io.ReadCloser) (*KontrolQuery, error) {
 	body, err := ioutil.ReadAll(requestBody)
 	if err != nil {
 		return nil, err
 	}
 	defer requestBody.Close()
 
-	var req query
+	var req KontrolQuery
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		return nil, err
@@ -94,24 +106,4 @@ func searchForKites(username, kitename string) ([]protocol.KiteWithToken, error)
 	}
 
 	return kites, nil
-}
-
-// requestHandler sends as response a list of kites that matches kites in form
-// of "username/kitename".
-// Request comes from a web browser.
-func requestHandler(w http.ResponseWriter, r *http.Request, q *query) {
-	kites, err := searchForKites(q.Username, q.Kitename)
-	if err != nil {
-		errMsg := fmt.Sprintf("{\"err\":\"%s\"}\n", err)
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return
-	}
-
-	kitesJSON, err := json.Marshal(kites)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("{\"err\":\"%s\"}\n", err), http.StatusBadRequest)
-		return
-	}
-
-	w.Write([]byte(kitesJSON))
 }

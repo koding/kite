@@ -97,7 +97,15 @@ func New(options *protocol.Options) *Kite {
 
 	// some simple validations for config
 	if options.Kitename == "" {
-		log.Fatal("error: options data is not set properly")
+		log.Fatal("ERROR: options.Kitename field is not set")
+	}
+
+	if options.Region == "" {
+		log.Fatal("ERROR: options.Region field is not set")
+	}
+
+	if options.Environment == "" {
+		log.Fatal("ERROR: options.Environment field is not set")
 	}
 
 	hostname, _ := os.Hostname()
@@ -119,12 +127,14 @@ func New(options *protocol.Options) *Kite {
 
 	k := &Kite{
 		Kite: protocol.Kite{
-			Name:     options.Kitename,
-			Username: options.Username,
-			ID:       kiteID,
-			Version:  options.Version,
-			Hostname: hostname,
-			Port:     port,
+			Name:        options.Kitename,
+			Username:    options.Username,
+			ID:          kiteID,
+			Version:     options.Version,
+			Hostname:    hostname,
+			Port:        port,
+			Environment: options.Environment,
+			Region:      options.Region,
 
 			// PublicIP will be set by Kontrol after registering if it is not set.
 			PublicIP: options.PublicIP,

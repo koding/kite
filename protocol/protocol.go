@@ -141,9 +141,10 @@ type Options struct {
 	Kitename     string `json:"kitename"`
 	LocalIP      string `json:"localIP"`
 	PublicIP     string `json:"publicIP"`
+	Environment  string `json:"environment"`
+	Region       string `json:"region"`
 	Port         string `json:"port"`
 	Version      string `json:"version"`
-	Kind         string `json:"kind"`
 	KontrolAddr  string `json:"kontrolAddr"`
 	Dependencies string `json:"dependencies"`
 }
@@ -155,7 +156,7 @@ type Options struct {
 type KontrolQuery struct {
 	Username    string `json:"username"`
 	Environment string `json:"environment"`
-	Kitename    string `json:"kitename"`
+	Name        string `json:"name"`
 	Version     string `json:"version"`
 	Region      string `json:"region"`
 	Hostname    string `json:"hostname"`
