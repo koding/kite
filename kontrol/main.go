@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/messaging/moh"
@@ -142,7 +142,7 @@ func (k *Kontrol) ping() {
 		Type: protocol.Ping,
 	}
 	msg, _ := json.Marshal(&m)
-	k.Publish("all", msg)
+	k.Publisher.Broadcast(msg)
 }
 
 // HeartBeat pool checker. Checking for kites if they are live or dead.

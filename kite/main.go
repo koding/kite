@@ -483,6 +483,10 @@ func (k *Kite) serveWS(ws *websocket.Conn) {
 	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
 }
 
+// OnDisconnect adds the given function to the list of the users callback list
+// which is called when the user is disconnected. There might be several
+// connections from one user to the kite, in that case the functions are
+// called only when all connections are closed.
 func (k *Kite) OnDisconnect(username string, f func()) {
 	addrs := k.clients.GetAddresses(username)
 	if addrs == nil {
