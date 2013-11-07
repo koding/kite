@@ -75,10 +75,11 @@ type Kontrol struct {
 var (
 	log = logging.MustGetLogger("Kontrol")
 
-	storage         Storage
-	dependency      Dependency
-	subscribePrefix = "kite."
+	storage    Storage
+	dependency Dependency
 )
+
+const SubscribePrefix = "kite."
 
 func main() {
 	hostname, _ := os.Hostname()
@@ -193,7 +194,7 @@ func (k *Kontrol) heartBeatChecker() {
 				k.Publish(c.ID, stoppedMsgBytes)
 			}
 
-			k.Publish(subscribePrefix+kite.Username, stoppedMsgBytes)
+			k.Publish(SubscribePrefix+kite.Username, stoppedMsgBytes)
 
 			// Am I the latest of my kind ? if yes remove me from the dependencies list
 			// and remove any tokens if I have some
@@ -305,7 +306,7 @@ func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKont
 	k.Publish(req.Kite.ID, msg)
 
 	// notify browser clients ...
-	k.Publish(subscribePrefix+kite.Username, msg)
+	k.Publish(SubscribePrefix+kite.Username, msg)
 
 	// then notify dependencies of this kite, if any available
 	k.NotifyDependencies(kite)
@@ -553,14 +554,14 @@ func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
 	key := cmd.Args["key"].(string)
 
 	// if it has doesn't have prefix let im trough
-	if !strings.HasPrefix(key, subscribePrefix) {
+	if !strings.HasPrefix(key, SubscribePrefix) {
 		return true
 	}
 
 	// now check if "kite.usernamefield" really is the same with the requester
 	// username. Users shouldn't be able subscribe to other people's kites.
 	// the `username` is fetched via websocket protocol authentication.
-	if strings.TrimPrefix(key, subscribePrefix) != username {
+	if strings.TrimPrefix(key, SubscribePrefix) != username {
 		return false
 	}
 
