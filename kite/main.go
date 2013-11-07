@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/golang/groupcache"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"io"
 	"koding/messaging/moh"
 	"koding/newkite/peers"
