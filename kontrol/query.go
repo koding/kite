@@ -99,19 +99,28 @@ func (k *KontrolQuery) query() []models.Kite {
 	return kites
 }
 
-// structToMap converts a query into key/value map. That means:
-// This query struct:
+// structToMap converts a query into key/value map. That means
+// suppose you have this query struct:
 //
 //		type KontrolQuery struct {
-//			Name     string
-//			Region   string
+//			Name       string
+//			Hostname   string
+//          Pid   	   int
+//			Region     string
 //		}
 //
-// get converted to:
+// and declared like:
 //
-// 		map[string]string{"Name":"Arslan", "Region":"Turkey"}
+// 		query := KontrolQuery{
+// 			Name:   "Arslan",
+// 			Region: "Turkey",
+// 		}
 //
-// Empty and non-string typed fields are neglected. Works perfectly
+// this get converted to:
+//
+// 		map[string]string{"name":"Arslan", "region":"Turkey"}
+//
+// As you see empty and non-string typed fields are neglected. Works perfectly
 // with bson.M type.
 func (k *KontrolQuery) structToMap() map[string]interface{} {
 	mapping := make(map[string]interface{})

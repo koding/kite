@@ -148,7 +148,6 @@ func New(options *protocol.Options) *Kite {
 
 	k.kontrolClient = moh.NewMessagingClient(options.KontrolAddr, k.handle)
 	k.kontrolClient.Subscribe(kiteID)
-	k.kontrolClient.Subscribe("all")
 
 	// Register our internal method
 	k.Methods["vm.info"] = "status.Info"

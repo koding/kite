@@ -13,7 +13,6 @@ import (
 	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
 	"koding/newkite/token"
-	"koding/newkite/utils"
 	"koding/tools/config"
 	stdlog "log"
 	"net"
@@ -76,8 +75,9 @@ type Kontrol struct {
 var (
 	log = logging.MustGetLogger("Kontrol")
 
-	storage    Storage
-	dependency Dependency
+	storage         Storage
+	dependency      Dependency
+	subscribePrefix = "kite."
 )
 
 func main() {
@@ -193,7 +193,7 @@ func (k *Kontrol) heartBeatChecker() {
 				k.Publish(c.ID, stoppedMsgBytes)
 			}
 
-			k.Publish("kite.start."+kite.Username, stoppedMsgBytes)
+			k.Publish(subscribePrefix+kite.Username, stoppedMsgBytes)
 
 			// Am I the latest of my kind ? if yes remove me from the dependencies list
 			// and remove any tokens if I have some
@@ -305,7 +305,7 @@ func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKont
 	k.Publish(req.Kite.ID, msg)
 
 	// notify browser clients ...
-	k.Publish("kite.start."+kite.Username, msg)
+	k.Publish(subscribePrefix+kite.Username, msg)
 
 	// then notify dependencies of this kite, if any available
 	k.NotifyDependencies(kite)
@@ -545,42 +545,24 @@ func findUsernameFromSessionID(c *websocket.Config, r *http.Request) (string, er
 }
 
 func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
-	if cmd.Name != "subscribe" || cmd.Name != "unsubscribe" {
+	// Return if incoming is not one of subscribe or unsubscribe
+	if cmd.Name != "subscribe" && cmd.Name != "unsubscribe" {
 		return true
 	}
 
 	key := cmd.Args["key"].(string)
 
-	if !strings.HasPrefix(key, "kite.start.") {
+	// if it has doesn't have prefix let im trough
+	if !strings.HasPrefix(key, subscribePrefix) {
 		return true
 	}
-	if strings.TrimPrefix(key, "kite.start.") != username {
+
+	// now check if "kite.usernamefield" really is the same with the requester
+	// username. Users shouldn't be able subscribe to other people's kites.
+	// the `username` is fetched via websocket protocol authentication.
+	if strings.TrimPrefix(key, subscribePrefix) != username {
 		return false
 	}
 
 	return true
-}
-
-func addToProxy(kite *models.Kite) {
-	err := utils.IsServerAlive(kite.Addr())
-	if err != nil {
-		log.Info("server not reachable: %s (%s)", kite.Addr(), err.Error())
-	} else {
-		log.Info("checking ok..", kite.Addr())
-	}
-
-	err = modelhelper.UpsertKey(
-		kite.Username,     // username
-		"",                // persistence, empty means disabled
-		"",                // loadbalancing mode, empty means direct
-		kite.Name,         // servicename
-		kite.Version,      // key
-		kite.Addr(),       // host
-		"FromKontrolKite", // hostdata
-		"",                // rabbitkey, not used currently
-	)
-	if err != nil {
-		log.Info("err")
-	}
-
 }
