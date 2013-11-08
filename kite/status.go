@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"github.com/cloudfoundry/gosigar"
+	sigar "github.com/cloudfoundry/gosigar"
 	"koding/newkite/protocol"
 	"os/user"
 	"runtime"
