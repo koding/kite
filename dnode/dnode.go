@@ -21,12 +21,6 @@ const functionPlaceholder = "[Function]"
 var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
 
 type Dnode struct {
-	// Sent messages will be put in this channel.
-	SendChan chan Message
-
-	// The caller must put the received messages to this channel.
-	ReceiveChan chan Message
-
 	// Registered mehtods with HandleFunc() are saved in this map with string keys.
 	// Callback methods sent by Call() are saved here with integer keys.
 	// Contains kinds of reflect.Func.
@@ -35,6 +29,14 @@ type Dnode struct {
 	// Next callback number.
 	// Incremented atomically by registerCallback().
 	seq uint64
+
+	// For sending and receiving messages
+	transport Transport
+}
+
+type Transport interface {
+	Send(msg []byte) error
+	Receive() ([]byte, error)
 }
 
 // Message is the JSON object to call a method at the other side.
@@ -53,11 +55,10 @@ type Message struct {
 }
 
 // New returns a pointer to a new Dnode.
-func New() *Dnode {
+func New(transport Transport) *Dnode {
 	return &Dnode{
-		SendChan:    make(chan Message),
-		ReceiveChan: make(chan Message),
-		handlers:    make(map[string]reflect.Value),
+		handlers:  make(map[string]reflect.Value),
+		transport: transport,
 	}
 }
 
@@ -72,8 +73,13 @@ func (d *Dnode) HandleFunc(method string, handler interface{}) {
 }
 
 // Run processes incoming messages. Blocking.
-func (d *Dnode) Run() {
-	for msg := range d.ReceiveChan {
+func (d *Dnode) Run() error {
+	for {
+		msg, err := d.transport.Receive()
+		if err != nil {
+			return err
+		}
+
 		d.processMessage(msg)
 	}
 }
@@ -81,7 +87,7 @@ func (d *Dnode) Run() {
 // Send serializes the method and arguments, then sends to the SendChan.
 // The user is responsible for reading from the channel and sending
 // messages to the remote side.
-func (d *Dnode) Call(method interface{}, arguments ...interface{}) {
+func (d *Dnode) Call(method interface{}, arguments ...interface{}) error {
 	l.Printf("Call method: %s arguments %+v\n", method, arguments)
 
 	callbacks := make(map[string]Path)
@@ -89,7 +95,7 @@ func (d *Dnode) Call(method interface{}, arguments ...interface{}) {
 
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	msg := Message{
@@ -99,13 +105,12 @@ func (d *Dnode) Call(method interface{}, arguments ...interface{}) {
 		Links:     []interface{}{},
 	}
 
-	d.SendChan <- msg
-}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 
-// Close closes both Send and Receive channels.
-func (d *Dnode) Close() {
-	close(d.ReceiveChan)
-	close(d.SendChan)
+	return d.transport.Send(data)
 }
 
 // collectCallbacks walks over the rawObj and populates callbackMap
@@ -180,7 +185,13 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 
 // processMessage processes a single message and call the previously
 // added callbacks.
-func (d *Dnode) processMessage(msg Message) {
+func (d *Dnode) processMessage(data []byte) error {
+	var msg Message
+	err := json.Unmarshal(data, &msg)
+	if err != nil {
+		return err
+	}
+
 	l.Printf("processMessage: %#v", msg)
 
 	// Parse callbacks field and create callback functions.
@@ -203,13 +214,13 @@ func (d *Dnode) processMessage(msg Message) {
 	l.Printf("Received method: %s", method)
 	handler := d.handlers[method]
 	if handler.Kind() != reflect.Func {
-		panic(fmt.Errorf("Unknown method: %v", msg.Method))
+		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
 	// Get arguments as array.
 	args, err := msg.Arguments.Array()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	l.Printf("Array of args: %#v", args)
 
@@ -221,5 +232,6 @@ func (d *Dnode) processMessage(msg Message) {
 
 	l.Printf("Calling %#v with args: %+v\n", handler.String(), args)
 	go handler.Call(callArgs)
-	return
+
+	return nil
 }

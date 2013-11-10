@@ -1,7 +1,7 @@
 package dnode
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -10,17 +10,19 @@ import (
 func TestSimpleMethodCall(t *testing.T) {
 	called := false
 
-	receiver := New()
+	tr1 := newMockTransport()
+	receiver := New(tr1)
 	receiver.HandleFunc("print", func(msg string) { fmt.Println(msg); called = true })
 	go receiver.Run()
-	defer receiver.Close()
+	defer tr1.Close()
 
-	sender := New()
+	tr2 := newMockTransport()
+	sender := New(tr2)
 	go sender.Run()
-	defer sender.Close()
+	defer tr2.Close()
 
 	go sender.Call("print", "hello world")
-	receiver.ReceiveChan <- <-sender.SendChan
+	tr1.toReceive <- <-tr2.sent
 	sleep()
 
 	if !called {
@@ -33,19 +35,21 @@ func TestMethodCallWithCallback(t *testing.T) {
 	success := func(code float64) { fmt.Println("success"); result = code }
 	failure := func(code float64) { fmt.Println("failure"); result = -code }
 
-	receiver := New()
+	tr1 := newMockTransport()
+	receiver := New(tr1)
 	foo := func(success, failure Callback) { success(6) }
 	receiver.HandleFunc("foo", foo)
 	go receiver.Run()
-	defer receiver.Close()
+	defer tr1.Close()
 
-	sender := New()
+	tr2 := newMockTransport()
+	sender := New(tr2)
 	go sender.Run()
-	defer sender.Close()
+	defer tr2.Close()
 
 	go sender.Call("foo", success, failure)
-	receiver.ReceiveChan <- <-sender.SendChan
-	sender.ReceiveChan <- <-receiver.SendChan
+	tr1.toReceive <- <-tr2.sent
+	tr2.toReceive <- <-tr1.sent
 	sleep()
 
 	if result != 6 {
@@ -54,12 +58,13 @@ func TestMethodCallWithCallback(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	d := New()
+	tr := newMockTransport()
+	d := New(tr)
 
 	// Send a single string method.
 	go d.Call("echo", "hello", "world")
 	expected := `{"method":"echo","arguments":["hello","world"],"callbacks":{},"links":[]}`
-	err := assertSentMessage(d.SendChan, expected)
+	err := assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -68,7 +73,7 @@ func TestSend(t *testing.T) {
 	// Send a single integer method.
 	go d.Call(5, "hello", "world")
 	expected = `{"method":5,"arguments":["hello","world"],"callbacks":{},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -76,7 +81,8 @@ func TestSend(t *testing.T) {
 }
 
 func TestSendCallback(t *testing.T) {
-	d := New()
+	tr := newMockTransport()
+	d := New(tr)
 
 	// echo function also sends the messages to this channel so
 	// we can assert the call and passed arguments.
@@ -95,7 +101,7 @@ func TestSendCallback(t *testing.T) {
 	// Test a single callback function.
 	go d.Call("echo", echo)
 	expected := `{"method":"echo","arguments":["[Function]"],"callbacks":{"0":["0"]},"links":[]}`
-	err := assertSentMessage(d.SendChan, expected)
+	err := assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -104,7 +110,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a second method and see that callback number is increased by one.
 	go d.Call("echo", echo)
 	expected = `{"method":"echo","arguments":["[Function]"],"callbacks":{"1":["0"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -113,7 +119,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a string and a callback as an argument.
 	go d.Call("echo", "hello cenk", echo)
 	expected = `{"method":"echo","arguments":["hello cenk","[Function]"],"callbacks":{"2":["1"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -122,7 +128,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a string and a callback as an argument.
 	go d.Call("echo", map[string]interface{}{"fn": echo, "msg": "hello cenk"})
 	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"3":["0","fn"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -131,7 +137,7 @@ func TestSendCallback(t *testing.T) {
 	// Same above with a pointer to map.
 	go d.Call("echo", &map[string]interface{}{"fn": echo, "msg": "hello cenk"})
 	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"4":["0","fn"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -147,7 +153,7 @@ func TestSendCallback(t *testing.T) {
 	// Pointer receivers will not be accessible.
 	go d.Call("calculate", a, 2)
 	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor"},2],"callbacks":{"5":["0","add"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
@@ -157,17 +163,15 @@ func TestSendCallback(t *testing.T) {
 	// Pointer receivers will be accessible.
 	go d.Call("calculate", &a, 2)
 	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor"},2],"callbacks":{"6":["0","add"],"7":["0","subtract"]},"links":[]}`
-	err = assertSentMessage(d.SendChan, expected)
+	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	// Process first callback method.
-	var msg Message
 	call := `{"method": 0, "arguments": ["hello cenk"]}`
-	json.Unmarshal([]byte(call), &msg)
-	go d.processMessage(msg)
+	go d.processMessage([]byte(call))
 	expected = "hello cenk"
 	err = assertCallbackIsCalled(echoChan, expected)
 	if err != nil {
@@ -176,12 +180,43 @@ func TestSendCallback(t *testing.T) {
 	}
 }
 
-func assertSentMessage(ch chan Message, expected string) error {
+type mockTransport struct {
+	sent      chan []byte
+	toReceive chan []byte
+	closeChan chan bool
+}
+
+func newMockTransport() *mockTransport {
+	return &mockTransport{
+		sent:      make(chan []byte, 10),
+		toReceive: make(chan []byte, 10),
+		closeChan: make(chan bool, 1),
+	}
+}
+
+func (t *mockTransport) Send(msg []byte) error {
+	t.sent <- msg
+	return nil
+}
+
+func (t *mockTransport) Receive() ([]byte, error) {
+	select {
+	case msg := <-t.toReceive:
+		return msg, nil
+	case <-t.closeChan:
+		return nil, errors.New("closed")
+	}
+}
+
+func (t *mockTransport) Close() {
+	t.closeChan <- true
+}
+
+func assertSentMessage(ch chan []byte, expected string) error {
 	// Receive from SendChannel and assert the message.
 	select {
 	case msg := <-ch:
-		b, _ := json.Marshal(msg)
-		s := string(b)
+		s := string(msg)
 		fmt.Println("Sent", s)
 
 		if s != expected {
