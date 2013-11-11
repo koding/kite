@@ -1,12 +1,9 @@
 package main
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	logging "github.com/op/go-logging"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/messaging/moh"
@@ -21,6 +18,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/mux"
+	logging "github.com/op/go-logging"
 )
 
 // Storage is an interface that encapsulates basic operations on the kite
@@ -142,7 +142,7 @@ func (k *Kontrol) ping() {
 		Type: protocol.Ping,
 	}
 	msg, _ := json.Marshal(&m)
-	k.Publisher.Broadcast(msg)
+	k.BroadcastToKites(msg)
 }
 
 // HeartBeat pool checker. Checking for kites if they are live or dead.
@@ -405,6 +405,12 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 
 func (k *Kontrol) Publish(filter string, msg []byte) {
 	k.Publisher.Publish(filter, msg)
+}
+
+func (k *Kontrol) BroadcastToKites(msg []byte) {
+	for _, r := range storage.List() {
+		k.Publisher.Publish(r.ID, msg)
+	}
 }
 
 // RegisterKite returns true if the specified kite has been seen before.
