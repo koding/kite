@@ -8,7 +8,9 @@ import (
 
 type Server struct {
 	websocket.Server
-	handlers map[string]interface{}
+	handlers     map[string]interface{}
+	OnConnect    func(*Client)
+	OnDisconnect func(*Client)
 }
 
 func NewServer() *Server {
@@ -29,8 +31,13 @@ func (s *Server) HandleFunc(method string, handler interface{}) {
 }
 
 func (s *Server) handleWS(ws *websocket.Conn) {
+	defer ws.Close()
+
 	c := newClient(ws)
-	defer c.Close()
+
+	if s.OnConnect != nil {
+		s.OnConnect(c)
+	}
 
 	// Initialize dnode with registered methods
 	for method, handler := range s.handlers {
@@ -38,4 +45,8 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	}
 
 	c.run()
+
+	if s.OnDisconnect != nil {
+		s.OnDisconnect(c)
+	}
 }

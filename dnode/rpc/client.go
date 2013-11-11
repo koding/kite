@@ -22,7 +22,6 @@ func Dial(url string) (*Client, error) {
 }
 
 func (c *Client) Close() {
-	c.dnode.Close()
 	c.ws.Close()
 }
 
@@ -31,32 +30,27 @@ func (c *Client) Call(method string, args ...interface{}) {
 }
 
 func newClient(ws *websocket.Conn) *Client {
+	tr := &wsTransport{ws}
 	return &Client{
 		ws:    ws,
-		dnode: dnode.New(),
+		dnode: dnode.New(tr),
 	}
 }
 
 func (c *Client) run() {
-	go c.dnode.Run()
-	go c.writer()
-	c.reader()
+	c.dnode.Run()
 }
 
-func (c *Client) reader() {
-	for {
-		var msg dnode.Message
-		if websocket.JSON.Receive(c.ws, &msg) != nil {
-			break
-		}
-		c.dnode.ReceiveChan <- msg
-	}
+type wsTransport struct {
+	ws *websocket.Conn
 }
 
-func (c *Client) writer() {
-	for msg := range c.dnode.SendChan {
-		if websocket.JSON.Send(c.ws, msg) != nil {
-			break
-		}
-	}
+func (t *wsTransport) Send(msg []byte) error {
+	return websocket.Message.Send(t.ws, string(msg))
+}
+
+func (t *wsTransport) Receive() ([]byte, error) {
+	var msg []byte
+	err := websocket.Message.Receive(t.ws, &msg)
+	return msg, err
 }
