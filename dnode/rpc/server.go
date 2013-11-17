@@ -3,14 +3,26 @@ package rpc
 import (
 	"code.google.com/p/go.net/websocket"
 	"errors"
+	"fmt"
+	"koding/newkite/dnode"
 	"reflect"
 )
 
+// Server is a websocket server serving each dnode messages with registered handlers.
 type Server struct {
 	websocket.Server
-	handlers     map[string]interface{}
-	OnConnect    func(*Client)
-	OnDisconnect func(*Client)
+
+	// Functions registered with HandleFunc() are saved here
+	handlers map[string]interface{}
+
+	// Unknown methods are precessed by this handler
+	Delegate dnode.MessageHandler
+
+	// Called when a client is connected
+	onConnectHandlers []func(*Client)
+
+	// Called when a client is disconnected
+	onDisconnectHandlers []func(*Client)
 }
 
 func NewServer() *Server {
@@ -21,6 +33,7 @@ func NewServer() *Server {
 	return s
 }
 
+// HandleFunc registers a function to run on "method".
 func (s *Server) HandleFunc(method string, handler interface{}) {
 	v := reflect.ValueOf(handler)
 	if v.Kind() != reflect.Func {
@@ -30,23 +43,56 @@ func (s *Server) HandleFunc(method string, handler interface{}) {
 	s.handlers[method] = handler
 }
 
+// handleWS is the websocket connection handler.
 func (s *Server) handleWS(ws *websocket.Conn) {
 	defer ws.Close()
 
-	c := newClient(ws)
+	fmt.Println("--- connected new client")
+	// This client is actually is the server for the websocket.
+	// Since both sides can send/receive messages the client code is reused here.
+	c := NewClient()
+	c.Conn = ws
+	c.tr.conn = ws
 
-	if s.OnConnect != nil {
-		s.OnConnect(c)
-	}
+	// Pass dnode message delegate
+	c.Dnode.ExternalHandler = s.Delegate
 
-	// Initialize dnode with registered methods
+	// Add our servers handler methods to the client.
 	for method, handler := range s.handlers {
-		c.dnode.HandleFunc(method, handler)
+		c.Dnode.HandleFunc(method, handler)
 	}
 
+	s.connected(c)
+
+	// Run after methods are registered and delegate is set
 	c.run()
 
-	if s.OnDisconnect != nil {
-		s.OnDisconnect(c)
+	s.disconnected(c)
+}
+
+func (s *Server) OnConnect(handler func(*Client)) {
+	s.onConnectHandlers = append(s.onConnectHandlers, handler)
+}
+
+func (s *Server) OnDisconnect(handler func(*Client)) {
+	s.onDisconnectHandlers = append(s.onDisconnectHandlers, handler)
+}
+
+func (s *Server) connected(c *Client) {
+	for _, handler := range s.onConnectHandlers {
+		go handler(c)
+	}
+	// It is unnecessary to call c.connected() here because the client is
+	// already created by this server and we did not attach any handlers to
+	// run on connect.
+}
+
+func (s *Server) disconnected(c *Client) {
+	// We are also triggering the disconnect event on the client because
+	// there may be a handler registered on it.
+	c.disconnected()
+
+	for _, handler := range s.onDisconnectHandlers {
+		go handler(c)
 	}
 }

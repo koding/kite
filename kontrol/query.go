@@ -18,38 +18,8 @@ type KontrolQuery protocol.KontrolQuery
 
 // Validate validates the incoming Query and returns the matched kites with
 // tokens attached.
-func (k *KontrolQuery) ValidateQueryAndGetKites() ([]protocol.KiteWithToken, error) {
-	if k.Authentication.Type == "browser" {
-		return k.validateBrowser()
-	}
-
-	if k.Authentication.Type == "kite" {
-		return k.validateKite()
-	}
-
-	return nil, errors.New("authentication type is not specified.")
-}
-
-// validateBrowser is used to validate the incoming kodingKey from a kite. it
-// returns the username if it belongs to a koding user.
-func (k *KontrolQuery) validateKite() ([]protocol.KiteWithToken, error) {
-	return nil, errors.New("validateKite is not implemented.")
-}
-
-// validateBrowser is used to validate the incoming sessionId from a
-// koding.com client/user. it returns the username if it belongs to a koding
-// user.
-func (k *KontrolQuery) validateBrowser() ([]protocol.KiteWithToken, error) {
-	if k.Authentication.Key == "" {
-		return nil, errors.New("sessionID field is empty")
-	}
-
-	session, err := modelhelper.GetSession(k.Authentication.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	return k.kiteWithTokens(session.Username)
+func (k *KontrolQuery) Run() ([]protocol.KiteWithToken, error) {
+	return k.kiteWithTokens(k.Username)
 }
 
 func (k *KontrolQuery) kiteWithTokens(requester string) ([]protocol.KiteWithToken, error) {

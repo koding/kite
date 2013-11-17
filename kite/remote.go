@@ -1,201 +1,200 @@
 package kite
 
 import (
-	"bufio"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"koding/newkite/dnode"
+	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
-	"math"
-	"net"
-	"net/http"
-	"net/rpc"
-	"time"
+	"strconv"
 )
 
-// Remote encapsulates kites of specified type of specified user.
-type Remote struct {
-	Username string
-	Kitename string
-	Kites    []*RemoteKite
-}
-
-// RemoteKite is the structure representing other connected kites.
+// RemoteKite is the client for communicating with another Kite.
+// It has Call() and Go() methods for calling methods sync/async way.
 type RemoteKite struct {
-	protocol.KiteWithToken
-	Client *rpc.Client
+	protocol.Kite
+	LocalKite      *Kite
+	Authentication callAuthentication
+	Client         *rpc.Client
+	disconnect     chan bool
 }
 
-// Remote is used to create a new remote struct that is used for remote
-// kite-to-kite calls.
-func (k *Kite) Remote(username, kitename string) (*Remote, error) {
-	remoteKites, err := k.requestKites(username, kitename)
-	if err != nil {
-		return nil, fmt.Errorf("Cannot get remote kites: %s", err.Error())
-	}
-	if len(remoteKites) == 0 {
-		return nil, fmt.Errorf("No remote kites available for %s/%s", username, kitename)
+// NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
+// is not connected. You have to call Dial() or DialForever() before calling
+// Call() and Go() methods.
+func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *RemoteKite {
+	r := &RemoteKite{
+		Kite:           kite,
+		LocalKite:      k,
+		Authentication: auth,
+		Client:         rpc.NewClient(),
+		disconnect:     make(chan bool),
 	}
 
-	return &Remote{
-		Username: username,
-		Kitename: kitename,
-		Kites:    remoteKites,
-	}, nil
+	r.Client.Dnode.ExternalHandler = k
+	r.Client.OnDisconnect(r.notifyDisconnect)
+	return r
 }
 
-func (k *Kite) requestKites(username, kitename string) ([]*RemoteKite, error) {
-	m := protocol.KiteToKontrolRequest{
-		Kite:      k.Kite,
-		KodingKey: k.KodingKey,
-		Method:    protocol.GetKites,
-		Args: map[string]interface{}{
-			"username": username,
-			"kitename": kitename,
+// newRemoteKiteWithClient returns a pointer to new RemoteKite instance.
+// The client will be replaced with the given client.
+// Used to give the Kite method handler a working RemoteKite to call methods
+// on other side.
+func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthentication, client *rpc.Client) *RemoteKite {
+	r := k.NewRemoteKite(kite, auth)
+	r.Client = client
+	r.Client.OnDisconnect(r.notifyDisconnect)
+	return r
+}
+
+// notifyDisconnect unblocks the caller of Call() on disconnect.
+func (r *RemoteKite) notifyDisconnect() {
+	// Unblocking send.
+	select {
+	case r.disconnect <- true:
+	default:
+	}
+}
+
+// Dial connects to the remote Kite. Returns error if it can't.
+func (r *RemoteKite) Dial() (err error) {
+	addr := r.Kite.Addr()
+	log.Info("Dialling %s", addr)
+	return r.Client.Dial("ws://" + addr + "/dnode")
+}
+
+// Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
+func (r *RemoteKite) DialForever() {
+	addr := r.Kite.Addr()
+	log.Info("Dialling %s", addr)
+	r.Client.DialForever("ws://" + addr + "/dnode")
+}
+
+// CallOptions is the first argument in the dnode message.
+// Second argument is a callback function.
+type CallOptions struct {
+	// Arguments to the method
+	WithArgs       *dnode.Partial     `json:"withArgs"`
+	Kite           protocol.Kite      `json:"kite"`
+	Authentication callAuthentication `json:"authentication"`
+}
+
+type callOptionsOut struct {
+	CallOptions
+	// Override this when sending because args will not be a *dnode.Partial.
+	WithArgs interface{} `json:"withArgs"`
+}
+
+// That's what we send as a first argument in dnode message.
+func (r *RemoteKite) makeOptions(args interface{}) *callOptionsOut {
+	return &callOptionsOut{
+		WithArgs: args,
+		CallOptions: CallOptions{
+			Kite:           r.LocalKite.Kite,
+			Authentication: r.Authentication,
 		},
 	}
-
-	msg, err := json.Marshal(&m)
-	if err != nil {
-		log.Info("requestKites marshall err 1", err)
-		return nil, err
-	}
-
-	log.Info("sending requesting message...")
-	result, err := k.kontrolClient.Request(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	var kitesResp protocol.GetKitesResponse
-	err = json.Unmarshal(result, &kitesResp)
-	if err != nil {
-		log.Info("requestKites marshall err 2", err)
-		return nil, err
-	}
-
-	remoteKites := make([]*RemoteKite, len(kitesResp))
-	for i, k := range kitesResp {
-		rk := &RemoteKite{
-			KiteWithToken: k,
-		}
-		remoteKites[i] = rk
-	}
-
-	return remoteKites, nil
 }
 
-// CallSync makes a blocking request to another kite. args and result is used
-// by the remote kite, therefore you should know what the kite is expecting.
-func (r *Remote) CallSync(method string, args interface{}, result interface{}) error {
-	remoteKite, err := r.getClient()
-	if err != nil {
-		return err
-	}
-
-	rpcMethod := r.Kitename + "." + method
-	err = remoteKite.Client.Call(rpcMethod, args, result)
-	if err != nil {
-		return fmt.Errorf("can't call '%s', err: %s", r.Kitename, err.Error())
-	}
-
-	return nil
+type callAuthentication struct {
+	// Type can be "kodingKey", "token" or "sessionID" for now.
+	Type string `json:"type"`
+	Key  string `json:"key"`
 }
 
-// Call makes a non-blocking request to another kite. args is used by the
-// remote kite, therefore you should know what the kite is expecting.  fn is a
-// callback that is executed when the result and error has been received.
-// Currently only string as a result is supported, but it needs to be changed.
-func (r *Remote) Call(method string, args interface{}, fn func(err error, res string)) (*rpc.Call, error) {
-	remoteKite, err := r.getClient()
-	if err != nil {
-		return nil, err
-	}
-
-	var response string
-
-	request := &protocol.KiteRequest{
-		Kite:  remoteKite.Kite,
-		Args:  args,
-		Token: remoteKite.Token,
-	}
-
-	rpcMethod := r.Kitename + "." + method
-	d := remoteKite.Client.Go(rpcMethod, request, &response, nil)
-
-	select {
-	case <-d.Done:
-		fn(d.Error, response)
-	case <-time.Tick(10 * time.Second):
-		fn(d.Error, response)
-	}
-
-	return d, nil
+// Go makes an unblocking mehtod call to the server.
+func (r *RemoteKite) Go(method string, args interface{}) error {
+	options := r.makeOptions(args)
+	_, err := r.Client.Call(method, options)
+	return err
 }
 
-func (r *Remote) getClient() (*RemoteKite, error) {
-	kite, err := r.roundRobin()
-	if err != nil {
-		return nil, err
-	}
+// Call makes a blocking method call to the server.
+// Send a callback function and waits until it is called or connection drops.
+// Returns the result and the error as the other side sends.
+func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partial, err error) {
+	options := r.makeOptions(args)
 
-	if kite.Client == nil {
-		var err error
+	// Buffered channel for waiting response from server
+	done := make(chan bool, 1)
 
-		log.Info("establishing HTTP client conn for %s - %s on %s\n",
-			kite.Name, kite.Addr(), kite.Hostname)
+	// To clean the sent callback after response is received.
+	// Send/Receive in a channel to prevent race condition because
+	// the callback is run in a seperate goroutine.
+	removeCallback := make(chan uint64, 1)
 
-		kite.Client, err = r.dialRemote(kite.Addr())
+	// This is the callback function sent to the server.
+	// The caller of the Call() is blocked until the server calls this callback function.
+	// This function does not return anything but sets "result" and "err" vaiables
+	// in upper scope.
+	responseCallback := func(arguments *dnode.Partial) {
+		// Unblock the caller.
+		defer func() { done <- true }()
+
+		// Remove the callback function from the map so we do not
+		// consume memory for unused callbacks.
+		id := <-removeCallback
+		r.Client.Dnode.RemoveCallback(id)
+
+		var (
+			// Arguments to our response callback It is a slice of length 2.
+			// The first argument is the error string,
+			// the second argument is the result.
+			responseArgs []*dnode.Partial
+
+			// The first argument mentioned above.
+			responseError string
+		)
+
+		err = arguments.Unmarshal(&responseArgs)
 		if err != nil {
-			return nil, err
+			return
 		}
 
-		// update kite in storage after we have an established connection
-		kites.Add(&kite.Kite)
+		// We must always get an error and a result argument.
+		if len(responseArgs) != 2 {
+			err = fmt.Errorf("Invalid response args: %s", string(arguments.Raw))
+			return
+		}
+
+		// The second argument is the our result, set it on upper scope.
+		result = responseArgs[1]
+
+		// This is error argument. Unmarshal panics if it is null.
+		if responseArgs[0] == nil {
+			return
+		}
+
+		err = responseArgs[0].Unmarshal(&responseError)
+		if err != nil {
+			return
+		}
+
+		// Set the err argument on upper scope.
+		err = errors.New(responseError)
 	}
 
-	return kite, nil
-}
-
-func (r *Remote) roundRobin() (*RemoteKite, error) {
-	if len(r.Kites) == 0 {
-		return nil, fmt.Errorf("kite %s/%s does not exist", r.Username, r.Kitename)
-	}
-
-	// TODO: use container/ring :)
-	index := balance.GetIndex(r.Kitename)
-	N := float64(len(r.Kites))
-	n := int(math.Mod(float64(index+1), N))
-	balance.AddOrUpdateIndex(r.Kitename, n)
-	return r.Kites[n], nil
-}
-
-// dialRemote is used to connect to a Remote Kite via the GOB codec. This is
-// used by other external kite methods.
-func (r *Remote) dialRemote(addr string) (*rpc.Client, error) {
-	var err error
-	conn, err := net.Dial("tcp4", addr)
+	// Send the method with callback to the server.
+	callbacks, err := r.Client.Call(method, options, dnode.Callback(responseCallback))
 	if err != nil {
 		return nil, err
 	}
-	io.WriteString(conn, "CONNECT "+rpc.DefaultRPCPath+" HTTP/1.0\n\n")
 
-	// Require successful HTTP response
-	// before switching to RPC protocol.
-	resp, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
-	if err == nil && resp.Status == connected {
-		codec := NewKiteClientCodec(conn) // pass our custom codec
-		return rpc.NewClientWithCodec(codec), nil
+	// Find the callback number to be deleted after response is received.
+	var max uint64 = 0
+	for id, _ := range callbacks {
+		i, _ := strconv.ParseUint(id, 10, 64)
+		if i > max {
+			max = i
+		}
 	}
-	if err == nil {
-		err = errors.New("unexpected HTTP response: " + resp.Status)
-	}
-	conn.Close()
-	return nil, &net.OpError{
-		Op:   "dial-http",
-		Net:  "tcp " + addr,
-		Addr: nil,
-		Err:  err,
+	removeCallback <- max
+
+	// Block until response callback is called or connection disconnect.
+	select {
+	case <-done:
+		return result, err
+	case <-r.disconnect:
+		return nil, errors.New("Client disconnected")
 	}
 }

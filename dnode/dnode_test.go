@@ -12,7 +12,11 @@ func TestSimpleMethodCall(t *testing.T) {
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	receiver.HandleFunc("print", func(msg string) { fmt.Println(msg); called = true })
+	printFunc := func(p *Partial) {
+		called = true
+		fmt.Println(string(p.Raw))
+	}
+	receiver.HandleFunc("print", Callback(printFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -32,13 +36,25 @@ func TestSimpleMethodCall(t *testing.T) {
 
 func TestMethodCallWithCallback(t *testing.T) {
 	var result float64 = 0
-	success := func(code float64) { fmt.Println("success"); result = code }
-	failure := func(code float64) { fmt.Println("failure"); result = -code }
+	successFunc := func(p *Partial) {
+		fmt.Println("success")
+		args, _ := p.Array()
+		result = args[0].(float64)
+	}
+	failureFunc := func(p *Partial) {
+		fmt.Println("failure")
+		args, _ := p.Array()
+		result = -args[0].(float64)
+	}
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	foo := func(success, failure Callback) { success(6) }
-	receiver.HandleFunc("foo", foo)
+	fooFunc := func(p *Partial) {
+		var callbacks []Function
+		p.Unmarshal(&callbacks)
+		callbacks[0](6)
+	}
+	receiver.HandleFunc("foo", Callback(fooFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -47,7 +63,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 	go sender.Run()
 	defer tr2.Close()
 
-	go sender.Call("foo", success, failure)
+	go sender.Call("foo", Callback(successFunc), Callback(failureFunc))
 	tr1.toReceive <- <-tr2.sent
 	tr2.toReceive <- <-tr1.sent
 	sleep()
@@ -57,7 +73,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 	}
 }
 
-func TestSend(t *testing.T) {
+func TestCallMessage(t *testing.T) {
 	tr := newMockTransport()
 	d := New(tr)
 
@@ -71,7 +87,7 @@ func TestSend(t *testing.T) {
 	}
 
 	// Send a single integer method.
-	go d.Call(5, "hello", "world")
+	go d.call(5, "hello", "world")
 	expected = `{"method":5,"arguments":["hello","world"],"callbacks":{},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
@@ -87,10 +103,14 @@ func TestSendCallback(t *testing.T) {
 	// echo function also sends the messages to this channel so
 	// we can assert the call and passed arguments.
 	echoChan := make(chan string)
-	echo := func(msg string) {
+	echoF := func(arguments *Partial) {
+		var args []string
+		arguments.Unmarshal(&args)
+		msg := args[0]
 		fmt.Println(msg)
 		echoChan <- msg
 	}
+	echo := Callback(echoF)
 
 	mapChan := make(chan map[string]string)
 	_ = func(m map[string]string) {
@@ -144,15 +164,19 @@ func TestSendCallback(t *testing.T) {
 	}
 
 	// For testing sending a struct with methods
+	f := func(p *Partial) {}
+	cb := Callback(f)
 	a := Math{
-		Name: "Pisagor",
-		i:    6,
+		Name:      "Pisagor",
+		i:         6,
+		Callbacks: []interface{}{cb, 1, 2, 3},
+		details:   []interface{}{cb, "x", "y", "z"},
 	}
 
 	// Send the struct itself.
 	// Pointer receivers will not be accessible.
 	go d.Call("calculate", a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor"},2],"callbacks":{"5":["0","add"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"]},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -162,7 +186,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a pointer to struct.
 	// Pointer receivers will be accessible.
 	go d.Call("calculate", &a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor"},2],"callbacks":{"6":["0","add"],"7":["0","subtract"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"6":["0","Callbacks","0"]},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -212,6 +236,18 @@ func (t *mockTransport) Close() {
 	t.closeChan <- true
 }
 
+func (t *mockTransport) RemoteAddr() string {
+	return "127.0.0.1:1234"
+}
+
+func (t *mockTransport) Properties() map[string]interface{} {
+	return nil
+}
+
+func (t *mockTransport) Client() interface{} {
+	return nil
+}
+
 func assertSentMessage(ch chan []byte, expected string) error {
 	// Receive from SendChannel and assert the message.
 	select {
@@ -222,7 +258,7 @@ func assertSentMessage(ch chan []byte, expected string) error {
 		if s != expected {
 			return fmt.Errorf("\nInvalid message : %s\nExpected message: %s", s, expected)
 		}
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		return fmt.Errorf("Did not receive a message from SendChan")
 	}
 
@@ -246,7 +282,7 @@ func assertCallbackIsCalled(ch chan string, expected string) error {
 			return fmt.Errorf("Invalid argument: %s", s)
 		}
 	// Nothing happened.
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(1000 * time.Millisecond):
 		return fmt.Errorf("Callback function is not called")
 	}
 
@@ -261,8 +297,17 @@ func assertCallbackIsCalled(ch chan string, expected string) error {
 }
 
 type Math struct {
+	// This will be exported
 	Name string
-	i    int
+
+	// This will be unexported
+	i int
+
+	// To test collecting callbacks in structs
+	Callbacks []interface{}
+
+	// Must not exported
+	details []interface{}
 }
 
 // Value receiver
@@ -273,6 +318,11 @@ func (m Math) Add(val int) int {
 // Pointer receiver
 func (m *Math) Subtract(val int) int {
 	return m.i - val
+}
+
+// This will not be exported
+func (m *Math) asdf() int {
+	return m.i
 }
 
 func sleep() { time.Sleep(100 * time.Millisecond) }

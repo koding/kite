@@ -2,6 +2,7 @@ package dnode
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 )
 
@@ -18,28 +19,41 @@ func (p *Partial) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON puts the data into Partial.Raw.
 func (p *Partial) UnmarshalJSON(data []byte) error {
-	p.Raw = make([]byte, len(data))
-	copy(p.Raw, data)
+	// p.Raw = make([]byte, len(data))
+	// copy(p.Raw, data)
+	// return nil
+	if p == nil {
+		return errors.New("json.Partial: UnmarshalJSON on nil pointer")
+	}
+	p.Raw = append(p.Raw[0:0], data...)
 	return nil
 }
 
 // Unmarshal unmarshals the raw data (p.Raw) into v and prepares callbacks.
 // v must be a struct that is the type of expected arguments.
 func (p *Partial) Unmarshal(v interface{}) error {
-	l.Printf("Unmarshal partial")
+	l.Printf("Unmarshal Partial")
+
+	value := reflect.ValueOf(v)
+	if value.Kind() != reflect.Ptr {
+		panic("v must be a pointer")
+	}
+
 	err := json.Unmarshal(p.Raw, &v)
 	if err != nil {
+		l.Println(err)
 		return err
 	}
 
-	value := reflect.ValueOf(v)
 	for _, spec := range p.CallbackSpecs {
 		l.Printf("spec: %#v", spec)
 		err := spec.Apply(value)
 		if err != nil {
+			l.Println(err)
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -65,4 +79,16 @@ func (p *Partial) Map() (map[string]interface{}, error) {
 	}
 
 	return m, nil
+}
+
+// String is a helper to unmarshal a string value.
+func (p *Partial) String() (s string, err error) {
+	err = p.Unmarshal(&s)
+	return
+}
+
+// Float64 is a helper to unmarshal a float64 value.
+func (p *Partial) Float64() (f float64, err error) {
+	err = p.Unmarshal(&f)
+	return
 }

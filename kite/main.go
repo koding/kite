@@ -1,45 +1,31 @@
 package kite
 
 import (
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"koding/messaging/moh"
+	"github.com/golang/groupcache"
+	logging "github.com/op/go-logging"
+	"koding/newkite/dnode"
+	"koding/newkite/dnode/rpc"
+	"koding/newkite/kodingkey"
 	"koding/newkite/peers"
 	"koding/newkite/protocol"
+	"koding/newkite/token"
 	"koding/newkite/utils"
-	"koding/tools/dnode"
 	stdlog "log"
 	"net"
 	"net/http"
-	"net/rpc"
 	"os"
-	"reflect"
-	"runtime"
-	"sync"
 	"time"
-	"code.google.com/p/go.net/websocket"
-	"github.com/golang/groupcache"
-	logging "github.com/op/go-logging"
 )
 
-var (
-	log = logging.MustGetLogger("Kite")
+var log = logging.MustGetLogger("Kite")
 
-	// in-memory hash table for kites of same types
-	kites = peers.New()
-
-	// roundrobin load balancing helpers
-	balance = NewBalancer()
-
-	// registers to kontrol in this interval
-	registerInterval = 700 * time.Millisecond
-
-	// after hitting the limit the register interval is no more increased
-	maxRegisterLimit = 30
-)
+// GetLogger returns a new logger which is used within the application itsel
+// (in main package).
+func GetLogger() *logging.Logger {
+	return log
+}
 
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
@@ -60,11 +46,23 @@ type Kite struct {
 	// other kites that needs to be run, in order to run this one
 	Dependencies string
 
-	// by default yes, if disabled it bypasses kontrol
+	// in-memory hash table for kites of same types
+	peers *peers.Kites
+
+	// roundrobin load balancing helpers
+	balance *Balancer
+
+	// Points to the Kontrol instance if enabled
+	Kontrol *Kontrol
+
+	// Wheter we want to connect to Kontrol on startup, true by default.
 	KontrolEnabled bool
 
+	// Wheter we want to register our Kite to Kontrol, true by default.
+	RegisterToKontrol bool
+
 	// method map for shared methods
-	Methods map[string]string
+	Handlers map[string]HandlerFunc
 
 	// implements the Clients interface
 	clients *clients
@@ -73,14 +71,12 @@ type Kite struct {
 	Pool  *groupcache.HTTPPool
 	Group *groupcache.Group
 
-	// RpcServer
+	// Dnode rpc server
 	Server *rpc.Server
 
-	// To allow only one register request at the same time
-	registerMutex sync.Mutex
-
-	// Used to talk with Kontrol server
-	kontrolClient *moh.MessagingClient
+	// Contains different functions for authenticating user from request.
+	// Keys are the authentication types (options.authentication.type).
+	Authenticators map[string]func(*CallOptions) error
 }
 
 // New creates, initialize and then returns a new Kite instance. It accept
@@ -139,59 +135,37 @@ func New(options *protocol.Options) *Kite {
 			// PublicIP will be set by Kontrol after registering if it is not set.
 			PublicIP: options.PublicIP,
 		},
-		KodingKey:      kodingKey,
-		Server:         rpc.NewServer(),
-		KontrolEnabled: true,
-		Methods:        make(map[string]string),
-		clients:        NewClients(),
+		KodingKey:         kodingKey,
+		Server:            rpc.NewServer(),
+		KontrolEnabled:    true,
+		RegisterToKontrol: true,
+		clients:           NewClients(),
+		peers:             peers.New(),
+		balance:           NewBalancer(),
+		Authenticators:    make(map[string]func(*CallOptions) error),
+		Handlers:          make(map[string]HandlerFunc),
 	}
 
-	k.kontrolClient = moh.NewMessagingClient(options.KontrolAddr, k.handle)
-	k.kontrolClient.Subscribe(kiteID)
+	// Every kite should be able to authenticate the user from token.
+	k.Authenticators["token"] = k.AuthenticateFromToken
+	// A kite accepts requests from Kontrol.
+	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
 
-	// Needed to receive batch messages that are intended to kites only.
-	// Everyone (like browser clients) also can connect to kontrol, that means
-	// if we want to notify all kites we have to distinguish them from others.
-	k.kontrolClient.Subscribe(protocol.KitesSubscribePrefix)
+	// Register our internal methods
+	k.Handlers["vm.info"] = new(Status).Info
+	k.Handlers["heartbeat"] = k.handleHeartbeat
+	k.Handlers["log"] = k.handleLog
 
-	// Register our internal method
-	k.Methods["vm.info"] = "status.Info"
-	k.Server.RegisterName("status", new(Status))
+	// Delegate method handling to our kite
+	k.Server.Delegate = k
 
 	return k
 }
 
-// AddMethods is used to add new structs with exposed methods with a different
-// name. rcvr is a struct on which your exported method's are defined. methods
-// is a map that expose your methods with different names to the outside world.
-func (k *Kite) AddMethods(rcvr interface{}, methods map[string]string) error {
-	if rcvr == nil {
-		panic(errors.New("method struct should not be nil"))
-	}
-
-	k.createMethodMap(rcvr, methods)
-	return k.Server.RegisterName(k.Name, rcvr)
-}
-
-func (k *Kite) createMethodMap(rcvr interface{}, methods map[string]string) {
-	kiteStruct := reflect.TypeOf(rcvr)
-
-	for alternativeName, method := range methods {
-		m, ok := kiteStruct.MethodByName(method)
-		if !ok {
-			panic(fmt.Sprintf("addmethods err: no method with name: %s", method))
-			continue
-		}
-
-		// map alternativeName to go's net/rpc methodname
-		k.Methods[alternativeName] = k.Name + "." + m.Name
-	}
-}
-
-// Start is a blocking method. It runs the kite server and then accepts requests
+// Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously. It can be started in a goroutine if you wish to use kite as a
 // client too.
-func (k *Kite) Start() {
+func (k *Kite) Run() {
 	k.parseVersionFlag()
 	k.setupLogging()
 
@@ -199,6 +173,82 @@ func (k *Kite) Start() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
+	args, err := r.Args.Array()
+	if err != nil {
+		return nil, err
+	}
+
+	seconds := args[0].(float64)
+	ping := args[1].(dnode.Function)
+
+	go func() {
+		for {
+			time.Sleep(time.Duration(seconds) * time.Second)
+			if ping() != nil {
+				return
+			}
+		}
+	}()
+
+	return nil, nil
+}
+
+func (k *Kite) handleLog(r *Request) (interface{}, error) {
+	s, err := r.Args.String()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, s))
+	return nil, nil
+}
+
+func (k *Kite) authenticateUser(options *CallOptions) error {
+	f := k.Authenticators[options.Authentication.Type]
+	if f == nil {
+		return fmt.Errorf("Unknown authentication type: %s", options.Authentication.Type)
+	}
+
+	return f(options)
+}
+
+// AuthenticateFromToken is the default Authenticator for Kite.
+func (k *Kite) AuthenticateFromToken(options *CallOptions) error {
+	key, err := kodingkey.FromString(k.KodingKey)
+	if err != nil {
+		return fmt.Errorf("Invalid Koding Key: %s", k.KodingKey)
+	}
+
+	tkn, err := token.DecryptString(options.Authentication.Key, key)
+	if err != nil {
+		return fmt.Errorf("Invalid token: %s", options.Authentication.Key)
+	}
+
+	if !tkn.IsValid(k.ID) {
+		return fmt.Errorf("Invalid token: %s", tkn)
+	}
+
+	options.Kite.Username = tkn.Username
+
+	return nil
+}
+
+// AuthenticateFromToken authenticates user from Koding Key.
+// Kontrol makes requests with a Koding Key.
+func (k *Kite) AuthenticateFromKodingKey(options *CallOptions) error {
+	if options.Authentication.Key != k.KodingKey {
+		return fmt.Errorf("Invalid Koding Key")
+	}
+
+	// Set the username if missing.
+	if options.Kite.Username == "" && k.Username != "" {
+		options.Kite.Username = k.Username
+	}
+
+	return nil
 }
 
 // setupLogging is used to setup the logging format, destination and level.
@@ -218,12 +268,6 @@ func (k *Kite) setupLogging() {
 		level = logging.DEBUG
 	}
 	logging.SetLevel(level, log.Module)
-}
-
-// GetLogger returns a new logger which is used within the application itsel
-// (in main package).
-func GetLogger() *logging.Logger {
-	return log
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -253,170 +297,24 @@ func (k *Kite) hasDebugFlag() bool {
 	return false
 }
 
-// handle is a method that interprets the incoming message from Kontrol. The
-// incoming message must be in form of protocol.KontrolMessage.
-func (k *Kite) handle(msg []byte) {
-	var r protocol.KontrolMessage
-	err := json.Unmarshal(msg, &r)
-	if err != nil {
-		log.Info(err.Error())
-		return
-	}
-	// log.Debug("INCOMING KONTROL MSG: %#v", r)
+// DISABLED TEMPORARILY
+// // AddKite is executed when a protocol.AddKite message has been received
+// // trough the handler.
+// func (k *Kite) AddKite(kite protocol.Kite) {
+// 	k.peers.Add(&kite)
 
-	switch r.Type {
-	case protocol.KiteRegistered:
-		k.AddKite(r)
-	case protocol.KiteDisconnected:
-		k.RemoveKite(r)
-	case protocol.KiteUpdated:
-		k.Registered = false //trigger reinitialization
-	case protocol.Ping:
-		k.Pong()
-	default:
-		return
-	}
+// 	// Groupache settings, enable when ready
+// 	// k.SetPeers(k.PeersAddr()...)
 
-}
+// 	log.Info("[added] -> known peers -> %v", k.PeersAddr())
+// }
 
-func unmarshalKiteArg(r *protocol.KontrolMessage) (kite *protocol.Kite, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			// Only type assertions below can panic with runtime.Error
-			if _, ok := r.(runtime.Error); ok {
-				// err will be returned at the end of this func (named returns)
-				err = errors.New("Invalid kite argument")
-			}
-		}
-	}()
-
-	k := r.Args["kite"].(map[string]interface{})
-	// Must set all fields manually
-	kite = &protocol.Kite{
-		Name:     k["name"].(string),
-		Username: k["username"].(string),
-		ID:       k["id"].(string),
-		Version:  k["version"].(string),
-		Hostname: k["hostname"].(string),
-		PublicIP: k["publicIP"].(string),
-		Port:     k["port"].(string),
-	}
-	return
-}
-
-// AddKite is executed when a protocol.AddKite message has been received
-// trough the handler.
-func (k *Kite) AddKite(r protocol.KontrolMessage) {
-	kite, err := unmarshalKiteArg(&r)
-	if err != nil {
-		return
-	}
-
-	kites.Add(kite)
-
-	// Groupache settings, enable when ready
-	// k.SetPeers(k.PeersAddr()...)
-
-	log.Info("[%s] -> known peers -> %v", r.Type, k.PeersAddr())
-}
-
-// RemoveKite is executed when a protocol.AddKite message has been received
-// trough the handler.
-func (k *Kite) RemoveKite(r protocol.KontrolMessage) {
-	kite, err := unmarshalKiteArg(&r)
-	if err != nil {
-		return
-	}
-
-	kites.Remove(kite.ID)
-	log.Info("[%s] -> known peers -> %v", r.Type, k.PeersAddr())
-}
-
-// Pong sends a 'pong' message whenever the kite receives a message from Kontrol.
-// This is used for node coordination and notifier Kontrol that the Kite is alive.
-func (k *Kite) Pong() {
-	m := protocol.KiteToKontrolRequest{
-		Kite:      k.Kite,
-		Method:    protocol.Pong,
-		KodingKey: k.KodingKey,
-	}
-
-	msg, _ := json.Marshal(&m)
-
-	resp, _ := k.kontrolClient.Request(msg)
-	if string(resp) == "UPDATE" {
-		k.Registered = false
-
-		k.registerMutex.Lock()
-		defer k.registerMutex.Unlock()
-
-		if k.Registered {
-			return
-		}
-
-		err := k.registerToKontrol()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		k.Registered = true
-	}
-}
-
-// registerToKontrol sends a register message to Kontrol. It returns an error
-// when it is not allowed by Kontrol. If allowed, nil is returned.
-func (k *Kite) registerToKontrol() error {
-	m := protocol.KiteToKontrolRequest{
-		Method:    protocol.RegisterKite,
-		Kite:      k.Kite,
-		KodingKey: k.KodingKey,
-	}
-
-	msg, err := json.Marshal(&m)
-	if err != nil {
-		log.Info("kontrolRequest marshall err", err)
-		return err
-	}
-
-	result, err := k.kontrolClient.Request(msg)
-	if err != nil {
-		return err
-	}
-
-	var resp protocol.RegisterResponse
-	err = json.Unmarshal(result, &resp)
-	if err != nil {
-		return err
-	}
-
-	switch resp.Result {
-	case protocol.AllowKite:
-		log.Info("registered to kontrol with addr: %s version: %s uuid: %s",
-			k.Addr(), k.Version, k.ID)
-
-		k.Username = resp.Username // we know now which user that is
-
-		// Set the correct PublicIP if left empty in options.
-		if k.PublicIP == "" {
-			k.PublicIP = resp.PublicIP
-		}
-
-		return nil
-	case protocol.RejectKite:
-		return errors.New("no permission to run")
-	}
-
-	return errors.New("got a nonstandard response")
-}
-
-/******************************************
-
-RPC
-
-******************************************/
-
-// Can connect to RPC service using HTTP CONNECT to rpcPath.
-var connected = "200 Connected to Go RPC"
+// // RemoveKite is executed when a protocol.AddKite message has been received
+// // trough the handler.
+// func (k *Kite) RemoveKite(kite protocol.Kite) {
+// 	k.peers.Remove(kite.ID)
+// 	log.Info("[removec] -> known peers -> %v", k.PeersAddr())
+// }
 
 // listenAndServe starts our rpc server with the given addr.
 func (k *Kite) listenAndServe() error {
@@ -425,106 +323,55 @@ func (k *Kite) listenAndServe() error {
 		return err
 	}
 
-	log.Info("serve addr is: %s", listener.Addr().String())
+	log.Info("Listening: %s", listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
-	_, k.Port, err = net.SplitHostPort(listener.Addr().String())
-	if err != nil {
-		log.Fatal("Invalid address")
-	}
+	_, k.Port, _ = net.SplitHostPort(listener.Addr().String())
 
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
-		// Listen Kontrol messages
-		k.kontrolClient.Connect()
+		k.Kontrol = k.NewKontrol()
+
+		if k.RegisterToKontrol {
+			k.Kontrol.RemoteKite.Client.OnConnect(k.registerToKontrol)
+		}
+
+		k.Kontrol.DialForever()
 	}
 
 	// GroupCache settings, enable it when ready
 	// k.newPool(k.Addr) // registers to http.DefaultServeMux
 	// k.newGroup()
 
-	k.Server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-
-	return http.Serve(listener, k)
+	return http.Serve(listener, k.Server)
 }
 
-// ServeHTTP interface for http package.
-func (k *Kite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == protocol.WEBSOCKET_PATH {
-		websocket.Handler(k.serveWS).ServeHTTP(w, r)
-		return
-	}
-
-	log.Info("a new rpc call is done from", r.RemoteAddr)
-	if r.Method != "CONNECT" {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		io.WriteString(w, "405 must CONNECT\n")
-		return
-	}
-
-	conn, _, err := w.(http.Hijacker).Hijack()
+func (k *Kite) registerToKontrol() {
+	err := k.Kontrol.Register()
 	if err != nil {
-		log.Info("rpc hijacking ", r.RemoteAddr, ": ", err.Error())
-		return
+		log.Fatalf("Cannot register to Kontrol: %s", err)
 	}
 
-	io.WriteString(conn, "HTTP/1.0 "+connected+"\n\n")
-	k.Server.ServeCodec(NewKiteServerCodec(k, conn))
+	log.Info("Registered to Kontrol successfully")
 }
 
-// serveWS is used serving content over WebSocket. Is used internally via
-// ServeHTTP method.
-func (k *Kite) serveWS(ws *websocket.Conn) {
-	addr := ws.Request().RemoteAddr
-	log.Info("[%s] client connected", addr)
-
-	client := NewClient()
-	client.Conn = ws
-	client.Addr = addr
-	k.clients.AddClient(addr, client)
-
-	// k.Server.ServeCodec(NewJsonServerCodec(k, ws))
-	k.Server.ServeCodec(NewDnodeServerCodec(k, ws))
-}
-
+// DISABLED TEMPORARILY
 // OnDisconnect adds the given function to the list of the users callback list
 // which is called when the user is disconnected. There might be several
 // connections from one user to the kite, in that case the functions are
 // called only when all connections are closed.
-func (k *Kite) OnDisconnect(username string, f func()) {
-	addrs := k.clients.GetAddresses(username)
-	if addrs == nil {
-		return
-	}
+// func (k *Kite) OnDisconnect(username string, f func()) {
+// 	addrs := k.clients.GetAddresses(username)
+// 	if addrs == nil {
+// 		return
+// 	}
 
-	for _, addr := range addrs {
-		client := k.clients.GetClient(addr)
-		client.onDisconnect = append(client.onDisconnect, f)
-		k.clients.AddClient(addr, client)
-	}
-}
-
-// broadcast sends messages in dnode protocol to all connected websocket
-// clients method and arguments is mapped to dnode's method and arguments
-// fields.
-func (k *Kite) broadcast(method string, arguments interface{}) {
-	for _, client := range k.clients.List() {
-		rawArgs, err := json.Marshal(arguments)
-		if err != nil {
-			log.Info("collect json unmarshal %+v", err)
-		}
-
-		message := dnode.Message{
-			Method:    "info",
-			Arguments: &dnode.Partial{Raw: rawArgs},
-			Links:     []string{},
-			Callbacks: make(map[string][]string),
-		}
-
-		websocket.JSON.Send(client.Conn, message)
-	}
-}
+// 	for _, addr := range addrs {
+// 		client := k.clients.GetClient(addr)
+// 		client.onDisconnect = append(client.onDisconnect, f)
+// 		k.clients.AddClient(addr, client)
+// 	}
+// }
 
 /******************************************
 
@@ -567,7 +414,7 @@ func (k *Kite) SetPeers(peers ...string) {
 
 func (k *Kite) PeersAddr() []string {
 	list := make([]string, 0)
-	for _, kite := range kites.List() {
+	for _, kite := range k.peers.List() {
 		list = append(list, kite.Addr())
 	}
 	return list

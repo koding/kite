@@ -7,8 +7,26 @@ import (
 	"strings"
 )
 
-// Callback is the callable function with arbitrary args and no return value.
-type Callback func(args ...interface{})
+const functionPlaceholder = `"[Function]"`
+
+// Callback is a function to send in arguments.
+// Wrap your function to make it marshalable before sending.
+type Callback func(*Partial)
+
+func (p Callback) MarshalJSON() ([]byte, error) {
+	return []byte(functionPlaceholder), nil
+}
+
+// Funciont is a callable function with arbitrary args and error return value.
+// It is used to wrap the callback function on receiving side.
+type Function func(...interface{}) error
+
+// UnmarshalJSON marshals the callback as "nil".
+// Value of the callback is not important in dnode protocol.
+// Skips unmarshal errors when unmarshalling a callback placeholder to Callback.
+func (p *Function) UnmarshalJSON(data []byte) error {
+	return nil
+}
 
 // Path represents a callback function's path in the arguments structure.
 // Contains mixture of string and integer values.
@@ -18,13 +36,15 @@ type Path []interface{}
 type CallbackSpec struct {
 	// Path represents the callback's path in the arguments structure.
 	Path     Path
-	Callback Callback
+	Callback Function
 }
 
 func (c *CallbackSpec) Apply(value reflect.Value) error {
 	l.Printf("Apply: %#v\n", value.Interface())
 	i := 0
 	for {
+		l.Printf("Apply value: %#v\n", value)
+		l.Printf("value.Kind(): %s\n", value.Kind())
 		switch value.Kind() {
 		case reflect.Slice:
 			if i == len(c.Path) {
@@ -68,7 +88,8 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			value = value.Elem()
 		case reflect.Struct:
 			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
-				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, CallbackSpec{c.Path[i:], c.Callback})
+				spec := CallbackSpec{c.Path[i:], c.Callback}
+				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)
 				return nil
 			}
 
@@ -87,7 +108,7 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			// callback path does not exist, skip
 			return nil
 		default:
-			return fmt.Errorf("Unhandled value of kind '%v' in callback path.", value.Kind())
+			return fmt.Errorf("Unhandled value of kind '%v' in callback path: %s", value.Kind(), value.Interface())
 		}
 	}
 	return nil

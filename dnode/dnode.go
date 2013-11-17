@@ -1,3 +1,5 @@
+// Package dnode implements a message processor for communication
+// via dnode protocol. See the following URL for details:
 // https://github.com/substack/dnode-protocol/blob/master/doc/protocol.markdown
 package dnode
 
@@ -5,20 +7,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "io/ioutil"
+	"io/ioutil"
 	"log"
-	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync/atomic"
 )
 
-const functionPlaceholder = "[Function]"
+var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
 
-// var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
-
-var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
+// Uncomment following to see log messages.
+// var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
 
 type Dnode struct {
 	// Registered mehtods with HandleFunc() are saved in this map with string keys.
@@ -32,11 +31,33 @@ type Dnode struct {
 
 	// For sending and receiving messages
 	transport Transport
+
+	// If the method is not found in handlers the message will be forwarded to this
+	ExternalHandler MessageHandler
 }
 
 type Transport interface {
+	// Address of the connected client
+	RemoteAddr() string
+
+	// Send a one message
 	Send(msg []byte) error
+
+	// Receive one message
 	Receive() ([]byte, error)
+
+	// A place to save/read extra information about the client
+	Properties() map[string]interface{}
+
+	// Returns the client for this transport.
+	// It may be a websocket client, sock.js, etc...
+	Client() interface{}
+}
+
+// MessageHandler is the interface for delegating message processing to outside
+// of the Dnode instance.
+type MessageHandler interface {
+	HandleDnodeMessage(*Message, *Dnode, Transport) error
 }
 
 // Message is the JSON object to call a method at the other side.
@@ -80,22 +101,38 @@ func (d *Dnode) Run() error {
 			return err
 		}
 
-		d.processMessage(msg)
+		err = d.processMessage(msg)
+		if err != nil {
+			fmt.Printf("Could not process message: %s\n", err)
+		}
 	}
 }
 
-// Send serializes the method and arguments, then sends to the SendChan.
-// The user is responsible for reading from the channel and sending
-// messages to the remote side.
-func (d *Dnode) Call(method interface{}, arguments ...interface{}) error {
-	l.Printf("Call method: %s arguments %+v\n", method, arguments)
+// Call sends the method and arguments to remote.
+func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, error) {
+	if method == "" {
+		panic("Empty method name")
+	}
+
+	return d.call(method, arguments...)
+}
+
+func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]Path, error) {
+	l.Printf("Call method: %s arguments: %+v\n", method, arguments)
 
 	callbacks := make(map[string]Path)
 	d.collectCallbacks(arguments, make(Path, 0), callbacks)
 
+	// Do not encode empty arguments as "null", make it "[]".
+	if arguments == nil {
+		arguments = make([]interface{}, 0)
+	}
+
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		return err
+		l.Printf("Cannot marshal arguments: %s: %#v", err, arguments)
+		d.removeCallbacks(callbacks)
+		return nil, err
 	}
 
 	msg := Message{
@@ -107,30 +144,49 @@ func (d *Dnode) Call(method interface{}, arguments ...interface{}) error {
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		l.Printf("Cannot marshal message: %s: %#v", err, msg)
+		d.removeCallbacks(callbacks)
+		return nil, err
 	}
 
-	return d.transport.Send(data)
+	err = d.transport.Send(data)
+	if err != nil {
+		l.Printf("Cannot send message over transport: %s", err)
+		d.removeCallbacks(callbacks)
+		return nil, err
+	}
+
+	// We are returning callbacks here so the caller can Cull() after it gets the response.
+	return callbacks, nil
+}
+
+// Used to remove callbacks after error occurs in call().
+func (d *Dnode) removeCallbacks(callbacks map[string]Path) {
+	for id, _ := range callbacks {
+		delete(d.handlers, id)
+	}
+}
+
+// RemoveCallback removes the callback with id from handlers.
+// Can be used to remove unused callbacks to free memory.
+func (d *Dnode) RemoveCallback(id uint64) {
+	delete(d.handlers, strconv.FormatUint(id, 10))
 }
 
 // collectCallbacks walks over the rawObj and populates callbackMap
 // with callbacks. This is a recursive function. The top level call must
 // sends arguments as rawObj, an empty path and empty callbackMap parameter.
-func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[string]Path) bool {
+func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[string]Path) {
 	switch obj := rawObj.(type) {
 	// skip nil values
 	case nil:
 	case []interface{}:
 		for i, item := range obj {
-			if d.collectCallbacks(item, append(path, strconv.Itoa(i)), callbackMap) {
-				obj[i] = functionPlaceholder
-			}
+			d.collectCallbacks(item, append(path, strconv.Itoa(i)), callbackMap)
 		}
 	case map[string]interface{}:
 		for key, item := range obj {
-			if d.collectCallbacks(item, append(path, key), callbackMap) {
-				obj[key] = functionPlaceholder
-			}
+			d.collectCallbacks(item, append(path, key), callbackMap)
 		}
 	// Dereference and continue.
 	case *[]interface{}:
@@ -145,23 +201,31 @@ func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[
 	default:
 		v := reflect.ValueOf(obj)
 
-		if v.Kind() == reflect.Func {
+		switch v.Kind() {
+		case reflect.Func:
 			d.registerCallback(v, path, callbackMap)
-			return true
-		}
-
-		// If type has methods, register them.
-		for i := 0; i < v.NumMethod(); i++ {
-			m := v.Type().Method(i)
-			if m.PkgPath == "" { // exported
-				name := v.Type().Method(i).Name
-				name = strings.ToLower(name[0:1]) + name[1:]
-				d.registerCallback(v.Method(i), append(path, name), callbackMap)
+		case reflect.Ptr:
+			e := v.Elem()
+			if e == reflect.ValueOf(nil) {
+				return
 			}
+
+			v = reflect.ValueOf(e.Interface())
+			d.collectFields(v, path, callbackMap)
+		case reflect.Struct:
+			d.collectFields(v, path, callbackMap)
 		}
 	}
+}
 
-	return false
+// collectFields collects callbacks from the exported fields of a struct.
+func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string]Path) {
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Type().Field(i)
+		if f.PkgPath == "" { // exported
+			d.collectCallbacks(v.Field(i).Interface(), append(path, f.Name), callbackMap)
+		}
+	}
 }
 
 // registerCallback is called when a function/mehtod is found in arguments array.
@@ -186,52 +250,67 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 // processMessage processes a single message and call the previously
 // added callbacks.
 func (d *Dnode) processMessage(data []byte) error {
+	l.Printf("processMessage: %s", string(data))
+
 	var msg Message
-	err := json.Unmarshal(data, &msg)
-	if err != nil {
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return err
 	}
 
-	l.Printf("processMessage: %#v", msg)
-
-	// Parse callbacks field and create callback functions.
-	l.Printf("Received message callbacks: %#v", msg.Callbacks)
-	for methodID, path := range msg.Callbacks {
-		l.Printf("MehodID", methodID)
-		// When the callback is called, we must send the method to the remote.
-		methodID2 := methodID // Closure issue, bind variable again.
-		f := Callback(func(args ...interface{}) {
-			d.Call(methodID2, args...)
-		})
-		spec := CallbackSpec{path, f}
-		msg.Arguments.CallbackSpecs = append(msg.Arguments.CallbackSpecs, spec)
+	if err := d.ParseCallbacks(&msg); err != nil {
+		return err
 	}
-	l.Printf("All callbackspecs: %#v", msg.Arguments.CallbackSpecs)
 
-	// Method may be string or integer
+	// Method may be string or integer.
 	l.Printf("All handlers: %#v", d.handlers)
 	method := fmt.Sprint(msg.Method)
+
+	// Get the handler function.
 	l.Printf("Received method: %s", method)
 	handler := d.handlers[method]
-	if handler.Kind() != reflect.Func {
+
+	// Try to find the handler from ExternalHandler.
+	if handler == reflect.ValueOf(nil) && d.ExternalHandler != nil {
+		l.Printf("Looking in external handler")
+		go d.ExternalHandler.HandleDnodeMessage(&msg, d, d.transport)
+		return nil
+	}
+
+	// Method is not found.
+	if handler == reflect.ValueOf(nil) {
 		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
-	// Get arguments as array.
-	args, err := msg.Arguments.Array()
-	if err != nil {
-		return err
-	}
-	l.Printf("Array of args: %#v", args)
+	// Call the handler with arguments.
+	args := []reflect.Value{reflect.ValueOf(msg.Arguments)}
+	go handler.Call(args)
 
-	// Get the reflect.Value of arguments.
-	callArgs := make([]reflect.Value, len(args))
-	for i, arg := range args {
-		callArgs[i] = reflect.ValueOf(arg)
-	}
+	return nil
+}
 
-	l.Printf("Calling %#v with args: %+v\n", handler.String(), args)
-	go handler.Call(callArgs)
+// ParseCallbacks parses the message's "callbacks" field and prepares
+// callback functions in "arguments" field.
+func (d *Dnode) ParseCallbacks(msg *Message) error {
+	// Parse callbacks field and create callback functions.
+	l.Printf("Received message callbacks: %#v", msg.Callbacks)
+
+	for methodID, path := range msg.Callbacks {
+		l.Printf("MehodID: %s", methodID)
+
+		id, err := strconv.ParseUint(methodID, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		// When the callback is called, we must send the method to the remote.
+		f := Function(func(args ...interface{}) error {
+			_, err := d.call(id, args...)
+			return err
+		})
+
+		spec := CallbackSpec{path, f}
+		msg.Arguments.CallbackSpecs = append(msg.Arguments.CallbackSpecs, spec)
+	}
 
 	return nil
 }
