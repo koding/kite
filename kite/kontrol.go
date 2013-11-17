@@ -96,7 +96,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
 			Key:  kite.Token,
 		}
 
-		remoteKites[i] = k.LocalKite.NewRemoteKite(kite.Kite, auth)
+		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
 	}
 
 	return remoteKites, nil

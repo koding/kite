@@ -13,7 +13,7 @@ import (
 // It has Call() and Go() methods for calling methods sync/async way.
 type RemoteKite struct {
 	protocol.Kite
-	LocalKite      *Kite
+	localKite      *Kite
 	Authentication callAuthentication
 	Client         *rpc.Client
 	disconnect     chan bool
@@ -25,7 +25,7 @@ type RemoteKite struct {
 func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *RemoteKite {
 	r := &RemoteKite{
 		Kite:           kite,
-		LocalKite:      k,
+		localKite:      k,
 		Authentication: auth,
 		Client:         rpc.NewClient(),
 		disconnect:     make(chan bool),
@@ -90,7 +90,7 @@ func (r *RemoteKite) makeOptions(args interface{}) *callOptionsOut {
 	return &callOptionsOut{
 		WithArgs: args,
 		CallOptions: CallOptions{
-			Kite:           r.LocalKite.Kite,
+			Kite:           r.localKite.Kite,
 			Authentication: r.Authentication,
 		},
 	}
