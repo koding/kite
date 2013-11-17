@@ -1,13 +1,10 @@
 package kite
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/golang/groupcache"
-	logging "github.com/op/go-logging"
 	"io"
 	"koding/messaging/moh"
 	"koding/newkite/peers"
@@ -23,6 +20,9 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"code.google.com/p/go.net/websocket"
+	"github.com/golang/groupcache"
+	logging "github.com/op/go-logging"
 )
 
 var (
@@ -148,6 +148,11 @@ func New(options *protocol.Options) *Kite {
 
 	k.kontrolClient = moh.NewMessagingClient(options.KontrolAddr, k.handle)
 	k.kontrolClient.Subscribe(kiteID)
+
+	// Needed to receive batch messages that are intended to kites only.
+	// Everyone (like browser clients) also can connect to kontrol, that means
+	// if we want to notify all kites we have to distinguish them from others.
+	k.kontrolClient.Subscribe(protocol.KitesSubscribePrefix)
 
 	// Register our internal method
 	k.Methods["vm.info"] = "status.Info"

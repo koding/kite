@@ -1,12 +1,9 @@
 package main
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	logging "github.com/op/go-logging"
 	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/messaging/moh"
@@ -21,6 +18,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/mux"
+	logging "github.com/op/go-logging"
 )
 
 // Storage is an interface that encapsulates basic operations on the kite
@@ -79,7 +79,8 @@ var (
 	dependency Dependency
 )
 
-const SubscribePrefix = "kite."
+const ClientSubscribePrefix = "client"
+const KitesSubscribePrefix = protocol.KitesSubscribePrefix
 
 func main() {
 	hostname, _ := os.Hostname()
@@ -142,7 +143,7 @@ func (k *Kontrol) ping() {
 		Type: protocol.Ping,
 	}
 	msg, _ := json.Marshal(&m)
-	k.Publisher.Broadcast(msg)
+	k.BroadcastToKites(msg)
 }
 
 // HeartBeat pool checker. Checking for kites if they are live or dead.
@@ -194,7 +195,7 @@ func (k *Kontrol) heartBeatChecker() {
 				k.Publish(c.ID, stoppedMsgBytes)
 			}
 
-			k.Publish(SubscribePrefix+kite.Username, stoppedMsgBytes)
+			k.Publish(ClientSubscribePrefix+"."+kite.Username, stoppedMsgBytes)
 
 			// Am I the latest of my kind ? if yes remove me from the dependencies list
 			// and remove any tokens if I have some
@@ -306,7 +307,7 @@ func (k *Kontrol) handleRegister(httpReq *http.Request, req *protocol.KiteToKont
 	k.Publish(req.Kite.ID, msg)
 
 	// notify browser clients ...
-	k.Publish(SubscribePrefix+kite.Username, msg)
+	k.Publish(ClientSubscribePrefix+"."+kite.Username, msg)
 
 	// then notify dependencies of this kite, if any available
 	k.NotifyDependencies(kite)
@@ -405,6 +406,13 @@ func (k *Kontrol) NotifyDependencies(kite *models.Kite) {
 
 func (k *Kontrol) Publish(filter string, msg []byte) {
 	k.Publisher.Publish(filter, msg)
+}
+
+// BroadcastToKites publishes messages to all connected kites. It doesn't
+// matter if the kite is registerd or not to kontrol. Also useful for pinging
+// all kites.
+func (k *Kontrol) BroadcastToKites(msg []byte) {
+	k.Publisher.Publish(KitesSubscribePrefix, msg)
 }
 
 // RegisterKite returns true if the specified kite has been seen before.
@@ -554,14 +562,14 @@ func validateCommand(username string, cmd *moh.SubscriberCommand) bool {
 	key := cmd.Args["key"].(string)
 
 	// if it has doesn't have prefix let im trough
-	if !strings.HasPrefix(key, SubscribePrefix) {
+	if !strings.HasPrefix(key, ClientSubscribePrefix) {
 		return true
 	}
 
 	// now check if "kite.usernamefield" really is the same with the requester
 	// username. Users shouldn't be able subscribe to other people's kites.
 	// the `username` is fetched via websocket protocol authentication.
-	if strings.TrimPrefix(key, SubscribePrefix) != username {
+	if strings.TrimPrefix(key, ClientSubscribePrefix+".") != username {
 		return false
 	}
 

@@ -27,6 +27,9 @@ const HEARTBEAT_DELAY = time.Millisecond * 1000
 // Kite's HTTP server runs a RPC server here
 const WEBSOCKET_PATH = "/sock"
 
+// Needed by kontrol to filter messages from other connections.
+const KitesSubscribePrefix = "kites"
+
 // Kite is the base struct containing the public fields. It is usually embeded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
