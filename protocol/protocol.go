@@ -65,22 +65,6 @@ type KiteWithToken struct {
 	Token string `json:"token"`
 }
 
-// // KontrolMessage is a structure that is published from Kontrol to Kite
-// // to notify some events.
-// type KontrolMessage struct {
-// 	Type MessageType            `json:"type"`
-// 	Args map[string]interface{} `json:"args"`
-// }
-
-// type MessageType string
-
-// const (
-// 	KiteRegistered   MessageType = "KITE_REGISTERED"
-// 	KiteDisconnected MessageType = "KITE_DISCONNECTED"
-// 	KiteUpdated      MessageType = "KITE_UPDATED"
-// 	Ping             MessageType = "PING"
-// )
-
 type Options struct {
 	Username     string `json:"username"`
 	Kitename     string `json:"kitename"`
