@@ -3,7 +3,6 @@ package kite
 import (
 	"flag"
 	"fmt"
-	"github.com/golang/groupcache"
 	logging "github.com/op/go-logging"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
@@ -66,10 +65,6 @@ type Kite struct {
 
 	// implements the Clients interface
 	clients *clients
-
-	// GroupCache variables
-	Pool  *groupcache.HTTPPool
-	Group *groupcache.Group
 
 	// Dnode rpc server
 	Server *rpc.Server
@@ -297,25 +292,6 @@ func (k *Kite) hasDebugFlag() bool {
 	return false
 }
 
-// DISABLED TEMPORARILY
-// // AddKite is executed when a protocol.AddKite message has been received
-// // trough the handler.
-// func (k *Kite) AddKite(kite protocol.Kite) {
-// 	k.peers.Add(&kite)
-
-// 	// Groupache settings, enable when ready
-// 	// k.SetPeers(k.PeersAddr()...)
-
-// 	log.Info("[added] -> known peers -> %v", k.PeersAddr())
-// }
-
-// // RemoveKite is executed when a protocol.AddKite message has been received
-// // trough the handler.
-// func (k *Kite) RemoveKite(kite protocol.Kite) {
-// 	k.peers.Remove(kite.ID)
-// 	log.Info("[removec] -> known peers -> %v", k.PeersAddr())
-// }
-
 // listenAndServe starts our rpc server with the given addr.
 func (k *Kite) listenAndServe() error {
 	listener, err := net.Listen("tcp4", ":"+k.Port)
@@ -338,10 +314,6 @@ func (k *Kite) listenAndServe() error {
 
 		k.Kontrol.DialForever()
 	}
-
-	// GroupCache settings, enable it when ready
-	// k.newPool(k.Addr) // registers to http.DefaultServeMux
-	// k.newGroup()
 
 	return http.Serve(listener, k.Server)
 }
@@ -372,50 +344,3 @@ func (k *Kite) registerToKontrol() {
 // 		k.clients.AddClient(addr, client)
 // 	}
 // }
-
-/******************************************
-
-GroupCache
-
-******************************************/
-func (k *Kite) newPool(addr string) {
-	k.Pool = groupcache.NewHTTPPool(addr)
-}
-
-func (k *Kite) newGroup() {
-	k.Group = groupcache.NewGroup(k.Name, 64<<20, groupcache.GetterFunc(
-		func(ctx groupcache.Context, key string, dest groupcache.Sink) error {
-			dest.SetString("fatih")
-			return nil
-		}))
-}
-
-func (k *Kite) GetString(name, key string) (result string) {
-	if k.Group == nil {
-		return
-	}
-
-	k.Group.Get(nil, key, groupcache.StringSink(&result))
-	return
-}
-
-func (k *Kite) GetByte(name, key string) (result []byte) {
-	if k.Group == nil {
-		return
-	}
-
-	k.Group.Get(nil, key, groupcache.AllocatingByteSliceSink(&result))
-	return
-}
-
-func (k *Kite) SetPeers(peers ...string) {
-	k.Pool.Set(peers...)
-}
-
-func (k *Kite) PeersAddr() []string {
-	list := make([]string, 0)
-	for _, kite := range k.peers.List() {
-		list = append(list, kite.Addr())
-	}
-	return list
-}
