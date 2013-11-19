@@ -63,7 +63,7 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 // The returned Client will have the same handlers with the server.
 func (s *Server) NewClientWithHandlers() *Client {
 	c := NewClient()
-	c.Dnode = s.dnode.Copy(c)
+	c.dnode = s.dnode.Copy(c)
 	return c
 }
 

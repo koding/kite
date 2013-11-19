@@ -133,7 +133,7 @@ func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partia
 		// Remove the callback function from the map so we do not
 		// consume memory for unused callbacks.
 		id := <-removeCallback
-		r.Client.Dnode.RemoveCallback(id)
+		r.Client.RemoveCallback(id)
 
 		var (
 			// Arguments to our response callback It is a slice of length 2.

@@ -31,7 +31,7 @@ type Client struct {
 	Conn *websocket.Conn
 
 	// Dnode message processor.
-	Dnode *dnode.Dnode
+	dnode *dnode.Dnode
 
 	// A space for saving/reading extra properties about this client.
 	properties map[string]interface{}
@@ -56,7 +56,7 @@ func NewClient() *Client {
 		properties:     make(map[string]interface{}),
 		redialDuration: redialDurationStart,
 	}
-	c.Dnode = dnode.New(c)
+	c.dnode = dnode.New(c)
 	return c
 }
 
@@ -117,7 +117,7 @@ func (c *Client) dialForever() {
 func (c *Client) run() (err error) {
 	for {
 	running:
-		err = c.Dnode.Run()
+		err = c.dnode.Run()
 		c.callOnDisconnectHandlers()
 	dialAgain:
 		if !c.Reconnect {
@@ -165,6 +165,10 @@ func (c *Client) Receive() ([]byte, error) {
 	return msg, err
 }
 
+func (c *Client) RemoveCallback(id uint64) {
+	c.dnode.RemoveCallback(id)
+}
+
 // RemoteAddr returns the host:port as string if server connection.
 func (c *Client) RemoteAddr() string {
 	if c.Conn.IsServerConn() {
@@ -179,7 +183,7 @@ func (c *Client) Properties() map[string]interface{} {
 
 // Call calls a method with args on the dnode server.
 func (c *Client) Call(method string, args ...interface{}) (map[string]dnode.Path, error) {
-	return c.Dnode.Call(method, args...)
+	return c.dnode.Call(method, args...)
 }
 
 // OnConnect registers a function to run on client connect.
