@@ -17,14 +17,14 @@ func (p Callback) MarshalJSON() ([]byte, error) {
 	return []byte(functionPlaceholder), nil
 }
 
-// Funciont is a callable function with arbitrary args and error return value.
+// Funcion is a callable function with arbitrary args and error return value.
 // It is used to wrap the callback function on receiving side.
 type Function func(...interface{}) error
 
 // UnmarshalJSON marshals the callback as "nil".
 // Value of the callback is not important in dnode protocol.
 // Skips unmarshal errors when unmarshalling a callback placeholder to Callback.
-func (p *Function) UnmarshalJSON(data []byte) error {
+func (f *Function) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
