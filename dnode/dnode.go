@@ -20,7 +20,7 @@ var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
 // var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
 
 type Dnode struct {
-	// Registered mehtods with HandleFunc() are saved in this map with string keys.
+	// Registered methods with HandleFunc() are saved in this map with string keys.
 	// Callback methods sent by Call() are saved here with integer keys.
 	// Contains kinds of reflect.Func.
 	handlers map[string]reflect.Value
@@ -36,14 +36,16 @@ type Dnode struct {
 	ExternalHandler MessageHandler
 }
 
+// Transport is an interface for sending and receiving data on network.
+// Each Transport must be unique for each Client.
 type Transport interface {
 	// Address of the connected client
 	RemoteAddr() string
 
-	// Send a one message
+	// Send single message
 	Send(msg []byte) error
 
-	// Receive one message
+	// Receive single message
 	Receive() ([]byte, error)
 
 	// A place to save/read extra information about the client
@@ -120,6 +122,13 @@ func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, 
 func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]Path, error) {
 	l.Printf("Call method: %s arguments: %+v\n", method, arguments)
 
+	var err error
+	defer func() {
+		if err != nil {
+			d.removeCallbacks(callbacks)
+		}
+	}()
+
 	callbacks := make(map[string]Path)
 	d.collectCallbacks(arguments, make(Path, 0), callbacks)
 
@@ -131,7 +140,6 @@ func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]P
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
 		l.Printf("Cannot marshal arguments: %s: %#v", err, arguments)
-		d.removeCallbacks(callbacks)
 		return nil, err
 	}
 
@@ -145,14 +153,12 @@ func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]P
 	data, err := json.Marshal(msg)
 	if err != nil {
 		l.Printf("Cannot marshal message: %s: %#v", err, msg)
-		d.removeCallbacks(callbacks)
 		return nil, err
 	}
 
 	err = d.transport.Send(data)
 	if err != nil {
 		l.Printf("Cannot send message over transport: %s", err)
-		d.removeCallbacks(callbacks)
 		return nil, err
 	}
 
