@@ -75,9 +75,9 @@ func main() {
 	k.KontrolEnabled = false
 	k.Authenticators["kodingKey"] = kontrol.AuthenticateFromKodingKey
 	k.Authenticators["sessionID"] = kontrol.AuthenticateFromSessionID
-	k.Handlers["register"] = kontrol.handleRegister
-	k.Handlers["getKites"] = kontrol.handleGetKites
-	k.Handlers["watchKites"] = kontrol.handleWatchKites
+	k.HandleFunc("register", kontrol.handleRegister)
+	k.HandleFunc("getKites", kontrol.handleGetKites)
+	k.HandleFunc("watchKites", kontrol.handleWatchKites)
 	go kontrol.heartBeatChecker()
 	k.Run()
 }
@@ -202,7 +202,8 @@ func (k *Kontrol) requestHeartbeat(kite *protocol.Kite, remote *kite.RemoteKite)
 		HEARTBEAT_INTERVAL / time.Second,
 		dnode.Callback(updateKite),
 	}
-	return remote.Go("heartbeat", heartbeatArgs)
+	_, err := remote.Call("heartbeat", heartbeatArgs)
+	return err
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {

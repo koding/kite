@@ -198,8 +198,19 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	seconds := args[0].(float64)
-	ping := args[1].(dnode.Function)
+	if len(args) != 2 {
+		return nil, fmt.Errorf("Invalid args: %s", string(r.Args.Raw))
+	}
+
+	seconds, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("Invalid interval: %s", args[0])
+	}
+
+	ping, ok := args[1].(dnode.Function)
+	if !ok {
+		return nil, fmt.Errorf("Invalid callback: %s", args[1])
+	}
 
 	go func() {
 		for {
