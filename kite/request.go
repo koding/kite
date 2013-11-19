@@ -62,7 +62,7 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 	if properties["remoteKite"] == nil {
 		// Do not create a new RemoteKite on every request,
 		// cache it in Transport.Properties().
-		client := tr.Client().(*rpc.Client) // We only have a dnode/rpc.Client for now.
+		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
 		remoteKite := k.newRemoteKiteWithClient(options.Kite, options.Authentication, client)
 		properties["remoteKite"] = remoteKite
 	}

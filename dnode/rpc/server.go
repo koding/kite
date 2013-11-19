@@ -52,7 +52,6 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	// Since both sides can send/receive messages the client code is reused here.
 	client := NewClient()
 	client.Conn = ws
-	client.tr.conn = ws
 
 	// Pass dnode message delegate
 	client.Dnode.ExternalHandler = s.Delegate

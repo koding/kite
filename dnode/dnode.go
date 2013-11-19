@@ -50,10 +50,6 @@ type Transport interface {
 
 	// A place to save/read extra information about the client
 	Properties() map[string]interface{}
-
-	// Returns the client for this transport.
-	// It may be a websocket client, sock.js, etc...
-	Client() interface{}
 }
 
 // MessageHandler is the interface for delegating message processing to outside

@@ -33,11 +33,8 @@ type Client struct {
 	// Dnode message processor.
 	Dnode *dnode.Dnode
 
-	// Implements dnode.Transport interface
-	tr *wsTransport
-
 	// A space for saving/reading extra properties about this client.
-	Properties map[string]interface{}
+	properties map[string]interface{}
 
 	// Dialled URL, used to re-connect again.
 	url string
@@ -55,19 +52,11 @@ type Client struct {
 // NewClient returns a pointer to new Client.
 // You need to call Dial() before interacting with the Server.
 func NewClient() *Client {
-	p := make(map[string]interface{})
-
-	tr := &wsTransport{properties: p}
-
 	c := &Client{
-		Properties:     p,
-		tr:             tr,
-		Dnode:          dnode.New(tr),
+		properties:     make(map[string]interface{}),
 		redialDuration: redialDurationStart,
 	}
-
-	tr.client = c
-
+	c.Dnode = dnode.New(c)
 	return c
 }
 
@@ -96,7 +85,6 @@ func (c *Client) dial() error {
 
 	// We are connected
 	c.Conn = ws
-	c.tr.conn = ws
 
 	// Reset the wait time.
 	c.redialDuration = redialDurationStart
@@ -164,6 +152,31 @@ func (c *Client) Close() {
 	c.Conn.Close()
 }
 
+func (c *Client) Send(msg []byte) error {
+	println("Sending...", string(msg))
+	return websocket.Message.Send(c.Conn, string(msg))
+}
+
+func (c *Client) Receive() ([]byte, error) {
+	println("Receiving...")
+	var msg []byte
+	err := websocket.Message.Receive(c.Conn, &msg)
+	println("Received:", string(msg))
+	return msg, err
+}
+
+// RemoteAddr returns the host:port as string if server connection.
+func (c *Client) RemoteAddr() string {
+	if c.Conn.IsServerConn() {
+		return c.Conn.Request().RemoteAddr
+	}
+	return ""
+}
+
+func (c *Client) Properties() map[string]interface{} {
+	return c.properties
+}
+
 // Call calls a method with args on the dnode server.
 func (c *Client) Call(method string, args ...interface{}) (map[string]dnode.Path, error) {
 	return c.Dnode.Call(method, args...)
@@ -191,44 +204,4 @@ func (c *Client) callOnDisconnectHandlers() {
 	for _, handler := range c.onDisconnectHandlers {
 		go handler()
 	}
-}
-
-// ------------
-// Transport
-// ------------
-
-// wsTransport implements dnode.Transport interface.
-type wsTransport struct {
-	client     *Client
-	conn       *websocket.Conn
-	properties map[string]interface{}
-}
-
-func (t *wsTransport) Send(msg []byte) error {
-	println("Sending...", string(msg))
-	return websocket.Message.Send(t.conn, string(msg))
-}
-
-func (t *wsTransport) Receive() ([]byte, error) {
-	println("Receiving...")
-	var msg []byte
-	err := websocket.Message.Receive(t.conn, &msg)
-	println("Received:", string(msg))
-	return msg, err
-}
-
-// RemoteAddr returns the host:port as string if server connection.
-func (t *wsTransport) RemoteAddr() string {
-	if t.conn.IsServerConn() {
-		return t.conn.Request().RemoteAddr
-	}
-	return ""
-}
-
-func (t *wsTransport) Properties() map[string]interface{} {
-	return t.properties
-}
-
-func (t *wsTransport) Client() interface{} {
-	return t.client
 }
