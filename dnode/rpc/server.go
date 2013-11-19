@@ -50,24 +50,24 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	fmt.Println("--- connected new client")
 	// This client is actually is the server for the websocket.
 	// Since both sides can send/receive messages the client code is reused here.
-	c := NewClient()
-	c.Conn = ws
-	c.tr.conn = ws
+	client := NewClient()
+	client.Conn = ws
+	client.tr.conn = ws
 
 	// Pass dnode message delegate
-	c.Dnode.ExternalHandler = s.Delegate
+	client.Dnode.ExternalHandler = s.Delegate
 
 	// Add our servers handler methods to the client.
 	for method, handler := range s.handlers {
-		c.Dnode.HandleFunc(method, handler)
+		client.Dnode.HandleFunc(method, handler)
 	}
 
-	s.callOnConnectHandlers(c)
+	s.callOnConnectHandlers(client)
 
 	// Run after methods are registered and delegate is set
-	c.run()
+	client.run()
 
-	s.callOnDisconnectHandlers(c)
+	s.callOnDisconnectHandlers(client)
 }
 
 func (s *Server) OnConnect(handler func(*Client)) {
