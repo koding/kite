@@ -324,12 +324,14 @@ func (d *Dnode) processMessage(data []byte) error {
 	case string:
 		handler = d.handlers[method]
 	default:
-		return fmt.Errorf("Invalid method: %s", msg.Method)
+		err = fmt.Errorf("Invalid method: %s", msg.Method)
+		return
 	}
 
 	// Method is not found.
 	if handler == nil {
-		return fmt.Errorf("Unknown method: %v", msg.Method)
+		err = fmt.Errorf("Unknown method: %v", msg.Method)
+		return
 	}
 
 	handler.ProcessMessage(&msg, d.transport)
