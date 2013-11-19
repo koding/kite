@@ -27,11 +27,10 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		Kite:           kite,
 		localKite:      k,
 		Authentication: auth,
-		Client:         rpc.NewClient(),
+		Client:         k.Server.NewClientWithHandlers(),
 		disconnect:     make(chan bool),
 	}
 
-	r.Client.Dnode.ExternalHandler = k
 	r.Client.OnDisconnect(r.notifyDisconnect)
 	return r
 }

@@ -48,9 +48,8 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 
 	// This client is actually is the server for the websocket.
 	// Since both sides can send/receive messages the client code is reused here.
-	clientServer := NewClient()
+	clientServer := s.NewClientWithHandlers()
 	clientServer.Conn = ws
-	clientServer.Dnode = s.dnode.Copy(clientServer)
 
 	s.callOnConnectHandlers(clientServer)
 
@@ -58,6 +57,14 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	clientServer.run()
 
 	s.callOnDisconnectHandlers(clientServer)
+}
+
+// NewClientWithHandlers returns a pointer to new Client.
+// The returned Client will have the same handlers with the server.
+func (s *Server) NewClientWithHandlers() *Client {
+	c := NewClient()
+	c.Dnode = s.dnode.Copy(c)
+	return c
 }
 
 func (s *Server) OnConnect(handler func(*Client)) {

@@ -60,8 +60,8 @@ type Kite struct {
 	// Wheter we want to register our Kite to Kontrol, true by default.
 	RegisterToKontrol bool
 
-	// method map for shared methods
-	Handlers map[string]HandlerFunc
+	// method map for exported methods
+	handlers map[string]HandlerFunc
 
 	// implements the Clients interface
 	clients *clients
@@ -138,7 +138,7 @@ func New(options *protocol.Options) *Kite {
 		peers:             peers.New(),
 		balance:           NewBalancer(),
 		Authenticators:    make(map[string]func(*CallOptions) error),
-		Handlers:          make(map[string]HandlerFunc),
+		handlers:          make(map[string]HandlerFunc),
 	}
 
 	// Every kite should be able to authenticate the user from token.
@@ -147,14 +147,36 @@ func New(options *protocol.Options) *Kite {
 	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
 
 	// Register our internal methods
-	k.Handlers["vm.info"] = new(Status).Info
-	k.Handlers["heartbeat"] = k.handleHeartbeat
-	k.Handlers["log"] = k.handleLog
-
-	// Delegate method handling to our kite
-	k.Server.Delegate = k
+	k.HandleFunc("vm.info", new(Status).Info)
+	k.HandleFunc("heartbeat", k.handleHeartbeat)
+	k.HandleFunc("log", k.handleLog)
 
 	return k
+}
+
+func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
+	k.Server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
+		request, responseCallback, err := k.parseRequest(msg, tr)
+		if err != nil {
+			log.Notice("Did not understand request: %s", err)
+			return
+		}
+
+		result, err := handler(request)
+		if responseCallback == nil {
+			return
+		}
+
+		if err != nil {
+			err = responseCallback(err.Error(), result)
+		} else {
+			err = responseCallback(nil, result)
+		}
+
+		if err != nil {
+			log.Error(err.Error())
+		}
+	})
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
