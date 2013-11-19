@@ -117,8 +117,8 @@ func (f HandlerFunc) ProcessMessage(m *Message, tr Transport) {
 }
 
 // HandleSimple registers the handler function for given method.
-// The difference from HandleFunc() all dnode message arguments are passed
-// directly to the handler.
+// The difference from HandleFunc() that all dnode message arguments are passed
+// directly to the handler instead of Message and Transport.
 func (d *Dnode) HandleSimple(method string, handler interface{}) {
 	v := reflect.ValueOf(handler)
 	if v.Kind() != reflect.Func {

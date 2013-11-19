@@ -28,14 +28,20 @@ func NewServer() *Server {
 	return s
 }
 
+// Handle registers the handler for the given method.
+// If a handler already exists for method, Handle panics.
 func (s *Server) Handle(method string, handler dnode.Handler) {
 	s.dnode.Handle(method, handler)
 }
 
+// HandleFunc registers the handler function for the given method.
 func (s *Server) HandleFunc(method string, handler func(*dnode.Message, dnode.Transport)) {
 	s.dnode.HandleFunc(method, handler)
 }
 
+// HandleSimple registers the handler function for given method.
+// The difference from HandleFunc() that all dnode message arguments are passed
+// directly to the handler instead of Message and Transport.
 func (s *Server) HandleSimple(method string, handler interface{}) {
 	s.dnode.HandleSimple(method, handler)
 }
