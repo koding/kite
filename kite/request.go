@@ -19,7 +19,7 @@ type Request struct {
 }
 
 // HandleDnodeMessage implemets dnode.MessageHandler interface.
-func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.Transport) (err error) {
+func (k *Kite) HandleDnodeMessage(msg *dnode.Message, tr dnode.Transport) (err error) {
 	var (
 		args     []*dnode.Partial
 		options  CallOptions

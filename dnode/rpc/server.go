@@ -15,9 +15,6 @@ type Server struct {
 	// Functions registered with HandleFunc() are saved here
 	handlers map[string]interface{}
 
-	// Unknown methods are precessed by this handler
-	Delegate dnode.MessageHandler
-
 	// Called when a client is connected
 	onConnectHandlers []func(*Client)
 
@@ -54,9 +51,6 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	// Since both sides can send/receive messages the client code is reused here.
 	clientServer := NewClient()
 	clientServer.Conn = ws
-
-	// Pass dnode message delegate
-	clientServer.Dnode.ExternalHandler = s.Delegate
 
 	// Add our servers handler methods to the client.
 	for method, handler := range s.handlers {

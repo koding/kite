@@ -22,8 +22,7 @@ var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
 type Dnode struct {
 	// Registered methods with HandleFunc() are saved in this map with string keys.
 	// Callback methods sent by Call() are saved here with integer keys.
-	// Contains kinds of reflect.Func.
-	handlers map[string]reflect.Value
+	handlers map[string]Handler
 
 	// Next callback number.
 	// Incremented atomically by registerCallback().
@@ -31,9 +30,6 @@ type Dnode struct {
 
 	// For sending and receiving messages
 	transport Transport
-
-	// If the method is not found in handlers the message will be forwarded to this
-	ExternalHandler MessageHandler
 }
 
 // Transport is an interface for sending and receiving data on network.
@@ -52,10 +48,10 @@ type Transport interface {
 	Properties() map[string]interface{}
 }
 
-// MessageHandler is the interface for delegating message processing to outside
-// of the Dnode instance.
-type MessageHandler interface {
-	HandleDnodeMessage(*Message, *Dnode, Transport) error
+// Objects implementing the Handler interface can be
+// registered to serve a particular method in the dnode processor.
+type Handler interface {
+	ProcessMessage(*Message, Transport)
 }
 
 // Message is the JSON object to call a method at the other side.
@@ -76,19 +72,56 @@ type Message struct {
 // New returns a pointer to a new Dnode.
 func New(transport Transport) *Dnode {
 	return &Dnode{
-		handlers:  make(map[string]reflect.Value),
+		handlers:  make(map[string]Handler),
 		transport: transport,
 	}
 }
 
-// HandleFunc registers a function.
-func (d *Dnode) HandleFunc(method string, handler interface{}) {
-	v := reflect.ValueOf(handler)
-	if v.Kind() != reflect.Func {
-		panic(errors.New("handler is not a func"))
+// Handle registers the handler for the given method.
+// If a handler already exists for method, Handle panics.
+func (d *Dnode) Handle(method string, handler Handler) {
+	if method == "" {
+		panic("dnode: invalid method " + method)
+	}
+	if handler == nil {
+		panic("dnode: nil handler")
+	}
+	if _, ok := d.handlers[method]; ok {
+		panic("dnode: handler already exists for method")
 	}
 
-	d.handlers[method] = v
+	d.handlers[method] = handler
+}
+
+// HandleFunc registers the handler function for the given method.
+func (d *Dnode) HandleFunc(method string, handler func(*Message, Transport)) {
+	d.Handle(method, HandlerFunc(handler))
+}
+
+type HandlerFunc func(*Message, Transport)
+
+func (f HandlerFunc) ProcessMessage(m *Message, tr Transport) {
+	f(m, tr)
+}
+
+// HandleSimple registers the handler function for given method.
+// The difference from HandleFunc() all dnode message arguments are passed
+// directly to the handler.
+func (d *Dnode) HandleSimple(method string, handler interface{}) {
+	v := reflect.ValueOf(handler)
+	if v.Kind() != reflect.Func {
+		panic(errors.New("dnode: handler is not a func"))
+	}
+
+	d.Handle(method, SimpleFunc(v))
+}
+
+type SimpleFunc reflect.Value
+
+func (f SimpleFunc) ProcessMessage(m *Message, tr Transport) {
+	// Call the handler with arguments.
+	args := []reflect.Value{reflect.ValueOf(m.Arguments)}
+	reflect.Value(f).Call(args)
 }
 
 // Run processes incoming messages. Blocking.
@@ -243,7 +276,7 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 	callbackMap[seq] = pathCopy
 
 	// Save in client callbacks so we can call it when we receive a call.
-	d.handlers[seq] = callback
+	d.handlers[seq] = SimpleFunc(callback)
 }
 
 // processMessage processes a single message and call the previously
@@ -251,19 +284,22 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 func (d *Dnode) processMessage(data []byte) error {
 	l.Printf("processMessage: %s", string(data))
 
-	var err error
+	var (
+		err error
+		msg Message
+	)
+
 	defer func() {
 		if err != nil {
 			l.Printf("Cannot process message: %s", err)
 		}
 	}()
 
-	var msg Message
-	if err := json.Unmarshal(data, &msg); err != nil {
+	if err = json.Unmarshal(data, &msg); err != nil {
 		return err
 	}
 
-	if err := d.ParseCallbacks(&msg); err != nil {
+	if err = d.ParseCallbacks(&msg); err != nil {
 		return err
 	}
 
@@ -273,24 +309,14 @@ func (d *Dnode) processMessage(data []byte) error {
 
 	// Get the handler function.
 	l.Printf("Received method: %s", method)
-	handler := d.handlers[method]
-
-	// Try to find the handler from ExternalHandler.
-	if handler == reflect.ValueOf(nil) && d.ExternalHandler != nil {
-		l.Printf("Looking in external handler")
-		err = d.ExternalHandler.HandleDnodeMessage(&msg, d, d.transport)
-		return err
-	}
+	handler, ok := d.handlers[method]
 
 	// Method is not found.
-	if handler == reflect.ValueOf(nil) {
-		err = fmt.Errorf("Unknown method: %v", msg.Method)
-		return err
+	if !ok {
+		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
-	// Call the handler with arguments.
-	args := []reflect.Value{reflect.ValueOf(msg.Arguments)}
-	handler.Call(args)
+	handler.ProcessMessage(&msg, d.transport)
 
 	return nil
 }

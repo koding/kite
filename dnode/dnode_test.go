@@ -16,7 +16,7 @@ func TestSimpleMethodCall(t *testing.T) {
 		called = true
 		fmt.Println(string(p.Raw))
 	}
-	receiver.HandleFunc("print", Callback(printFunc))
+	receiver.HandleSimple("print", Callback(printFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -54,7 +54,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 		p.Unmarshal(&callbacks)
 		callbacks[0](6)
 	}
-	receiver.HandleFunc("foo", Callback(fooFunc))
+	receiver.HandleSimple("foo", Callback(fooFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
