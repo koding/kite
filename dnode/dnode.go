@@ -99,10 +99,7 @@ func (d *Dnode) Run() error {
 			return err
 		}
 
-		err = d.processMessage(msg)
-		if err != nil {
-			fmt.Printf("Could not process message: %s\n", err)
-		}
+		go d.processMessage(msg)
 	}
 }
 
@@ -254,6 +251,13 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 func (d *Dnode) processMessage(data []byte) error {
 	l.Printf("processMessage: %s", string(data))
 
+	var err error
+	defer func() {
+		if err != nil {
+			l.Printf("Cannot process message: %s", err)
+		}
+	}()
+
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
 		return err
@@ -274,18 +278,19 @@ func (d *Dnode) processMessage(data []byte) error {
 	// Try to find the handler from ExternalHandler.
 	if handler == reflect.ValueOf(nil) && d.ExternalHandler != nil {
 		l.Printf("Looking in external handler")
-		go d.ExternalHandler.HandleDnodeMessage(&msg, d, d.transport)
-		return nil
+		err = d.ExternalHandler.HandleDnodeMessage(&msg, d, d.transport)
+		return err
 	}
 
 	// Method is not found.
 	if handler == reflect.ValueOf(nil) {
-		return fmt.Errorf("Unknown method: %v", msg.Method)
+		err = fmt.Errorf("Unknown method: %v", msg.Method)
+		return err
 	}
 
 	// Call the handler with arguments.
 	args := []reflect.Value{reflect.ValueOf(msg.Arguments)}
-	go handler.Call(args)
+	handler.Call(args)
 
 	return nil
 }

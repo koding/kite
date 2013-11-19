@@ -102,7 +102,7 @@ type callAuthentication struct {
 	Key  string `json:"key"`
 }
 
-// Go makes an unblocking mehtod call to the server.
+// Go makes an unblocking method call to the server.
 func (r *RemoteKite) Go(method string, args interface{}) error {
 	options := r.makeOptions(args)
 	_, err := r.Client.Call(method, options)
@@ -120,12 +120,12 @@ func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partia
 
 	// To clean the sent callback after response is received.
 	// Send/Receive in a channel to prevent race condition because
-	// the callback is run in a seperate goroutine.
+	// the callback is run in a separate goroutine.
 	removeCallback := make(chan uint64, 1)
 
 	// This is the callback function sent to the server.
 	// The caller of the Call() is blocked until the server calls this callback function.
-	// This function does not return anything but sets "result" and "err" vaiables
+	// This function does not return anything but sets "result" and "err" variables
 	// in upper scope.
 	responseCallback := func(arguments *dnode.Partial) {
 		// Unblock the caller.

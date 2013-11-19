@@ -13,7 +13,7 @@ const functionPlaceholder = `"[Function]"`
 // Wrap your function to make it marshalable before sending.
 type Callback func(*Partial)
 
-func (p Callback) MarshalJSON() ([]byte, error) {
+func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(functionPlaceholder), nil
 }
 
@@ -32,11 +32,11 @@ func (f *Function) UnmarshalJSON(data []byte) error {
 // Contains mixture of string and integer values.
 type Path []interface{}
 
-// CallbackSpec is a structure encapsulating a Callback and it's Path.
+// CallbackSpec is a structure encapsulating a Function and it's Path.
 type CallbackSpec struct {
 	// Path represents the callback's path in the arguments structure.
 	Path     Path
-	Callback Function
+	Function Function
 }
 
 func (c *CallbackSpec) Apply(value reflect.Value) error {
@@ -73,7 +73,7 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 				return fmt.Errorf("Callback path too short: %v", c.Path)
 			}
 			if i == len(c.Path)-1 && value.Type().Elem().Kind() == reflect.Interface {
-				value.SetMapIndex(reflect.ValueOf(c.Path[i]), reflect.ValueOf(c.Callback))
+				value.SetMapIndex(reflect.ValueOf(c.Path[i]), reflect.ValueOf(c.Function))
 				return nil
 			}
 			value = value.MapIndex(reflect.ValueOf(c.Path[i]))
@@ -82,13 +82,13 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			value = value.Elem()
 		case reflect.Interface:
 			if i == len(c.Path) {
-				value.Set(reflect.ValueOf(c.Callback))
+				value.Set(reflect.ValueOf(c.Function))
 				return nil
 			}
 			value = value.Elem()
 		case reflect.Struct:
 			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
-				spec := CallbackSpec{c.Path[i:], c.Callback}
+				spec := CallbackSpec{c.Path[i:], c.Function}
 				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)
 				return nil
 			}
@@ -102,7 +102,7 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			value = value.FieldByName(strings.ToUpper(name[0:1]) + name[1:])
 			i++
 		case reflect.Func:
-			value.Set(reflect.ValueOf(c.Callback))
+			value.Set(reflect.ValueOf(c.Function))
 			return nil
 		case reflect.Invalid:
 			// callback path does not exist, skip

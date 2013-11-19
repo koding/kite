@@ -29,6 +29,7 @@ func NewServer() *Server {
 	s := &Server{
 		handlers: make(map[string]interface{}),
 	}
+	// Need to set this because websocket.Server is embedded.
 	s.Handler = s.handleWS
 	return s
 }
@@ -48,25 +49,26 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	defer ws.Close()
 
 	fmt.Println("--- connected new client")
+
 	// This client is actually is the server for the websocket.
 	// Since both sides can send/receive messages the client code is reused here.
-	client := NewClient()
-	client.Conn = ws
+	clientServer := NewClient()
+	clientServer.Conn = ws
 
 	// Pass dnode message delegate
-	client.Dnode.ExternalHandler = s.Delegate
+	clientServer.Dnode.ExternalHandler = s.Delegate
 
 	// Add our servers handler methods to the client.
 	for method, handler := range s.handlers {
-		client.Dnode.HandleFunc(method, handler)
+		clientServer.Dnode.HandleFunc(method, handler)
 	}
 
-	s.callOnConnectHandlers(client)
+	s.callOnConnectHandlers(clientServer)
 
 	// Run after methods are registered and delegate is set
-	client.run()
+	clientServer.run()
 
-	s.callOnDisconnectHandlers(client)
+	s.callOnDisconnectHandlers(clientServer)
 }
 
 func (s *Server) OnConnect(handler func(*Client)) {
