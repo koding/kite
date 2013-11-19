@@ -18,7 +18,7 @@ func TestClientServer(t *testing.T) {
 		result := args[2].(dnode.Function)
 		result(a + b)
 	}
-	s.HandleFunc("add", add)
+	s.HandleSimple("add", add)
 
 	// Listen HTTP
 	http.Handle("/dnode", s)

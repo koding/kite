@@ -2,18 +2,17 @@ package rpc
 
 import (
 	"code.google.com/p/go.net/websocket"
-	"errors"
 	"fmt"
 	"koding/newkite/dnode"
-	"reflect"
 )
 
 // Server is a websocket server serving each dnode messages with registered handlers.
 type Server struct {
 	websocket.Server
 
-	// Functions registered with HandleFunc() are saved here
-	handlers map[string]interface{}
+	// Base Dnode instance that holds registered methods.
+	// It is copied for each connection with Dnode.Copy().
+	dnode *dnode.Dnode
 
 	// Called when a client is connected
 	onConnectHandlers []func(*Client)
@@ -23,22 +22,22 @@ type Server struct {
 }
 
 func NewServer() *Server {
-	s := &Server{
-		handlers: make(map[string]interface{}),
-	}
+	s := &Server{dnode: dnode.New(nil)}
 	// Need to set this because websocket.Server is embedded.
 	s.Handler = s.handleWS
 	return s
 }
 
-// HandleFunc registers a function to run on "method".
-func (s *Server) HandleFunc(method string, handler interface{}) {
-	v := reflect.ValueOf(handler)
-	if v.Kind() != reflect.Func {
-		panic(errors.New("handler is not a func"))
-	}
+func (s *Server) Handle(method string, handler dnode.Handler) {
+	s.dnode.Handle(method, handler)
+}
 
-	s.handlers[method] = handler
+func (s *Server) HandleFunc(method string, handler func(*dnode.Message, dnode.Transport)) {
+	s.dnode.HandleFunc(method, handler)
+}
+
+func (s *Server) HandleSimple(method string, handler interface{}) {
+	s.dnode.HandleSimple(method, handler)
 }
 
 // handleWS is the websocket connection handler.
@@ -51,11 +50,7 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 	// Since both sides can send/receive messages the client code is reused here.
 	clientServer := NewClient()
 	clientServer.Conn = ws
-
-	// Add our servers handler methods to the client.
-	for method, handler := range s.handlers {
-		clientServer.Dnode.HandleFunc(method, handler)
-	}
+	clientServer.Dnode = s.dnode.Copy(clientServer)
 
 	s.callOnConnectHandlers(clientServer)
 

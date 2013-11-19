@@ -20,9 +20,11 @@ var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
 // var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
 
 type Dnode struct {
-	// Registered methods with HandleFunc() are saved in this map with string keys.
-	// Callback methods sent by Call() are saved here with integer keys.
+	// Registered methods are saved in this map.
 	handlers map[string]Handler
+
+	// Reference to sent callbacks are saved in this map.
+	callbacks map[uint64]SimpleFunc
 
 	// Next callback number.
 	// Incremented atomically by registerCallback().
@@ -73,6 +75,16 @@ type Message struct {
 func New(transport Transport) *Dnode {
 	return &Dnode{
 		handlers:  make(map[string]Handler),
+		callbacks: make(map[uint64]SimpleFunc),
+		transport: transport,
+	}
+}
+
+// Copy returns a pointer to a new Dnode with the same handlers as d but empty callbacks.
+func (d *Dnode) Copy(transport Transport) *Dnode {
+	return &Dnode{
+		handlers:  d.handlers,
+		callbacks: make(map[uint64]SimpleFunc),
 		transport: transport,
 	}
 }
@@ -260,7 +272,7 @@ func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string
 	}
 }
 
-// registerCallback is called when a function/mehtod is found in arguments array.
+// registerCallback is called when a function/method is found in arguments array.
 func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap map[string]Path) {
 	// Make a copy of path because it is reused in caller.
 	pathCopy := make(Path, len(path))
@@ -276,7 +288,7 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 	callbackMap[seq] = pathCopy
 
 	// Save in client callbacks so we can call it when we receive a call.
-	d.handlers[seq] = SimpleFunc(callback)
+	d.callbacks[next] = SimpleFunc(callback)
 }
 
 // processMessage processes a single message and call the previously
@@ -285,8 +297,9 @@ func (d *Dnode) processMessage(data []byte) error {
 	l.Printf("processMessage: %s", string(data))
 
 	var (
-		err error
-		msg Message
+		err     error
+		msg     Message
+		handler Handler
 	)
 
 	defer func() {
@@ -303,16 +316,19 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
-	// Method may be string or integer.
-	l.Printf("All handlers: %#v", d.handlers)
-	method := fmt.Sprint(msg.Method)
-
-	// Get the handler function.
-	l.Printf("Received method: %s", method)
-	handler, ok := d.handlers[method]
+	// Get the handler function. Method may be string or integer.
+	l.Printf("Received method: %s", msg.Method)
+	switch method := msg.Method.(type) {
+	case float64:
+		handler = d.callbacks[uint64(method)]
+	case string:
+		handler = d.handlers[method]
+	default:
+		return fmt.Errorf("Invalid method: %s", msg.Method)
+	}
 
 	// Method is not found.
-	if !ok {
+	if handler == nil {
 		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
