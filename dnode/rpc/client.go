@@ -56,14 +56,18 @@ type Client struct {
 // You need to call Dial() before interacting with the Server.
 func NewClient() *Client {
 	p := make(map[string]interface{})
+
 	tr := &wsTransport{properties: p}
+
 	c := &Client{
 		Properties:     p,
 		tr:             tr,
 		Dnode:          dnode.New(tr),
 		redialDuration: redialDurationStart,
 	}
+
 	tr.client = c
+
 	return c
 }
 
@@ -98,7 +102,7 @@ func (c *Client) dial() error {
 	c.redialDuration = redialDurationStart
 
 	// Must be run in a goroutine because a handler may wait a response from server.
-	go c.connected()
+	go c.callOnConnectHandlers()
 
 	return nil
 }
@@ -126,7 +130,7 @@ func (c *Client) run() (err error) {
 	for {
 	running:
 		err = c.Dnode.Run()
-		c.disconnected()
+		c.callOnDisconnectHandlers()
 	dialAgain:
 		if !c.Reconnect {
 			break
@@ -148,6 +152,7 @@ func (c *Client) run() (err error) {
 // Each time it is called the redialDuration is incremented.
 func (c *Client) sleep() {
 	time.Sleep(c.redialDuration)
+
 	c.redialDuration *= 2
 	if c.redialDuration > redialDurationMax {
 		c.redialDuration = redialDurationMax
@@ -174,15 +179,15 @@ func (c *Client) OnDisconnect(handler func()) {
 	c.onDisconnectHandlers = append(c.onDisconnectHandlers, handler)
 }
 
-// connected runs the registered connect handlers.
-func (c *Client) connected() {
+// callOnConnectHandlers runs the registered connect handlers.
+func (c *Client) callOnConnectHandlers() {
 	for _, handler := range c.onConnectHandlers {
 		go handler()
 	}
 }
 
-// disconnected runs the registered disconnect handlers.
-func (c *Client) disconnected() {
+// callOnDisconnectHandlers runs the registered disconnect handlers.
+func (c *Client) callOnDisconnectHandlers() {
 	for _, handler := range c.onDisconnectHandlers {
 		go handler()
 	}
