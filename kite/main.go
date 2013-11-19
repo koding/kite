@@ -48,8 +48,8 @@ type Kite struct {
 	// Wheter we want to register our Kite to Kontrol, true by default.
 	RegisterToKontrol bool
 
-	// method map for shared methods
-	Handlers map[string]HandlerFunc
+	// method map for exported methods
+	handlers map[string]HandlerFunc
 
 	// Dnode rpc server
 	Server *rpc.Server
@@ -120,7 +120,7 @@ func New(options *protocol.Options) *Kite {
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*CallOptions) error),
-		Handlers:          make(map[string]HandlerFunc),
+		handlers:          make(map[string]HandlerFunc),
 	}
 	k.Kontrol = k.NewKontrol(options.KontrolAddr)
 
@@ -130,14 +130,36 @@ func New(options *protocol.Options) *Kite {
 	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
 
 	// Register our internal methods
-	k.Handlers["status"] = new(Status).Info
-	k.Handlers["heartbeat"] = k.handleHeartbeat
-	k.Handlers["log"] = k.handleLog
-
-	// Delegate method handling to our kite
-	k.Server.Delegate = k
+	k.HandleFunc("status", new(Status).Info)
+	k.HandleFunc("heartbeat", k.handleHeartbeat)
+	k.HandleFunc("log", k.handleLog)
 
 	return k
+}
+
+func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
+	k.Server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
+		request, responseCallback, err := k.parseRequest(msg, tr)
+		if err != nil {
+			log.Notice("Did not understand request: %s", err)
+			return
+		}
+
+		result, err := handler(request)
+		if responseCallback == nil {
+			return
+		}
+
+		if err != nil {
+			err = responseCallback(err.Error(), result)
+		} else {
+			err = responseCallback(nil, result)
+		}
+
+		if err != nil {
+			log.Error(err.Error())
+		}
+	})
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
@@ -159,8 +181,19 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	seconds := args[0].(float64)
-	ping := args[1].(dnode.Function)
+	if len(args) != 2 {
+		return nil, fmt.Errorf("Invalid args: %s", string(r.Args.Raw))
+	}
+
+	seconds, ok := args[0].(float64)
+	if !ok {
+		return nil, fmt.Errorf("Invalid interval: %s", args[0])
+	}
+
+	ping, ok := args[1].(dnode.Function)
+	if !ok {
+		return nil, fmt.Errorf("Invalid callback: %s", args[1])
+	}
 
 	go func() {
 		for {

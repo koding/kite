@@ -20,31 +20,26 @@ type Request struct {
 	RemoteAddr     string
 }
 
-// HandleDnodeMessage implemets dnode.MessageHandler interface.
-func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.Transport) (err error) {
+func (k *Kite) parseRequest(msg *dnode.Message, tr dnode.Transport) (request *Request, response dnode.Function, err error) {
 	var (
-		args     []*dnode.Partial
-		options  CallOptions
-		response dnode.Function
+		args    []*dnode.Partial
+		options CallOptions
 	)
 
 	// Parse dnode method arguments [options, response]
-	err = msg.Arguments.Unmarshal(&args)
-	if err != nil {
-		return err
+	if err = msg.Arguments.Unmarshal(&args); err != nil {
+		return
 	}
 
 	// Parse options argument
-	err = args[0].Unmarshal(&options)
-	if err != nil {
-		return err
+	if err = args[0].Unmarshal(&options); err != nil {
+		return
 	}
 
 	// Parse response callback if present
 	if len(args) > 1 && args[1] != nil {
-		err = args[1].Unmarshal(&response)
-		if err != nil {
-			return err
+		if err = args[1].Unmarshal(&response); err != nil {
+			return
 		}
 	}
 
@@ -53,7 +48,7 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 	// RemoteAddr() returns "" if this is an outgoing connection.
 	if tr.RemoteAddr() != "" {
 		if err = k.authenticateUser(&options); err != nil {
-			return err
+			return
 		}
 	}
 
@@ -70,7 +65,7 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 		properties["remoteKite"] = remoteKite
 	}
 
-	request := &Request{
+	request = &Request{
 		Method:         fmt.Sprint(msg.Method),
 		Args:           options.WithArgs,
 		LocalKite:      k,
@@ -84,28 +79,7 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 	properties["username"] = request.Username
 	properties["kiteID"] = request.RemoteKite.Kite.ID
 
-	// Find handler function
-	handler := k.Handlers[request.Method]
-	if handler == nil {
-		err = fmt.Errorf("Unknown method: %s", request.Method)
-		return response(err.Error(), nil)
-	}
-
-	// Call the handler
-	result, err := handler(request)
-
-	// There is not a callback if RemoteKite.Go() is used.
-	if response == nil {
-		return nil
-	}
-
-	// Send an error response.
-	if err != nil {
-		return response(err.Error(), nil)
-	}
-
-	// Send the result back.
-	return response(nil, result)
+	return
 }
 
 // authenticateUser tries to authenticate the user by selecting appropriate

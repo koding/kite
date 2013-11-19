@@ -22,7 +22,7 @@ func main() {
 
 	k := kite.New(options)
 
-	k.Handlers["square"] = Square
+	k.HandleFunc("square", Square)
 
 	k.Run()
 }

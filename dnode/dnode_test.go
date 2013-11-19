@@ -3,20 +3,24 @@ package dnode
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestSimpleMethodCall(t *testing.T) {
+	l := sync.Mutex{}
 	called := false
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
 	printFunc := func(p *Partial) {
+		l.Lock()
 		called = true
+		l.Unlock()
 		fmt.Println(string(p.Raw))
 	}
-	receiver.HandleFunc("print", Callback(printFunc))
+	receiver.HandleSimple("print", Callback(printFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -29,22 +33,29 @@ func TestSimpleMethodCall(t *testing.T) {
 	tr1.toReceive <- <-tr2.sent
 	sleep()
 
+	l.Lock()
 	if !called {
 		t.Error("Function is not called")
 	}
+	l.Unlock()
 }
 
 func TestMethodCallWithCallback(t *testing.T) {
+	l := sync.Mutex{}
 	var result float64 = 0
 	successFunc := func(p *Partial) {
 		fmt.Println("success")
 		args, _ := p.Array()
+		l.Lock()
 		result = args[0].(float64)
+		l.Unlock()
 	}
 	failureFunc := func(p *Partial) {
 		fmt.Println("failure")
 		args, _ := p.Array()
+		l.Lock()
 		result = -args[0].(float64)
+		l.Unlock()
 	}
 
 	tr1 := newMockTransport()
@@ -54,7 +65,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 		p.Unmarshal(&callbacks)
 		callbacks[0](6)
 	}
-	receiver.HandleFunc("foo", Callback(fooFunc))
+	receiver.HandleSimple("foo", Callback(fooFunc))
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -68,9 +79,11 @@ func TestMethodCallWithCallback(t *testing.T) {
 	tr2.toReceive <- <-tr1.sent
 	sleep()
 
+	l.Lock()
 	if result != 6 {
 		t.Error("success callback is not called")
 	}
+	l.Unlock()
 }
 
 func TestCallMessage(t *testing.T) {
