@@ -73,12 +73,16 @@ func main() {
 
 	k := kite.New(options)
 	k.KontrolEnabled = false
+
 	k.Authenticators["kodingKey"] = kontrol.AuthenticateFromKodingKey
 	k.Authenticators["sessionID"] = kontrol.AuthenticateFromSessionID
+
 	k.Handlers["register"] = kontrol.handleRegister
 	k.Handlers["getKites"] = kontrol.handleGetKites
 	k.Handlers["watchKites"] = kontrol.handleWatchKites
+
 	go kontrol.heartBeatChecker()
+
 	k.Run()
 }
 
@@ -151,27 +155,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// Prevent registration with same ID.
 	kite := k.storage.Get(r.RemoteKite.ID)
 	if kite == nil {
-		kite = modelhelper.NewKite()
-		kite.Kite = r.RemoteKite.Kite
-		kite.Username = r.Username
-		kite.KodingKey = r.Authentication.Key
-
-		if r.RemoteKite.PublicIP == "" {
-			kite.PublicIP, _, _ = net.SplitHostPort(r.RemoteAddr)
-		}
-
-		// Deregister the Kite on disconnect.
-		r.RemoteKite.Client.OnDisconnect(func() {
-			log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
-			k.storage.Remove(r.RemoteKite.ID)
-
-			// Delete from jVMs when all kites to that user is died.
-			if !k.kitesExistsForUser(r.RemoteKite.Username) {
-				deleteFromVM(r.RemoteKite.Username)
-			}
-		})
-
-		k.storage.Add(kite)
+		kite = k.addKite(r)
 	}
 
 	log.Info("Kite registered: %#v", kite.Kite)
@@ -192,6 +176,31 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	go k.watchers.Notify(&kite.Kite)
 
 	return response, nil
+}
+
+func (k *Kontrol) addKite(r *kite.Request) *models.Kite {
+	kite := modelhelper.NewKite()
+	kite.Kite = r.RemoteKite.Kite
+	kite.Username = r.Username
+	kite.KodingKey = r.Authentication.Key
+
+	if r.RemoteKite.PublicIP == "" {
+		kite.PublicIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
+
+	// Deregister the Kite on disconnect.
+	r.RemoteKite.Client.OnDisconnect(func() {
+		log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
+		k.storage.Remove(r.RemoteKite.ID)
+
+		// Delete from jVMs when all kites to that user is died.
+		if !k.kitesExistsForUser(r.RemoteKite.Username) {
+			deleteFromVM(r.RemoteKite.Username)
+		}
+	})
+
+	k.storage.Add(kite)
+	return kite
 }
 
 func (k *Kontrol) requestHeartbeat(kite *protocol.Kite, remote *kite.RemoteKite) error {

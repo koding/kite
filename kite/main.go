@@ -6,10 +6,7 @@ import (
 	logging "github.com/op/go-logging"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
-	"koding/newkite/kodingkey"
-	"koding/newkite/peers"
 	"koding/newkite/protocol"
-	"koding/newkite/token"
 	"koding/newkite/utils"
 	stdlog "log"
 	"net"
@@ -42,15 +39,6 @@ type Kite struct {
 	// Registered is true if the Kite is registered to kontrol itself
 	Registered bool
 
-	// other kites that needs to be run, in order to run this one
-	Dependencies string
-
-	// in-memory hash table for kites of same types
-	peers *peers.Kites
-
-	// roundrobin load balancing helpers
-	balance *Balancer
-
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
 
@@ -62,9 +50,6 @@ type Kite struct {
 
 	// method map for shared methods
 	Handlers map[string]HandlerFunc
-
-	// implements the Clients interface
-	clients *clients
 
 	// Dnode rpc server
 	Server *rpc.Server
@@ -134,9 +119,6 @@ func New(options *protocol.Options) *Kite {
 		Server:            rpc.NewServer(),
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
-		clients:           NewClients(),
-		peers:             peers.New(),
-		balance:           NewBalancer(),
 		Authenticators:    make(map[string]func(*CallOptions) error),
 		Handlers:          make(map[string]HandlerFunc),
 	}
@@ -148,7 +130,7 @@ func New(options *protocol.Options) *Kite {
 	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
 
 	// Register our internal methods
-	k.Handlers["vm.info"] = new(Status).Info
+	k.Handlers["status"] = new(Status).Info
 	k.Handlers["heartbeat"] = k.handleHeartbeat
 	k.Handlers["log"] = k.handleLog
 
@@ -192,6 +174,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	return nil, nil
 }
 
+// handleLog prints a log message to stdout.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	s, err := r.Args.String()
 	if err != nil {
@@ -200,51 +183,6 @@ func (k *Kite) handleLog(r *Request) (interface{}, error) {
 
 	log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, s))
 	return nil, nil
-}
-
-func (k *Kite) authenticateUser(options *CallOptions) error {
-	f := k.Authenticators[options.Authentication.Type]
-	if f == nil {
-		return fmt.Errorf("Unknown authentication type: %s", options.Authentication.Type)
-	}
-
-	return f(options)
-}
-
-// AuthenticateFromToken is the default Authenticator for Kite.
-func (k *Kite) AuthenticateFromToken(options *CallOptions) error {
-	key, err := kodingkey.FromString(k.KodingKey)
-	if err != nil {
-		return fmt.Errorf("Invalid Koding Key: %s", k.KodingKey)
-	}
-
-	tkn, err := token.DecryptString(options.Authentication.Key, key)
-	if err != nil {
-		return fmt.Errorf("Invalid token: %s", options.Authentication.Key)
-	}
-
-	if !tkn.IsValid(k.ID) {
-		return fmt.Errorf("Invalid token: %s", tkn)
-	}
-
-	options.Kite.Username = tkn.Username
-
-	return nil
-}
-
-// AuthenticateFromToken authenticates user from Koding Key.
-// Kontrol makes requests with a Koding Key.
-func (k *Kite) AuthenticateFromKodingKey(options *CallOptions) error {
-	if options.Authentication.Key != k.KodingKey {
-		return fmt.Errorf("Invalid Koding Key")
-	}
-
-	// Set the username if missing.
-	if options.Kite.Username == "" && k.Username != "" {
-		options.Kite.Username = k.Username
-	}
-
-	return nil
 }
 
 // setupLogging is used to setup the logging format, destination and level.
@@ -277,7 +215,7 @@ var _ = flag.Bool("debug", false, "print debug logs")
 func (k *Kite) parseVersionFlag() {
 	for _, flag := range os.Args {
 		if flag == "-version" {
-			log.Info(k.Version)
+			fmt.Println(k.Version)
 			os.Exit(0)
 		}
 	}
@@ -332,14 +270,11 @@ func (k *Kite) registerToKontrol() {
 // connections from one user to the kite, in that case the functions are
 // called only when all connections are closed.
 // func (k *Kite) OnDisconnect(username string, f func()) {
-// 	addrs := k.clients.GetAddresses(username)
 // 	if addrs == nil {
 // 		return
 // 	}
 
 // 	for _, addr := range addrs {
-// 		client := k.clients.GetClient(addr)
 // 		client.onDisconnect = append(client.onDisconnect, f)
-// 		k.clients.AddClient(addr, client)
 // 	}
 // }

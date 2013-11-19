@@ -27,11 +27,13 @@ func newWatchers() *watchers {
 func (w *watchers) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, cb dnode.Function) {
 	w.Lock()
 	defer w.Unlock()
+
 	r.Client.OnDisconnect(func() {
 		w.Lock()
 		delete(w.requests, r)
 		w.Unlock()
 	})
+
 	w.requests[r] = append(w.requests[r], &request{q, cb})
 }
 

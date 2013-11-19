@@ -12,11 +12,20 @@ import (
 // RemoteKite is the client for communicating with another Kite.
 // It has Call() and Go() methods for calling methods sync/async way.
 type RemoteKite struct {
+	// The information about the kite that we are connecting to.
 	protocol.Kite
-	localKite      *Kite
+
+	// A reference to the current Kite running.
+	localKite *Kite
+
+	// Credentials that we sent in each request.
 	Authentication callAuthentication
-	Client         *rpc.Client
-	disconnect     chan bool
+
+	// dnode RPC client that processes messages.
+	Client *rpc.Client
+
+	// A channel to notify waiters on Call() or Go() when we disconnect.
+	disconnect chan bool
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
@@ -70,8 +79,9 @@ func (r *RemoteKite) DialForever() {
 	r.Client.DialForever("ws://" + addr + "/dnode")
 }
 
-// CallOptions is the first argument in the dnode message.
+// CallOptions is the type of first argument in the dnode message.
 // Second argument is a callback function.
+// It is used when unmarshalling a dnode message.
 type CallOptions struct {
 	// Arguments to the method
 	WithArgs       *dnode.Partial     `json:"withArgs"`
@@ -79,6 +89,8 @@ type CallOptions struct {
 	Authentication callAuthentication `json:"authentication"`
 }
 
+// callOptionsOut is the same structure with CallOptions.
+// It is used when marshalling a dnode message.
 type callOptionsOut struct {
 	CallOptions
 	// Override this when sending because args will not be a *dnode.Partial.

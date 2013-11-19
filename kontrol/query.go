@@ -16,8 +16,7 @@ import (
 
 type KontrolQuery protocol.KontrolQuery
 
-// Validate validates the incoming Query and returns the matched kites with
-// tokens attached.
+// Run runs the query and returns matching Kites with attached tokens for authentication.
 func (k *KontrolQuery) Run() ([]protocol.KiteWithToken, error) {
 	return k.kiteWithTokens(k.Username)
 }

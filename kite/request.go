@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
+	"koding/newkite/kodingkey"
+	"koding/newkite/token"
 )
 
 type HandlerFunc func(*Request) (response interface{}, err error)
@@ -48,6 +50,7 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 
 	// Trust the Kite if we have initiated the connection.
 	// Otherwise try to authenticate the user.
+	// RemoteAddr() returns "" if this is an outgoing connection.
 	if tr.RemoteAddr() != "" {
 		if err = k.authenticateUser(&options); err != nil {
 			return err
@@ -103,4 +106,51 @@ func (k *Kite) HandleDnodeMessage(msg *dnode.Message, dn *dnode.Dnode, tr dnode.
 
 	// Send the result back.
 	return response(nil, result)
+}
+
+// authenticateUser tries to authenticate the user by selecting appropriate
+// authenticator function.
+func (k *Kite) authenticateUser(options *CallOptions) error {
+	f := k.Authenticators[options.Authentication.Type]
+	if f == nil {
+		return fmt.Errorf("Unknown authentication type: %s", options.Authentication.Type)
+	}
+
+	return f(options)
+}
+
+// AuthenticateFromToken is the default Authenticator for Kite.
+func (k *Kite) AuthenticateFromToken(options *CallOptions) error {
+	key, err := kodingkey.FromString(k.KodingKey)
+	if err != nil {
+		return fmt.Errorf("Invalid Koding Key: %s", k.KodingKey)
+	}
+
+	tkn, err := token.DecryptString(options.Authentication.Key, key)
+	if err != nil {
+		return fmt.Errorf("Invalid token: %s", options.Authentication.Key)
+	}
+
+	if !tkn.IsValid(k.ID) {
+		return fmt.Errorf("Invalid token: %s", tkn)
+	}
+
+	options.Kite.Username = tkn.Username
+
+	return nil
+}
+
+// AuthenticateFromToken authenticates user from Koding Key.
+// Kontrol makes requests with a Koding Key.
+func (k *Kite) AuthenticateFromKodingKey(options *CallOptions) error {
+	if options.Authentication.Key != k.KodingKey {
+		return fmt.Errorf("Invalid Koding Key")
+	}
+
+	// Set the username if missing.
+	if options.Kite.Username == "" && k.Username != "" {
+		options.Kite.Username = k.Username
+	}
+
+	return nil
 }
