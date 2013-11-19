@@ -123,13 +123,13 @@ func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]P
 	l.Printf("Call method: %s arguments: %+v\n", method, arguments)
 
 	var err error
+	callbacks := make(map[string]Path)
 	defer func() {
 		if err != nil {
 			d.removeCallbacks(callbacks)
 		}
 	}()
 
-	callbacks := make(map[string]Path)
 	d.collectCallbacks(arguments, make(Path, 0), callbacks)
 
 	// Do not encode empty arguments as "null", make it "[]".

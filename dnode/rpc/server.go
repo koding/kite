@@ -62,12 +62,12 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 		c.Dnode.HandleFunc(method, handler)
 	}
 
-	s.connected(c)
+	s.callOnConnectHandlers(c)
 
 	// Run after methods are registered and delegate is set
 	c.run()
 
-	s.disconnected(c)
+	s.callOnDisconnectHandlers(c)
 }
 
 func (s *Server) OnConnect(handler func(*Client)) {
@@ -78,7 +78,7 @@ func (s *Server) OnDisconnect(handler func(*Client)) {
 	s.onDisconnectHandlers = append(s.onDisconnectHandlers, handler)
 }
 
-func (s *Server) connected(c *Client) {
+func (s *Server) callOnConnectHandlers(c *Client) {
 	for _, handler := range s.onConnectHandlers {
 		go handler(c)
 	}
@@ -87,10 +87,10 @@ func (s *Server) connected(c *Client) {
 	// run on connect.
 }
 
-func (s *Server) disconnected(c *Client) {
+func (s *Server) callOnDisconnectHandlers(c *Client) {
 	// We are also triggering the disconnect event on the client because
 	// there may be a handler registered on it.
-	c.disconnected()
+	c.callOnDisconnectHandlers()
 
 	for _, handler := range s.onDisconnectHandlers {
 		go handler(c)
