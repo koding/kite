@@ -4,22 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"koding/newkite/protocol"
-)
-
-const (
-	KontrolHost = "127.0.0.1"
-	KontrolPort = "4000"
+	"net"
 )
 
 // Kontrol is also a Kite which has special helper methods.
 type Kontrol struct{ RemoteKite }
 
 // NewKontrol returns a pointer to new Kontrol instance.
-func (k *Kite) NewKontrol() *Kontrol {
+func (k *Kite) NewKontrol(addr string) *Kontrol {
 	// Only the address is required to connect Kontrol
+	host, port, _ := net.SplitHostPort(addr)
 	kite := protocol.Kite{
-		PublicIP: KontrolHost,
-		Port:     KontrolPort,
+		PublicIP: host,
+		Port:     port,
 	}
 
 	auth := callAuthentication{

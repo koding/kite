@@ -140,6 +140,7 @@ func New(options *protocol.Options) *Kite {
 		Authenticators:    make(map[string]func(*CallOptions) error),
 		Handlers:          make(map[string]HandlerFunc),
 	}
+	k.Kontrol = k.NewKontrol(options.KontrolAddr)
 
 	// Every kite should be able to authenticate the user from token.
 	k.Authenticators["token"] = k.AuthenticateFromToken
@@ -306,8 +307,6 @@ func (k *Kite) listenAndServe() error {
 
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
-		k.Kontrol = k.NewKontrol()
-
 		if k.RegisterToKontrol {
 			k.Kontrol.RemoteKite.Client.OnConnect(k.registerToKontrol)
 		}
