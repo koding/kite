@@ -54,6 +54,9 @@ type Kite struct {
 	// Handlers to call when a Kite opens a connection to this Kite.
 	onConnectHandlers []func(*RemoteKite)
 
+	// Handlers to call when a client has disconnected.
+	onDisconnectHandlers []func(*RemoteKite)
+
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*CallOptions) error
@@ -122,7 +125,15 @@ func New(options *protocol.Options) *Kite {
 		Authenticators:    make(map[string]func(*CallOptions) error),
 		handlers:          make(map[string]HandlerFunc),
 	}
+
 	k.Kontrol = k.NewKontrol(options.KontrolAddr)
+
+	// Call registered handlers when a client has disconnected.
+	k.server.OnDisconnect(func(c *rpc.Client) {
+		if r, ok := c.Properties()["remoteKite"]; ok {
+			k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
+		}
+	})
 
 	// Every kite should be able to authenticate the user from token.
 	k.Authenticators["token"] = k.AuthenticateFromToken
@@ -304,23 +315,22 @@ func (k *Kite) OnConnect(handler func(*RemoteKite)) {
 
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
 func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
-	k.server.OnDisconnect(func(c *rpc.Client) {
-		if r, ok := c.Properties()["remoteKite"]; ok {
-			handler(r.(*RemoteKite))
-		}
-	})
+	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
 }
 
 // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
 func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	// Print log messages on connect and disconnect.
 	log.Info("Client has connected: %s", r.Addr())
-	k.OnDisconnect(func(r *RemoteKite) {
-		log.Info("Client has disconnected: %s", r.Addr())
-	})
 
-	// Run handlers.
 	for _, handler := range k.onConnectHandlers {
+		go handler(r)
+	}
+}
+
+func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
+	log.Info("Client has disconnected: %s", r.Addr())
+
+	for _, handler := range k.onDisconnectHandlers {
 		go handler(r)
 	}
 }

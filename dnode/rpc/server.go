@@ -85,16 +85,9 @@ func (s *Server) callOnConnectHandlers(c *Client) {
 	for _, handler := range s.onConnectHandlers {
 		go handler(c)
 	}
-	// It is unnecessary to call c.connected() here because the client is
-	// already created by this server and we did not attach any handlers to
-	// run on connect.
 }
 
 func (s *Server) callOnDisconnectHandlers(c *Client) {
-	// We are also triggering the disconnect event on the client because
-	// there may be a handler registered on it.
-	c.callOnDisconnectHandlers()
-
 	for _, handler := range s.onDisconnectHandlers {
 		go handler(c)
 	}
