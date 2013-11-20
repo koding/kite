@@ -296,18 +296,3 @@ func (k *Kite) registerToKontrol() {
 
 	log.Info("Registered to Kontrol successfully")
 }
-
-// DISABLED TEMPORARILY
-// OnDisconnect adds the given function to the list of the users callback list
-// which is called when the user is disconnected. There might be several
-// connections from one user to the kite, in that case the functions are
-// called only when all connections are closed.
-// func (k *Kite) OnDisconnect(username string, f func()) {
-// 	if addrs == nil {
-// 		return
-// 	}
-
-// 	for _, addr := range addrs {
-// 		client.onDisconnect = append(client.onDisconnect, f)
-// 	}
-// }
