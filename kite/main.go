@@ -49,7 +49,7 @@ type Kite struct {
 	handlers map[string]HandlerFunc
 
 	// Dnode rpc server
-	Server *rpc.Server
+	server *rpc.Server
 
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
@@ -113,7 +113,7 @@ func New(options *protocol.Options) *Kite {
 			PublicIP: options.PublicIP,
 		},
 		KodingKey:         kodingKey,
-		Server:            rpc.NewServer(),
+		server:            rpc.NewServer(),
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*CallOptions) error),
@@ -135,7 +135,7 @@ func New(options *protocol.Options) *Kite {
 }
 
 func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
-	k.Server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
+	k.server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
 		request, responseCallback, err := k.parseRequest(msg, tr)
 		if err != nil {
 			log.Notice("Did not understand request: %s", err)
@@ -282,7 +282,7 @@ func (k *Kite) listenAndServe() error {
 		k.Kontrol.DialForever()
 	}
 
-	return http.Serve(listener, k.Server)
+	return http.Serve(listener, k.server)
 }
 
 func (k *Kite) registerToKontrol() {

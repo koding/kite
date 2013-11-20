@@ -36,7 +36,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		Kite:           kite,
 		localKite:      k,
 		Authentication: auth,
-		client:         k.Server.NewClientWithHandlers(),
+		client:         k.server.NewClientWithHandlers(),
 		disconnect:     make(chan bool),
 	}
 
