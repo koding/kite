@@ -51,6 +51,9 @@ type Kite struct {
 	// Dnode rpc server
 	server *rpc.Server
 
+	// Handlers to call when a Kite opens a connection to this Kite.
+	onConnectHandlers []func(*RemoteKite)
+
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*CallOptions) error
@@ -294,17 +297,30 @@ func (k *Kite) registerToKontrol() {
 	log.Info("Registered to Kontrol successfully")
 }
 
-// DISABLED TEMPORARILY
-// OnDisconnect adds the given function to the list of the users callback list
-// which is called when the user is disconnected. There might be several
-// connections from one user to the kite, in that case the functions are
-// called only when all connections are closed.
-// func (k *Kite) OnDisconnect(username string, f func()) {
-// 	if addrs == nil {
-// 		return
-// 	}
+// OnConnect registers a function to run when a Kite connects to this Kite.
+func (k *Kite) OnConnect(handler func(*RemoteKite)) {
+	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+}
 
-// 	for _, addr := range addrs {
-// 		client.onDisconnect = append(client.onDisconnect, f)
-// 	}
-// }
+// OnDisconnect registers a function to run when a connected Kite is disconnected.
+func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
+	k.server.OnDisconnect(func(c *rpc.Client) {
+		if r, ok := c.Properties()["remoteKite"]; ok {
+			handler(r.(*RemoteKite))
+		}
+	})
+}
+
+// notifyRemoteKiteConnected runs the registered handlers with OnConnect().
+func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
+	// Print log messages on connect and disconnect.
+	log.Info("Client has connected: %s", r.Addr())
+	k.OnDisconnect(func(r *RemoteKite) {
+		log.Info("Client has disconnected: %s", r.Addr())
+	})
+
+	// Run handlers.
+	for _, handler := range k.onConnectHandlers {
+		go handler(r)
+	}
+}

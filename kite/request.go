@@ -63,6 +63,9 @@ func (k *Kite) parseRequest(msg *dnode.Message, tr dnode.Transport) (request *Re
 		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
 		remoteKite := k.newRemoteKiteWithClient(options.Kite, options.Authentication, client)
 		properties["remoteKite"] = remoteKite
+
+		// Notify Kite.OnConnect handlers.
+		k.notifyRemoteKiteConnected(remoteKite)
 	}
 
 	request = &Request{
