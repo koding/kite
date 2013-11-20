@@ -155,11 +155,42 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 	// the callback is run in a separate goroutine.
 	removeCallback := make(chan uint64, 1)
 
-	// This is the callback function sent to the server.
-	// The caller of the Call() is blocked until the server calls this callback function.
-	// This function does not return anything but sets "result" and "err" variables
-	// in upper scope.
-	responseCallback := func(arguments *dnode.Partial) {
+	// Send the method with callback to the server.
+	opts := r.makeOptions(args)
+	cb := r.makeResponseCallback(theResponse, done, removeCallback)
+	callbacks, err := r.client.Call(method, opts, cb)
+	if err != nil {
+		responseChan <- &response{nil, err}
+	}
+
+	// Find the callback number to be deleted after response is received.
+	var max uint64 = 0
+	for id, _ := range callbacks {
+		i, _ := strconv.ParseUint(id, 10, 64)
+		if i > max {
+			max = i
+		}
+	}
+	removeCallback <- max
+
+	// Waits until the response callback is finished or connection is disconnected.
+	go func() {
+		select {
+		case <-done:
+			responseChan <- theResponse
+		case <-r.disconnect:
+			responseChan <- &response{nil, errors.New("Client disconnected")}
+		}
+	}()
+
+	return responseChan
+}
+
+// makeResponseCallback prepares and returns a callback function sent to the server.
+// The caller of the Call() is blocked until the server calls this callback function.
+// Sets theResponse and notifies the caller by sending to done channel.
+func (r *RemoteKite) makeResponseCallback(theResponse *response, done chan<- bool, removeCallback <-chan uint64) dnode.Callback {
+	return dnode.Callback(func(arguments *dnode.Partial) {
 		var (
 			// Arguments to our response callback It is a slice of length 2.
 			// The first argument is the error string,
@@ -198,7 +229,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 			return
 		}
 
-		// The second argument is the our result, set it on upper scope.
+		// The second argument is our result.
 		result = responseArgs[1]
 
 		// This is error argument. Unmarshal panics if it is null.
@@ -206,6 +237,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 			return
 		}
 
+		// Read the error argument in response.
 		var errorString string
 		err = responseArgs[0].Unmarshal(&errorString)
 		if err != nil {
@@ -214,33 +246,5 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 		if errorString != "" {
 			err = errors.New(errorString)
 		}
-	}
-
-	// Send the method with callback to the server.
-	callbacks, err := r.client.Call(method, r.makeOptions(args), dnode.Callback(responseCallback))
-	if err != nil {
-		responseChan <- &response{nil, err}
-	}
-
-	// Find the callback number to be deleted after response is received.
-	var max uint64 = 0
-	for id, _ := range callbacks {
-		i, _ := strconv.ParseUint(id, 10, 64)
-		if i > max {
-			max = i
-		}
-	}
-	removeCallback <- max
-
-	// Waits until the response callback is finished or connection is disconnected.
-	go func() {
-		select {
-		case <-done:
-			responseChan <- theResponse
-		case <-r.disconnect:
-			responseChan <- &response{nil, errors.New("Client disconnected")}
-		}
-	}()
-
-	return responseChan
+	})
 }
