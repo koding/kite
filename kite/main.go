@@ -130,7 +130,7 @@ func New(options *protocol.Options) *Kite {
 	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
 
 	// Register our internal methods
-	k.HandleFunc("status", new(Status).Info)
+	k.HandleFunc("systemInfo", new(Status).Info)
 	k.HandleFunc("heartbeat", k.handleHeartbeat)
 	k.HandleFunc("log", k.handleLog)
 
