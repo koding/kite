@@ -28,7 +28,7 @@ func (w *watchers) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, cb dnode
 	w.Lock()
 	defer w.Unlock()
 
-	r.Client.OnDisconnect(func() {
+	r.OnDisconnect(func() {
 		w.Lock()
 		delete(w.requests, r)
 		w.Unlock()

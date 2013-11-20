@@ -22,7 +22,7 @@ type RemoteKite struct {
 	Authentication callAuthentication
 
 	// dnode RPC client that processes messages.
-	Client *rpc.Client
+	client *rpc.Client
 
 	// A channel to notify waiters on Call() or Go() when we disconnect.
 	disconnect chan bool
@@ -36,11 +36,11 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		Kite:           kite,
 		localKite:      k,
 		Authentication: auth,
-		Client:         k.Server.NewClientWithHandlers(),
+		client:         k.Server.NewClientWithHandlers(),
 		disconnect:     make(chan bool),
 	}
 
-	r.Client.OnDisconnect(r.notifyDisconnect)
+	r.client.OnDisconnect(r.notifyDisconnect)
 	return r
 }
 
@@ -50,8 +50,8 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 // on other side.
 func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthentication, client *rpc.Client) *RemoteKite {
 	r := k.NewRemoteKite(kite, auth)
-	r.Client = client
-	r.Client.OnDisconnect(r.notifyDisconnect)
+	r.client = client
+	r.client.OnDisconnect(r.notifyDisconnect)
 	return r
 }
 
@@ -68,14 +68,24 @@ func (r *RemoteKite) notifyDisconnect() {
 func (r *RemoteKite) Dial() (err error) {
 	addr := r.Kite.Addr()
 	log.Info("Dialling %s", addr)
-	return r.Client.Dial("ws://" + addr + "/dnode")
+	return r.client.Dial("ws://" + addr + "/dnode")
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
 func (r *RemoteKite) DialForever() {
 	addr := r.Kite.Addr()
 	log.Info("Dialling %s", addr)
-	r.Client.DialForever("ws://" + addr + "/dnode")
+	r.client.DialForever("ws://" + addr + "/dnode")
+}
+
+// OnConnect registers a function to run on client connect.
+func (r *RemoteKite) OnConnect(handler func()) {
+	r.client.OnConnect(handler)
+}
+
+// OnDisconnect registers a function to run on client disconnect.
+func (r *RemoteKite) OnDisconnect(handler func()) {
+	r.client.OnDisconnect(handler)
 }
 
 // CallOptions is the type of first argument in the dnode message.
@@ -119,14 +129,15 @@ type response struct {
 }
 
 // Call makes a blocking method call to the server.
-// Send a callback function and waits until it is called or connection drops.
-// Returns the result and the error as the other side sends.
+// Waits until the callback function is called by the other side and
+// returns the result and the error.
 func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partial, err error) {
 	response := <-r.Go(method, args)
 	return response.Result, response.Err
 }
 
 // Go makes an unblocking method call to the server.
+// It returns a channel that the caller can wait on it to get the response.
 func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
@@ -174,7 +185,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 		// Remove the callback function from the map so we do not
 		// consume memory for unused callbacks.
 		id := <-removeCallback
-		r.Client.RemoveCallback(id)
+		r.client.RemoveCallback(id)
 
 		err = arguments.Unmarshal(&responseArgs)
 		if err != nil {
@@ -206,7 +217,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 	}
 
 	// Send the method with callback to the server.
-	callbacks, err := r.Client.Call(method, r.makeOptions(args), dnode.Callback(responseCallback))
+	callbacks, err := r.client.Call(method, r.makeOptions(args), dnode.Callback(responseCallback))
 	if err != nil {
 		responseChan <- &response{nil, err}
 	}

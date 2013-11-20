@@ -25,11 +25,11 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	}
 
 	remoteKite := k.NewRemoteKite(kite, auth)
-	remoteKite.Client.Reconnect = true
+	remoteKite.client.Reconnect = true
 
 	// Print log messages on connect/disconnect.
-	remoteKite.Client.OnConnect(func() { log.Info("Connected to Kontrol.") })
-	remoteKite.Client.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
+	remoteKite.OnConnect(func() { log.Info("Connected to Kontrol.") })
+	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
 	return &Kontrol{*remoteKite}
 }

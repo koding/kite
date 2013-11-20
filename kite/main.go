@@ -279,7 +279,7 @@ func (k *Kite) listenAndServe() error {
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
 		if k.RegisterToKontrol {
-			k.Kontrol.RemoteKite.Client.OnConnect(k.registerToKontrol)
+			k.Kontrol.RemoteKite.OnConnect(k.registerToKontrol)
 		}
 
 		k.Kontrol.DialForever()

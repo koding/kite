@@ -189,7 +189,7 @@ func (k *Kontrol) addKite(r *kite.Request) *models.Kite {
 	}
 
 	// Deregister the Kite on disconnect.
-	r.RemoteKite.Client.OnDisconnect(func() {
+	r.RemoteKite.OnDisconnect(func() {
 		log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
 		k.storage.Remove(r.RemoteKite.ID)
 
