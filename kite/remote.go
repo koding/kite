@@ -7,6 +7,7 @@ import (
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"strconv"
+	"sync"
 )
 
 // RemoteKite is the client for communicating with another Kite.
@@ -24,8 +25,11 @@ type RemoteKite struct {
 	// dnode RPC client that processes messages.
 	client *rpc.Client
 
-	// A channel to notify waiters on Call() or Go() when we disconnect.
-	disconnect chan bool
+	// Channels that we are waiting requests after calling Call() or Go().
+	pending map[chan *response]bool
+
+	// Protects pending
+	mutex sync.Mutex
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
@@ -37,10 +41,10 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		localKite:      k,
 		Authentication: auth,
 		client:         k.server.NewClientWithHandlers(),
-		disconnect:     make(chan bool),
+		pending:        make(map[chan *response]bool),
 	}
 
-	r.client.OnDisconnect(r.notifyDisconnect)
+	r.client.OnDisconnect(r.closePendingResponseChannels)
 	return r
 }
 
@@ -51,16 +55,24 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthentication, client *rpc.Client) *RemoteKite {
 	r := k.NewRemoteKite(kite, auth)
 	r.client = client
-	r.client.OnDisconnect(r.notifyDisconnect)
+	r.client.OnDisconnect(r.closePendingResponseChannels)
 	return r
 }
 
-// notifyDisconnect unblocks the caller of Call() on disconnect.
-func (r *RemoteKite) notifyDisconnect() {
-	// Unblocking send.
-	select {
-	case r.disconnect <- true:
-	default:
+// closePendingResponseChannels unblocks the callers of Call() on disconnect.
+func (r *RemoteKite) closePendingResponseChannels() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	for ch, _ := range r.pending {
+		select {
+		case ch <- &response{nil, errors.New("Client disconnected")}:
+			close(ch) // Nothing will be sent afterwards.
+		default:
+			// We don't want to block here.
+		}
+
+		delete(r.pending, ch)
 	}
 }
 
@@ -147,53 +159,54 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 	// It can wait on this channel to get the response.
 	responseChan := make(chan *response, 1)
 
-	// The response value that will be sent to the returned channel.
-	theResponse := new(response)
+	r.send(method, args, responseChan)
 
-	// Buffered channel for waiting response from server.
-	// Strobes when response callback is called.
-	done := make(chan bool, 1)
+	return responseChan
+}
 
+// send sends the method with callback to the server.
+func (r *RemoteKite) send(method string, args interface{}, responseChan chan *response) {
 	// To clean the sent callback after response is received.
 	// Send/Receive in a channel to prevent race condition because
 	// the callback is run in a separate goroutine.
 	removeCallback := make(chan uint64, 1)
 
-	// Send the method with callback to the server.
 	opts := r.makeOptions(args)
-	cb := r.makeResponseCallback(theResponse, done, removeCallback)
+	cb := r.makeResponseCallback(responseChan, removeCallback)
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	callbacks, err := r.client.Call(method, opts, cb)
 	if err != nil {
 		responseChan <- &response{nil, err}
+	} else {
+		r.pending[responseChan] = true
 	}
 
-	// Find the callback number to be deleted after response is received.
-	var max uint64 = 0
-	for id, _ := range callbacks {
-		i, _ := strconv.ParseUint(id, 10, 64)
-		if i > max {
-			max = i
+	sendCallbackID(callbacks, removeCallback)
+}
+
+// sendCallbackID send the callback number to be deleted after response is received.
+func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
+	if len(callbacks) > 0 {
+		max := uint64(0)
+		for id, _ := range callbacks {
+			i, _ := strconv.ParseUint(id, 10, 64)
+			if i > max {
+				max = i
+			}
 		}
+		ch <- max
+	} else {
+		close(ch)
 	}
-	removeCallback <- max
-
-	// Waits until the response callback is finished or connection is disconnected.
-	go func() {
-		select {
-		case <-done:
-			responseChan <- theResponse
-		case <-r.disconnect:
-			responseChan <- &response{nil, errors.New("Client disconnected")}
-		}
-	}()
-
-	return responseChan
 }
 
 // makeResponseCallback prepares and returns a callback function sent to the server.
 // The caller of the Call() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
-func (r *RemoteKite) makeResponseCallback(theResponse *response, done chan<- bool, removeCallback <-chan uint64) dnode.Callback {
+func (r *RemoteKite) makeResponseCallback(responseChan chan *response, removeCallback <-chan uint64) dnode.Callback {
 	return dnode.Callback(func(arguments *dnode.Partial) {
 		var (
 			// Arguments to our response callback It is a slice of length 2.
@@ -210,17 +223,18 @@ func (r *RemoteKite) makeResponseCallback(theResponse *response, done chan<- boo
 
 		// Notify that the callback is finished.
 		defer func() {
-			// Sets the response from outer scope.
-			theResponse.Result = result
-			theResponse.Err = err
-
-			done <- true
+			r.mutex.Lock()
+			responseChan <- &response{result, err}
+			delete(r.pending, responseChan)
+			close(responseChan)
+			r.mutex.Unlock()
 		}()
 
 		// Remove the callback function from the map so we do not
 		// consume memory for unused callbacks.
-		id := <-removeCallback
-		r.client.RemoveCallback(id)
+		if id, ok := <-removeCallback; ok {
+			r.client.RemoveCallback(id)
+		}
 
 		err = arguments.Unmarshal(&responseArgs)
 		if err != nil {
