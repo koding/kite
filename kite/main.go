@@ -36,9 +36,6 @@ type Kite struct {
 	// KodingKey is used for authenticate to Kontrol.
 	KodingKey string
 
-	// Registered is true if the Kite is registered to kontrol itself
-	Registered bool
-
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
 
