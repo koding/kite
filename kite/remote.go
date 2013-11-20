@@ -78,6 +78,10 @@ func (r *RemoteKite) DialForever() {
 	r.client.DialForever("ws://" + addr + "/dnode")
 }
 
+func (r *RemoteKite) Close() {
+	r.client.Close()
+}
+
 // OnConnect registers a function to run on client connect.
 func (r *RemoteKite) OnConnect(handler func()) {
 	r.client.OnConnect(handler)
