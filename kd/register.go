@@ -64,10 +64,10 @@ func checker(key string) error {
 	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", AuthServer, key)
 
 	// check the result every two seconds
-	ticker := time.NewTicker(time.Second * 2).C
+	ticker := time.NewTicker(2 * time.Second).C
 
 	// wait for three minutes, if not successfull abort it
-	timeout := time.After(time.Minute * 3)
+	timeout := time.After(3 * time.Minute)
 
 	for {
 		select {
@@ -151,7 +151,7 @@ func writeNewKey(kdPath, keyPath string) (string, error) {
 		return "", err
 	}
 
-	err = ioutil.WriteFile(keyPath, key, 0600)
+	err = ioutil.WriteFile(keyPath, []byte(key.String()), 0600)
 	if err != nil {
 		return "", err
 	}
