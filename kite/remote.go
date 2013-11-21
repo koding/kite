@@ -65,14 +65,14 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
 	addr := r.Kite.Addr()
-	log.Info("Dialling %s", addr)
+	log.Info("Dialing %s", addr)
 	return r.client.Dial("ws://" + addr + "/dnode")
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
 func (r *RemoteKite) DialForever() {
 	addr := r.Kite.Addr()
-	log.Info("Dialling %s", addr)
+	log.Info("Dialing %s", addr)
 	r.client.DialForever("ws://" + addr + "/dnode")
 }
 
