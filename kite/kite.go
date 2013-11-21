@@ -62,9 +62,9 @@ type Kite struct {
 	Authenticators map[string]func(*CallOptions) error
 }
 
-// New creates, initialize and then returns a new Kite instance. It accept
-// three  arguments. options is a config struct that needs to be filled with
-// several informations like Name, Port, IP and so on.
+// New creates, initialize and then returns a new Kite instance. It accepts
+// a single options argument that is a config struct that needs to be filled
+// with several informations like Name, Port, IP and so on.
 func New(options *protocol.Options) *Kite {
 	var err error
 	if options == nil {
