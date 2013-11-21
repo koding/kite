@@ -131,6 +131,7 @@ func New(options *protocol.Options) *Kite {
 	// Call registered handlers when a client has disconnected.
 	k.server.OnDisconnect(func(c *rpc.Client) {
 		if r, ok := c.Properties()["remoteKite"]; ok {
+			// Run OnDisconnect handlers.
 			k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
 		}
 	})

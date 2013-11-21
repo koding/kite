@@ -9,11 +9,11 @@ import (
 
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
-	math := mathWorker()
-	go math.Run()
+	mathKite := mathWorker()
+	go mathKite.Run()
 
-	e := exp2()
-	go e.Run()
+	exp2Kite := exp2()
+	go exp2Kite.Run()
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
@@ -23,16 +23,16 @@ func TestKite(t *testing.T) {
 		return nil, nil
 	}
 
-	e.HandleFunc("foo", handleFoo)
+	exp2Kite.HandleFunc("foo", handleFoo)
 
 	time.Sleep(100 * time.Millisecond)
 
 	// Use the kodingKey auth type since they are on same host.
 	auth := callAuthentication{
 		Type: "kodingKey",
-		Key:  e.KodingKey,
+		Key:  exp2Kite.KodingKey,
 	}
-	remote := e.NewRemoteKite(math.Kite, auth)
+	remote := exp2Kite.NewRemoteKite(mathKite.Kite, auth)
 
 	err := remote.Dial()
 	if err != nil {
