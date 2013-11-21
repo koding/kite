@@ -266,7 +266,12 @@ func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[
 func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string]Path) {
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Type().Field(i)
+
 		name := f.Tag.Get("json")
+		if name == "" {
+			name = f.Name
+		}
+
 		if f.PkgPath == "" { // exported
 			d.collectCallbacks(v.Field(i).Interface(), append(path, name), callbackMap)
 		}
