@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"code.google.com/p/go.net/websocket"
+	"errors"
 	"koding/newkite/dnode"
 	"time"
 )
@@ -154,6 +155,10 @@ func (c *Client) Close() {
 
 func (c *Client) Send(msg []byte) error {
 	println("Sending...", string(msg))
+	if c.Conn == nil {
+		return errors.New("Not connected")
+	}
+
 	return websocket.Message.Send(c.Conn, string(msg))
 }
 

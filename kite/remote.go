@@ -165,7 +165,7 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 
 	callbacks, err := r.client.Call(method, opts, cb)
 	if err != nil {
-		responseChan <- &response{nil, err}
+		responseChan <- &response{nil, fmt.Errorf("RemoteKite error: %s", err)}
 		return
 	}
 
