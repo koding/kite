@@ -1,19 +1,23 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/coreos/go-etcd/etcd"
 	logging "github.com/op/go-logging"
-	"koding/db/models"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/dnode"
 	"koding/newkite/kite"
+	"koding/newkite/kodingkey"
 	"koding/newkite/protocol"
+	"koding/newkite/token"
 	"koding/tools/config"
 	stdlog "log"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -24,44 +28,20 @@ const (
 
 var log = logging.MustGetLogger("Kontrol")
 
-// Storage is an interface that encapsulates basic operations on the kite
-// struct. ID is an unique string that belongs to the kite.
-type Storage interface {
-	// Add inserts the kite into the storage with the kite.ID key. If there
-	// is already a kite available with this id, it should update/replace it.
-	Add(kite *models.Kite)
-
-	// Get returns the specified kite struct with the given id
-	Get(id string) *models.Kite
-
-	// Remove deletes the kite with the given id
-	Remove(id string)
-
-	// Has checks whether the kite with the given id exist
-	Has(id string) bool
-
-	// Size returns the total number of kites in the storage
-	Size() int
-
-	// List returns a slice of all kites in the storage
-	List() []*models.Kite
-}
-
 type Kontrol struct {
-	storage  Storage
-	watchers *watchers
+	etcd *etcd.Client
 }
 
 func NewKontrol() *Kontrol {
 	return &Kontrol{
-		storage:  NewMongoDB(),
-		watchers: newWatchers(),
+		etcd: etcd.NewClient(nil), // TODO read machine list from config
 	}
 }
 
 func main() {
+	setupLogging()
+
 	kontrol := NewKontrol()
-	kontrol.setupLogging()
 
 	options := &protocol.Options{
 		Kitename:    "kontrol",
@@ -79,49 +59,25 @@ func main() {
 
 	k.HandleFunc("register", kontrol.handleRegister)
 	k.HandleFunc("getKites", kontrol.handleGetKites)
-	k.HandleFunc("watchKites", kontrol.handleWatchKites)
-
-	go kontrol.heartBeatChecker()
+	// k.HandleFunc("watchKites", kontrol.handleWatchKites)
 
 	k.Run()
 }
 
-func (k *Kontrol) setupLogging() {
+func setupLogging() {
 	log.Module = "Kontrol"
 	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
 	stderrBackend.Color = true
 	syslogBackend, _ := logging.NewSyslogBackend(log.Module)
 	logging.SetBackend(stderrBackend, syslogBackend)
-
-	log.Info("started")
 }
 
-// heartBeatChecker removes dead kites from the DB.
-func (k *Kontrol) heartBeatChecker() {
-	for {
-		k.removeDeadKites()
-		time.Sleep(HEARTBEAT_INTERVAL)
-	}
-}
-
-func (k *Kontrol) removeDeadKites() {
-	for _, kite := range k.storage.List() {
-		// Delay is needed to fix network delays, otherwise kites are
-		// marked as death even if they are sending pings to us.
-		if time.Now().UTC().Before(kite.UpdatedAt.Add(HEARTBEAT_DELAY)) {
-			continue // still alive, pick up the next one
-		}
-
-		log.Info("Removing dead Kite: %#v", kite)
-
-		k.storage.Remove(kite.ID)
-
-		// only delete from jVMs when all kites to that user is died.
-		if !k.kitesExistsForUser(kite.Username) {
-			deleteFromVM(kite.Username)
-		}
-	}
+// registerValue is the type of the value that is saved to etcd.
+type registerValue struct {
+	PublicIP  string
+	Port      string
+	KodingKey string
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -133,95 +89,162 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
 	}
 
-	if r.Authentication.Key == "" {
-		return nil, errors.New("Invalid Koding Key")
+	// Set PublicIP address if it's empty.
+	if r.RemoteKite.PublicIP == "" {
+		r.RemoteKite.PublicIP, _, _ = net.SplitHostPort(r.RemoteAddr)
 	}
 
-	if r.RemoteKite.ID == "" {
-		return nil, errors.New("Invalid Kite ID")
-	}
-
-	// Prevent registration with same ID.
-	kite := k.storage.Get(r.RemoteKite.ID)
-	if kite == nil {
-		kite = k.addKite(r)
-	}
-
-	log.Info("Kite registered: %#v", kite.Kite)
-
-	// Request heartbeat from the Kite.
-	err := k.requestHeartbeat(&kite.Kite, r.RemoteKite)
+	key, err := getKiteKey(r.RemoteKite.Kite)
 	if err != nil {
 		return nil, err
 	}
+
+	rv := &registerValue{
+		PublicIP:  r.RemoteKite.PublicIP,
+		Port:      r.RemoteKite.Port,
+		KodingKey: r.Authentication.Key,
+	}
+
+	valueBytes, _ := json.Marshal(rv)
+	value := string(valueBytes)
+
+	ttl := uint64(HEARTBEAT_DELAY / time.Second)
+
+	// setKey sets the value of the Kite in etcd.
+	setKey := func() (prevValue string, err error) {
+		resp, err := k.etcd.Set(key, value, ttl)
+		if err != nil {
+			log.Critical("etcd error: %s", err)
+			return
+		}
+
+		prevValue = resp.PrevValue
+
+		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
+		_, err = k.etcd.UpdateDir("/"+r.RemoteKite.Username, ttl)
+		if err != nil {
+			log.Critical("etcd error: %s", err)
+			return
+		}
+
+		return
+	}
+
+	// Register to etcd.
+	prev, err := setKey()
+	if err != nil {
+		return nil, errors.New("Internal error")
+	}
+
+	if prev != "" {
+		log.Notice("Kite (%s) is already registered. Doing nothing.", key)
+	} else {
+		// Request heartbeat from the Kite.
+
+		heartbeatFunc := func(p *dnode.Partial) {
+			prev, err := setKey()
+			if err == nil && prev == "" {
+				log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", key)
+			}
+		}
+
+		heartbeatArgs := []interface{}{
+			HEARTBEAT_INTERVAL / time.Second,
+			dnode.Callback(heartbeatFunc),
+		}
+
+		_, err := r.RemoteKite.Call("heartbeat", heartbeatArgs)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	log.Info("Kite registered: %s", key)
 
 	// send response back to the kite, also identify him with the new name
 	response := protocol.RegisterResult{
 		Result:   protocol.AllowKite,
-		Username: kite.Username,
-		PublicIP: kite.PublicIP,
+		Username: r.RemoteKite.Username,
+		PublicIP: r.RemoteKite.PublicIP,
 	}
-
-	go k.watchers.Notify(&kite.Kite)
 
 	return response, nil
 }
 
-func (k *Kontrol) addKite(r *kite.Request) *models.Kite {
-	kite := modelhelper.NewKite()
-	kite.Kite = r.RemoteKite.Kite
-	kite.Username = r.Username
-	kite.KodingKey = r.Authentication.Key
-
-	if r.RemoteKite.PublicIP == "" {
-		kite.PublicIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+func getKiteKey(k protocol.Kite) (string, error) {
+	// Order is important.
+	fields := map[string]string{
+		"username":    k.Username,
+		"environment": k.Environment,
+		"name":        k.Name,
+		"version":     k.Version,
+		"region":      k.Region,
+		"hostname":    k.Hostname,
+		"id":          k.ID,
 	}
 
-	// Deregister the Kite on disconnect.
-	r.RemoteKite.OnDisconnect(func() {
-		log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
-		k.storage.Remove(r.RemoteKite.ID)
-
-		// Delete from jVMs when all kites to that user is died.
-		if !k.kitesExistsForUser(r.RemoteKite.Username) {
-			deleteFromVM(r.RemoteKite.Username)
+	// Validate fields.
+	for k, v := range fields {
+		if v == "" {
+			return "", fmt.Errorf("Empty Kite field: %s", k)
 		}
-	})
-
-	k.storage.Add(kite)
-	return kite
-}
-
-func (k *Kontrol) requestHeartbeat(kite *protocol.Kite, remote *kite.RemoteKite) error {
-	updateKite := func(p *dnode.Partial) {
-		err := k.updateKite(kite.ID)
-		if err != nil {
-			log.Warning("Came heartbeat but the Kite is not registered. Dropping it's connection to prevent bad things happening. It may be an indication that the heartbeat delay is too short.")
-			remote.Close()
+		if strings.ContainsRune(v, '/') {
+			return "", fmt.Errorf("Field \"%s\" must not contain '/'", k)
 		}
 	}
-	heartbeatArgs := []interface{}{
-		HEARTBEAT_INTERVAL / time.Second,
-		dnode.Callback(updateKite),
+
+	// Build key.
+	key := "/"
+	for _, v := range fields {
+		key = key + v + "/"
 	}
-	_, err := remote.Call("heartbeat", heartbeatArgs)
-	return err
+	key = strings.TrimSuffix(key, "/")
+
+	return key, nil
 }
 
-func (k *Kontrol) updateKite(id string) error {
-	kite := k.storage.Get(id)
-	if kite == nil {
-		return errors.New("Kite not registered")
+func getQueryKey(q *KontrolQuery) (string, error) {
+	fields := []string{
+		q.Username,
+		q.Environment,
+		q.Name,
+		q.Version,
+		q.Region,
+		q.Hostname,
+		q.ID,
 	}
 
-	kite.UpdatedAt = time.Now().UTC().Add(HEARTBEAT_INTERVAL)
-	k.storage.Add(kite)
-	return nil
+	// Validate query and build key.
+	path := "/"
+	empty := false
+	for _, f := range fields {
+		if f == "" {
+			empty = true
+		} else {
+			if empty {
+				return "", errors.New("Invalid query")
+			}
+			path = path + f + "/"
+		}
+	}
+
+	return path, nil
 }
+
+// 	// Deregister the Kite on disconnect.
+// 	r.RemoteKite.OnDisconnect(func() {
+// 		log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
+// 		k.storage.Remove(r.RemoteKite.ID)
+
+// 		// Delete from jVMs when all kites to that user is died.
+// 		if !k.kitesExistsForUser(r.RemoteKite.Username) {
+// 			deleteFromVM(r.RemoteKite.Username)
+// 		}
+// 	})
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	var query KontrolQuery
-	err := r.Args.Unmarshal(&query)
+	query := new(KontrolQuery)
+	err := r.Args.Unmarshal(query)
 	if err != nil {
 		return nil, err
 	}
@@ -231,65 +254,156 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Not your Kite")
 	}
 
-	return query.Run()
-}
-
-func (k *Kontrol) handleWatchKites(r *kite.Request) (interface{}, error) {
-	var args []*dnode.Partial
-	err := r.Args.Unmarshal(&args)
+	key, err := getQueryKey(query)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(args) != 2 {
-		return nil, errors.New("Invalid number of arguments")
+	resp, err := k.etcd.GetAll(key, false)
+	if err != nil {
+		log.Critical("etcd error: %s", err)
+		return nil, fmt.Errorf("Internal error")
 	}
 
-	var query KontrolQuery
-	err = args[0].Unmarshal(&query)
+	kvs := flatten(resp.Kvs)
+
+	kitesWithToken, err := addTokenToKites(kvs, r.Username)
 	if err != nil {
 		return nil, err
 	}
 
-	var callback dnode.Function
-	err = args[1].Unmarshal(&callback)
-	if err != nil {
-		return nil, err
-	}
-
-	// We do not allow access to other's kites for now.
-	if r.Username != query.Username {
-		return nil, errors.New("Not your Kite")
-	}
-
-	k.watchers.RegisterWatcher(r.RemoteKite, &query, callback)
-	return nil, nil
+	return kitesWithToken, nil
 }
 
-func deleteFromVM(username string) error {
-	if username == "" {
-		return errors.New("deleting local vm err: empty username is passed")
+// flatten converts the recursive etcd directory structure to flat one that contains Kites.
+func flatten(in []etcd.KeyValuePair) []etcd.KeyValuePair {
+	var out []etcd.KeyValuePair
+
+	for _, kv := range in {
+		if kv.Dir {
+			out = append(out, flatten(kv.KVPairs)...)
+			continue
+		}
+
+		out = append(out, kv)
 	}
 
-	hostnameAlias := "local-" + username
-	err := modelhelper.DeleteVM(hostnameAlias)
-	if err != nil {
-		return fmt.Errorf("deleting local vm err:", err)
-	}
-	return nil
+	return out
 }
 
-func (k *Kontrol) kitesExistsForUser(username string) bool {
-	found := false
+func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]protocol.KiteWithToken, error) {
+	kitesWithToken := make([]protocol.KiteWithToken, len(kvs))
 
-	for _, kite := range k.storage.List() {
-		if kite.Username == username {
-			found = true
+	for i, kv := range kvs {
+		kite, kodingKey, err := kiteFromEtcdKV(&kv)
+		if err != nil {
+			return nil, err
+		}
+
+		// Generate token.
+		key, err := kodingkey.FromString(kodingKey)
+		if err != nil {
+			return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
+		}
+
+		// username is from requester, key is from kite owner.
+		tokenString, err := token.NewToken(username, kite.ID).EncryptString(key)
+		if err != nil {
+			return nil, errors.New("Server error: Cannot generate a token")
+		}
+
+		kitesWithToken[i] = protocol.KiteWithToken{
+			Kite:  *kite,
+			Token: tokenString,
 		}
 	}
 
-	return found
+	return kitesWithToken, nil
 }
+
+func kiteFromEtcdKV(kv *etcd.KeyValuePair) (*protocol.Kite, string, error) {
+	key := strings.TrimPrefix(kv.Key, "/")
+
+	fields := strings.Split(key, "/")
+	if len(fields) != 7 {
+		log.Critical("Key does not represent a Kite: %s", kv.Key)
+		return nil, "", errors.New("Internal error")
+	}
+
+	kite := new(protocol.Kite)
+	kite.Username = fields[0]
+	kite.Environment = fields[1]
+	kite.Name = fields[2]
+	kite.Version = fields[3]
+	kite.Region = fields[4]
+	kite.Hostname = fields[5]
+	kite.ID = fields[6]
+
+	value := new(registerValue)
+	json.Unmarshal([]byte(kv.Value), value)
+
+	kite.PublicIP = value.PublicIP
+	kite.Port = value.Port
+
+	return kite, value.KodingKey, nil
+}
+
+// func (k *Kontrol) handleWatchKites(r *kite.Request) (interface{}, error) {
+// 	var args []*dnode.Partial
+// 	err := r.Args.Unmarshal(&args)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	if len(args) != 2 {
+// 		return nil, errors.New("Invalid number of arguments")
+// 	}
+
+// 	var query KontrolQuery
+// 	err = args[0].Unmarshal(&query)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var callback dnode.Function
+// 	err = args[1].Unmarshal(&callback)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// We do not allow access to other's kites for now.
+// 	if r.Username != query.Username {
+// 		return nil, errors.New("Not your Kite")
+// 	}
+
+// 	k.watchers.RegisterWatcher(r.RemoteKite, &query, callback)
+// 	return nil, nil
+// }
+
+// func deleteFromVM(username string) error {
+// 	if username == "" {
+// 		return errors.New("deleting local vm err: empty username is passed")
+// 	}
+
+// 	hostnameAlias := "local-" + username
+// 	err := modelhelper.DeleteVM(hostnameAlias)
+// 	if err != nil {
+// 		return fmt.Errorf("deleting local vm err:", err)
+// 	}
+// 	return nil
+// }
+
+// func (k *Kontrol) kitesExistsForUser(username string) bool {
+// 	found := false
+
+// 	for _, kite := range k.storage.List() {
+// 		if kite.Username == username {
+// 			found = true
+// 		}
+// 	}
+
+// 	return found
+// }
 
 func (k *Kontrol) AuthenticateFromSessionID(options *kite.CallOptions) error {
 	username, err := findUsernameFromSessionID(options.Authentication.Key)

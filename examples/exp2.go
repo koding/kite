@@ -33,8 +33,9 @@ func main() {
 	time.Sleep(1 * time.Second)
 
 	query := protocol.KontrolQuery{
-		Username: "devrim",
-		Name:     "mathworker",
+		Username:    "devrim",
+		Environment: "development",
+		Name:        "mathworker",
 	}
 
 	kites, err := k.Kontrol.GetKites(query)

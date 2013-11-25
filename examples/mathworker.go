@@ -18,6 +18,7 @@ func main() {
 		Port:        *port,
 		Region:      "localhost",
 		Environment: "development",
+		PublicIP:    "127.0.0.1",
 	}
 
 	k := kite.New(options)
