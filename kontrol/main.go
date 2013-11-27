@@ -8,6 +8,7 @@ import (
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/dnode"
 	"koding/newkite/kite"
+	"koding/newkite/peers"
 	"koding/newkite/protocol"
 	"koding/tools/config"
 	stdlog "log"
@@ -54,7 +55,7 @@ type Kontrol struct {
 
 func NewKontrol() *Kontrol {
 	return &Kontrol{
-		storage:  NewMongoDB(),
+		storage:  peers.New(),
 		watchers: newWatchers(),
 	}
 }

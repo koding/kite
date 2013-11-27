@@ -1,25 +1,25 @@
 package peers
 
 import (
-	"koding/newkite/protocol"
+	"koding/db/models"
 	"sync"
 )
 
 // Kites is a concurrent safe abstraction package that let us add, remove, get
-// , list data in form of protocol.Kite
+// , list data in form of models.Kite
 type Kites struct {
-	m map[string]*protocol.Kite
+	m map[string]*models.Kite
 	sync.Mutex
 }
 
 func New() *Kites {
 	return &Kites{
-		m: make(map[string]*protocol.Kite),
+		m: make(map[string]*models.Kite),
 	}
 }
 
-// Add registers or replaces a new protocol.Kite to the global map
-func (k *Kites) Add(kite *protocol.Kite) {
+// Add registers or replaces a new models.Kite to the global map
+func (k *Kites) Add(kite *models.Kite) {
 	if kite == nil {
 		return
 	}
@@ -31,7 +31,7 @@ func (k *Kites) Add(kite *protocol.Kite) {
 }
 
 // Get returns the specified kite via its Uuid.
-func (k *Kites) Get(id string) *protocol.Kite {
+func (k *Kites) Get(id string) *models.Kite {
 	k.Lock()
 	defer k.Unlock()
 
@@ -71,11 +71,11 @@ func (k *Kites) Size() int {
 }
 
 // List returns a slice of all active kites.
-func (k *Kites) List() []*protocol.Kite {
+func (k *Kites) List() []*models.Kite {
 	k.Lock()
 	defer k.Unlock()
 
-	kites := make([]*protocol.Kite, 0)
+	kites := make([]*models.Kite, 0)
 	for _, kite := range k.m {
 		kites = append(kites, kite)
 	}
