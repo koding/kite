@@ -1,4 +1,4 @@
-package main
+package kontrol
 
 import (
 	"container/list"

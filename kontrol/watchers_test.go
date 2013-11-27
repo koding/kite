@@ -1,4 +1,4 @@
-package main
+package kontrol
 
 import (
 	"koding/newkite/protocol"
@@ -11,10 +11,10 @@ func TestQueryMatch(t *testing.T) {
 		Username: "cenk",
 		Version:  "1",
 	}
-	query1 := &KontrolQuery{
+	query1 := &protocol.KontrolQuery{
 		Name: "foo",
 	}
-	query2 := &KontrolQuery{
+	query2 := &protocol.KontrolQuery{
 		Name:     "foo",
 		Username: "nil",
 	}

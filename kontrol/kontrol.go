@@ -1,4 +1,4 @@
-package main
+package kontrol
 
 import (
 	"encoding/json"
@@ -29,29 +29,13 @@ const (
 var log = logging.MustGetLogger("Kontrol")
 
 type Kontrol struct {
+	kite       *kite.Kite
 	etcd       *etcd.Client
 	watcherHub *watcherHub
 }
 
-func NewKontrol() *Kontrol {
-	// Read list of etcd servers from config.
-	machines := make([]string, len(config.Current.Etcd))
-	for i, s := range config.Current.Etcd {
-		machines[i] = "http://" + s.Host + ":" + strconv.FormatUint(uint64(s.Port), 10)
-	}
-
-	return &Kontrol{
-		etcd:       etcd.NewClient(machines),
-		watcherHub: newWatcherHub(),
-	}
-}
-
-func main() {
-	setupLogging()
-
-	kontrol := NewKontrol()
-
-	options := &protocol.Options{
+func New() *Kontrol {
+	kiteOptions := &protocol.Options{
 		Kitename:    "kontrol",
 		Version:     "1",
 		Port:        strconv.Itoa(config.Current.NewKontrol.Port),
@@ -59,18 +43,33 @@ func main() {
 		Environment: "development",
 	}
 
-	k := kite.New(options)
-	k.KontrolEnabled = false
+	// Read list of etcd servers from config.
+	machines := make([]string, len(config.Current.Etcd))
+	for i, s := range config.Current.Etcd {
+		machines[i] = "http://" + s.Host + ":" + strconv.FormatUint(uint64(s.Port), 10)
+	}
 
-	k.Authenticators["kodingKey"] = kontrol.AuthenticateFromKodingKey
-	k.Authenticators["sessionID"] = kontrol.AuthenticateFromSessionID
+	kontrol := &Kontrol{
+		kite:       kite.New(kiteOptions),
+		etcd:       etcd.NewClient(machines),
+		watcherHub: newWatcherHub(),
+	}
 
-	k.HandleFunc("register", kontrol.handleRegister)
-	k.HandleFunc("getKites", kontrol.handleGetKites)
+	kontrol.kite.KontrolEnabled = false // Because we are Kontrol!
 
-	go kontrol.WatchEtcd()
+	kontrol.kite.Authenticators["kodingKey"] = kontrol.AuthenticateFromKodingKey
+	kontrol.kite.Authenticators["sessionID"] = kontrol.AuthenticateFromSessionID
 
-	k.Run()
+	kontrol.kite.HandleFunc("register", kontrol.handleRegister)
+	kontrol.kite.HandleFunc("getKites", kontrol.handleGetKites)
+
+	return kontrol
+}
+
+func (k *Kontrol) Run() {
+	setupLogging()
+	go k.WatchEtcd()
+	k.kite.Run()
 }
 
 func setupLogging() {
