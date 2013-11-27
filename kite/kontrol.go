@@ -34,14 +34,12 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	remoteKite := k.NewRemoteKite(kite, auth)
 	remoteKite.client.Reconnect = true
 
-	ready := make(chan bool)
-	remoteKite.OnConnect(func() {
-		log.Info("Connected to Kontrol ")
-		ready <- true
-	})
+	remoteKite.OnConnect(func() { log.Info("Connected to Kontrol ") })
+	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
-	remoteKite.OnDisconnect(func() {
-		log.Warning("Disconnected from Kontrol. I will retry in background...")
+	ready := make(chan bool)
+	remoteKite.OnceConnect(func() {
+		close(ready)
 	})
 
 	return &Kontrol{

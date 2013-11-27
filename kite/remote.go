@@ -80,14 +80,24 @@ func (r *RemoteKite) Close() {
 	r.client.Close()
 }
 
-// OnConnect registers a function to run on client connect.
+// OnConnect registers a function to run on connect.
 func (r *RemoteKite) OnConnect(handler func()) {
 	r.client.OnConnect(handler)
 }
 
-// OnDisconnect registers a function to run on client disconnect.
+// OnDisconnect registers a function to run on disconnect.
 func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
+}
+
+// OnceConnect registers a function to run on connect only once.
+func (r *RemoteKite) OnceConnect(handler func()) {
+	r.client.OnceConnect(handler)
+}
+
+// OnceDisconnect registers a function to run on disconnect only once.
+func (r *RemoteKite) OnceDisconnect(handler func()) {
+	r.client.OnceDisconnect(handler)
 }
 
 // CallOptions is the type of first argument in the dnode message.
