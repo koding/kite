@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"errors"
 	"koding/newkite/dnode"
-	"sync"
 	"time"
 )
 
@@ -46,13 +45,6 @@ type Client struct {
 
 	// Time to wait before redial connection.
 	redialDuration time.Duration
-
-	// once handlers are called just once for every dial. Useful if you want
-	// to initialize something after the first connection only once.
-	onceConnectHandler    func()
-	onceConnect           sync.Once
-	onceDisconnectHandler func()
-	onceDisconnect        sync.Once
 
 	// on connect/disconnect handlers are invoked after every
 	// connect/disconnect.
@@ -104,8 +96,6 @@ func (c *Client) dial() error {
 	// server.
 	go c.callOnConnectHandlers()
 
-	go c.onceConnect.Do(c.callOnceConnect)
-
 	return nil
 }
 
@@ -133,7 +123,6 @@ func (c *Client) run() (err error) {
 	running:
 		err = c.dnode.Run()
 		c.callOnDisconnectHandlers()
-		c.onceDisconnect.Do(c.callOnceDisconnect)
 	dialAgain:
 		if !c.Reconnect {
 			break
@@ -203,32 +192,6 @@ func (c *Client) Properties() map[string]interface{} {
 // Call calls a method with args on the dnode server.
 func (c *Client) Call(method string, args ...interface{}) (map[string]dnode.Path, error) {
 	return c.dnode.Call(method, args...)
-}
-
-// OnceConnect registers a function to run on client connect only once.
-func (c *Client) OnceConnect(handler func()) {
-	c.onceConnectHandler = handler
-}
-
-// OnceDisconnect registers a function to run on client disconnect only once.
-func (c *Client) OnceDisconnect(handler func()) {
-	c.onceDisconnectHandler = handler
-}
-
-// callOnceConnect runs the registered once connect handler
-func (c *Client) callOnceConnect() {
-	if c.onceConnectHandler == nil {
-		return
-	}
-	c.onceConnectHandler()
-}
-
-// callOnceDisconnect runs the registered once disconnect handler
-func (c *Client) callOnceDisconnect() {
-	if c.onceDisconnectHandler == nil {
-		return
-	}
-	c.onceDisconnectHandler()
 }
 
 // OnConnect registers a function to run on client connect.

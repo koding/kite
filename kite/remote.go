@@ -90,16 +90,6 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
-// OnceConnect registers a function to run on connect only once.
-func (r *RemoteKite) OnceConnect(handler func()) {
-	r.client.OnceConnect(handler)
-}
-
-// OnceDisconnect registers a function to run on disconnect only once.
-func (r *RemoteKite) OnceDisconnect(handler func()) {
-	r.client.OnceDisconnect(handler)
-}
-
 // CallOptions is the type of first argument in the dnode message.
 // Second argument is a callback function.
 // It is used when unmarshalling a dnode message.

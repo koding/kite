@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"koding/newkite/protocol"
 	"net"
+	"sync"
 )
 
 // Kontrol embeds RemoteKite which has additional special helper methods.
@@ -34,13 +35,18 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	remoteKite := k.NewRemoteKite(kite, auth)
 	remoteKite.client.Reconnect = true
 
-	remoteKite.OnConnect(func() { log.Info("Connected to Kontrol ") })
-	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
-
+	var once sync.Once
 	ready := make(chan bool)
-	remoteKite.OnceConnect(func() {
-		close(ready)
+
+	remoteKite.OnConnect(func() {
+		log.Info("Connected to Kontrol ")
+
+		// signal all other methods that are listening on this channel, that we
+		// are ready.
+		once.Do(func() { close(ready) })
 	})
+
+	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
 	return &Kontrol{
 		RemoteKite: *remoteKite,
