@@ -13,7 +13,7 @@ type watcherHub struct {
 	sync.RWMutex
 
 	// Indexed by user to iterate faster when a notification comes.
-	// Indexed by user because it is the first field in KontrolQuery.
+	// Indexed by user because it is the first field in protocol.KontrolQuery.
 	watchesByUser map[string]*list.List // List contains *watch
 
 	// Indexed by Kite to remove them easily when Kite disconnects.
@@ -21,14 +21,9 @@ type watcherHub struct {
 }
 
 type watch struct {
-	query    *KontrolQuery
+	query    *protocol.KontrolQuery
 	callback dnode.Function
 }
-
-// const (
-// 	  Register = iota
-// 	Deregister
-// )
 
 func newWatcherHub() *watcherHub {
 	return &watcherHub{
@@ -39,7 +34,7 @@ func newWatcherHub() *watcherHub {
 
 // RegisterWatcher saves the callbacks to invoke later
 // when a Kite is registered/deregistered matching the query.
-func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, callback dnode.Function) {
+func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *protocol.KontrolQuery, callback dnode.Function) {
 	h.Lock()
 	defer h.Unlock()
 
@@ -52,6 +47,7 @@ func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, callba
 			l := h.watchesByUser[q.Username]
 			l.Remove(elem)
 
+			// Delete the empty list.
 			if l.Len() == 0 {
 				delete(h.watchesByUser, q.Username)
 			}
@@ -60,6 +56,7 @@ func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, callba
 		delete(h.watchesByKite, r)
 	})
 
+	// Get or create a new list.
 	l, ok := h.watchesByUser[q.Username]
 	if !ok {
 		l = list.New()
@@ -88,7 +85,7 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction) {
 }
 
 // matches returns true if kite mathches to the query.
-func matches(kite *protocol.Kite, query *KontrolQuery) bool {
+func matches(kite *protocol.Kite, query *protocol.KontrolQuery) bool {
 	qv := reflect.ValueOf(*query)
 	qt := qv.Type()
 

@@ -222,7 +222,7 @@ func getKiteKey(k protocol.Kite) (string, error) {
 }
 
 // getQueryKey returns the etcd key for the query.
-func getQueryKey(q *KontrolQuery) (string, error) {
+func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 	fields := []string{
 		q.Username,
 		q.Environment,
@@ -261,7 +261,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Invalid number of arguments")
 	}
 
-	var query KontrolQuery
+	var query protocol.KontrolQuery
 	err = args[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid query argument")
@@ -284,7 +284,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	return k.getKites(r, query, watchCallback)
 }
 
-func (k *Kontrol) getKites(r *kite.Request, query KontrolQuery, watchCallback dnode.Function) ([]protocol.KiteWithToken, error) {
+func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]protocol.KiteWithToken, error) {
 	key, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
