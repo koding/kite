@@ -36,7 +36,7 @@ func Square(r *kite.Request) (interface{}, error) {
 
 	result := a * a
 
-	fmt.Printf("Kite call, sending result '%s' back\n", result)
+	fmt.Printf("Kite call, sending result %.0f back\n", result)
 
 	// Print a log on remote Kite.
 	r.RemoteKite.Go("log", fmt.Sprintf("You have requested square of: %f", a))
