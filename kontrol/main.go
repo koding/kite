@@ -34,11 +34,11 @@ type Kontrol struct {
 }
 
 func NewKontrol() *Kontrol {
+	// Read list of etcd servers from config.
 	machines := make([]string, len(config.Current.Etcd))
 	for i, s := range config.Current.Etcd {
 		machines[i] = "http://" + s.Host + ":" + strconv.FormatUint(uint64(s.Port), 10)
 	}
-	fmt.Printf("--- machines: %#v\n", machines)
 
 	return &Kontrol{
 		etcd:       etcd.NewClient(machines),
