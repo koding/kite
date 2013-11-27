@@ -69,7 +69,7 @@ func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *protocol.KontrolQuer
 
 // Notify is called when a Kite is registered by the user of this watcherHub.
 // Calls the registered callbacks mathching to the kite.
-func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction) {
+func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction, kodingKey string) {
 	h.RLock()
 	defer h.RUnlock()
 
@@ -78,7 +78,27 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction) {
 		for e := l.Front(); e != nil; e = e.Next() {
 			watch := e.Value.(*watch)
 			if matches(kite, watch.query) {
-				go watch.callback(&protocol.KiteEvent{action, *kite})
+				var kiteWithToken *protocol.KiteWithToken
+				var err error
+
+				// Register events needs a token attached.
+				if action == protocol.Register {
+					kiteWithToken, err = addTokenToKite(kite, watch.query.Username, kodingKey)
+					if err != nil {
+						log.Error("watch notify: %s", err)
+						continue
+					}
+
+				} else {
+					// We do not need to send token for deregister event.
+					kiteWithToken = &protocol.KiteWithToken{Kite: *kite}
+				}
+
+				event := protocol.KiteEvent{
+					Action: action,
+					Kite:   *kiteWithToken,
+				}
+				go watch.callback(event)
 			}
 		}
 	}

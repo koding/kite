@@ -61,13 +61,13 @@ const (
 )
 
 type KiteWithToken struct {
-	Kite  `json:"kite"`
+	Kite  Kite   `json:"kite"`
 	Token string `json:"token"`
 }
 
 type KiteEvent struct {
-	Action KiteAction `json:"action"`
-	Kite   Kite       `json:"kite"`
+	Action KiteAction    `json:"action"`
+	Kite   KiteWithToken `json:"kite"`
 }
 
 type KiteAction string

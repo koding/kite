@@ -169,7 +169,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	log.Info("Kite registered: %s", key)
-	k.watcherHub.Notify(&r.RemoteKite.Kite, protocol.Register)
+	k.watcherHub.Notify(&r.RemoteKite.Kite, protocol.Register, rv.KodingKey)
 
 	r.RemoteKite.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -284,7 +284,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	return k.getKites(r, query, watchCallback)
 }
 
-func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]protocol.KiteWithToken, error) {
+func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]*protocol.KiteWithToken, error) {
 	key, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	if err != nil {
 		if etcdErr, ok := err.(etcd.EtcdError); ok {
 			if etcdErr.ErrorCode == 100 { // Key Not Found
-				return make([]protocol.KiteWithToken, 0), nil
+				return make([]*protocol.KiteWithToken, 0), nil
 			}
 		}
 		log.Critical("etcd error: %s", err)
@@ -333,8 +333,8 @@ func flatten(in []etcd.KeyValuePair) []etcd.KeyValuePair {
 	return out
 }
 
-func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]protocol.KiteWithToken, error) {
-	kitesWithToken := make([]protocol.KiteWithToken, len(kvs))
+func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]*protocol.KiteWithToken, error) {
+	kitesWithToken := make([]*protocol.KiteWithToken, len(kvs))
 
 	for i, kv := range kvs {
 		kite, kodingKey, err := kiteFromEtcdKV(kv.Key, kv.Value)
@@ -342,25 +342,32 @@ func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]protocol.KiteW
 			return nil, err
 		}
 
-		// Generate token.
-		key, err := kodingkey.FromString(kodingKey)
+		kitesWithToken[i], err = addTokenToKite(kite, username, kodingKey)
 		if err != nil {
-			return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
-		}
-
-		// username is from requester, key is from kite owner.
-		tokenString, err := token.NewToken(username, kite.ID).EncryptString(key)
-		if err != nil {
-			return nil, errors.New("Server error: Cannot generate a token")
-		}
-
-		kitesWithToken[i] = protocol.KiteWithToken{
-			Kite:  *kite,
-			Token: tokenString,
+			return nil, err
 		}
 	}
 
 	return kitesWithToken, nil
+}
+
+func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.KiteWithToken, error) {
+	// Generate token.
+	key, err := kodingkey.FromString(kodingKey)
+	if err != nil {
+		return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
+	}
+
+	// username is from requester, key is from kite owner.
+	tokenString, err := token.NewToken(username, kite.ID).EncryptString(key)
+	if err != nil {
+		return nil, errors.New("Server error: Cannot generate a token")
+	}
+
+	return &protocol.KiteWithToken{
+		Kite:  *kite,
+		Token: tokenString,
+	}, nil
 }
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
@@ -424,7 +431,7 @@ getIndex:
 		if strings.HasPrefix(resp.Key, "/kites") && (resp.Action == "delete" || resp.Action == "expire") {
 			kite, _, err := kiteFromEtcdKV(resp.Key, resp.Value)
 			if err == nil {
-				k.watcherHub.Notify(kite, protocol.Deregister)
+				k.watcherHub.Notify(kite, protocol.Deregister, "")
 			}
 		}
 	}
