@@ -22,19 +22,21 @@ import (
 )
 
 const (
-	HEARTBEAT_INTERVAL = time.Millisecond * 1000
-	HEARTBEAT_DELAY    = time.Millisecond * 2000
+	HEARTBEAT_INTERVAL = 1 * time.Minute
+	HEARTBEAT_DELAY    = 2 * time.Minute
 )
 
 var log = logging.MustGetLogger("Kontrol")
 
 type Kontrol struct {
-	etcd *etcd.Client
+	etcd       *etcd.Client
+	watcherHub *watcherHub
 }
 
 func NewKontrol() *Kontrol {
 	return &Kontrol{
-		etcd: etcd.NewClient(nil), // TODO read machine list from config
+		etcd:       etcd.NewClient(nil), // TODO read machine list from config
+		watcherHub: newWatcherHub(),
 	}
 }
 
@@ -59,7 +61,8 @@ func main() {
 
 	k.HandleFunc("register", kontrol.handleRegister)
 	k.HandleFunc("getKites", kontrol.handleGetKites)
-	// k.HandleFunc("watchKites", kontrol.handleWatchKites)
+
+	go kontrol.WatchEtcd()
 
 	k.Run()
 }
@@ -121,7 +124,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		prevValue = resp.PrevValue
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.etcd.UpdateDir("/"+r.RemoteKite.Username, ttl)
+		_, err = k.etcd.UpdateDir("/kites/"+r.RemoteKite.Username, ttl)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
 			return
@@ -160,6 +163,13 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	log.Info("Kite registered: %s", key)
+	k.watcherHub.Notify(&r.RemoteKite.Kite, protocol.Register)
+
+	r.RemoteKite.OnDisconnect(func() {
+		// Delete from etcd, WatchEtcd() will get the event
+		// and will notify watchers of this Kite for deregistration.
+		k.etcd.Delete(key)
+	})
 
 	// send response back to the kite, also identify him with the new name
 	response := protocol.RegisterResult{
@@ -171,6 +181,8 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	return response, nil
 }
 
+// getKiteKey returns a string representing the kite uniquely
+// that is suitable to use as a key for etcd.
 func getKiteKey(k protocol.Kite) (string, error) {
 	// Order is important.
 	fields := map[string]string{
@@ -200,9 +212,10 @@ func getKiteKey(k protocol.Kite) (string, error) {
 	}
 	key = strings.TrimSuffix(key, "/")
 
-	return key, nil
+	return "/kites" + key, nil
 }
 
+// getQueryKey returns the etcd key for the query.
 func getQueryKey(q *KontrolQuery) (string, error) {
 	fields := []string{
 		q.Username,
@@ -228,25 +241,33 @@ func getQueryKey(q *KontrolQuery) (string, error) {
 		}
 	}
 
-	return path, nil
+	return "/kites" + path, nil
 }
 
-// 	// Deregister the Kite on disconnect.
-// 	r.RemoteKite.OnDisconnect(func() {
-// 		log.Info("Deregistering Kite: %s", r.RemoteKite.ID)
-// 		k.storage.Remove(r.RemoteKite.ID)
-
-// 		// Delete from jVMs when all kites to that user is died.
-// 		if !k.kitesExistsForUser(r.RemoteKite.Username) {
-// 			deleteFromVM(r.RemoteKite.Username)
-// 		}
-// 	})
-
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	query := new(KontrolQuery)
-	err := r.Args.Unmarshal(query)
+	var args []*dnode.Partial
+	err := r.Args.Unmarshal(&args)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(args) != 1 && len(args) != 2 {
+		return nil, errors.New("Invalid number of arguments")
+	}
+
+	var query KontrolQuery
+	err = args[0].Unmarshal(&query)
+	if err != nil {
+		return nil, errors.New("Invalid query argument")
+	}
+
+	// To be called when a Kite is registered or deregistered matching the query.
+	var watchCallback dnode.Function
+	if len(args) == 2 {
+		err = args[1].Unmarshal(&watchCallback)
+		if err != nil {
+			return nil, errors.New("Invalid callback argument")
+		}
 	}
 
 	// We do not allow access to other's kites for now.
@@ -254,13 +275,22 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Not your Kite")
 	}
 
-	key, err := getQueryKey(query)
+	return k.getKites(r, query, watchCallback)
+}
+
+func (k *Kontrol) getKites(r *kite.Request, query KontrolQuery, watchCallback dnode.Function) ([]protocol.KiteWithToken, error) {
+	key, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := k.etcd.GetAll(key, false)
 	if err != nil {
+		if etcdErr, ok := err.(etcd.EtcdError); ok {
+			if etcdErr.ErrorCode == 100 { // Key Not Found
+				return make([]protocol.KiteWithToken, 0), nil
+			}
+		}
 		log.Critical("etcd error: %s", err)
 		return nil, fmt.Errorf("Internal error")
 	}
@@ -270,6 +300,12 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	kitesWithToken, err := addTokenToKites(kvs, r.Username)
 	if err != nil {
 		return nil, err
+	}
+
+	// Register callbacks to our watcher hub.
+	// It will call them when a Kite registered/unregistered matching the query.
+	if watchCallback != nil {
+		k.watcherHub.RegisterWatcher(r.RemoteKite, &query, watchCallback)
 	}
 
 	return kitesWithToken, nil
@@ -295,7 +331,7 @@ func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]protocol.KiteW
 	kitesWithToken := make([]protocol.KiteWithToken, len(kvs))
 
 	for i, kv := range kvs {
-		kite, kodingKey, err := kiteFromEtcdKV(&kv)
+		kite, kodingKey, err := kiteFromEtcdKV(kv.Key, kv.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -321,89 +357,72 @@ func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]protocol.KiteW
 	return kitesWithToken, nil
 }
 
-func kiteFromEtcdKV(kv *etcd.KeyValuePair) (*protocol.Kite, string, error) {
-	key := strings.TrimPrefix(kv.Key, "/")
-
-	fields := strings.Split(key, "/")
-	if len(fields) != 7 {
-		log.Critical("Key does not represent a Kite: %s", kv.Key)
-		return nil, "", errors.New("Internal error")
+// kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
+// etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
+func kiteFromEtcdKV(key, value string) (*protocol.Kite, string, error) {
+	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
+	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
+		return nil, "", fmt.Errorf("Invalid Kite: %s", key)
 	}
 
 	kite := new(protocol.Kite)
-	kite.Username = fields[0]
-	kite.Environment = fields[1]
-	kite.Name = fields[2]
-	kite.Version = fields[3]
-	kite.Region = fields[4]
-	kite.Hostname = fields[5]
-	kite.ID = fields[6]
+	kite.Username = fields[1]
+	kite.Environment = fields[2]
+	kite.Name = fields[3]
+	kite.Version = fields[4]
+	kite.Region = fields[5]
+	kite.Hostname = fields[6]
+	kite.ID = fields[7]
 
-	value := new(registerValue)
-	json.Unmarshal([]byte(kv.Value), value)
+	rv := new(registerValue)
+	json.Unmarshal([]byte(value), rv)
 
-	kite.PublicIP = value.PublicIP
-	kite.Port = value.Port
+	kite.PublicIP = rv.PublicIP
+	kite.Port = rv.Port
 
-	return kite, value.KodingKey, nil
+	return kite, rv.KodingKey, nil
 }
 
-// func (k *Kontrol) handleWatchKites(r *kite.Request) (interface{}, error) {
-// 	var args []*dnode.Partial
-// 	err := r.Args.Unmarshal(&args)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// WatchEtcd watches all Kite changes on etcd cluster
+// and notifies registered watchers on this Kontrol instance.
+func (k *Kontrol) WatchEtcd() {
+getIndex:
+	resp, err := k.etcd.Set("/_kontrol_get_index", "OK", 1)
+	if err != nil {
+		log.Critical("etcd error 1: %s", err.Error())
+		time.Sleep(time.Second)
+		goto getIndex
+	}
 
-// 	if len(args) != 2 {
-// 		return nil, errors.New("Invalid number of arguments")
-// 	}
+	index := resp.ModifiedIndex
+	log.Info("etcd: index = %d", index)
 
-// 	var query KontrolQuery
-// 	err = args[0].Unmarshal(&query)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	receiver := make(chan *etcd.Response)
 
-// 	var callback dnode.Function
-// 	err = args[1].Unmarshal(&callback)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	go func() {
+	watch:
+		resp, err = k.etcd.WatchAll("/kites", index+1, receiver, nil)
+		if err != nil {
+			log.Critical("etcd error 2: %s", err)
+			time.Sleep(time.Second)
+			goto watch
+		}
+	}()
 
-// 	// We do not allow access to other's kites for now.
-// 	if r.Username != query.Username {
-// 		return nil, errors.New("Not your Kite")
-// 	}
+	// Channel is never closed.
+	for resp := range receiver {
+		// log.Debug("etcd: change received: %#v", resp)
+		index = resp.ModifiedIndex
 
-// 	k.watchers.RegisterWatcher(r.RemoteKite, &query, callback)
-// 	return nil, nil
-// }
-
-// func deleteFromVM(username string) error {
-// 	if username == "" {
-// 		return errors.New("deleting local vm err: empty username is passed")
-// 	}
-
-// 	hostnameAlias := "local-" + username
-// 	err := modelhelper.DeleteVM(hostnameAlias)
-// 	if err != nil {
-// 		return fmt.Errorf("deleting local vm err:", err)
-// 	}
-// 	return nil
-// }
-
-// func (k *Kontrol) kitesExistsForUser(username string) bool {
-// 	found := false
-
-// 	for _, kite := range k.storage.List() {
-// 		if kite.Username == username {
-// 			found = true
-// 		}
-// 	}
-
-// 	return found
-// }
+		// Notify deregistration events.
+		if strings.HasPrefix(resp.Key, "/kites") && (resp.Action == "delete" || resp.Action == "expire") {
+			kite, _, err := kiteFromEtcdKV(resp.Key, resp.Value)
+			if err == nil {
+				k.watcherHub.Notify(kite, protocol.Deregister)
+			}
+		}
+	}
+}
 
 func (k *Kontrol) AuthenticateFromSessionID(options *kite.CallOptions) error {
 	username, err := findUsernameFromSessionID(options.Authentication.Key)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"koding/newkite/dnode"
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
@@ -8,52 +9,85 @@ import (
 	"sync"
 )
 
-type watchers struct {
+type watcherHub struct {
 	sync.RWMutex
-	requests map[*kite.RemoteKite][]*request
+
+	// Indexed by user to iterate faster when a notification comes.
+	// Indexed by user because it is the first field in KontrolQuery.
+	watchesByUser map[string]*list.List // List contains *watch
+
+	// Indexed by Kite to remove them easily when Kite disconnects.
+	watchesByKite map[*kite.RemoteKite][]*list.Element
 }
 
-type request struct {
+type watch struct {
 	query    *KontrolQuery
 	callback dnode.Function
 }
 
-func newWatchers() *watchers {
-	return &watchers{requests: make(map[*kite.RemoteKite][]*request)}
+// const (
+// 	  Register = iota
+// 	Deregister
+// )
+
+func newWatcherHub() *watcherHub {
+	return &watcherHub{
+		watchesByUser: make(map[string]*list.List),
+		watchesByKite: make(map[*kite.RemoteKite][]*list.Element),
+	}
 }
 
-// RegisterWatcher saves the callback to invoke later
-// when a Kite is registered matching the query.
-func (w *watchers) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, cb dnode.Function) {
-	w.Lock()
-	defer w.Unlock()
+// RegisterWatcher saves the callbacks to invoke later
+// when a Kite is registered/deregistered matching the query.
+func (h *watcherHub) RegisterWatcher(r *kite.RemoteKite, q *KontrolQuery, callback dnode.Function) {
+	h.Lock()
+	defer h.Unlock()
 
 	r.OnDisconnect(func() {
-		w.Lock()
-		delete(w.requests, r)
-		w.Unlock()
+		h.Lock()
+		defer h.Unlock()
+
+		// Delete watch from watchesByUser
+		for _, elem := range h.watchesByKite[r] {
+			l := h.watchesByUser[q.Username]
+			l.Remove(elem)
+
+			if l.Len() == 0 {
+				delete(h.watchesByUser, q.Username)
+			}
+		}
+
+		delete(h.watchesByKite, r)
 	})
 
-	w.requests[r] = append(w.requests[r], &request{q, cb})
+	l, ok := h.watchesByUser[q.Username]
+	if !ok {
+		l = list.New()
+		h.watchesByUser[q.Username] = l
+	}
+
+	elem := l.PushBack(&watch{q, callback})
+	h.watchesByKite[r] = append(h.watchesByKite[r], elem)
 }
 
-// Notify is called when a Kite is registered.
-func (w *watchers) Notify(kite *protocol.Kite) {
-	w.RLock()
-	defer w.RUnlock()
+// Notify is called when a Kite is registered by the user of this watcherHub.
+// Calls the registered callbacks mathching to the kite.
+func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction) {
+	h.RLock()
+	defer h.RUnlock()
 
-	// Iterating over every watch request is really not efficient.
-	// However, I have written in easy way because we are going to replace
-	// this functionality with Zookeeper, Etcd or similar service.
-	for _, requests := range w.requests {
-		for _, request := range requests {
-			if matches(kite, request.query) {
-				go request.callback(kite)
+	l, ok := h.watchesByUser[kite.Username]
+	if ok {
+		for e := l.Front(); e != nil; e = e.Next() {
+			watch := e.Value.(*watch)
+			if matches(kite, watch.query) {
+				go watch.callback(&protocol.KiteEvent{action, *kite})
 			}
 		}
 	}
 }
 
+// matches returns true if kite mathches to the query.
 func matches(kite *protocol.Kite, query *KontrolQuery) bool {
 	qv := reflect.ValueOf(*query)
 	qt := qv.Type()

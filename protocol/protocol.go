@@ -65,6 +65,18 @@ type KiteWithToken struct {
 	Token string `json:"token"`
 }
 
+type KiteEvent struct {
+	Action KiteAction `json:"action"`
+	Kite   Kite       `json:"kite"`
+}
+
+type KiteAction string
+
+const (
+	Register   KiteAction = "REGISTER"
+	Deregister KiteAction = "DEREGISTER"
+)
+
 type Options struct {
 	Username     string `json:"username"`
 	Kitename     string `json:"kitename"`

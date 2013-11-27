@@ -38,7 +38,15 @@ func main() {
 		Name:        "mathworker",
 	}
 
-	kites, err := k.Kontrol.GetKites(query)
+	// To demonstrate we can receive notifications matcing to our query.
+	events := make(chan *protocol.KiteEvent)
+	go func() {
+		for e := range events {
+			fmt.Printf("--- kite event: %#v\n", e)
+		}
+	}()
+
+	kites, err := k.Kontrol.GetKites(query, events)
 	if err != nil {
 		fmt.Println(err)
 		return
