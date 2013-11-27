@@ -65,14 +65,14 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
 	addr := r.Kite.Addr()
-	log.Info("Dialing %s", addr)
+	log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, addr)
 	return r.client.Dial("ws://" + addr + "/dnode")
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
 func (r *RemoteKite) DialForever() {
 	addr := r.Kite.Addr()
-	log.Info("Dialing %s", addr)
+	log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, addr)
 	r.client.DialForever("ws://" + addr + "/dnode")
 }
 
@@ -80,12 +80,12 @@ func (r *RemoteKite) Close() {
 	r.client.Close()
 }
 
-// OnConnect registers a function to run on client connect.
+// OnConnect registers a function to run on connect.
 func (r *RemoteKite) OnConnect(handler func()) {
 	r.client.OnConnect(handler)
 }
 
-// OnDisconnect registers a function to run on client disconnect.
+// OnDisconnect registers a function to run on disconnect.
 func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
@@ -143,6 +143,7 @@ func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partia
 func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
+	log.Debug("Calling method [%s] on kite [%s]", method, r.Name)
 	responseChan := make(chan *response, 1)
 
 	r.send(method, args, responseChan)
@@ -165,7 +166,11 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 
 	callbacks, err := r.client.Call(method, opts, cb)
 	if err != nil {
-		responseChan <- &response{nil, fmt.Errorf("RemoteKite error: %s", err)}
+		responseChan <- &response{
+			Result: nil,
+			Err: fmt.Errorf("Calling method [%s] on [%s] error: %s",
+				r.Kite.Name, method, err),
+		}
 		return
 	}
 

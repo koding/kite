@@ -60,6 +60,10 @@ type Kite struct {
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*CallOptions) error
+
+	// ready is used to signal if the kite is ready to start and make calls to
+	// other kites.
+	ready chan bool
 }
 
 // New creates, initialize and then returns a new Kite instance. It accepts
@@ -124,6 +128,7 @@ func New(options *protocol.Options) *Kite {
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*CallOptions) error),
 		handlers:          make(map[string]HandlerFunc),
+		ready:             make(chan bool),
 	}
 
 	k.Kontrol = k.NewKontrol(options.KontrolAddr)
@@ -175,16 +180,25 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
-// asynchronously. It can be started in a goroutine if you wish to use kite as a
-// client too.
+// asynchronously.
 func (k *Kite) Run() {
+	k.Start()
+	select {}
+}
+
+// Start is like Run(), but does not wait for it to complete. It's nonblocking.
+func (k *Kite) Start() {
 	k.parseVersionFlag()
 	k.setupLogging()
 
-	err := k.listenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		err := k.listenAndServe()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	<-k.ready // wait until we are ready
 }
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
@@ -291,12 +305,13 @@ func (k *Kite) listenAndServe() error {
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
 		if k.RegisterToKontrol {
-			k.Kontrol.RemoteKite.OnConnect(k.registerToKontrol)
+			k.Kontrol.OnConnect(k.registerToKontrol)
 		}
 
 		k.Kontrol.DialForever()
 	}
 
+	k.ready <- true // listener is ready, means we are ready too
 	return http.Serve(listener, k.server)
 }
 
@@ -305,8 +320,6 @@ func (k *Kite) registerToKontrol() {
 	if err != nil {
 		log.Fatalf("Cannot register to Kontrol: %s", err)
 	}
-
-	log.Info("Registered to Kontrol successfully")
 }
 
 // OnConnect registers a function to run when a Kite connects to this Kite.
@@ -321,7 +334,7 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 
 // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
 func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	log.Info("Client has connected: %s", r.Addr())
+	log.Info("Client is connected to us: [%s %s]", r.Name, r.Addr())
 
 	for _, handler := range k.onConnectHandlers {
 		go handler(r)
@@ -329,7 +342,7 @@ func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
 }
 
 func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-	log.Info("Client has disconnected: %s", r.Addr())
+	log.Info("Client has disconnected: [%s %s]", r.Name, r.Addr())
 
 	for _, handler := range k.onDisconnectHandlers {
 		go handler(r)

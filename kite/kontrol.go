@@ -6,10 +6,17 @@ import (
 	"koding/newkite/dnode"
 	"koding/newkite/protocol"
 	"net"
+	"sync"
 )
 
-// Kontrol is also a Kite which has special helper methods.
-type Kontrol struct{ RemoteKite }
+// Kontrol embeds RemoteKite which has additional special helper methods.
+type Kontrol struct {
+	RemoteKite
+
+	// used for synchronizing methods that needs to be called after
+	// successful connection.
+	ready chan bool
+}
 
 // NewKontrol returns a pointer to new Kontrol instance.
 func (k *Kite) NewKontrol(addr string) *Kontrol {
@@ -18,6 +25,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	kite := protocol.Kite{
 		PublicIP: host,
 		Port:     port,
+		Name:     "kontrol", // for logging purposes
 	}
 
 	auth := callAuthentication{
@@ -28,17 +36,28 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	remoteKite := k.NewRemoteKite(kite, auth)
 	remoteKite.client.Reconnect = true
 
-	// Print log messages on connect/disconnect.
-	remoteKite.OnConnect(func() { log.Info("Connected to Kontrol.") })
+	var once sync.Once
+	ready := make(chan bool)
+
+	remoteKite.OnConnect(func() {
+		log.Info("Connected to Kontrol ")
+
+		// signal all other methods that are listening on this channel, that we
+		// are ready.
+		once.Do(func() { close(ready) })
+	})
+
 	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
-	return &Kontrol{*remoteKite}
+	return &Kontrol{
+		RemoteKite: *remoteKite,
+		ready:      ready,
+	}
 }
 
-// Register registers current Kite to Kontrol.
-// After registration other Kites can find it via GetKites() method.
+// Register registers current Kite to Kontrol. After registration other Kites
+// can find it via GetKites() method.
 func (k *Kontrol) Register() error {
-	log.Debug("Registering to Kontrol")
 	response, err := k.RemoteKite.Call("register", nil)
 	if err != nil {
 		return err
@@ -52,17 +71,18 @@ func (k *Kontrol) Register() error {
 
 	switch rr.Result {
 	case protocol.AllowKite:
-		kite := &k.Kite
-		log.Info("registered to kontrol with addr: %s version: %s uuid: %s",
-			kite.Addr(), kite.Version, kite.ID)
+		kite := &k.localKite.Kite
 
-		// we know now which user that is
+		// we know now which user that is after authentication
 		kite.Username = rr.Username
 
 		// Set the correct PublicIP if left empty in options.
 		if kite.PublicIP == "" {
 			kite.PublicIP = rr.PublicIP
 		}
+
+		log.Info("Registered to kontrol with addr: %s version: %s uuid: %s",
+			kite.Addr(), kite.Version, kite.ID)
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")
 	default:
@@ -76,6 +96,10 @@ func (k *Kontrol) Register() error {
 // The returned list contains ready to connect RemoteKite instances.
 // The caller must connect with RemoteKite.Dial() before using each Kite.
 func (k *Kontrol) GetKites(query protocol.KontrolQuery, events chan *protocol.KiteEvent) ([]*RemoteKite, error) {
+	// this is needed because we are calling GetKites explicitly, therefore
+	// this should be only callable *after* we are connected to kontrol.
+	<-k.ready
+
 	queueEvents := func(p *dnode.Partial) {
 		var args []*dnode.Partial
 		err := p.Unmarshal(&args)

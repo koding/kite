@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"code.google.com/p/go.net/websocket"
-	"fmt"
 	"koding/newkite/dnode"
 )
 
@@ -49,8 +48,6 @@ func (s *Server) HandleSimple(method string, handler interface{}) {
 // handleWS is the websocket connection handler.
 func (s *Server) handleWS(ws *websocket.Conn) {
 	defer ws.Close()
-
-	fmt.Println("--- connected new client")
 
 	// This client is actually is the server for the websocket.
 	// Since both sides can send/receive messages the client code is reused here.
