@@ -418,12 +418,17 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, string, error) {
 // WatchEtcd watches all Kite changes on etcd cluster
 // and notifies registered watchers on this Kontrol instance.
 func (k *Kontrol) WatchEtcd() {
-getIndex:
-	resp, err := k.etcd.Set("/_kontrol_get_index", "OK", 1)
-	if err != nil {
+	var resp *etcd.Response
+	var err error
+
+	for {
+		resp, err = k.etcd.Set("/_kontrol_get_index", "OK", 1)
+		if err == nil {
+			break
+		}
+
 		log.Critical("etcd error 1: %s", err.Error())
 		time.Sleep(time.Second)
-		goto getIndex
 	}
 
 	index := resp.ModifiedIndex
@@ -432,12 +437,12 @@ getIndex:
 	receiver := make(chan *etcd.Response)
 
 	go func() {
-	watch:
-		resp, err = k.etcd.WatchAll(KitesPrefix, index+1, receiver, nil)
-		if err != nil {
-			log.Critical("etcd error 2: %s", err)
-			time.Sleep(time.Second)
-			goto watch
+		for {
+			_, err := k.etcd.WatchAll(KitesPrefix, index+1, receiver, nil)
+			if err != nil {
+				log.Critical("etcd error 2: %s", err)
+				time.Sleep(time.Second)
+			}
 		}
 	}()
 
