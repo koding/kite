@@ -22,9 +22,9 @@ import (
 )
 
 const (
-	HEARTBEAT_INTERVAL = 1 * time.Minute
-	HEARTBEAT_DELAY    = 2 * time.Minute
-	KitesPrefix        = "/kites"
+	HeartbeatInterval = 1 * time.Minute
+	HeartbeatDelay    = 2 * time.Minute
+	KitesPrefix       = "/kites"
 )
 
 var log = logging.MustGetLogger("Kontrol")
@@ -165,7 +165,7 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) err
 	}
 
 	heartbeatArgs := []interface{}{
-		HEARTBEAT_INTERVAL / time.Second,
+		HeartbeatInterval / time.Second,
 		dnode.Callback(heartbeatFunc),
 	}
 
@@ -184,7 +184,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) fun
 	valueBytes, _ := json.Marshal(rv)
 	value := string(valueBytes)
 
-	ttl := uint64(HEARTBEAT_DELAY / time.Second)
+	ttl := uint64(HeartbeatDelay / time.Second)
 
 	return func() (prevValue string, err error) {
 		resp, err := k.etcd.Set(etcdKey, value, ttl)
