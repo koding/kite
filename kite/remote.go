@@ -169,7 +169,7 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 		responseChan <- &response{
 			Result: nil,
 			Err: fmt.Errorf("Calling method [%s] on [%s] error: %s",
-				r.Kite.Name, method, err),
+				method, r.Kite.Name, err),
 		}
 		return
 	}
