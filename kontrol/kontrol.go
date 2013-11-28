@@ -112,41 +112,19 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		r.RemoteKite.PublicIP, _, _ = net.SplitHostPort(r.RemoteAddr)
 	}
 
-	key, err := getKiteKey(r.RemoteKite.Kite)
+	return k.register(r.RemoteKite, r.Authentication.Key)
+}
+
+func (k *Kontrol) register(r *kite.RemoteKite, kodingkey string) (*protocol.RegisterResult, error) {
+	kite := &r.Kite
+
+	key, err := getKiteKey(kite)
 	if err != nil {
 		return nil, err
 	}
 
-	rv := &registerValue{
-		PublicIP:  r.RemoteKite.PublicIP,
-		Port:      r.RemoteKite.Port,
-		KodingKey: r.Authentication.Key,
-	}
-
-	valueBytes, _ := json.Marshal(rv)
-	value := string(valueBytes)
-
-	ttl := uint64(HEARTBEAT_DELAY / time.Second)
-
 	// setKey sets the value of the Kite in etcd.
-	setKey := func() (prevValue string, err error) {
-		resp, err := k.etcd.Set(key, value, ttl)
-		if err != nil {
-			log.Critical("etcd error: %s", err)
-			return
-		}
-
-		prevValue = resp.PrevValue
-
-		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.etcd.UpdateDir("/kites/"+r.RemoteKite.Username, ttl)
-		if err != nil {
-			log.Critical("etcd error: %s", err)
-			return
-		}
-
-		return
-	}
+	setKey := k.makeSetter(kite, key, kodingkey)
 
 	// Register to etcd.
 	prev, err := setKey()
@@ -156,49 +134,80 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	if prev != "" {
 		log.Notice("Kite (%s) is already registered. Doing nothing.", key)
-	} else {
-		// Request heartbeat from the Kite.
-
-		heartbeatFunc := func(p *dnode.Partial) {
-			prev, err := setKey()
-			if err == nil && prev == "" {
-				log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", key)
-			}
-		}
-
-		heartbeatArgs := []interface{}{
-			HEARTBEAT_INTERVAL / time.Second,
-			dnode.Callback(heartbeatFunc),
-		}
-
-		_, err := r.RemoteKite.Call("heartbeat", heartbeatArgs)
-		if err != nil {
-			return nil, err
-		}
+	} else if err := requestHeartbeat(r, setKey); err != nil {
+		return nil, err
 	}
 
 	log.Info("Kite registered: %s", key)
-	k.watcherHub.Notify(&r.RemoteKite.Kite, protocol.Register, rv.KodingKey)
+	k.watcherHub.Notify(kite, protocol.Register, kodingkey)
 
-	r.RemoteKite.OnDisconnect(func() {
+	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
 		k.etcd.Delete(key)
 	})
 
 	// send response back to the kite, also identify him with the new name
-	response := protocol.RegisterResult{
+	return &protocol.RegisterResult{
 		Result:   protocol.AllowKite,
-		Username: r.RemoteKite.Username,
-		PublicIP: r.RemoteKite.PublicIP,
+		Username: r.Username,
+		PublicIP: r.PublicIP,
+	}, nil
+}
+
+func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) error {
+	heartbeatFunc := func(p *dnode.Partial) {
+		prev, err := setterFunc()
+		if err == nil && prev == "" {
+			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", r.ID)
+		}
 	}
 
-	return response, nil
+	heartbeatArgs := []interface{}{
+		HEARTBEAT_INTERVAL / time.Second,
+		dnode.Callback(heartbeatFunc),
+	}
+
+	_, err := r.Call("heartbeat", heartbeatArgs)
+	return err
+}
+
+//  makeSetter returns a func for setting the kite key with value in etcd.
+func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) func() (string, error) {
+	rv := &registerValue{
+		PublicIP:  kite.PublicIP,
+		Port:      kite.Port,
+		KodingKey: kodingkey,
+	}
+
+	valueBytes, _ := json.Marshal(rv)
+	value := string(valueBytes)
+
+	ttl := uint64(HEARTBEAT_DELAY / time.Second)
+
+	return func() (prevValue string, err error) {
+		resp, err := k.etcd.Set(etcdKey, value, ttl)
+		if err != nil {
+			log.Critical("etcd error: %s", err)
+			return
+		}
+
+		prevValue = resp.PrevValue
+
+		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
+		_, err = k.etcd.UpdateDir("/kites/"+kite.Username, ttl)
+		if err != nil {
+			log.Critical("etcd error: %s", err)
+			return
+		}
+
+		return
+	}
 }
 
 // getKiteKey returns a string representing the kite uniquely
 // that is suitable to use as a key for etcd.
-func getKiteKey(k protocol.Kite) (string, error) {
+func getKiteKey(k *protocol.Kite) (string, error) {
 	// Order is important.
 	fields := map[string]string{
 		"username":    k.Username,
