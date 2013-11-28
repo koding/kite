@@ -258,15 +258,20 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 
 	// Validate query and build key.
 	path := "/"
-	empty := false // encountered with empty field?
+
+	empty := false   // encountered with empty field?
+	empytField := "" // for error log
 	for k, v := range fields {
 		if v == "" {
 			empty = true
+			empytField = k
 			continue
 		}
+
 		if empty && v != "" {
-			return "", fmt.Errorf("Gap between query fields in field: %s", k)
+			return "", fmt.Errorf("Invalid query. Query option is not set: %s", empytField)
 		}
+
 		path = path + v + "/"
 	}
 
