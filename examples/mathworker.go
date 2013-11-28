@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"koding/newkite/kite"
-	"koding/newkite/protocol"
 )
 
 var port = flag.String("port", "", "port to bind itself")
@@ -12,7 +11,7 @@ var port = flag.String("port", "", "port to bind itself")
 func main() {
 	flag.Parse()
 
-	options := &protocol.Options{
+	options := &kite.Options{
 		Kitename:    "mathworker",
 		Version:     "1",
 		Port:        *port,

@@ -3,12 +3,10 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
-	"koding/newkite/protocol"
 	"log"
 	"net"
 	"net/http"
@@ -127,21 +125,6 @@ func GetPublicIP(ip string) string {
 	}
 
 	return netIP.To4().String()
-}
-
-func ReadKiteOptions(configfile string) (*protocol.Options, error) {
-	file, err := ioutil.ReadFile(configfile)
-	if err != nil {
-		return nil, err
-	}
-
-	options := &protocol.Options{}
-	err = json.Unmarshal(file, &options)
-	if err != nil {
-		return nil, err
-	}
-
-	return options, nil
 }
 
 func IsServerAlive(host string) error {

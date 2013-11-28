@@ -14,7 +14,7 @@ var port = flag.String("port", "", "port to bind itself")
 func main() {
 	flag.Parse()
 
-	options := &protocol.Options{
+	options := &kite.Options{
 		Kitename:    "application",
 		Version:     "1",
 		Port:        *port,

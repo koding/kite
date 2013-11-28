@@ -102,7 +102,7 @@ func TestKontrol(t *testing.T) {
 }
 
 func mathWorker() *kite.Kite {
-	options := &protocol.Options{
+	options := &kite.Options{
 		Kitename:    "mathworker",
 		Version:     "1",
 		Port:        "3636",
@@ -132,7 +132,7 @@ func Square(r *kite.Request) (interface{}, error) {
 }
 
 func exp2() *kite.Kite {
-	options := &protocol.Options{
+	options := &kite.Options{
 		Kitename:    "exp2",
 		Version:     "1",
 		Port:        "3637",

@@ -35,7 +35,7 @@ type Kontrol struct {
 }
 
 func New() *Kontrol {
-	kiteOptions := &protocol.Options{
+	kiteOptions := &kite.Options{
 		Kitename:    "kontrol",
 		Version:     "1",
 		Port:        strconv.Itoa(config.Current.NewKontrol.Port),

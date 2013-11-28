@@ -2,7 +2,6 @@ package kite
 
 import (
 	"fmt"
-	"koding/newkite/protocol"
 	"testing"
 	"time"
 )
@@ -68,7 +67,7 @@ func TestKite(t *testing.T) {
 }
 
 func exp2() *Kite {
-	options := &protocol.Options{
+	options := &Options{
 		Kitename:    "exp2",
 		Version:     "1",
 		Port:        "3637",
@@ -80,7 +79,7 @@ func exp2() *Kite {
 }
 
 func mathWorker() *Kite {
-	options := &protocol.Options{
+	options := &Options{
 		Kitename:    "mathworker",
 		Version:     "1",
 		Port:        "3636",

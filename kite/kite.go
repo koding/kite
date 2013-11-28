@@ -1,9 +1,11 @@
 package kite
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	logging "github.com/op/go-logging"
+	"io/ioutil"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
@@ -66,13 +68,41 @@ type Kite struct {
 	ready chan bool
 }
 
+type Options struct {
+	Username     string
+	Kitename     string
+	LocalIP      string
+	PublicIP     string
+	Environment  string
+	Region       string
+	Port         string
+	Version      string
+	KontrolAddr  string
+	Dependencies string
+}
+
+func ReadKiteOptions(configfile string) (*Options, error) {
+	file, err := ioutil.ReadFile(configfile)
+	if err != nil {
+		return nil, err
+	}
+
+	options := &Options{}
+	err = json.Unmarshal(file, &options)
+	if err != nil {
+		return nil, err
+	}
+
+	return options, nil
+}
+
 // New creates, initialize and then returns a new Kite instance. It accepts
 // a single options argument that is a config struct that needs to be filled
 // with several informations like Name, Port, IP and so on.
-func New(options *protocol.Options) *Kite {
+func New(options *Options) *Kite {
 	var err error
 	if options == nil {
-		options, err = utils.ReadKiteOptions("manifest.json")
+		options, err = ReadKiteOptions("manifest.json")
 		if err != nil {
 			log.Fatal("error: could not read config file", err)
 		}
