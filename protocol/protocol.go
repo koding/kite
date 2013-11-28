@@ -65,6 +65,8 @@ type KiteWithToken struct {
 	Token string `json:"token"`
 }
 
+// KiteEvent is the struct that is sent as an argument in watchCallback of
+// getKites method of Kontrol.
 type KiteEvent struct {
 	Action KiteAction    `json:"action"`
 	Kite   KiteWithToken `json:"kite"`
