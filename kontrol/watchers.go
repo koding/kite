@@ -104,7 +104,8 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction, kod
 
 		event := protocol.KiteEvent{
 			Action: action,
-			Kite:   *kiteWithToken,
+			Kite:   kiteWithToken.Kite,
+			Token:  kiteWithToken.Token,
 		}
 		go watch.callback(event)
 	}
