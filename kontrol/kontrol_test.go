@@ -142,3 +142,33 @@ func exp2() *kite.Kite {
 
 	return kite.New(options)
 }
+
+func TestGetQueryKey(t *testing.T) {
+	q := &protocol.KontrolQuery{
+		Username:    "cenk",
+		Environment: "production",
+	}
+
+	key, err := getQueryKey(q)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if key != "/kites/cenk/production" {
+		t.Errorf("Invalid key: %s", key)
+	}
+
+	// This is wrong because Environment field is empty.
+	// We can't make a query on etcd because wildcards are not allowed in paths.
+	q = &protocol.KontrolQuery{
+		Username: "cenk",
+		Name:     "fs",
+	}
+
+	key, err = getQueryKey(q)
+	if err == nil {
+		t.Errorf("Error is expected")
+	}
+	if key != "" {
+		t.Errorf("Key is not expected: %s", key)
+	}
+}

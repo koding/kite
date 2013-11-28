@@ -266,6 +266,8 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 		}
 	}
 
+	path = strings.TrimSuffix(path, "/")
+
 	return KitesPrefix + path, nil
 }
 
