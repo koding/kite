@@ -18,9 +18,10 @@ import (
 
 const KeyLength = 64
 
-// var AuthServer = "https://koding.com"
+var AuthServer = "https://koding.com"
+
 // TODO change this before deploying to production
-var AuthServer = "http://localhost:3020"
+// var AuthServer = "http://localhost:3020"
 
 type Register struct{}
 
