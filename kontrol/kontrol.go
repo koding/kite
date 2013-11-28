@@ -24,6 +24,7 @@ import (
 const (
 	HEARTBEAT_INTERVAL = 1 * time.Minute
 	HEARTBEAT_DELAY    = 2 * time.Minute
+	KitesPrefix        = "/kites"
 )
 
 var log = logging.MustGetLogger("Kontrol")
@@ -195,7 +196,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) fun
 		prevValue = resp.PrevValue
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.etcd.UpdateDir("/kites/"+kite.Username, ttl)
+		_, err = k.etcd.UpdateDir(KitesPrefix+"/"+kite.Username, ttl)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
 			return
@@ -236,7 +237,7 @@ func getKiteKey(k *protocol.Kite) (string, error) {
 	}
 	key = strings.TrimSuffix(key, "/")
 
-	return "/kites" + key, nil
+	return KitesPrefix + key, nil
 }
 
 // getQueryKey returns the etcd key for the query.
@@ -265,7 +266,7 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 		}
 	}
 
-	return "/kites" + path, nil
+	return KitesPrefix + path, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
@@ -432,7 +433,7 @@ getIndex:
 
 	go func() {
 	watch:
-		resp, err = k.etcd.WatchAll("/kites", index+1, receiver, nil)
+		resp, err = k.etcd.WatchAll(KitesPrefix, index+1, receiver, nil)
 		if err != nil {
 			log.Critical("etcd error 2: %s", err)
 			time.Sleep(time.Second)
@@ -446,7 +447,7 @@ getIndex:
 		index = resp.ModifiedIndex
 
 		// Notify deregistration events.
-		if strings.HasPrefix(resp.Key, "/kites") && (resp.Action == "delete" || resp.Action == "expire") {
+		if strings.HasPrefix(resp.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
 			kite, _, err := kiteFromEtcdKV(resp.Key, resp.Value)
 			if err == nil {
 				k.watcherHub.Notify(kite, protocol.Deregister, "")
