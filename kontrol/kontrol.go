@@ -242,28 +242,32 @@ func getKiteKey(k *protocol.Kite) (string, error) {
 
 // getQueryKey returns the etcd key for the query.
 func getQueryKey(q *protocol.KontrolQuery) (string, error) {
-	fields := []string{
-		q.Username,
-		q.Environment,
-		q.Name,
-		q.Version,
-		q.Region,
-		q.Hostname,
-		q.ID,
+	fields := map[string]string{
+		"username":    q.Username,
+		"environment": q.Environment,
+		"name":        q.Name,
+		"version":     q.Version,
+		"region":      q.Region,
+		"hostname":    q.Hostname,
+		"id":          q.ID,
+	}
+
+	if q.Username == "" {
+		return "", errors.New("Empty username field")
 	}
 
 	// Validate query and build key.
 	path := "/"
-	empty := false
-	for _, f := range fields {
-		if f == "" {
+	empty := false // encountered with empty field?
+	for k, v := range fields {
+		if v == "" {
 			empty = true
-		} else {
-			if empty {
-				return "", errors.New("Invalid query")
-			}
-			path = path + f + "/"
+			continue
 		}
+		if empty && v != "" {
+			return "", fmt.Errorf("Gap between query fields in field: %s", k)
+		}
+		path = path + v + "/"
 	}
 
 	path = strings.TrimSuffix(path, "/")

@@ -144,17 +144,17 @@ func exp2() *kite.Kite {
 }
 
 func TestGetQueryKey(t *testing.T) {
+	// This query is valid because there are no gaps between query fields.
 	q := &protocol.KontrolQuery{
 		Username:    "cenk",
 		Environment: "production",
 	}
-
 	key, err := getQueryKey(q)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
 	if key != "/kites/cenk/production" {
-		t.Errorf("Invalid key: %s", key)
+		t.Errorf("Unexpected key: %s", key)
 	}
 
 	// This is wrong because Environment field is empty.
@@ -163,7 +163,19 @@ func TestGetQueryKey(t *testing.T) {
 		Username: "cenk",
 		Name:     "fs",
 	}
+	key, err = getQueryKey(q)
+	if err == nil {
+		t.Errorf("Error is expected")
+	}
+	if key != "" {
+		t.Errorf("Key is not expected: %s", key)
+	}
 
+	// This is also wrong becaus each query must have a non-empty username field.
+	q = &protocol.KontrolQuery{
+		Environment: "production",
+		Name:        "fs",
+	}
 	key, err = getQueryKey(q)
 	if err == nil {
 		t.Errorf("Error is expected")
