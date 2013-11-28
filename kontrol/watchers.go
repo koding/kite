@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// watcherHub allows watches to be registered on Kites and allows them to
+// be notified when a Kite changes (registered or deregistered).
 type watcherHub struct {
 	sync.RWMutex
 
@@ -74,33 +76,37 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction, kod
 	defer h.RUnlock()
 
 	l, ok := h.watchesByUser[kite.Username]
-	if ok {
-		for e := l.Front(); e != nil; e = e.Next() {
-			watch := e.Value.(*watch)
-			if matches(kite, watch.query) {
-				var kiteWithToken *protocol.KiteWithToken
-				var err error
+	if !ok {
+		return
+	}
 
-				// Register events needs a token attached.
-				if action == protocol.Register {
-					kiteWithToken, err = addTokenToKite(kite, watch.query.Username, kodingKey)
-					if err != nil {
-						log.Error("watch notify: %s", err)
-						continue
-					}
-
-				} else {
-					// We do not need to send token for deregister event.
-					kiteWithToken = &protocol.KiteWithToken{Kite: *kite}
-				}
-
-				event := protocol.KiteEvent{
-					Action: action,
-					Kite:   *kiteWithToken,
-				}
-				go watch.callback(event)
-			}
+	for e := l.Front(); e != nil; e = e.Next() {
+		watch := e.Value.(*watch)
+		if !matches(kite, watch.query) {
+			continue
 		}
+
+		var kiteWithToken *protocol.KiteWithToken
+		var err error
+
+		// Register events needs a token attached.
+		if action == protocol.Register {
+			kiteWithToken, err = addTokenToKite(kite, watch.query.Username, kodingKey)
+			if err != nil {
+				log.Error("watch notify: %s", err)
+				continue
+			}
+
+		} else {
+			// We do not need to send token for deregister event.
+			kiteWithToken = &protocol.KiteWithToken{Kite: *kite}
+		}
+
+		event := protocol.KiteEvent{
+			Action: action,
+			Kite:   *kiteWithToken,
+		}
+		go watch.callback(event)
 	}
 }
 
