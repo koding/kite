@@ -67,9 +67,19 @@ func New() *Kontrol {
 }
 
 func (k *Kontrol) Run() {
+	k.init()
+	k.kite.Run()
+}
+
+func (k *Kontrol) Start() {
+	k.init()
+	k.kite.Start()
+}
+
+// init does common operations of Run() and Start().
+func (k *Kontrol) init() {
 	setupLogging()
 	go k.WatchEtcd()
-	k.kite.Run()
 }
 
 func setupLogging() {
