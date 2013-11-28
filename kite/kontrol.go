@@ -95,7 +95,7 @@ func (k *Kontrol) Register() error {
 // GetKites returns the list of Kites matching the query.
 // The returned list contains ready to connect RemoteKite instances.
 // The caller must connect with RemoteKite.Dial() before using each Kite.
-func (k *Kontrol) GetKites(query protocol.KontrolQuery, events chan *protocol.KiteEvent) ([]*RemoteKite, error) {
+func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.KiteEvent)) ([]*RemoteKite, error) {
 	// this is needed because we are calling GetKites explicitly, therefore
 	// this should be only callable *after* we are connected to kontrol.
 	<-k.ready
@@ -120,12 +120,11 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, events chan *protocol.Ki
 			return
 		}
 
-		events <- &event
+		onEvent(&event)
 	}
 
 	args := []interface{}{query}
-	if events != nil {
-		k.OnDisconnect(func() { close(events) })
+	if onEvent != nil {
 		args = append(args, dnode.Callback(queueEvents))
 	}
 
