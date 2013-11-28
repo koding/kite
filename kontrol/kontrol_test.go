@@ -8,6 +8,7 @@ import (
 	"koding/newkite/kite"
 	"koding/newkite/protocol"
 	"labix.org/v2/mgo/bson"
+	"os/user"
 	"testing"
 	"time"
 )
@@ -25,7 +26,8 @@ func setupTest(t *testing.T) {
 		return
 	}
 
-	err = ioutil.WriteFile("/home/vagrant/.kd/koding.key", []byte(kodingKey.Key), 0644)
+	usr, _ := user.Current()
+	err = ioutil.WriteFile(usr.HomeDir+"/.kd/koding.key", []byte(kodingKey.Key), 0644)
 	if err != nil {
 		t.Errorf("Cannot write Koding Key to disk: %s", err.Error())
 		return
