@@ -9,6 +9,7 @@ import (
 	"koding/newkite/protocol"
 	"labix.org/v2/mgo/bson"
 	"testing"
+	"time"
 )
 
 func setupTest(t *testing.T) {
@@ -51,6 +52,9 @@ func TestKontrol(t *testing.T) {
 
 	exp2Kite := exp2()
 	exp2Kite.Start()
+
+	// Wait for kites to register themselves on Kontrol.
+	time.Sleep(500 * time.Millisecond)
 
 	query := protocol.KontrolQuery{
 		Username:    "devrim",
