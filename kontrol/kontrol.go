@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/coreos/go-etcd/etcd"
-	logging "github.com/op/go-logging"
+	"github.com/op/go-logging"
 	"koding/db/mongodb/modelhelper"
 	"koding/newkite/dnode"
 	"koding/newkite/kite"
@@ -13,9 +13,7 @@ import (
 	"koding/newkite/protocol"
 	"koding/newkite/token"
 	"koding/tools/config"
-	stdlog "log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +25,7 @@ const (
 	KitesPrefix       = "/kites"
 )
 
-var log = logging.MustGetLogger("Kontrol")
+var log *logging.Logger
 
 type Kontrol struct {
 	kite       *kite.Kite
@@ -56,6 +54,8 @@ func New() *Kontrol {
 		watcherHub: newWatcherHub(),
 	}
 
+	log = kontrol.kite.Log
+
 	kontrol.kite.KontrolEnabled = false // Because we are Kontrol!
 
 	kontrol.kite.Authenticators["kodingKey"] = kontrol.AuthenticateFromKodingKey
@@ -79,17 +79,7 @@ func (k *Kontrol) Start() {
 
 // init does common operations of Run() and Start().
 func (k *Kontrol) init() {
-	setupLogging()
 	go k.WatchEtcd()
-}
-
-func setupLogging() {
-	log.Module = "Kontrol"
-	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
-	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags|stdlog.Lshortfile)
-	stderrBackend.Color = true
-	syslogBackend, _ := logging.NewSyslogBackend(log.Module)
-	logging.SetBackend(stderrBackend, syslogBackend)
 }
 
 // registerValue is the type of the value that is saved to etcd.
