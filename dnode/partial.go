@@ -57,38 +57,38 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	return nil
 }
 
-// Array is a helper method that returns a []interface{}
-// by unmarshalling the Partial.
-func (p *Partial) Array() ([]interface{}, error) {
-	var a []interface{}
-	err := p.Unmarshal(&a)
-	if err != nil {
-		return nil, err
-	}
-
-	return a, nil
+// Slice is a helper method to unmarshal a JSON Array.
+func (p *Partial) Slice() (a []*Partial, err error) {
+	err = p.Unmarshal(&a)
+	return
 }
 
-// Array is a helper method that returns a map[string]interface{}
-// by unmarshalling the Partial.
-func (p *Partial) Map() (map[string]interface{}, error) {
-	var m map[string]interface{}
-	err := p.Unmarshal(&m)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
+// Map is a helper method to unmarshal to a JSON Object.
+func (p *Partial) Map() (m map[string]*Partial, err error) {
+	err = p.Unmarshal(&m)
+	return
 }
 
-// String is a helper to unmarshal a string value.
+// String is a helper to unmarshal a JSON String.
 func (p *Partial) String() (s string, err error) {
 	err = p.Unmarshal(&s)
 	return
 }
 
-// Float64 is a helper to unmarshal a float64 value.
+// Float64 is a helper to unmarshal a JSON Number.
 func (p *Partial) Float64() (f float64, err error) {
+	err = p.Unmarshal(&f)
+	return
+}
+
+// Bool is a helper to unmarshal a JSON Boolean.
+func (p *Partial) Bool() (b bool, err error) {
+	err = p.Unmarshal(&b)
+	return
+}
+
+// Function is a helper to unmarshal a callback function.
+func (p *Partial) Function() (f Function, err error) {
 	err = p.Unmarshal(&f)
 	return
 }

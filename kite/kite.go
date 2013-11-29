@@ -227,7 +227,7 @@ func (k *Kite) Start() {
 }
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	args, err := r.Args.Array()
+	args, err := r.Args.Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -236,13 +236,13 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 		return nil, fmt.Errorf("Invalid args: %s", string(r.Args.Raw))
 	}
 
-	seconds, ok := args[0].(float64)
-	if !ok {
+	seconds, err := args[0].Float64()
+	if err != nil {
 		return nil, fmt.Errorf("Invalid interval: %s", args[0])
 	}
 
-	ping, ok := args[1].(dnode.Function)
-	if !ok {
+	ping, err := args[1].Function()
+	if err != nil {
 		return nil, fmt.Errorf("Invalid callback: %s", args[1])
 	}
 

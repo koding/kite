@@ -12,10 +12,10 @@ func TestClientServer(t *testing.T) {
 	// Create new dnode server
 	s := NewServer()
 	add := func(p *dnode.Partial) {
-		args, _ := p.Array()
-		a := args[0].(float64)
-		b := args[1].(float64)
-		result := args[2].(dnode.Function)
+		args, _ := p.Slice()
+		a, _ := args[0].Float64()
+		b, _ := args[1].Float64()
+		result, _ := args[2].Function()
 		result(a + b)
 	}
 	s.HandleSimple("add", add)

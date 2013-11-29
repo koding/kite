@@ -42,19 +42,20 @@ func TestSimpleMethodCall(t *testing.T) {
 
 func TestMethodCallWithCallback(t *testing.T) {
 	l := sync.Mutex{}
-	var result float64 = 0
+	var result float64
 	successFunc := func(p *Partial) {
 		fmt.Println("success")
-		args, _ := p.Array()
+		args, _ := p.Slice()
 		l.Lock()
-		result = args[0].(float64)
+		result, _ = args[0].Float64()
 		l.Unlock()
 	}
 	failureFunc := func(p *Partial) {
 		fmt.Println("failure")
-		args, _ := p.Array()
+		args, _ := p.Slice()
 		l.Lock()
-		result = -args[0].(float64)
+		result, _ = args[0].Float64()
+		result = -result
 		l.Unlock()
 	}
 
