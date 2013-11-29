@@ -4,26 +4,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	logging "github.com/op/go-logging"
+	"github.com/op/go-logging"
 	"io/ioutil"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
-	stdlog "log"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"time"
 )
-
-var log = logging.MustGetLogger("Kite")
-
-// GetLogger returns a new logger which is used within the application itsel
-// (in main package).
-func GetLogger() *logging.Logger {
-	return log
-}
 
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
@@ -63,9 +55,12 @@ type Kite struct {
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*CallOptions) error
 
-	// ready is used to signal if the kite is ready to start and make calls to
+	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
 	ready chan bool
+
+	// Prints logging messages to stderr and syslog.
+	Log *logging.Logger
 }
 
 type Options struct {
@@ -161,6 +156,7 @@ func New(options *Options) *Kite {
 		ready:             make(chan bool),
 	}
 
+	k.Log = newLogger(k.Name, k.hasDebugFlag())
 	k.Kontrol = k.NewKontrol(options.KontrolAddr)
 
 	// Call registered handlers when a client has disconnected.
@@ -188,7 +184,7 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 	k.server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
 		request, responseCallback, err := k.parseRequest(msg, tr)
 		if err != nil {
-			log.Notice("Did not understand request: %s", err)
+			k.Log.Notice("Did not understand request: %s", err)
 			return
 		}
 
@@ -204,7 +200,7 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 		}
 
 		if err != nil {
-			log.Error(err.Error())
+			k.Log.Error(err.Error())
 		}
 	})
 }
@@ -219,12 +215,11 @@ func (k *Kite) Run() {
 // Start is like Run(), but does not wait for it to complete. It's nonblocking.
 func (k *Kite) Start() {
 	k.parseVersionFlag()
-	k.setupLogging()
 
 	go func() {
 		err := k.listenAndServe()
 		if err != nil {
-			log.Fatal(err)
+			k.Log.Fatal(err)
 		}
 	}()
 
@@ -270,27 +265,31 @@ func (k *Kite) handleLog(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, s))
+	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, s))
 	return nil, nil
 }
 
-// setupLogging is used to setup the logging format, destination and level.
-func (k *Kite) setupLogging() {
-	log.Module = k.Name
+func init() {
+	// These logging related stuff needs to be called once because stupid
+	// logging library uses global variables and resets the backends every time.
 	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
-
-	stderrBackend := logging.NewLogBackend(os.Stderr, "", stdlog.LstdFlags)
+	stderrBackend := logging.NewLogBackend(os.Stderr, "", log.LstdFlags)
 	stderrBackend.Color = true
-
-	syslogBackend, _ := logging.NewSyslogBackend(k.Name)
+	syslogBackend, _ := logging.NewSyslogBackend("")
 	logging.SetBackend(stderrBackend, syslogBackend)
+}
 
-	// Set logging level. Default level is INFO.
+// newLogger returns a new logger object for desired name and level.
+func newLogger(name string, debug bool) *logging.Logger {
+	logger := logging.MustGetLogger(name)
+
 	level := logging.INFO
-	if k.hasDebugFlag() {
+	if debug {
 		level = logging.DEBUG
 	}
-	logging.SetLevel(level, log.Module)
+
+	logging.SetLevel(level, name)
+	return logger
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
@@ -317,6 +316,13 @@ func (k *Kite) hasDebugFlag() bool {
 			return true
 		}
 	}
+
+	// We can't use flags when running "go test" command.
+	// This is another way to print debug logs.
+	if os.Getenv("DEBUG") != "" {
+		return true
+	}
+
 	return false
 }
 
@@ -327,7 +333,7 @@ func (k *Kite) listenAndServe() error {
 		return err
 	}
 
-	log.Info("Listening: %s", listener.Addr().String())
+	k.Log.Info("Listening: %s", listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
 	_, k.Port, _ = net.SplitHostPort(listener.Addr().String())
@@ -348,7 +354,7 @@ func (k *Kite) listenAndServe() error {
 func (k *Kite) registerToKontrol() {
 	err := k.Kontrol.Register()
 	if err != nil {
-		log.Fatalf("Cannot register to Kontrol: %s", err)
+		k.Log.Fatalf("Cannot register to Kontrol: %s", err)
 	}
 }
 
@@ -364,7 +370,7 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 
 // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
 func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	log.Info("Client is connected to us: [%s %s]", r.Name, r.Addr())
+	k.Log.Info("Client is connected to us: [%s %s]", r.Name, r.Addr())
 
 	for _, handler := range k.onConnectHandlers {
 		go handler(r)
@@ -372,7 +378,7 @@ func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
 }
 
 func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-	log.Info("Client has disconnected: [%s %s]", r.Name, r.Addr())
+	k.Log.Info("Client has disconnected: [%s %s]", r.Name, r.Addr())
 
 	for _, handler := range k.onDisconnectHandlers {
 		go handler(r)

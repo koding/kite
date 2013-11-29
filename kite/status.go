@@ -52,7 +52,6 @@ func diskStats() *disk {
 func homeDir() string {
 	usr, err := user.Current()
 	if err != nil {
-		log.Info("could not get homedir", err)
 		return ""
 	}
 

@@ -40,14 +40,14 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	ready := make(chan bool)
 
 	remoteKite.OnConnect(func() {
-		log.Info("Connected to Kontrol ")
+		k.Log.Info("Connected to Kontrol ")
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
 		once.Do(func() { close(ready) })
 	})
 
-	remoteKite.OnDisconnect(func() { log.Warning("Disconnected from Kontrol. I will retry in background...") })
+	remoteKite.OnDisconnect(func() { k.Log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
 	return &Kontrol{
 		RemoteKite: *remoteKite,
@@ -81,7 +81,7 @@ func (k *Kontrol) Register() error {
 			kite.PublicIP = rr.PublicIP
 		}
 
-		log.Info("Registered to kontrol with addr: %s version: %s uuid: %s",
+		k.Log.Info("Registered to kontrol with addr: %s version: %s uuid: %s",
 			kite.Addr(), kite.Version, kite.ID)
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")
@@ -104,19 +104,19 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 		var args []*dnode.Partial
 		err := p.Unmarshal(&args)
 		if err != nil {
-			log.Error(err.Error())
+			k.Log.Error(err.Error())
 			return
 		}
 
 		if len(args) != 1 {
-			log.Error("Invalid Kite event")
+			k.Log.Error("Invalid Kite event")
 			return
 		}
 
 		var event protocol.KiteEvent
 		err = args[0].Unmarshal(&event)
 		if err != nil {
-			log.Error(err.Error())
+			k.Log.Error(err.Error())
 			return
 		}
 
