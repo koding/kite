@@ -226,6 +226,8 @@ func (k *Kite) Start() {
 	<-k.ready // wait until we are ready
 }
 
+type Callback func(r *Request)
+
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	args, err := r.Args.Slice()
 	if err != nil {
