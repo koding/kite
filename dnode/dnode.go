@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"reflect"
-	"strconv"
 )
 
 var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
@@ -145,8 +144,8 @@ func (d *Dnode) Run() error {
 	}
 }
 
-// RemoveCallback removes the callback with id from handlers.
+// RemoveCallback removes the callback with id from callbacks.
 // Can be used to remove unused callbacks to free memory.
 func (d *Dnode) RemoveCallback(id uint64) {
-	delete(d.handlers, strconv.FormatUint(id, 10))
+	delete(d.callbacks, id)
 }
