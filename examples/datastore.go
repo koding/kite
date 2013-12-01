@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"koding/newkite/kite"
+	"koding/db/mongodb/modelhelper"
 )
 
 var port = flag.String("port", "", "port to bind itself")
@@ -29,24 +30,29 @@ func main() {
 }
 
 
-func Get(r *kite.Request) (interface{}, error) {
-	key, err := r.Args.String()
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println("get called with - ", key)
-	result := "some string"
-	return result, nil
-}
-
 func Set(r *kite.Request) (interface{}, error) {
 	kv, err := r.Args.Array()
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("set called with - ", kv)
+	keyValue := modelhelper.NewKeyValue(r.Username, r.RemoteKite.ID, kv[0].(string), kv[1].(string))
+	modelhelper.UpsertKeyValue(keyValue)
+	fmt.Println("set called with - ", kv, keyValue)
 
 	result := 1
+	return result, nil
+}
+
+func Get(r *kite.Request) (interface{}, error) {
+	key, err := r.Args.String()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("requesting user :", r.Username, " kite:", r.RemoteKite)
+
+	fmt.Println("get called with - ", key)
+	result := "some string"
 	return result, nil
 }
