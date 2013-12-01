@@ -51,8 +51,12 @@ func Get(r *kite.Request) (interface{}, error) {
 	}
 
 	fmt.Println("requesting user :", r.Username, " kite:", r.RemoteKite)
-
 	fmt.Println("get called with - ", key)
-	result := "some string"
-	return result, nil
+
+	err, kv := modelhelper.GetKeyValue(r.Username, r.RemoteKite.ID, key)
+	if err != nil{
+		return err, nil
+	}
+
+	return kv.Value, nil
 }
