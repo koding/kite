@@ -46,6 +46,9 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		disconnect:     make(chan bool),
 	}
 
+	// We need a reference to the local kite when a method call is received.
+	r.client.Properties()["localKite"] = k
+
 	var m sync.Mutex
 	r.OnDisconnect(func() {
 		m.Lock()
@@ -64,6 +67,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthentication, client *rpc.Client) *RemoteKite {
 	r := k.NewRemoteKite(kite, auth)
 	r.client = client
+	r.client.Properties()["localKite"] = k
 	return r
 }
 
@@ -211,8 +215,8 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 // makeResponseCallback prepares and returns a callback function sent to the server.
 // The caller of the Call() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
-func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) dnode.Callback {
-	return dnode.Callback(func(arguments *dnode.Partial) {
+func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
+	return Callback(func(request *Request) {
 		var (
 			// Arguments to our response callback It is a slice of length 2.
 			// The first argument is the error string,
@@ -235,14 +239,14 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
-		err = arguments.Unmarshal(&responseArgs)
+		err = request.Args.Unmarshal(&responseArgs)
 		if err != nil {
 			return
 		}
 
 		// We must always get an error and a result argument.
 		if len(responseArgs) != 2 {
-			err = fmt.Errorf("Invalid response args: %s", string(arguments.Raw))
+			err = fmt.Errorf("Invalid response args: %s", string(request.Args.Raw))
 			return
 		}
 

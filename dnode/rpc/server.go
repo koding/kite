@@ -34,7 +34,7 @@ func (s *Server) Handle(method string, handler dnode.Handler) {
 }
 
 // HandleFunc registers the handler function for the given method.
-func (s *Server) HandleFunc(method string, handler func(*dnode.Message, dnode.Transport)) {
+func (s *Server) HandleFunc(method string, handler func(string, *dnode.Partial, dnode.Transport)) {
 	s.dnode.HandleFunc(method, handler)
 }
 

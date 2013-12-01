@@ -70,9 +70,21 @@ func TestKite(t *testing.T) {
 	resultCallback := func(r *Request) {
 		fmt.Printf("Request: %#v\n", r)
 
-		n, err := r.Args.Float64()
+		args, err := r.Args.Slice()
 		if err != nil {
 			t.Errorf(err.Error())
+			return
+		}
+
+		if len(args) != 1 {
+			t.Errorf("Unexpected args: %s", args)
+			return
+		}
+
+		n, err := args[0].Float64()
+		if err != nil {
+			t.Errorf(err.Error())
+			return
 		}
 
 		resultChan <- n

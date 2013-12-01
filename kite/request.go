@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"errors"
 	"fmt"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
@@ -8,7 +9,49 @@ import (
 	"koding/newkite/token"
 )
 
+type kiteMethod struct {
+	kite    *Kite
+	method  string
+	handler HandlerFunc
+}
+
+func (m kiteMethod) WrapArgs(args []interface{}, tr dnode.Transport) []interface{} {
+	return []interface{}{&callOptionsOut{
+		WithArgs: args,
+		CallOptions: CallOptions{
+			Kite: m.kite.Kite,
+		},
+	}}
+}
+
+func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport) {
+	request, responseCallback, err := m.kite.parseRequest(method, args, tr)
+	if err != nil {
+		m.kite.Log.Notice("Did not understand request: %s", err)
+		return
+	}
+
+	result, err := m.handler(request)
+	if responseCallback == nil {
+		return
+	}
+
+	if err != nil {
+		err = responseCallback(err.Error(), result)
+	} else {
+		err = responseCallback(nil, result)
+	}
+
+	if err != nil {
+		m.kite.Log.Error(err.Error())
+	}
+}
+
 type HandlerFunc func(*Request) (response interface{}, err error)
+
+func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
+	k.server.Handle(method, kiteMethod{k, method, handler})
+}
 
 type Request struct {
 	Method         string
@@ -20,18 +63,44 @@ type Request struct {
 	RemoteAddr     string
 }
 
-func (k *Kite) parseRequest(msg *dnode.Message, tr dnode.Transport) (request *Request, response dnode.Function, err error) {
-	var (
-		args    []*dnode.Partial
-		options CallOptions
-	)
+type Callback func(r *Request)
 
-	// Parse dnode method arguments [options, response]
-	if err = msg.Arguments.Unmarshal(&args); err != nil {
+func (c Callback) MarshalJSON() ([]byte, error) {
+	return []byte(`"[Function]"`), nil
+}
+
+func (c Callback) WrapArgs(args []interface{}, tr dnode.Transport) []interface{} {
+	return []interface{}{&callOptionsOut{
+		WithArgs: args,
+		CallOptions: CallOptions{
+			Kite: tr.Properties()["localKite"].(*Kite).Kite,
+		},
+	}}
+}
+
+func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
+	k := tr.Properties()["localKite"].(*Kite)
+	req, _, err := k.parseRequest(method, args, tr)
+	if err != nil {
+		println("error 2", err.Error())
 		return
 	}
 
+	c(req)
+}
+
+func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport) (request *Request, response dnode.Function, err error) {
+	// Parse dnode method arguments [options, response]
+	args, err := arguments.Slice()
+	if err != nil {
+		return
+	}
+	if len(args) != 1 && len(args) != 2 {
+		return nil, nil, errors.New("Invalid number of arguments")
+	}
+
 	// Parse options argument
+	var options CallOptions
 	if err = args[0].Unmarshal(&options); err != nil {
 		return
 	}
@@ -69,7 +138,7 @@ func (k *Kite) parseRequest(msg *dnode.Message, tr dnode.Transport) (request *Re
 	}
 
 	request = &Request{
-		Method:         fmt.Sprint(msg.Method),
+		Method:         method,
 		Args:           options.WithArgs,
 		LocalKite:      k,
 		RemoteKite:     properties["remoteKite"].(*RemoteKite),

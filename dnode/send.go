@@ -2,6 +2,7 @@ package dnode
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"sync/atomic"
@@ -17,7 +18,7 @@ func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, 
 }
 
 func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]Path, error) {
-	l.Printf("Call method: %s arguments: %+v\n", method, arguments)
+	l.Printf("Call method: %s arguments: %+v\n", fmt.Sprint(method), arguments)
 
 	var err error
 	callbacks := make(map[string]Path)
@@ -132,7 +133,7 @@ func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string
 }
 
 // registerCallback is called when a function/method is found in arguments array.
-func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap map[string]Path) {
+func (d *Dnode) registerCallback(val reflect.Value, path Path, callbackMap map[string]Path) {
 	// Make a copy of path because it is reused in caller.
 	pathCopy := make(Path, len(path))
 	copy(pathCopy, path)
@@ -147,5 +148,9 @@ func (d *Dnode) registerCallback(callback reflect.Value, path Path, callbackMap 
 	callbackMap[seq] = pathCopy
 
 	// Save in client callbacks so we can call it when we receive a call.
-	d.callbacks[next] = SimpleFunc(callback)
+	if fn, ok := val.Interface().(Handler); ok {
+		d.callbacks[next] = fn
+	} else {
+		d.callbacks[next] = SimpleFunc(val)
+	}
 }

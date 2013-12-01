@@ -20,7 +20,7 @@ type Dnode struct {
 	handlers map[string]Handler
 
 	// Reference to sent callbacks are saved in this map.
-	callbacks map[uint64]SimpleFunc
+	callbacks map[uint64]Handler
 
 	// Next callback number.
 	// Incremented atomically by registerCallback().
@@ -49,7 +49,11 @@ type Transport interface {
 // Objects implementing the Handler interface can be
 // registered to serve a particular method in the dnode processor.
 type Handler interface {
-	ProcessMessage(*Message, Transport)
+	// Wrap arguments before sending to remote.
+	WrapArgs(args []interface{}, tr Transport) []interface{}
+
+	// Unwrap arguments and call the handler function.
+	Call(method string, args *Partial, tr Transport)
 }
 
 // Message is the JSON object to call a method at the other side.
@@ -71,7 +75,7 @@ type Message struct {
 func New(transport Transport) *Dnode {
 	return &Dnode{
 		handlers:  make(map[string]Handler),
-		callbacks: make(map[uint64]SimpleFunc),
+		callbacks: make(map[uint64]Handler),
 		transport: transport,
 	}
 }
@@ -80,7 +84,7 @@ func New(transport Transport) *Dnode {
 func (d *Dnode) Copy(transport Transport) *Dnode {
 	return &Dnode{
 		handlers:  d.handlers,
-		callbacks: make(map[uint64]SimpleFunc),
+		callbacks: make(map[uint64]Handler),
 		transport: transport,
 	}
 }
@@ -102,14 +106,18 @@ func (d *Dnode) Handle(method string, handler Handler) {
 }
 
 // HandleFunc registers the handler function for the given method.
-func (d *Dnode) HandleFunc(method string, handler func(*Message, Transport)) {
+func (d *Dnode) HandleFunc(method string, handler func(string, *Partial, Transport)) {
 	d.Handle(method, HandlerFunc(handler))
 }
 
-type HandlerFunc func(*Message, Transport)
+type HandlerFunc func(method string, args *Partial, tr Transport)
 
-func (f HandlerFunc) ProcessMessage(m *Message, tr Transport) {
-	f(m, tr)
+func (f HandlerFunc) Call(method string, args *Partial, tr Transport) {
+	f(method, args, tr)
+}
+
+func (f HandlerFunc) WrapArgs(args []interface{}, tr Transport) []interface{} {
+	return args
 }
 
 // HandleSimple registers the handler function for given method.
@@ -126,10 +134,14 @@ func (d *Dnode) HandleSimple(method string, handler interface{}) {
 
 type SimpleFunc reflect.Value
 
-func (f SimpleFunc) ProcessMessage(m *Message, tr Transport) {
+func (f SimpleFunc) Call(method string, args *Partial, tr Transport) {
 	// Call the handler with arguments.
-	args := []reflect.Value{reflect.ValueOf(m.Arguments)}
-	reflect.Value(f).Call(args)
+	callArgs := []reflect.Value{reflect.ValueOf(args)}
+	reflect.Value(f).Call(callArgs)
+}
+
+func (f SimpleFunc) WrapArgs(args []interface{}, tr Transport) []interface{} {
+	return args
 }
 
 // Run processes incoming messages. Blocking.

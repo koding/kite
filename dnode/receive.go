@@ -27,12 +27,8 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
-	if err = d.ParseCallbacks(&msg); err != nil {
-		return err
-	}
-
 	// Get the handler function. Method may be string or integer.
-	l.Printf("Received method: %s", msg.Method)
+	l.Printf("Received method: %s", fmt.Sprint(msg.Method))
 	switch method := msg.Method.(type) {
 	case float64:
 		handler = d.callbacks[uint64(method)]
@@ -49,14 +45,18 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
-	handler.ProcessMessage(&msg, d.transport)
+	if err = d.parseCallbacks(&msg, handler); err != nil {
+		return err
+	}
+
+	handler.Call(fmt.Sprint(msg.Method), msg.Arguments, d.transport)
 
 	return nil
 }
 
-// ParseCallbacks parses the message's "callbacks" field and prepares
+// parseCallbacks parses the message's "callbacks" field and prepares
 // callback functions in "arguments" field.
-func (d *Dnode) ParseCallbacks(msg *Message) error {
+func (d *Dnode) parseCallbacks(msg *Message, handler Handler) error {
 	// Parse callbacks field and create callback functions.
 	l.Printf("Received message callbacks: %#v", msg.Callbacks)
 
@@ -70,7 +70,8 @@ func (d *Dnode) ParseCallbacks(msg *Message) error {
 
 		// When the callback is called, we must send the method to the remote.
 		f := Function(func(args ...interface{}) error {
-			_, err := d.call(id, args...)
+			preparedArgs := handler.WrapArgs(args, d.transport)
+			_, err := d.call(id, preparedArgs...)
 			return err
 		})
 

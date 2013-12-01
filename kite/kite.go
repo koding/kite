@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/op/go-logging"
 	"io/ioutil"
-	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
@@ -180,31 +179,6 @@ func New(options *Options) *Kite {
 	return k
 }
 
-func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
-	k.server.HandleFunc(method, func(msg *dnode.Message, tr dnode.Transport) {
-		request, responseCallback, err := k.parseRequest(msg, tr)
-		if err != nil {
-			k.Log.Notice("Did not understand request: %s", err)
-			return
-		}
-
-		result, err := handler(request)
-		if responseCallback == nil {
-			return
-		}
-
-		if err != nil {
-			err = responseCallback(err.Error(), result)
-		} else {
-			err = responseCallback(nil, result)
-		}
-
-		if err != nil {
-			k.Log.Error(err.Error())
-		}
-	})
-}
-
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously.
 func (k *Kite) Run() {
@@ -225,8 +199,6 @@ func (k *Kite) Start() {
 
 	<-k.ready // wait until we are ready
 }
-
-type Callback func(r *Request)
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	args, err := r.Args.Slice()
