@@ -16,7 +16,7 @@ func TestKite(t *testing.T) {
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
-		s, _ := r.Args.String()
+		s := r.Args.MustString()
 		fmt.Printf("Message received: %s\n", s)
 		fooChan <- s
 		return nil, nil
@@ -43,11 +43,7 @@ func TestKite(t *testing.T) {
 		return
 	}
 
-	number, err := result.Float64()
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
+	number := result.MustFloat64()
 
 	fmt.Printf("rpc result: %f\n", number)
 
@@ -69,19 +65,8 @@ func TestKite(t *testing.T) {
 	resultChan := make(chan float64, 1)
 	resultCallback := func(r *Request) {
 		fmt.Printf("Request: %#v\n", r)
-
-		args, err := r.Args.SliceOfLength(1)
-		if err != nil {
-			t.Errorf(err.Error())
-			return
-		}
-
-		n, err := args[0].Float64()
-		if err != nil {
-			t.Errorf(err.Error())
-			return
-		}
-
+		args := r.Args.MustSliceOfLength(1)
+		n := args[0].MustFloat64()
 		resultChan <- n
 	}
 
@@ -133,11 +118,7 @@ func mathWorker() *Kite {
 
 // Returns the result. Also tests reverse call.
 func Square(r *Request) (interface{}, error) {
-	a, err := r.Args.Float64()
-	if err != nil {
-		return nil, err
-	}
-
+	a := r.Args.MustFloat64()
 	result := a * a
 
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
@@ -150,27 +131,16 @@ func Square(r *Request) (interface{}, error) {
 
 // Calls the callback with the result. For testing requests from Callback.
 func Square2(r *Request) (interface{}, error) {
-	args, err := r.Args.SliceOfLength(2)
-	if err != nil {
-		return nil, err
-	}
-
-	a, err := args[0].Float64()
-	if err != nil {
-		return nil, err
-	}
-
-	cb, err := args[1].Function()
-	if err != nil {
-		return nil, err
-	}
+	args := r.Args.MustSliceOfLength(2)
+	a := args[0].MustFloat64()
+	cb := args[1].MustFunction()
 
 	result := a * a
 
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
 
 	// Send the result.
-	err = cb(result)
+	err := cb(result)
 	if err != nil {
 		return nil, err
 	}

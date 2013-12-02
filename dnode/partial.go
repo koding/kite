@@ -57,6 +57,10 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	return nil
 }
 
+//-------------------------------------------
+// Helper methods for unmarshaling JSON types
+//-------------------------------------------
+
 // Slice is a helper method to unmarshal a JSON Array.
 func (p *Partial) Slice() (a []*Partial, err error) {
 	err = p.Unmarshal(&a)
@@ -105,4 +109,60 @@ func (p *Partial) Bool() (b bool, err error) {
 func (p *Partial) Function() (f Function, err error) {
 	err = p.Unmarshal(&f)
 	return
+}
+
+//----------------------------------------------------------------
+// Helper methods for unmarshaling JSON types that panic on errors
+//----------------------------------------------------------------
+
+type ArgumentError struct {
+	s string
+}
+
+func checkError(err error) {
+	if err != nil {
+		panic(ArgumentError{err.Error()})
+	}
+}
+
+func (p *Partial) MustSlice() []*Partial {
+	a, err := p.Slice()
+	checkError(err)
+	return a
+}
+
+func (p *Partial) MustSliceOfLength(length int) []*Partial {
+	a, err := p.SliceOfLength(length)
+	checkError(err)
+	return a
+}
+
+func (p *Partial) MustMap() map[string]*Partial {
+	m, err := p.Map()
+	checkError(err)
+	return m
+}
+
+func (p *Partial) MustString() string {
+	s, err := p.String()
+	checkError(err)
+	return s
+}
+
+func (p *Partial) MustFloat64() float64 {
+	f, err := p.Float64()
+	checkError(err)
+	return f
+}
+
+func (p *Partial) MustBool() bool {
+	b, err := p.Bool()
+	checkError(err)
+	return b
+}
+
+func (p *Partial) MustFunction() Function {
+	f, err := p.Function()
+	checkError(err)
+	return f
 }
