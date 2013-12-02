@@ -23,13 +23,7 @@ func main() {
 	}
 
 	k := kite.New(options)
-	go k.Run()
-
-	// this is needed that the goroutine k.Start() is been settled. We will
-	// probably change the behaviour of k.Start() from blocking to nonblocking
-	// and remove the sleep, however this is a design decision that needs to be
-	// rethought.
-	time.Sleep(1 * time.Second)
+	go k.Start()
 
 	query := protocol.KontrolQuery{
 		Username:    "devrim",
@@ -82,8 +76,6 @@ func main() {
 
 
 	get := func(k string) (error, string) {
-		// we cant simply call, right ??
-		// response, err := datastore.Call("set", k, v )
 		response, err := datastore.Call("get", k )
 		if err != nil {
 			fmt.Println(err)

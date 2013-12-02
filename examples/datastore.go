@@ -15,7 +15,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"koding/newkite/kite"
 	"koding/db/mongodb/modelhelper"
 )
