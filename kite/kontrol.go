@@ -151,3 +151,14 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 
 	return remoteKites, nil
 }
+
+func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
+	<-k.ready
+
+	result, err := k.RemoteKite.Call("getToken", kite)
+	if err != nil {
+		return "", err
+	}
+
+	return result.MustString(), nil
+}

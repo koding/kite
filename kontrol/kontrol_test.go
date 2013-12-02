@@ -82,6 +82,14 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
+	// Test Kontrol.GetToken
+	fmt.Printf("oldToken: %#v\n", mathWorker.Authentication.Key)
+	newToken, err := exp2Kite.Kontrol.GetToken(&mathWorker.Kite)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	fmt.Printf("newToken: %#v\n", newToken)
+
 	response, err := mathWorker.Call("square", 2)
 	if err != nil {
 		t.Errorf(err.Error())

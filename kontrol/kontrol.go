@@ -63,6 +63,7 @@ func New() *Kontrol {
 
 	kontrol.kite.HandleFunc("register", kontrol.handleRegister)
 	kontrol.kite.HandleFunc("getKites", kontrol.handleGetKites)
+	kontrol.kite.HandleFunc("getToken", kontrol.handleGetToken)
 
 	return kontrol
 }
@@ -365,22 +366,25 @@ func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]*protocol.Kite
 }
 
 func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.KiteWithToken, error) {
-	// Generate token.
-	key, err := kodingkey.FromString(kodingKey)
+	token, err := generateToken(kite, username, kodingKey)
 	if err != nil {
-		return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
-	}
-
-	// username is from requester, key is from kite owner.
-	tokenString, err := token.NewToken(username, kite.ID).EncryptString(key)
-	if err != nil {
-		return nil, errors.New("Server error: Cannot generate a token")
+		return nil, err
 	}
 
 	return &protocol.KiteWithToken{
 		Kite:  *kite,
-		Token: tokenString,
+		Token: token,
 	}, nil
+}
+
+func generateToken(kite *protocol.Kite, username, kodingKey string) (string, error) {
+	key, err := kodingkey.FromString(kodingKey)
+	if err != nil {
+		return "", fmt.Errorf("Koding Key is invalid at Kite: %s", key)
+	}
+
+	// username is from requester, key is from kite owner.
+	return token.NewToken(username, kite.ID).EncryptString(key)
 }
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
@@ -453,6 +457,32 @@ func (k *Kontrol) WatchEtcd() {
 			}
 		}
 	}
+}
+
+func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
+	var kite *protocol.Kite
+	err := r.Args.Unmarshal(&kite)
+	if err != nil {
+		return nil, errors.New("Invalid Kite")
+	}
+
+	kiteKey, err := getKiteKey(kite)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := k.etcd.Get(kiteKey, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var kiteVal registerValue
+	err = json.Unmarshal([]byte(resp.Value), &kiteVal)
+	if err != nil {
+		return nil, err
+	}
+
+	return generateToken(kite, r.Username, kiteVal.KodingKey)
 }
 
 func (k *Kontrol) AuthenticateFromSessionID(options *kite.CallOptions) error {
