@@ -40,6 +40,7 @@ func main() {
 	k.HandleFunc("get", Get)
 
 	k.Run()
+	modelhelper.EnsureKeyValueIndexes()
 }
 
 
@@ -49,9 +50,10 @@ func Set(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	keyValue := modelhelper.NewKeyValue(r.Username, r.RemoteKite.ID, kv[0].(string), kv[1].(string))
+	keyValue := modelhelper.NewKeyValue(r.Username, r.RemoteKite.Name, r.RemoteKite.Environment, kv[0].(string))
+	keyValue.Value = kv[1].(string)
 	err = modelhelper.UpsertKeyValue(keyValue)
-	fmt.Println("set called with - ", kv, keyValue)
+
 	result := true
 	if err != nil {
 		result = false
@@ -65,10 +67,7 @@ func Get(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	fmt.Println("requesting user :", r.Username, " kite:", r.RemoteKite)
-	fmt.Println("get called with - ", key)
-
-	kv, err := modelhelper.GetKeyValue(r.Username, r.RemoteKite.ID, key)
+	kv, err := modelhelper.GetKeyValue(r.Username, r.RemoteKite.Name, r.RemoteKite.Environment, key)
 	if err != nil{
 		return err, nil
 	}
