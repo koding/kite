@@ -63,6 +63,20 @@ func (p *Partial) Slice() (a []*Partial, err error) {
 	return
 }
 
+// SliceOfLength is a helper method to unmarshal a JSON Array with specified length.
+func (p *Partial) SliceOfLength(length int) (a []*Partial, err error) {
+	err = p.Unmarshal(&a)
+	if err != nil {
+		return
+	}
+
+	if len(a) != length {
+		err = errors.New("Invalid array length")
+	}
+
+	return
+}
+
 // Map is a helper method to unmarshal to a JSON Object.
 func (p *Partial) Map() (m map[string]*Partial, err error) {
 	err = p.Unmarshal(&m)

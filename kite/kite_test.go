@@ -70,14 +70,9 @@ func TestKite(t *testing.T) {
 	resultCallback := func(r *Request) {
 		fmt.Printf("Request: %#v\n", r)
 
-		args, err := r.Args.Slice()
+		args, err := r.Args.SliceOfLength(1)
 		if err != nil {
 			t.Errorf(err.Error())
-			return
-		}
-
-		if len(args) != 1 {
-			t.Errorf("Unexpected args: %s", args)
 			return
 		}
 
@@ -155,12 +150,9 @@ func Square(r *Request) (interface{}, error) {
 
 // Calls the callback with the result. For testing requests from Callback.
 func Square2(r *Request) (interface{}, error) {
-	args, err := r.Args.Slice()
+	args, err := r.Args.SliceOfLength(2)
 	if err != nil {
 		return nil, err
-	}
-	if len(args) != 2 {
-		return nil, fmt.Errorf("Invalid number of arguments: %s", len(args))
 	}
 
 	a, err := args[0].Float64()
