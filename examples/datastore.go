@@ -1,3 +1,16 @@
+// this provides a simple datastore for kites just with get/set methods.
+// mongodb has 24k number of collection limit in a single database
+// http://stackoverflow.com/questions/9858393/limits-of-number-of-collections-in-databases
+// thats why we have a single collection and use single index
+// though instead of using a single collection  we can use different strategies, like
+// multiple database, single collections
+// multiple database, multiple collections
+// etc... to make it a bit more performant.
+// though mongodb has an auto sharding setup, http://docs.mongodb.org/manual/sharding/
+// which should be considered first. or use another datastore like elasticsearch, cassandra etc.
+// to handle the sharding on database level.
+// thats why we only have one strategy only for now, to get the ball rolling.
+
 package main
 
 import (
