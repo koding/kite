@@ -42,11 +42,6 @@ func main() {
 		return
 	}
 
-	if len(kites) == 0 {
-		fmt.Println("No datastore kite is available")
-		return
-	}
-
 	datastore := kites[0]
 	fmt.Println(datastore)
 	err = datastore.Dial()
