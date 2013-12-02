@@ -23,7 +23,7 @@ func main() {
 	}
 
 	k := kite.New(options)
-	go k.Start()
+	k.Start()
 
 	query := protocol.KontrolQuery{
 		Username:    "devrim",
@@ -59,7 +59,7 @@ func main() {
 			return
 		}
 
-		var result int
+		var result bool
 		err = response.Unmarshal(&result)
 		if err != nil {
 			fmt.Println(err)
