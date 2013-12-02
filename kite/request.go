@@ -34,12 +34,24 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 		return
 	}
 
-	result, err := m.handler(request)
+	var result interface{}
+
+	// Wrap handler func.
+	handler := func() { result, err = m.handler(request) }
+
+	// Recover dnode argument errors.
+	// The caller can use functions like MustString(), MustSlice()...
+	// without the fear of panic.
+	argumentErr := recoverArgumentError(handler)
+
 	if responseCallback == nil {
 		return
 	}
 
-	if err != nil {
+	// Call response callback function.
+	if argumentErr != nil {
+		err = responseCallback(argumentErr.Error(), nil)
+	} else if err != nil {
 		err = responseCallback(err.Error(), result)
 	} else {
 		err = responseCallback(nil, result)
@@ -48,6 +60,26 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 	if err != nil {
 		m.kite.Log.Error(err.Error())
 	}
+}
+
+// recoverArgumentError takes a function and tries to recover a dnode.ArgumentError
+// if it panics.
+func recoverArgumentError(f func()) (err *dnode.ArgumentError) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+
+		var ok bool
+		if err, ok = r.(*dnode.ArgumentError); !ok {
+			panic(r)
+		}
+	}()
+
+	f()
+
+	return
 }
 
 type HandlerFunc func(*Request) (result interface{}, err error)
@@ -91,7 +123,7 @@ func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
 		return
 	}
 
-	c(req)
+	recoverArgumentError(func() { c(req) })
 }
 
 // parseRequest is used to read a dnode message.

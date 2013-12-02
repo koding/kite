@@ -119,9 +119,13 @@ type ArgumentError struct {
 	s string
 }
 
+func (err ArgumentError) Error() string {
+	return err.s
+}
+
 func checkError(err error) {
 	if err != nil {
-		panic(ArgumentError{err.Error()})
+		panic(&ArgumentError{err.Error()})
 	}
 }
 
