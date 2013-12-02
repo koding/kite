@@ -271,18 +271,14 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	var args []*dnode.Partial
-	err := r.Args.Unmarshal(&args)
-	if err != nil {
-		return nil, err
-	}
+	args := r.Args.MustSlice()
 
 	if len(args) != 1 && len(args) != 2 {
 		return nil, errors.New("Invalid number of arguments")
 	}
 
 	var query protocol.KontrolQuery
-	err = args[0].Unmarshal(&query)
+	err := args[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid query argument")
 	}
@@ -290,10 +286,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	// To be called when a Kite is registered or deregistered matching the query.
 	var watchCallback dnode.Function
 	if len(args) == 2 {
-		err = args[1].Unmarshal(&watchCallback)
-		if err != nil {
-			return nil, errors.New("Invalid callback argument")
-		}
+		watchCallback = args[1].MustFunction()
 	}
 
 	// We do not allow access to other's kites for now.

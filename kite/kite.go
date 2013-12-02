@@ -201,24 +201,9 @@ func (k *Kite) Start() {
 }
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	args, err := r.Args.Slice()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(args) != 2 {
-		return nil, fmt.Errorf("Invalid args: %s", string(r.Args.Raw))
-	}
-
-	seconds, err := args[0].Float64()
-	if err != nil {
-		return nil, fmt.Errorf("Invalid interval: %s", args[0])
-	}
-
-	ping, err := args[1].Function()
-	if err != nil {
-		return nil, fmt.Errorf("Invalid callback: %s", args[1])
-	}
+	args := r.Args.MustSliceOfLength(2)
+	seconds := args[0].MustFloat64()
+	ping := args[1].MustFunction()
 
 	go func() {
 		for {
@@ -234,12 +219,8 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 
 // handleLog prints a log message to stdout.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
-	s, err := r.Args.String()
-	if err != nil {
-		return nil, err
-	}
-
-	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, s))
+	msg := r.Args.MustString()
+	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, msg))
 	return nil, nil
 }
 

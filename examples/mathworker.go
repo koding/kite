@@ -28,10 +28,7 @@ func main() {
 }
 
 func Square(r *kite.Request) (interface{}, error) {
-	a, err := r.Args.Float64()
-	if err != nil {
-		return nil, err
-	}
+	a := r.Args.MustFloat64()
 
 	result := a * a
 
