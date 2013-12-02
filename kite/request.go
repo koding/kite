@@ -50,7 +50,7 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 	}
 }
 
-type HandlerFunc func(*Request) (response interface{}, err error)
+type HandlerFunc func(*Request) (result interface{}, err error)
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
 func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
