@@ -13,7 +13,7 @@ func main() {
 
 	options := &kite.Options{
 		Kitename:    "mathworker",
-		Version:     "1",
+		Version:     "0.0.1",
 		Port:        *port,
 		Region:      "localhost",
 		Environment: "development",

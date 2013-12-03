@@ -16,7 +16,7 @@ func main() {
 
 	options := &kite.Options{
 		Kitename:    "application",
-		Version:     "1",
+		Version:     "0.0.1",
 		Port:        *port,
 		Region:      "localhost",
 		Environment: "development",
