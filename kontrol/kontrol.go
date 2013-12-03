@@ -366,14 +366,14 @@ func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]*protocol.Kite
 }
 
 func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.KiteWithToken, error) {
-	token, err := generateToken(kite, username, kodingKey)
+	tkn, err := generateToken(kite, username, kodingKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return &protocol.KiteWithToken{
 		Kite:  *kite,
-		Token: token,
+		Token: tkn,
 	}, nil
 }
 
