@@ -384,7 +384,12 @@ func generateToken(kite *protocol.Kite, username, kodingKey string) (string, err
 	}
 
 	// username is from requester, key is from kite owner.
-	return token.NewToken(username, kite.ID).EncryptString(key)
+	tkn, err := token.NewToken(username, kite.ID).EncryptString(key)
+	if err != nil {
+		return "", errors.New("Server error: Cannot generate a token")
+	}
+
+	return tkn, nil
 }
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
