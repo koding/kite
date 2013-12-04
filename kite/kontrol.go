@@ -3,7 +3,6 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/dnode"
 	"koding/newkite/protocol"
 	"net"
 	"sync"
@@ -100,21 +99,11 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 	// this should be only callable *after* we are connected to kontrol.
 	<-k.ready
 
-	queueEvents := func(p *dnode.Partial) {
-		var args []*dnode.Partial
-		err := p.Unmarshal(&args)
-		if err != nil {
-			k.Log.Error(err.Error())
-			return
-		}
-
-		if len(args) != 1 {
-			k.Log.Error("Invalid Kite event")
-			return
-		}
+	queueEvents := func(r *Request) {
+		args := r.Args.MustSliceOfLength(1)
 
 		var event protocol.KiteEvent
-		err = args[0].Unmarshal(&event)
+		err := args[0].Unmarshal(&event)
 		if err != nil {
 			k.Log.Error(err.Error())
 			return
@@ -125,7 +114,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 
 	args := []interface{}{query}
 	if onEvent != nil {
-		args = append(args, dnode.Callback(queueEvents))
+		args = append(args, Callback(queueEvents))
 	}
 
 	response, err := k.RemoteKite.Call("getKites", args)
