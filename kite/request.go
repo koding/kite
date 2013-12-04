@@ -119,7 +119,7 @@ func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
 	k := tr.Properties()["localKite"].(*Kite)
 	req, _, err := k.parseRequest(method, args, tr, false)
 	if err != nil {
-		k.Log.Notice("Did not understand callback message: %s", err)
+		k.Log.Notice("Did not understand callback message: %s. method: %q args: %q", err, method, args)
 		return
 	}
 

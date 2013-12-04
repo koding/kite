@@ -3,6 +3,7 @@ package dnode
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -33,6 +34,10 @@ func (p *Partial) UnmarshalJSON(data []byte) error {
 // v must be a struct that is the type of expected arguments.
 func (p *Partial) Unmarshal(v interface{}) error {
 	l.Printf("Unmarshal Partial")
+
+	if p == nil {
+		return fmt.Errorf("Cannot unmarshal nil argument")
+	}
 
 	value := reflect.ValueOf(v)
 	if value.Kind() != reflect.Ptr {
