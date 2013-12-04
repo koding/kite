@@ -86,27 +86,21 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction, kod
 			continue
 		}
 
-		var kiteWithToken *protocol.KiteWithToken
-		var err error
+		event := protocol.KiteEvent{
+			Action: action,
+			Kite:   *kite,
+		}
 
 		// Register events needs a token attached.
 		if action == protocol.Register {
-			kiteWithToken, err = addTokenToKite(kite, watch.query.Username, kodingKey)
+			var err error
+			event.Token, err = generateToken(kite, watch.query.Username, kodingKey)
 			if err != nil {
 				log.Error("watch notify: %s", err)
 				continue
 			}
-
-		} else {
-			// We do not need to send token for deregister event.
-			kiteWithToken = &protocol.KiteWithToken{Kite: *kite}
 		}
 
-		event := protocol.KiteEvent{
-			Action: action,
-			Kite:   kiteWithToken.Kite,
-			Token:  kiteWithToken.Token,
-		}
 		go watch.callback(event)
 	}
 }
