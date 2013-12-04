@@ -11,7 +11,7 @@ import (
 
 // Kontrol embeds RemoteKite which has additional special helper methods.
 type Kontrol struct {
-	RemoteKite
+	*RemoteKite
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
@@ -50,7 +50,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	remoteKite.OnDisconnect(func() { k.Log.Warning("Disconnected from Kontrol. I will retry in background...") })
 
 	return &Kontrol{
-		RemoteKite: *remoteKite,
+		RemoteKite: remoteKite,
 		ready:      ready,
 	}
 }
