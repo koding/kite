@@ -248,13 +248,12 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 		}
 
 		// Read the error argument in response.
-		var errorString string
-		err = responseArgs[0].Unmarshal(&errorString)
+		var kiteErr *Error
+		err = responseArgs[0].Unmarshal(kiteErr)
 		if err != nil {
 			return
 		}
-		if errorString != "" {
-			err = errors.New(errorString)
-		}
+
+		err = kiteErr
 	})
 }

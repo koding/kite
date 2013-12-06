@@ -48,18 +48,30 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 		return
 	}
 
-	// Call response callback function.
+	// Prepare error argument.
 	if argumentErr != nil {
-		err = responseCallback(argumentErr.Error(), nil)
+		err = &Error{"argumentError", argumentErr.Error()}
 	} else if err != nil {
-		err = responseCallback(err.Error(), result)
-	} else {
-		err = responseCallback(nil, result)
+		// Convert all errors to kite.Error type.
+		if _, ok := err.(*Error); !ok {
+			err = &Error{"serverError", err.Error()}
+		}
 	}
 
-	if err != nil {
+	// Call response callback function.
+	if err = responseCallback(err, result); err != nil {
 		m.kite.Log.Error(err.Error())
 	}
+}
+
+// Error is the type of the first argument in response callback.
+type Error struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprint("Kite error: %s: %s", e.Type, e.Message)
 }
 
 // recoverArgumentError takes a function and tries to recover a dnode.ArgumentError
