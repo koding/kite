@@ -36,7 +36,7 @@ type Kontrol struct {
 func New() *Kontrol {
 	kiteOptions := &kite.Options{
 		Kitename:    "kontrol",
-		Version:     "1",
+		Version:     "0.0.1",
 		Port:        strconv.Itoa(config.Current.NewKontrol.Port),
 		Region:      "localhost",
 		Environment: "development",
