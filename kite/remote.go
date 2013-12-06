@@ -218,11 +218,6 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
 	return Callback(func(request *Request) {
 		var (
-			// Arguments to our response callback It is a slice of length 2.
-			// The first argument is the error string,
-			// the second argument is the result.
-			responseArgs []*dnode.Partial
-
 			// First argument
 			err error
 
@@ -239,16 +234,10 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
-		err = request.Args.Unmarshal(&responseArgs)
-		if err != nil {
-			return
-		}
-
-		// We must always get an error and a result argument.
-		if len(responseArgs) != 2 {
-			err = fmt.Errorf("Invalid response args: %s", string(request.Args.Raw))
-			return
-		}
+		// Arguments to our response callback It is a slice of length 2.
+		// The first argument is the error string,
+		// the second argument is the result.
+		responseArgs := request.Args.MustSliceOfLength(2)
 
 		// The second argument is our result.
 		result = responseArgs[1]
