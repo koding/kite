@@ -96,8 +96,6 @@ func (k *Kontrol) Register() error {
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
 func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol.KiteEvent)) error {
-	// this is needed because we are calling GetKites explicitly, therefore
-	// this should be only callable *after* we are connected to kontrol.
 	<-k.ready
 
 	queueEvents := func(r *Request) {
