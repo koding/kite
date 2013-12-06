@@ -114,7 +114,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 	}
 
 	args := []interface{}{query, Callback(queueEvents)}
-	remoteKites, err := k.GetKites(args...)
+	remoteKites, err := k.getKites(args...)
 	if err != nil && err != ErrNoKitesAvailable {
 		return err // return only when something really happened
 	}
@@ -137,7 +137,12 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 // contains ready to connect RemoteKite instances. The caller must connect
 // with RemoteKite.Dial() before using each Kite. An error is returned when no
 // kites are available.
-func (k *Kontrol) GetKites(args ...interface{}) ([]*RemoteKite, error) {
+func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
+	return k.getKites(query)
+}
+
+// used internally for GetKites() and WatchKites()
+func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	<-k.ready
 
 	response, err := k.RemoteKite.Call("getKites", args)
