@@ -132,7 +132,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 	for i, kite := range kites {
 		auth := callAuthentication{
 			Type: "token",
-			Key:  kite.Token,
+			Key:  kite.Token.Key,
 		}
 
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
@@ -141,13 +141,19 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 	return remoteKites, nil
 }
 
-func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
+func (k *Kontrol) GetToken(kite *protocol.Kite) (*protocol.Token, error) {
 	<-k.ready
 
 	result, err := k.RemoteKite.Call("getToken", kite)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return result.MustString(), nil
+	var tkn *protocol.Token
+	err = result.Unmarshal(&tkn)
+	if err != nil {
+		return nil, err
+	}
+
+	return tkn, nil
 }

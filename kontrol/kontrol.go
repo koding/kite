@@ -373,23 +373,28 @@ func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.
 
 	return &protocol.KiteWithToken{
 		Kite:  *kite,
-		Token: tkn,
+		Token: *tkn,
 	}, nil
 }
 
-func generateToken(kite *protocol.Kite, username, kodingKey string) (string, error) {
+func generateToken(kite *protocol.Kite, username, kodingKey string) (*protocol.Token, error) {
 	key, err := kodingkey.FromString(kodingKey)
 	if err != nil {
-		return "", fmt.Errorf("Koding Key is invalid at Kite: %s", key)
+		return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
 	}
+
+	ttl := 1 * time.Hour
 
 	// username is from requester, key is from kite owner.
-	tkn, err := token.NewToken(username, kite.ID).EncryptString(key)
+	tkn, err := token.NewTokenWithDuration(username, kite.ID, ttl).EncryptString(key)
 	if err != nil {
-		return "", errors.New("Server error: Cannot generate a token")
+		return nil, errors.New("Server error: Cannot generate a token")
 	}
 
-	return tkn, nil
+	return &protocol.Token{
+		Key: tkn,
+		TTL: int(ttl / time.Second),
+	}, nil
 }
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
