@@ -495,13 +495,13 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	return generateToken(kite, r.Username, kiteVal.KodingKey)
 }
 
-func (k *Kontrol) AuthenticateFromSessionID(options *kite.CallOptions) error {
-	username, err := findUsernameFromSessionID(options.Authentication.Key)
+func (k *Kontrol) AuthenticateFromSessionID(r *kite.Request) error {
+	username, err := findUsernameFromSessionID(r.Authentication.Key)
 	if err != nil {
 		return err
 	}
 
-	options.Kite.Username = username
+	r.Username = username
 
 	return nil
 }
@@ -515,13 +515,13 @@ func findUsernameFromSessionID(sessionID string) (string, error) {
 	return session.Username, nil
 }
 
-func (k *Kontrol) AuthenticateFromKodingKey(options *kite.CallOptions) error {
-	username, err := findUsernameFromKey(options.Authentication.Key)
+func (k *Kontrol) AuthenticateFromKodingKey(r *kite.Request) error {
+	username, err := findUsernameFromKey(r.Authentication.Key)
 	if err != nil {
 		return err
 	}
 
-	options.Kite.Username = username
+	r.Username = username
 
 	return nil
 }

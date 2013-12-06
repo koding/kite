@@ -52,7 +52,7 @@ type Kite struct {
 
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
-	Authenticators map[string]func(*CallOptions) error
+	Authenticators map[string]func(*Request) error
 
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
@@ -150,7 +150,7 @@ func New(options *Options) *Kite {
 		server:            rpc.NewServer(),
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
-		Authenticators:    make(map[string]func(*CallOptions) error),
+		Authenticators:    make(map[string]func(*Request) error),
 		handlers:          make(map[string]HandlerFunc),
 		ready:             make(chan bool),
 	}

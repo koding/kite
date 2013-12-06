@@ -28,9 +28,18 @@ func (m kiteMethod) WrapArgs(args []interface{}, tr dnode.Transport) []interface
 
 // Call is called when a method is received from remote.
 func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport) {
-	request, responseCallback, err := m.kite.parseRequest(method, args, tr, true)
+	request, responseCallback, err := m.kite.parseRequest(method, args, tr)
 	if err != nil {
 		m.kite.Log.Notice("Did not understand request: %s", err)
+		return
+	}
+
+	err = request.authenticate()
+	if kiteErr, ok := err.(*Error); ok && kiteErr.Type == "authenticationError" {
+		err = responseCallback(kiteErr, nil)
+	}
+	if err != nil {
+		m.kite.Log.Error(err.Error())
 		return
 	}
 
@@ -129,7 +138,7 @@ func (c Callback) WrapArgs(args []interface{}, tr dnode.Transport) []interface{}
 // Call is called when a callback method call is received from remote.
 func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
 	k := tr.Properties()["localKite"].(*Kite)
-	req, _, err := k.parseRequest(method, args, tr, false)
+	req, _, err := k.parseRequest(method, args, tr)
 	if err != nil {
 		k.Log.Notice("Did not understand callback message: %s. method: %q args: %q", err, method, args)
 		return
@@ -140,7 +149,7 @@ func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
 
 // parseRequest is used to read a dnode message.
 // It is called when a method or callback is received.
-func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport, authenticate bool) (
+func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport) (
 	request *Request, response dnode.Function, err error) {
 
 	// Parse dnode method arguments [options, response]
@@ -161,16 +170,6 @@ func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Tr
 	// Parse response callback if present
 	if len(args) > 1 && args[1] != nil {
 		if err = args[1].Unmarshal(&response); err != nil {
-			return
-		}
-	}
-
-	// Trust the Kite if we have initiated the connection.
-	// Otherwise try to authenticate the user.
-	// RemoteAddr() returns "" if this is an outgoing connection.
-	// Also we do not need to authenticate requests when a callback method is received.
-	if authenticate && tr.RemoteAddr() != "" {
-		if err = k.authenticateUser(&options); err != nil {
 			return
 		}
 	}
@@ -197,55 +196,77 @@ func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Tr
 		LocalKite:      k,
 		RemoteKite:     properties["remoteKite"].(*RemoteKite),
 		RemoteAddr:     tr.RemoteAddr(),
-		Username:       options.Kite.Username, // authenticateUser() sets it.
+		Username:       options.Kite.Username,
 		Authentication: &options.Authentication,
 	}
 
 	return
 }
 
-// authenticateUser tries to authenticate the user by selecting appropriate
+// authenticate tries to authenticate the user by selecting appropriate
 // authenticator function.
-func (k *Kite) authenticateUser(options *CallOptions) error {
-	f := k.Authenticators[options.Authentication.Type]
-	if f == nil {
-		return fmt.Errorf("Unknown authentication type: %s", options.Authentication.Type)
+func (r *Request) authenticate() error {
+	// Trust the Kite if we have initiated the connection.
+	// RemoteAddr() returns "" if this is an outgoing connection.
+	if r.RemoteAddr == "" {
+		return nil
 	}
 
-	return f(options)
+	// Select authenticator function.
+	f := r.LocalKite.Authenticators[r.Authentication.Type]
+	if f == nil {
+		return &Error{
+			Type:    "authenticationError",
+			Message: fmt.Sprint("Unknown authentication type: %s", r.Authentication.Type),
+		}
+	}
+
+	// Call authenticator function.
+	err := f(r)
+	if err != nil {
+		return &Error{
+			Type:    "authenticationError",
+			Message: err.Error(),
+		}
+	}
+
+	// Fix username of the remote Kite if it is invalid.
+	r.RemoteKite.Kite.Username = r.Username
+
+	return nil
 }
 
 // AuthenticateFromToken is the default Authenticator for Kite.
-func (k *Kite) AuthenticateFromToken(options *CallOptions) error {
+func (k *Kite) AuthenticateFromToken(r *Request) error {
 	key, err := kodingkey.FromString(k.KodingKey)
 	if err != nil {
 		return fmt.Errorf("Invalid Koding Key: %s", k.KodingKey)
 	}
 
-	tkn, err := token.DecryptString(options.Authentication.Key, key)
+	tkn, err := token.DecryptString(r.Authentication.Key, key)
 	if err != nil {
-		return fmt.Errorf("Invalid token: %s", options.Authentication.Key)
+		return fmt.Errorf("Invalid token: %s", r.Authentication.Key)
 	}
 
 	if !tkn.IsValid(k.ID) {
 		return fmt.Errorf("Invalid token: %s", tkn)
 	}
 
-	options.Kite.Username = tkn.Username
+	r.Username = tkn.Username
 
 	return nil
 }
 
 // AuthenticateFromToken authenticates user from Koding Key.
 // Kontrol makes requests with a Koding Key.
-func (k *Kite) AuthenticateFromKodingKey(options *CallOptions) error {
-	if options.Authentication.Key != k.KodingKey {
+func (k *Kite) AuthenticateFromKodingKey(r *Request) error {
+	if r.Authentication.Key != k.KodingKey {
 		return fmt.Errorf("Invalid Koding Key")
 	}
 
 	// Set the username if missing.
-	if options.Kite.Username == "" && k.Username != "" {
-		options.Kite.Username = k.Username
+	if r.RemoteKite.Username == "" && k.Username != "" {
+		r.RemoteKite.Username = k.Username
 	}
 
 	return nil
