@@ -1,11 +1,9 @@
 package kite
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/op/go-logging"
-	"io/ioutil"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
@@ -62,34 +60,6 @@ type Kite struct {
 	Log *logging.Logger
 }
 
-type Options struct {
-	Username     string
-	Kitename     string
-	LocalIP      string
-	PublicIP     string
-	Environment  string
-	Region       string
-	Port         string
-	Version      string
-	KontrolAddr  string
-	Dependencies string
-}
-
-func ReadKiteOptions(configfile string) (*Options, error) {
-	file, err := ioutil.ReadFile(configfile)
-	if err != nil {
-		return nil, err
-	}
-
-	options := &Options{}
-	err = json.Unmarshal(file, &options)
-	if err != nil {
-		return nil, err
-	}
-
-	return options, nil
-}
-
 // New creates, initialize and then returns a new Kite instance. It accepts
 // a single options argument that is a config struct that needs to be filled
 // with several informations like Name, Port, IP and so on.
@@ -102,34 +72,13 @@ func New(options *Options) *Kite {
 		}
 	}
 
-	// some simple validations for config
-	if options.Kitename == "" {
-		log.Fatal("ERROR: options.Kitename field is not set")
-	}
-
-	if options.Region == "" {
-		log.Fatal("ERROR: options.Region field is not set")
-	}
-
-	if options.Environment == "" {
-		log.Fatal("ERROR: options.Environment field is not set")
-	}
+	options.validate() // exits if validating fails
 
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
-
 	kodingKey, err := utils.GetKodingKey()
 	if err != nil {
 		log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
-	}
-
-	port := options.Port
-	if options.Port == "" {
-		port = "0" // OS binds to an automatic port
-	}
-
-	if options.KontrolAddr == "" {
-		options.KontrolAddr = "127.0.0.1:4000" // local fallback address
 	}
 
 	k := &Kite{
@@ -139,7 +88,7 @@ func New(options *Options) *Kite {
 			ID:          kiteID,
 			Version:     options.Version,
 			Hostname:    hostname,
-			Port:        port,
+			Port:        options.Port,
 			Environment: options.Environment,
 			Region:      options.Region,
 
