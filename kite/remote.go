@@ -255,11 +255,8 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
 	return Callback(func(request *Request) {
 		var (
-			// First argument
-			err error
-
-			// Second argument
-			result *dnode.Partial
+			err    error          // First argument
+			result *dnode.Partial // Second argument
 		)
 
 		// Notify that the callback is finished.
