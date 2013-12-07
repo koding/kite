@@ -9,6 +9,7 @@ import (
 	"koding/newkite/protocol"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // RemoteKite is the client for communicating with another Kite.
@@ -48,6 +49,25 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 
 	// We need a reference to the local kite when a method call is received.
 	r.client.Properties()["localKite"] = k
+
+	r.OnConnect(func() {
+		if r.Authentication.ValidUntil == nil {
+			return
+		}
+
+		// Start a goroutine that will renew the token before it expires.
+		go func() {
+			for {
+				renewTime := r.Authentication.ValidUntil.Add(-30 * time.Second)
+				select {
+				case <-time.After(renewTime.Sub(time.Now().UTC())):
+					r.renewToken()
+				case <-r.disconnect:
+					return
+				}
+			}
+		}()
+	})
 
 	var m sync.Mutex
 	r.OnDisconnect(func() {
@@ -99,6 +119,22 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
+func (r *RemoteKite) renewToken() {
+	const retryInterval = 10 * time.Second
+	for {
+		tkn, err := r.localKite.Kontrol.GetToken(&r.Kite)
+		if err != nil {
+			r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval)
+			continue
+		}
+
+		validUntil := time.Now().UTC().Add(time.Duration(tkn.TTL) * time.Second)
+		r.Authentication.Key = tkn.Key
+		r.Authentication.ValidUntil = &validUntil
+		break
+	}
+}
+
 // CallOptions is the type of first argument in the dnode message.
 // Second argument is a callback function.
 // It is used when unmarshalling a dnode message.
@@ -130,8 +166,9 @@ func (r *RemoteKite) makeOptions(args interface{}) *callOptionsOut {
 
 type callAuthentication struct {
 	// Type can be "kodingKey", "token" or "sessionID" for now.
-	Type string `json:"type"`
-	Key  string `json:"key"`
+	Type       string     `json:"type"`
+	Key        string     `json:"key"`
+	ValidUntil *time.Time `json:"-"`
 }
 
 type response struct {

@@ -6,6 +6,7 @@ import (
 	"koding/newkite/protocol"
 	"net"
 	"sync"
+	"time"
 )
 
 // Kontrol embeds RemoteKite which has additional special helper methods.
@@ -130,9 +131,11 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 
 	remoteKites := make([]*RemoteKite, len(kites))
 	for i, kite := range kites {
+		validUntil := time.Now().UTC().Add(time.Duration(kite.Token.TTL) * time.Second)
 		auth := callAuthentication{
-			Type: "token",
-			Key:  kite.Token.Key,
+			Type:       "token",
+			Key:        kite.Token.Key,
+			ValidUntil: &validUntil,
 		}
 
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
