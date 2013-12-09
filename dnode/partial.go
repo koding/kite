@@ -20,13 +20,12 @@ func (p *Partial) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON puts the data into Partial.Raw.
 func (p *Partial) UnmarshalJSON(data []byte) error {
-	// p.Raw = make([]byte, len(data))
-	// copy(p.Raw, data)
-	// return nil
 	if p == nil {
 		return errors.New("json.Partial: UnmarshalJSON on nil pointer")
 	}
-	p.Raw = append(p.Raw[0:0], data...)
+
+	p.Raw = make([]byte, len(data))
+	copy(p.Raw, data)
 	return nil
 }
 
