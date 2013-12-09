@@ -56,17 +56,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		}
 
 		// Start a goroutine that will renew the token before it expires.
-		go func() {
-			for {
-				renewTime := r.Authentication.ValidUntil.Add(-30 * time.Second)
-				select {
-				case <-time.After(renewTime.Sub(time.Now().UTC())):
-					r.renewToken()
-				case <-r.disconnect:
-					return
-				}
-			}
-		}()
+		go r.tokenRenewer()
 	})
 
 	var m sync.Mutex
@@ -119,20 +109,56 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
-func (r *RemoteKite) renewToken() {
-	const retryInterval = 10 * time.Second
+func (r *RemoteKite) tokenRenewer() {
 	for {
-		tkn, err := r.localKite.Kontrol.GetToken(&r.Kite)
-		if err != nil {
-			r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval)
-			continue
+		renewTime := r.Authentication.ValidUntil.Add(-30 * time.Second)
+		select {
+		case <-time.After(renewTime.Sub(time.Now().UTC())):
+			if err := r.renewTokenUntilDisconnect(); err != nil {
+				return
+			}
+		case <-r.disconnect:
+			return
 		}
-
-		validUntil := time.Now().UTC().Add(time.Duration(tkn.TTL) * time.Second)
-		r.Authentication.Key = tkn.Key
-		r.Authentication.ValidUntil = &validUntil
-		break
 	}
+}
+
+// renewToken retries until the request is successful or disconnect.
+func (r *RemoteKite) renewTokenUntilDisconnect() error {
+	const retryInterval = 10 * time.Second
+
+	if err := r.renewToken(); err == nil {
+		return nil
+	}
+
+	for {
+		select {
+		case <-time.After(retryInterval):
+			if err := r.renewToken(); err != nil {
+				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval)
+				continue
+			}
+
+			break
+		case <-r.disconnect:
+			return errors.New("disconnect")
+		}
+	}
+
+	return nil
+}
+
+func (r *RemoteKite) renewToken() error {
+	tkn, err := r.localKite.Kontrol.GetToken(&r.Kite)
+	if err != nil {
+		return err
+	}
+
+	validUntil := time.Now().UTC().Add(time.Duration(tkn.TTL) * time.Second)
+	r.Authentication.Key = tkn.Key
+	r.Authentication.ValidUntil = &validUntil
+
+	return nil
 }
 
 // CallOptions is the type of first argument in the dnode message.
