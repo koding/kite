@@ -11,8 +11,28 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 	"time"
 )
+
+// Debugging helper.
+func init() {
+	// Print stacktrace on SIGUSR1.
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGUSR1)
+	go func() {
+		for {
+			s := <-c
+			fmt.Println("Got signal:", s)
+			buf := make([]byte, 1<<16)
+			runtime.Stack(buf, true)
+			fmt.Println(string(buf))
+			fmt.Println("Number of goroutines:", runtime.NumGoroutine())
+		}
+	}()
+}
 
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
