@@ -21,7 +21,7 @@ type Options struct {
 	Dependencies string
 }
 
-// validate is validating the fields of the options struct. It exists if an
+// validate is validating the fields of the options struct. It exits if an
 // error is occured.
 func (o *Options) validate() {
 	if o.Kitename == "" {
