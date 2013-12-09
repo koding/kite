@@ -217,25 +217,39 @@ type response struct {
 // Waits until the callback function is called by the other side and
 // returns the result and the error.
 func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partial, err error) {
-	response := <-r.Go(method, args)
+	return r.CallWithTimeout(method, args, 0)
+}
+
+// CallWithTimeout does the same thing with Call() method except it takes an
+// extra argument that is the timeout for waiting reply from the remote Kite.
+// If timeout is given 0, the behavior is same as Call().
+func (r *RemoteKite) CallWithTimeout(method string, args interface{}, timeout uint) (result *dnode.Partial, err error) {
+	response := <-r.GoWithTimeout(method, args, timeout)
 	return response.Result, response.Err
 }
 
 // Go makes an unblocking method call to the server.
 // It returns a channel that the caller can wait on it to get the response.
 func (r *RemoteKite) Go(method string, args interface{}) chan *response {
+	return r.GoWithTimeout(method, args, 0)
+}
+
+// GoWithTimeout does the same thing with Go() method except it takes an
+// extra argument that is the timeout for waiting reply from the remote Kite.
+// If timeout is given 0, the behavior is same as Go().
+func (r *RemoteKite) GoWithTimeout(method string, args interface{}, timeout uint) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
 	r.Log.Debug("Calling method [%s] on kite [%s]", method, r.Name)
 	responseChan := make(chan *response, 1)
 
-	r.send(method, args, responseChan)
+	r.send(method, args, timeout, responseChan)
 
 	return responseChan
 }
 
 // send sends the method with callback to the server.
-func (r *RemoteKite) send(method string, args interface{}, responseChan chan *response) {
+func (r *RemoteKite) send(method string, args interface{}, timeout uint, responseChan chan *response) {
 	// To clean the sent callback after response is received.
 	// Send/Receive in a channel to prevent race condition because
 	// the callback is run in a separate goroutine.
@@ -260,6 +274,14 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 		return
 	}
 
+	// Use default timeout from r (RemoteKite) if zero.
+	var wait time.Duration
+	if timeout == 0 {
+		wait = r.callTimeout
+	} else {
+		wait = time.Duration(timeout) * time.Millisecond
+	}
+
 	// Waits until the response has came or the connection has disconnected.
 	go func() {
 		select {
@@ -267,7 +289,7 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 			responseChan <- &response{nil, errors.New("Client disconnected")}
 		case resp := <-doneChan:
 			responseChan <- resp
-		case <-time.After(r.callTimeout):
+		case <-time.After(wait):
 			responseChan <- &response{nil, errors.New("Timeout")}
 
 			// Remove the callback function from the map so we do not
