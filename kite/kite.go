@@ -27,6 +27,9 @@ type Kite struct {
 	// KodingKey is used for authenticate to Kontrol.
 	KodingKey string
 
+	// Is this Kite Public or Private? Default is Private.
+	Visibility protocol.Visibility
+
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
 
@@ -91,6 +94,7 @@ func New(options *Options) *Kite {
 			Port:        options.Port,
 			Environment: options.Environment,
 			Region:      options.Region,
+			Visibility:  options.Visibility,
 
 			// PublicIP will be set by Kontrol after registering if it is not set.
 			PublicIP: options.PublicIP,

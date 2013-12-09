@@ -31,6 +31,9 @@ type Kite struct {
 	// locations.
 	Region string `bson:"region" json:"region"`
 
+	// Is this Kite public or private?
+	Visibility Visibility
+
 	Version  string `bson:"version" json:"version"`
 	Hostname string `bson:"hostname" json:"hostname"`
 	PublicIP string `bson:"publicIP" json:"publicIP"`
@@ -40,6 +43,13 @@ type Kite struct {
 func (k *Kite) Addr() string {
 	return net.JoinHostPort(k.PublicIP, k.Port)
 }
+
+type Visibility string
+
+const (
+	Public  Visibility = "PUBLIC"
+	Private Visibility = "PRIVATE"
+)
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
