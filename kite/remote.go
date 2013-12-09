@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const DefaultCallTimeout = 4000 // milliseconds
+
 // RemoteKite is the client for communicating with another Kite.
 // It has Call() and Go() methods for calling methods sync/async way.
 type RemoteKite struct {
@@ -32,6 +34,9 @@ type RemoteKite struct {
 
 	// To signal waiters of Go() on disconnect.
 	disconnect chan bool
+
+	// Duration to wait reply from remote when making a request with Call().
+	callTimeout time.Duration
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
@@ -46,6 +51,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		client:         k.server.NewClientWithHandlers(),
 		disconnect:     make(chan bool),
 	}
+	r.SetCallTimeout(DefaultCallTimeout)
 
 	// We need a reference to the local kite when a method call is received.
 	r.client.Properties()["localKite"] = k
@@ -79,6 +85,10 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 	r.client = client
 	r.client.Properties()["localKite"] = k
 	return r
+}
+
+func (r *RemoteKite) SetCallTimeout(ms uint) {
+	r.callTimeout = time.Duration(ms) * time.Millisecond
 }
 
 // Dial connects to the remote Kite. Returns error if it can't.
@@ -253,6 +263,14 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 			responseChan <- &response{nil, errors.New("Client disconnected")}
 		case resp := <-doneChan:
 			responseChan <- resp
+		case <-time.After(r.callTimeout):
+			responseChan <- &response{nil, errors.New("Timeout")}
+
+			// Remove the callback function from the map so we do not
+			// consume memory for unused callbacks.
+			if id, ok := <-removeCallback; ok {
+				r.client.RemoveCallback(id)
+			}
 		}
 	}()
 
