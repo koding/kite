@@ -262,6 +262,7 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 // sendCallbackID send the callback number to be deleted after response is received.
 func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 	if len(callbacks) > 0 {
+		// Find max callback ID.
 		max := uint64(0)
 		for id, _ := range callbacks {
 			i, _ := strconv.ParseUint(id, 10, 64)
@@ -269,6 +270,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 				max = i
 			}
 		}
+
 		ch <- max
 	} else {
 		close(ch)

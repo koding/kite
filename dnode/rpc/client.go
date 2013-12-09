@@ -157,7 +157,7 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Send(msg []byte) error {
-	// println("Sending...", string(msg))
+	// println("\nSending...", string(msg))
 	if c.Conn == nil {
 		return errors.New("Not connected")
 	}
@@ -169,7 +169,7 @@ func (c *Client) Receive() ([]byte, error) {
 	// println("Receiving...")
 	var msg []byte
 	err := websocket.Message.Receive(c.Conn, &msg)
-	// println("Received:", string(msg))
+	// println("\nReceived:", string(msg))
 	return msg, err
 }
 
