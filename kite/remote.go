@@ -247,6 +247,9 @@ func (r *RemoteKite) send(method string, args interface{}, responseChan chan *re
 	opts := r.makeOptions(args)
 	cb := r.makeResponseCallback(doneChan, removeCallback)
 
+	// BUG: This sometimes does not return an error, even if the remote
+	// kite is disconnected. I could not find out why.
+	// Timeout below in goroutine saves us in this case.
 	callbacks, err := r.client.Call(method, opts, cb)
 	if err != nil {
 		responseChan <- &response{
