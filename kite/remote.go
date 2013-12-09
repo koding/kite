@@ -87,6 +87,7 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 	return r
 }
 
+// SetCallTimeout sets the timeout duration for requests made with Call().
 func (r *RemoteKite) SetCallTimeout(ms uint) {
 	r.callTimeout = time.Duration(ms) * time.Millisecond
 }
