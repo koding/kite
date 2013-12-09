@@ -91,7 +91,7 @@ func TestKite(t *testing.T) {
 func exp2() *Kite {
 	options := &Options{
 		Kitename:    "exp2",
-		Version:     "1",
+		Version:     "0.0.1",
 		Port:        "3637",
 		Region:      "localhost",
 		Environment: "development",
@@ -104,7 +104,7 @@ func exp2() *Kite {
 func mathWorker() *Kite {
 	options := &Options{
 		Kitename:    "mathworker",
-		Version:     "1",
+		Version:     "0.0.1",
 		Port:        "3636",
 		Region:      "localhost",
 		Environment: "development",
