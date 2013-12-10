@@ -144,6 +144,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 	return remoteKites, nil
 }
 
+// GetToken is used to get a new token for a single Kite.
 func (k *Kontrol) GetToken(kite *protocol.Kite) (*protocol.Token, error) {
 	<-k.ready
 

@@ -92,6 +92,8 @@ const (
 	Deregister KiteAction = "DEREGISTER"
 )
 
+// Token is the type of the struct given to a Kite in order to authenticate
+// itself to the remote Kite.
 type Token struct {
 	Key string
 	TTL int

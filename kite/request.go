@@ -80,7 +80,7 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprint("Kite error: %s: %s", e.Type, e.Message)
+	return fmt.Sprintf("Kite error: %s: %s", e.Type, e.Message)
 }
 
 // recoverArgumentError takes a function and tries to recover a dnode.ArgumentError
@@ -217,11 +217,11 @@ func (r *Request) authenticate() error {
 	if f == nil {
 		return &Error{
 			Type:    "authenticationError",
-			Message: fmt.Sprint("Unknown authentication type: %s", r.Authentication.Type),
+			Message: fmt.Sprintf("Unknown authentication type: %s", r.Authentication.Type),
 		}
 	}
 
-	// Call authenticator function.
+	// Call authenticator function. It sets the Request.Username field.
 	err := f(r)
 	if err != nil {
 		return &Error{
@@ -231,6 +231,7 @@ func (r *Request) authenticate() error {
 	}
 
 	// Fix username of the remote Kite if it is invalid.
+	// This prevents a Kite to impersonate someone else's Kite.
 	r.RemoteKite.Kite.Username = r.Username
 
 	return nil
@@ -261,7 +262,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 // Kontrol makes requests with a Koding Key.
 func (k *Kite) AuthenticateFromKodingKey(r *Request) error {
 	if r.Authentication.Key != k.KodingKey {
-		return fmt.Errorf("Invalid Koding Key")
+		return errors.New("Invalid Koding Key")
 	}
 
 	// Set the username if missing.

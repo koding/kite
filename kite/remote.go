@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const DefaultCallTimeout = 4000 // milliseconds
+const DefaultCallTimeout = 4 * time.Second
 
 // RemoteKite is the client for communicating with another Kite.
 // It has Call() and Go() methods for calling methods sync/async way.
@@ -88,9 +88,7 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 }
 
 // SetCallTimeout sets the timeout duration for requests made with Call().
-func (r *RemoteKite) SetCallTimeout(ms uint) {
-	r.callTimeout = time.Duration(ms) * time.Millisecond
-}
+func (r *RemoteKite) SetCallTimeout(d time.Duration) { r.callTimeout = d }
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
@@ -122,6 +120,7 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 
 func (r *RemoteKite) tokenRenewer() {
 	for {
+		// Token will be renewed before it expires.
 		renewTime := r.Authentication.ValidUntil.Add(-30 * time.Second)
 		select {
 		case <-time.After(renewTime.Sub(time.Now().UTC())):
@@ -142,6 +141,7 @@ func (r *RemoteKite) renewTokenUntilDisconnect() error {
 		return nil
 	}
 
+loop:
 	for {
 		select {
 		case <-time.After(retryInterval):
@@ -150,7 +150,7 @@ func (r *RemoteKite) renewTokenUntilDisconnect() error {
 				continue
 			}
 
-			break
+			break loop
 		case <-r.disconnect:
 			return errors.New("disconnect")
 		}
@@ -223,7 +223,7 @@ func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partia
 // CallWithTimeout does the same thing with Call() method except it takes an
 // extra argument that is the timeout for waiting reply from the remote Kite.
 // If timeout is given 0, the behavior is same as Call().
-func (r *RemoteKite) CallWithTimeout(method string, args interface{}, timeout uint) (result *dnode.Partial, err error) {
+func (r *RemoteKite) CallWithTimeout(method string, args interface{}, timeout time.Duration) (result *dnode.Partial, err error) {
 	response := <-r.GoWithTimeout(method, args, timeout)
 	return response.Result, response.Err
 }
@@ -237,7 +237,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 // GoWithTimeout does the same thing with Go() method except it takes an
 // extra argument that is the timeout for waiting reply from the remote Kite.
 // If timeout is given 0, the behavior is same as Go().
-func (r *RemoteKite) GoWithTimeout(method string, args interface{}, timeout uint) chan *response {
+func (r *RemoteKite) GoWithTimeout(method string, args interface{}, timeout time.Duration) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
 	r.Log.Debug("Calling method [%s] on kite [%s]", method, r.Name)
@@ -249,7 +249,7 @@ func (r *RemoteKite) GoWithTimeout(method string, args interface{}, timeout uint
 }
 
 // send sends the method with callback to the server.
-func (r *RemoteKite) send(method string, args interface{}, timeout uint, responseChan chan *response) {
+func (r *RemoteKite) send(method string, args interface{}, timeout time.Duration, responseChan chan *response) {
 	// To clean the sent callback after response is received.
 	// Send/Receive in a channel to prevent race condition because
 	// the callback is run in a separate goroutine.
@@ -275,21 +275,18 @@ func (r *RemoteKite) send(method string, args interface{}, timeout uint, respons
 	}
 
 	// Use default timeout from r (RemoteKite) if zero.
-	var wait time.Duration
 	if timeout == 0 {
-		wait = r.callTimeout
-	} else {
-		wait = time.Duration(timeout) * time.Millisecond
+		timeout = r.callTimeout
 	}
 
 	// Waits until the response has came or the connection has disconnected.
 	go func() {
 		select {
-		case <-r.disconnect:
-			responseChan <- &response{nil, errors.New("Client disconnected")}
 		case resp := <-doneChan:
 			responseChan <- resp
-		case <-time.After(wait):
+		case <-r.disconnect:
+			responseChan <- &response{nil, errors.New("Client disconnected")}
+		case <-time.After(timeout):
 			responseChan <- &response{nil, errors.New("Timeout")}
 
 			// Remove the callback function from the map so we do not
@@ -340,15 +337,14 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
-		// Arguments to our response callback It is a slice of length 2.
-		// The first argument is the error string,
+		// Arguments to our response callback:
+		// The first argument is the error struct and
 		// the second argument is the result.
 		responseArgs := request.Args.MustSliceOfLength(2)
 
-		// The second argument is our result.
 		result = responseArgs[1]
 
-		// This is error argument. Unmarshal panics if it is null.
+		// This is the error argument. Unmarshal panics if it is null.
 		if responseArgs[0] == nil {
 			return
 		}
