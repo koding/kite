@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var ErrNoKitesAvailable = errors.New("no kites availabile")
+
 // Kontrol embeds RemoteKite which has additional special helper methods.
 type Kontrol struct {
 	*RemoteKite
@@ -92,12 +94,9 @@ func (k *Kontrol) Register() error {
 	return nil
 }
 
-// GetKites returns the list of Kites matching the query.
-// The returned list contains ready to connect RemoteKite instances.
-// The caller must connect with RemoteKite.Dial() before using each Kite.
-func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.KiteEvent)) ([]*RemoteKite, error) {
-	// this is needed because we are calling GetKites explicitly, therefore
-	// this should be only callable *after* we are connected to kontrol.
+// WatchKites watches for Kites that matches the query. The onEvent functions
+// is called for current kites and every new kite event.
+func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol.KiteEvent)) error {
 	<-k.ready
 
 	queueEvents := func(r *Request) {
@@ -113,10 +112,37 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 		onEvent(&event)
 	}
 
-	args := []interface{}{query}
-	if onEvent != nil {
-		args = append(args, Callback(queueEvents))
+	args := []interface{}{query, Callback(queueEvents)}
+	remoteKites, err := k.getKites(args...)
+	if err != nil && err != ErrNoKitesAvailable {
+		return err // return only when something really happened
 	}
+
+	// also put the current kites to the eventChan.
+	for _, remoteKite := range remoteKites {
+		event := protocol.KiteEvent{
+			Action: protocol.Register,
+			Kite:   remoteKite.Kite,
+			Token:  remoteKite.Authentication.Key,
+		}
+
+		onEvent(&event)
+	}
+
+	return nil
+}
+
+// GetKites returns the list of Kites matching the query. The returned list
+// contains ready to connect RemoteKite instances. The caller must connect
+// with RemoteKite.Dial() before using each Kite. An error is returned when no
+// kites are available.
+func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
+	return k.getKites(query)
+}
+
+// used internally for GetKites() and WatchKites()
+func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
+	<-k.ready
 
 	response, err := k.RemoteKite.Call("getKites", args)
 	if err != nil {
@@ -127,6 +153,10 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery, onEvent func(*protocol.K
 	err = response.Unmarshal(&kites)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(kites) == 0 {
+		return nil, ErrNoKitesAvailable
 	}
 
 	remoteKites := make([]*RemoteKite, len(kites))
