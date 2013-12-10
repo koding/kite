@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync/atomic"
 )
 
@@ -108,10 +109,12 @@ func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[
 				return
 			}
 
-			v = reflect.ValueOf(e.Interface())
-			d.collectFields(v, path, callbackMap)
+			v2 := reflect.ValueOf(e.Interface())
+			d.collectFields(v2, path, callbackMap)
+			d.collectMethods(v, path, callbackMap)
 		case reflect.Struct:
 			d.collectFields(v, path, callbackMap)
+			d.collectMethods(v, path, callbackMap)
 		}
 	}
 }
@@ -128,6 +131,16 @@ func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string
 
 		if f.PkgPath == "" { // exported
 			d.collectCallbacks(v.Field(i).Interface(), append(path, name), callbackMap)
+		}
+	}
+}
+
+func (d *Dnode) collectMethods(v reflect.Value, path Path, callbackMap map[string]Path) {
+	for i := 0; i < v.NumMethod(); i++ {
+		if v.Type().Method(i).PkgPath == "" { // exported
+			name := v.Type().Method(i).Name
+			name = strings.ToLower(name[0:1]) + name[1:]
+			d.registerCallback(v.Method(i), append(path, name), callbackMap)
 		}
 	}
 }
