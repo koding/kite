@@ -31,7 +31,11 @@ func init() {
 			buf := make([]byte, 1<<16)
 			runtime.Stack(buf, true)
 			fmt.Println(string(buf))
-			fmt.Println("Number of goroutines:", runtime.NumGoroutine())
+			fmt.Print("Number of goroutines:", runtime.NumGoroutine())
+			m := new(runtime.MemStats)
+			runtime.GC()
+			runtime.ReadMemStats(m)
+			fmt.Printf(", Memory allocated: %+v\n", m.Alloc)
 		}
 	}()
 }
