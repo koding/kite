@@ -59,7 +59,7 @@ func main() {
 	}
 
 	squareOf := func(i int) {
-		response, err := mathWorker.Call("square", i)
+		response, err := mathWorker.Tell("square", i)
 		if err != nil {
 			fmt.Println(err)
 			return
