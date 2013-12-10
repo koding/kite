@@ -165,7 +165,7 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) err
 		dnode.Callback(heartbeatFunc),
 	}
 
-	_, err := r.Call("heartbeat", heartbeatArgs)
+	_, err := r.Tell("heartbeat", heartbeatArgs)
 	return err
 }
 

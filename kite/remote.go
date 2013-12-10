@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-const DefaultCallTimeout = 4 * time.Second
+const DefaultTellTimeout = 4 * time.Second
 
 // RemoteKite is the client for communicating with another Kite.
-// It has Call() and Go() methods for calling methods sync/async way.
+// It has Tell() and Go() methods for calling methods sync/async way.
 type RemoteKite struct {
 	// The information about the kite that we are connecting to.
 	protocol.Kite
@@ -35,13 +35,13 @@ type RemoteKite struct {
 	// To signal waiters of Go() on disconnect.
 	disconnect chan bool
 
-	// Duration to wait reply from remote when making a request with Call().
-	callTimeout time.Duration
+	// Duration to wait reply from remote when making a request with Tell().
+	tellTimeout time.Duration
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
 // is not connected. You have to call Dial() or DialForever() before calling
-// Call() and Go() methods.
+// Tell() and Go() methods.
 func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *RemoteKite {
 	r := &RemoteKite{
 		Kite:           kite,
@@ -51,7 +51,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 		client:         k.server.NewClientWithHandlers(),
 		disconnect:     make(chan bool),
 	}
-	r.SetCallTimeout(DefaultCallTimeout)
+	r.SetTellTimeout(DefaultTellTimeout)
 
 	// We need a reference to the local kite when a method call is received.
 	r.client.Properties()["localKite"] = k
@@ -87,8 +87,8 @@ func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthenticati
 	return r
 }
 
-// SetCallTimeout sets the timeout duration for requests made with Call().
-func (r *RemoteKite) SetCallTimeout(d time.Duration) { r.callTimeout = d }
+// SetTellTimeout sets the timeout duration for requests made with Tell().
+func (r *RemoteKite) SetTellTimeout(d time.Duration) { r.tellTimeout = d }
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
@@ -213,17 +213,17 @@ type response struct {
 	Err    error
 }
 
-// Call makes a blocking method call to the server.
+// Tell makes a blocking method call to the server.
 // Waits until the callback function is called by the other side and
 // returns the result and the error.
-func (r *RemoteKite) Call(method string, args interface{}) (result *dnode.Partial, err error) {
-	return r.CallWithTimeout(method, args, 0)
+func (r *RemoteKite) Tell(method string, args interface{}) (result *dnode.Partial, err error) {
+	return r.TellWithTimeout(method, args, 0)
 }
 
-// CallWithTimeout does the same thing with Call() method except it takes an
+// TellWithTimeout does the same thing with Tell() method except it takes an
 // extra argument that is the timeout for waiting reply from the remote Kite.
-// If timeout is given 0, the behavior is same as Call().
-func (r *RemoteKite) CallWithTimeout(method string, args interface{}, timeout time.Duration) (result *dnode.Partial, err error) {
+// If timeout is given 0, the behavior is same as Tell().
+func (r *RemoteKite) TellWithTimeout(method string, args interface{}, timeout time.Duration) (result *dnode.Partial, err error) {
 	response := <-r.GoWithTimeout(method, args, timeout)
 	return response.Result, response.Err
 }
@@ -240,7 +240,7 @@ func (r *RemoteKite) Go(method string, args interface{}) chan *response {
 func (r *RemoteKite) GoWithTimeout(method string, args interface{}, timeout time.Duration) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
-	r.Log.Debug("Calling method [%s] on kite [%s]", method, r.Name)
+	r.Log.Debug("Telling method [%s] on kite [%s]", method, r.Name)
 	responseChan := make(chan *response, 1)
 
 	r.send(method, args, timeout, responseChan)
@@ -268,7 +268,7 @@ func (r *RemoteKite) send(method string, args interface{}, timeout time.Duration
 	if err != nil {
 		responseChan <- &response{
 			Result: nil,
-			Err: fmt.Errorf("Calling method [%s] on [%s] error: %s",
+			Err: fmt.Errorf("Telling method [%s] on [%s] error: %s",
 				method, r.Kite.Name, err),
 		}
 		return
@@ -276,7 +276,7 @@ func (r *RemoteKite) send(method string, args interface{}, timeout time.Duration
 
 	// Use default timeout from r (RemoteKite) if zero.
 	if timeout == 0 {
-		timeout = r.callTimeout
+		timeout = r.tellTimeout
 	}
 
 	// Waits until the response has came or the connection has disconnected.
@@ -319,7 +319,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 }
 
 // makeResponseCallback prepares and returns a callback function sent to the server.
-// The caller of the Call() is blocked until the server calls this callback function.
+// The caller of the Tell() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
 func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
 	return Callback(func(request *Request) {

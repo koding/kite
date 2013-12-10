@@ -37,7 +37,7 @@ func TestKite(t *testing.T) {
 		return
 	}
 
-	result, err := remote.Call("square", 2)
+	result, err := remote.Tell("square", 2)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -71,7 +71,7 @@ func TestKite(t *testing.T) {
 	}
 
 	args := []interface{}{3, Callback(resultCallback)}
-	result, err = remote.Call("square2", args)
+	result, err = remote.Tell("square2", args)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
