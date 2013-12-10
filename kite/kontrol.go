@@ -123,7 +123,10 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 		event := protocol.KiteEvent{
 			Action: protocol.Register,
 			Kite:   remoteKite.Kite,
-			Token:  remoteKite.Authentication.Key,
+			Token: &protocol.Token{
+				Key: remoteKite.Authentication.Key,
+				TTL: int(remoteKite.Authentication.ValidUntil.Sub(time.Now().UTC()) / time.Second),
+			},
 		}
 
 		onEvent(&event)

@@ -64,7 +64,7 @@ func TestKontrol(t *testing.T) {
 		Name:        "mathworker",
 	}
 
-	kites, err := exp2Kite.Kontrol.GetKites(query, nil)
+	kites, err := exp2Kite.Kontrol.GetKites(query)
 	if err != nil {
 		fmt.Println(err)
 		return
