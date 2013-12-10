@@ -85,9 +85,10 @@ func (k *Kontrol) init() {
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
-	PublicIP  string
-	Port      string
-	KodingKey string
+	PublicIP   string
+	Port       string
+	KodingKey  string
+	Visibility protocol.Visibility
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -109,6 +110,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 func (k *Kontrol) register(r *kite.RemoteKite, kodingkey string) (*protocol.RegisterResult, error) {
 	kite := &r.Kite
+
+	if kite.Visibility != protocol.Public && kite.Visibility != protocol.Private {
+		return nil, errors.New("Invalid visibility field")
+	}
 
 	key, err := getKiteKey(kite)
 	if err != nil {
@@ -167,9 +172,10 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) err
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) func() (string, error) {
 	rv := &registerValue{
-		PublicIP:  kite.PublicIP,
-		Port:      kite.Port,
-		KodingKey: kodingkey,
+		PublicIP:   kite.PublicIP,
+		Port:       kite.Port,
+		KodingKey:  kodingkey,
+		Visibility: kite.Visibility,
 	}
 
 	valueBytes, _ := json.Marshal(rv)
@@ -290,12 +296,19 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		watchCallback = args[1].MustFunction()
 	}
 
-	// We do not allow access to other's kites for now.
-	if r.Username != query.Username {
-		return nil, errors.New("Not your Kite")
+	kites, err := k.getKites(r, query, watchCallback)
+	if err != nil {
+		return nil, err
 	}
 
-	return k.getKites(r, query, watchCallback)
+	filtered := make([]*protocol.KiteWithToken, 0, len(kites))
+	for _, kite := range kites {
+		if canAccess(r.RemoteKite.Kite, kite.Kite) {
+			filtered = append(filtered, kite)
+		}
+	}
+
+	return filtered, nil
 }
 
 func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]*protocol.KiteWithToken, error) {
@@ -373,23 +386,28 @@ func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.
 
 	return &protocol.KiteWithToken{
 		Kite:  *kite,
-		Token: tkn,
+		Token: *tkn,
 	}, nil
 }
 
-func generateToken(kite *protocol.Kite, username, kodingKey string) (string, error) {
+func generateToken(kite *protocol.Kite, username, kodingKey string) (*protocol.Token, error) {
 	key, err := kodingkey.FromString(kodingKey)
 	if err != nil {
-		return "", fmt.Errorf("Koding Key is invalid at Kite: %s", key)
+		return nil, fmt.Errorf("Koding Key is invalid at Kite: %s", key)
 	}
+
+	ttl := 1 * time.Hour
 
 	// username is from requester, key is from kite owner.
-	tkn, err := token.NewToken(username, kite.ID).EncryptString(key)
+	tkn, err := token.NewTokenWithDuration(username, kite.ID, ttl).EncryptString(key)
 	if err != nil {
-		return "", errors.New("Server error: Cannot generate a token")
+		return nil, errors.New("Server error: Cannot generate a token")
 	}
 
-	return tkn, nil
+	return &protocol.Token{
+		Key: tkn,
+		TTL: int(ttl / time.Second),
+	}, nil
 }
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
@@ -471,6 +489,10 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Invalid Kite")
 	}
 
+	if !canAccess(r.RemoteKite.Kite, *kite) {
+		return nil, errors.New("Forbidden")
+	}
+
 	kiteKey, err := getKiteKey(kite)
 	if err != nil {
 		return nil, err
@@ -490,13 +512,29 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	return generateToken(kite, r.Username, kiteVal.KodingKey)
 }
 
-func (k *Kontrol) AuthenticateFromSessionID(options *kite.CallOptions) error {
-	username, err := findUsernameFromSessionID(options.Authentication.Key)
+// canAccess makes some access control checks and returns true
+// if fromKite can talk with toKite.
+func canAccess(fromKite protocol.Kite, toKite protocol.Kite) bool {
+	// Do not allow other users if kite is private.
+	if fromKite.Username != toKite.Username && toKite.Visibility == protocol.Private {
+		return false
+	}
+
+	// Prevent access to development/staging kites if the requester is not owner.
+	if fromKite.Username != toKite.Username && toKite.Environment != "production" {
+		return false
+	}
+
+	return true
+}
+
+func (k *Kontrol) AuthenticateFromSessionID(r *kite.Request) error {
+	username, err := findUsernameFromSessionID(r.Authentication.Key)
 	if err != nil {
 		return err
 	}
 
-	options.Kite.Username = username
+	r.Username = username
 
 	return nil
 }
@@ -510,13 +548,13 @@ func findUsernameFromSessionID(sessionID string) (string, error) {
 	return session.Username, nil
 }
 
-func (k *Kontrol) AuthenticateFromKodingKey(options *kite.CallOptions) error {
-	username, err := findUsernameFromKey(options.Authentication.Key)
+func (k *Kontrol) AuthenticateFromKodingKey(r *kite.Request) error {
+	username, err := findUsernameFromKey(r.Authentication.Key)
 	if err != nil {
 		return err
 	}
 
-	options.Kite.Username = username
+	r.Username = username
 
 	return nil
 }

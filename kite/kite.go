@@ -11,8 +11,30 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 	"time"
 )
+
+func init() {
+	// Use all available CPUS.
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	// Debugging helper: Prints stacktrace on SIGUSR1.
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGUSR1)
+	go func() {
+		for {
+			s := <-c
+			fmt.Println("Got signal:", s)
+			buf := make([]byte, 1<<16)
+			runtime.Stack(buf, true)
+			fmt.Println(string(buf))
+			fmt.Println("Number of goroutines:", runtime.NumGoroutine())
+		}
+	}()
+}
 
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
@@ -26,6 +48,9 @@ type Kite struct {
 
 	// KodingKey is used for authenticate to Kontrol.
 	KodingKey string
+
+	// Is this Kite Public or Private? Default is Private.
+	Visibility protocol.Visibility
 
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
@@ -50,7 +75,7 @@ type Kite struct {
 
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
-	Authenticators map[string]func(*CallOptions) error
+	Authenticators map[string]func(*Request) error
 
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
@@ -91,6 +116,7 @@ func New(options *Options) *Kite {
 			Port:        options.Port,
 			Environment: options.Environment,
 			Region:      options.Region,
+			Visibility:  options.Visibility,
 
 			// PublicIP will be set by Kontrol after registering if it is not set.
 			PublicIP: options.PublicIP,
@@ -99,7 +125,7 @@ func New(options *Options) *Kite {
 		server:            rpc.NewServer(),
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
-		Authenticators:    make(map[string]func(*CallOptions) error),
+		Authenticators:    make(map[string]func(*Request) error),
 		handlers:          make(map[string]HandlerFunc),
 		ready:             make(chan bool),
 	}

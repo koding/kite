@@ -3,6 +3,7 @@ package kite
 import (
 	"encoding/json"
 	"io/ioutil"
+	"koding/newkite/protocol"
 	"log"
 	"strings"
 )
@@ -19,6 +20,7 @@ type Options struct {
 	Version      string
 	KontrolAddr  string
 	Dependencies string
+	Visibility   protocol.Visibility
 }
 
 // validate is validating the fields of the options struct. It exits if an
@@ -46,6 +48,10 @@ func (o *Options) validate() {
 
 	if o.KontrolAddr == "" {
 		o.KontrolAddr = "127.0.0.1:4000" // local fallback address
+	}
+
+	if o.Visibility == protocol.Visibility("") {
+		o.Visibility = protocol.Private
 	}
 }
 

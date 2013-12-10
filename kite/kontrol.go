@@ -6,6 +6,7 @@ import (
 	"koding/newkite/protocol"
 	"net"
 	"sync"
+	"time"
 )
 
 var ErrNoKitesAvailable = errors.New("no kites availabile")
@@ -160,9 +161,11 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 
 	remoteKites := make([]*RemoteKite, len(kites))
 	for i, kite := range kites {
+		validUntil := time.Now().UTC().Add(time.Duration(kite.Token.TTL) * time.Second)
 		auth := callAuthentication{
-			Type: "token",
-			Key:  kite.Token,
+			Type:       "token",
+			Key:        kite.Token.Key,
+			ValidUntil: &validUntil,
 		}
 
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
@@ -171,13 +174,19 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	return remoteKites, nil
 }
 
-func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
+func (k *Kontrol) GetToken(kite *protocol.Kite) (*protocol.Token, error) {
 	<-k.ready
 
 	result, err := k.RemoteKite.Call("getToken", kite)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return result.MustString(), nil
+	var tkn *protocol.Token
+	err = result.Unmarshal(&tkn)
+	if err != nil {
+		return nil, err
+	}
+
+	return tkn, nil
 }

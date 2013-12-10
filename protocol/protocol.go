@@ -31,6 +31,9 @@ type Kite struct {
 	// locations.
 	Region string `bson:"region" json:"region"`
 
+	// Is this Kite public or private?
+	Visibility Visibility
+
 	Version  string `bson:"version" json:"version"`
 	Hostname string `bson:"hostname" json:"hostname"`
 	PublicIP string `bson:"publicIP" json:"publicIP"`
@@ -40,6 +43,13 @@ type Kite struct {
 func (k *Kite) Addr() string {
 	return net.JoinHostPort(k.PublicIP, k.Port)
 }
+
+type Visibility string
+
+const (
+	Public  Visibility = "PUBLIC"
+	Private Visibility = "PRIVATE"
+)
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
@@ -61,8 +71,8 @@ const (
 )
 
 type KiteWithToken struct {
-	Kite  Kite   `json:"kite"`
-	Token string `json:"token"`
+	Kite  Kite  `json:"kite"`
+	Token Token `json:"token"`
 }
 
 // KiteEvent is the struct that is sent as an argument in watchCallback of
@@ -72,7 +82,7 @@ type KiteEvent struct {
 	Kite   Kite       `json:"kite"`
 
 	// Required when Action == Register
-	Token string `json:"token,omitempty"`
+	Token *Token `json:"token,omitempty"`
 }
 
 type KiteAction string
@@ -81,6 +91,11 @@ const (
 	Register   KiteAction = "REGISTER"
 	Deregister KiteAction = "DEREGISTER"
 )
+
+type Token struct {
+	Key string
+	TTL int
+}
 
 // KontrolQuery is a structure of message sent to Kontrol. It is used for
 // querying kites based on the incoming field parameters. Missing fields are
