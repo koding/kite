@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -71,6 +72,8 @@ type Kite struct {
 	// Dnode rpc server
 	server *rpc.Server
 
+	listener net.Listener
+
 	// Handlers to call when a Kite opens a connection to this Kite.
 	onConnectHandlers []func(*RemoteKite)
 
@@ -84,6 +87,7 @@ type Kite struct {
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
 	ready chan bool
+	end   chan bool
 
 	// Prints logging messages to stderr and syslog.
 	Log *logging.Logger
@@ -132,6 +136,7 @@ func New(options *Options) *Kite {
 		Authenticators:    make(map[string]func(*Request) error),
 		handlers:          make(map[string]HandlerFunc),
 		ready:             make(chan bool),
+		end:               make(chan bool, 1),
 	}
 
 	k.Log = newLogger(k.Name, k.hasDebugFlag())
@@ -162,7 +167,8 @@ func New(options *Options) *Kite {
 // asynchronously.
 func (k *Kite) Run() {
 	k.Start()
-	select {}
+	<-k.end
+	k.Log.Notice("Kite server is closed.")
 }
 
 // Start is like Run(), but does not wait for it to complete. It's nonblocking.
@@ -177,6 +183,12 @@ func (k *Kite) Start() {
 	}()
 
 	<-k.ready // wait until we are ready
+}
+
+// Close stops the server.
+func (k *Kite) Close() {
+	k.Log.Notice("Closing server...")
+	k.listener.Close()
 }
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
@@ -261,16 +273,20 @@ func (k *Kite) hasDebugFlag() bool {
 }
 
 // listenAndServe starts our rpc server with the given addr.
-func (k *Kite) listenAndServe() error {
-	listener, err := net.Listen("tcp4", ":"+k.Port)
+func (k *Kite) listenAndServe() (err error) {
+	// An error string equivalent to net.errClosing for using with http.Serve()
+	// during a graceful exit.
+	// I had to put it here because it is not exported by "net" package.
+	const errClosing = "use of closed network connection"
+
+	k.listener, err = net.Listen("tcp4", ":"+k.Port)
 	if err != nil {
 		return err
 	}
-
-	k.Log.Info("Listening: %s", listener.Addr().String())
+	k.Log.Info("Listening: %s", k.listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
-	_, k.Port, _ = net.SplitHostPort(listener.Addr().String())
+	_, k.Port, _ = net.SplitHostPort(k.listener.Addr().String())
 
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled {
@@ -282,7 +298,16 @@ func (k *Kite) listenAndServe() error {
 	}
 
 	k.ready <- true // listener is ready, means we are ready too
-	return http.Serve(listener, k.server)
+
+	err = http.Serve(k.listener, k.server)
+	if strings.Contains(err.Error(), errClosing) {
+		// The server is closed by Close() method
+		err = nil
+	}
+
+	k.end <- true // Serving is finished.
+
+	return err
 }
 
 func (k *Kite) registerToKontrol() {
