@@ -100,10 +100,8 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 	<-k.ready
 
 	queueEvents := func(r *Request) {
-		args := r.Args.MustSliceOfLength(1)
-
 		var event protocol.KiteEvent
-		err := args[0].Unmarshal(&event)
+		err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&event)
 		if err != nil {
 			k.Log.Error(err.Error())
 			return
