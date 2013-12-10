@@ -116,7 +116,7 @@ type Request struct {
 	LocalKite      *Kite
 	RemoteKite     *RemoteKite
 	Username       string
-	Authentication *callAuthentication
+	Authentication *Authentication
 	RemoteAddr     string
 }
 

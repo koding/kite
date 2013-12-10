@@ -30,7 +30,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 		Name:     "kontrol", // for logging purposes
 	}
 
-	auth := callAuthentication{
+	auth := Authentication{
 		Type: "kodingKey",
 		Key:  k.KodingKey,
 	}
@@ -163,7 +163,7 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	remoteKites := make([]*RemoteKite, len(kites))
 	for i, kite := range kites {
 		validUntil := time.Now().UTC().Add(time.Duration(kite.Token.TTL) * time.Second)
-		auth := callAuthentication{
+		auth := Authentication{
 			Type:       "token",
 			Key:        kite.Token.Key,
 			ValidUntil: &validUntil,

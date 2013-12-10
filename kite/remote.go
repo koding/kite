@@ -27,7 +27,7 @@ type RemoteKite struct {
 	Log *logging.Logger
 
 	// Credentials that we sent in each request.
-	Authentication callAuthentication
+	Authentication Authentication
 
 	// dnode RPC client that processes messages.
 	client *rpc.Client
@@ -42,7 +42,7 @@ type RemoteKite struct {
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
-func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *RemoteKite {
+func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKite {
 	r := &RemoteKite{
 		Kite:           kite,
 		localKite:      k,
@@ -80,7 +80,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth callAuthentication) *Remot
 // The client will be replaced with the given client.
 // Used to give the Kite method handler a working RemoteKite to call methods
 // on other side.
-func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth callAuthentication, client *rpc.Client) *RemoteKite {
+func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth Authentication, client *rpc.Client) *RemoteKite {
 	r := k.NewRemoteKite(kite, auth)
 	r.client = client
 	r.client.Properties()["localKite"] = k
@@ -177,9 +177,9 @@ func (r *RemoteKite) renewToken() error {
 // It is used when unmarshalling a dnode message.
 type CallOptions struct {
 	// Arguments to the method
-	WithArgs       *dnode.Partial     `json:"withArgs"`
-	Kite           protocol.Kite      `json:"kite"`
-	Authentication callAuthentication `json:"authentication"`
+	WithArgs       *dnode.Partial `json:"withArgs"`
+	Kite           protocol.Kite  `json:"kite"`
+	Authentication Authentication `json:"authentication"`
 }
 
 // callOptionsOut is the same structure with CallOptions.
@@ -201,7 +201,7 @@ func (r *RemoteKite) makeOptions(args interface{}) *callOptionsOut {
 	}
 }
 
-type callAuthentication struct {
+type Authentication struct {
 	// Type can be "kodingKey", "token" or "sessionID" for now.
 	Type       string     `json:"type"`
 	Key        string     `json:"key"`

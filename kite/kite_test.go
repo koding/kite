@@ -25,7 +25,7 @@ func TestKite(t *testing.T) {
 	exp2Kite.HandleFunc("foo", handleFoo)
 
 	// Use the kodingKey auth type since they are on same host.
-	auth := callAuthentication{
+	auth := Authentication{
 		Type: "kodingKey",
 		Key:  exp2Kite.KodingKey,
 	}
