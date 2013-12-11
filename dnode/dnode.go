@@ -121,15 +121,7 @@ func (d *Dnode) Run() error {
 			return err
 		}
 
-		// Do not run this function in a separate goroutine,
-		// otherwise the order of the messages may be mixed.
-		// If the order of the messages is not important for the user of
-		// this package he can choose to start separate gorouitens in his own
-		// handler. However, if we make this decision here and start a goroutine
-		// for each message the user cannot change this behavior in his handler.
-		// This is very important in Kites such as Terminal because the order
-		// of the key presses must be preserved.
-		d.processMessage(msg)
+		go d.processMessage(msg)
 	}
 }
 
