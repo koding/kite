@@ -156,7 +156,7 @@ func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string
 			name = f.Name
 		}
 
-		if f.PkgPath == "" { // exported
+		if f.PkgPath == "" && name != "-" { // exported
 			d.collectCallbacks(v.Field(i).Interface(), append(path, name), callbackMap)
 		}
 	}
