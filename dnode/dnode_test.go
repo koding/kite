@@ -190,7 +190,7 @@ func TestSendCallback(t *testing.T) {
 	// Send the struct itself.
 	// Pointer receivers will not be accessible.
 	go d.Call("calculate", a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"],"6":["0","add"]},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -200,7 +200,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a pointer to struct.
 	// Pointer receivers will be accessible.
 	go d.Call("calculate", &a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"6":["0","Callbacks","0"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"7":["0","Callbacks","0"],"8":["0","add"],"9":["0","subtract"]},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)

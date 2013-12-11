@@ -165,7 +165,7 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) err
 		dnode.Callback(heartbeatFunc),
 	}
 
-	_, err := r.Call("heartbeat", heartbeatArgs)
+	_, err := r.Tell("heartbeat", heartbeatArgs)
 	return err
 }
 
@@ -301,14 +301,14 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	filtered := make([]*protocol.KiteWithToken, 0, len(kites))
+	allowed := make([]*protocol.KiteWithToken, 0, len(kites))
 	for _, kite := range kites {
 		if canAccess(r.RemoteKite.Kite, kite.Kite) {
-			filtered = append(filtered, kite)
+			allowed = append(allowed, kite)
 		}
 	}
 
-	return filtered, nil
+	return allowed, nil
 }
 
 func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]*protocol.KiteWithToken, error) {

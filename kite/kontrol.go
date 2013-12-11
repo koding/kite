@@ -60,7 +60,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
 func (k *Kontrol) Register() error {
-	response, err := k.RemoteKite.Call("register", nil)
+	response, err := k.RemoteKite.Tell("register", nil)
 	if err != nil {
 		return err
 	}
@@ -100,10 +100,8 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 	<-k.ready
 
 	queueEvents := func(r *Request) {
-		args := r.Args.MustSliceOfLength(1)
-
 		var event protocol.KiteEvent
-		err := args[0].Unmarshal(&event)
+		err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&event)
 		if err != nil {
 			k.Log.Error(err.Error())
 			return
@@ -123,7 +121,10 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 		event := protocol.KiteEvent{
 			Action: protocol.Register,
 			Kite:   remoteKite.Kite,
-			Token:  remoteKite.Authentication.Key,
+			Token: &protocol.Token{
+				Key: remoteKite.Authentication.Key,
+				TTL: int(remoteKite.Authentication.ValidUntil.Sub(time.Now().UTC()) / time.Second),
+			},
 		}
 
 		onEvent(&event)
@@ -144,7 +145,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
 func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	<-k.ready
 
-	response, err := k.RemoteKite.Call("getKites", args)
+	response, err := k.RemoteKite.Tell("getKites", args)
 	if err != nil {
 		return nil, err
 	}
@@ -174,10 +175,11 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	return remoteKites, nil
 }
 
+// GetToken is used to get a new token for a single Kite.
 func (k *Kontrol) GetToken(kite *protocol.Kite) (*protocol.Token, error) {
 	<-k.ready
 
-	result, err := k.RemoteKite.Call("getToken", kite)
+	result, err := k.RemoteKite.Tell("getToken", kite)
 	if err != nil {
 		return nil, err
 	}

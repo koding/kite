@@ -64,7 +64,7 @@ func TestKontrol(t *testing.T) {
 		Name:        "mathworker",
 	}
 
-	kites, err := exp2Kite.Kontrol.GetKites(query, nil)
+	kites, err := exp2Kite.Kontrol.GetKites(query)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -90,7 +90,7 @@ func TestKontrol(t *testing.T) {
 	}
 	fmt.Printf("newToken: %#v\n", newToken)
 
-	response, err := mathWorker.Call("square", 2)
+	response, err := mathWorker.Tell("square", 2)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
