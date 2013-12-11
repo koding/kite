@@ -139,6 +139,9 @@ func New(options *Options) *Kite {
 		end:               make(chan bool, 1),
 	}
 
+	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback)
+	k.server.Properties()["localKite"] = k
+
 	k.Log = newLogger(k.Name, k.hasDebugFlag())
 	k.Kontrol = k.NewKontrol(options.KontrolAddr)
 

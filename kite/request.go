@@ -7,30 +7,16 @@ import (
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/kodingkey"
 	"koding/newkite/token"
+	"reflect"
 )
 
-// kiteMethod implements dnode.Handler.
-type kiteMethod struct {
-	kite    *Kite
-	method  string
-	handler HandlerFunc
-}
+// runMethod is called when a method is received from remote.
+func runMethod(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
+	kite := tr.Properties()["localKite"].(*Kite)
 
-// WrapArgs is called before a Callback is sent to remote in order to wrap arguments.
-func (m kiteMethod) WrapArgs(args []interface{}, tr dnode.Transport) []interface{} {
-	return []interface{}{&callOptionsOut{
-		WithArgs: args,
-		CallOptions: CallOptions{
-			Kite: m.kite.Kite,
-		},
-	}}
-}
-
-// Call is called when a method is received from remote.
-func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport) {
-	request, responseCallback, err := m.kite.parseRequest(method, args, tr)
+	request, responseCallback, err := kite.parseRequest(method, args, tr)
 	if err != nil {
-		m.kite.Log.Notice("Did not understand request: %s", err)
+		kite.Log.Notice("Did not understand request: %s", err)
 		return
 	}
 
@@ -39,14 +25,18 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 		err = responseCallback(kiteErr, nil)
 	}
 	if err != nil {
-		m.kite.Log.Error(err.Error())
+		kite.Log.Error(err.Error())
 		return
 	}
 
 	var result interface{}
+	var values []reflect.Value
 
 	// Wrap handler func.
-	handler := func() { result, err = m.handler(request) }
+	handler := func() {
+		callArgs := []reflect.Value{reflect.ValueOf(request)}
+		values = handlerFunc.Call(callArgs)
+	}
 
 	// Recover dnode argument errors.
 	// The caller can use functions like MustString(), MustSlice()...
@@ -55,6 +45,14 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 
 	if responseCallback == nil {
 		return
+	}
+
+	result = values[0].Interface()
+	errVal := values[1].Interface()
+	if errVal != nil {
+		err = errVal.(error)
+	} else {
+		err = nil
 	}
 
 	// Prepare error argument.
@@ -69,7 +67,7 @@ func (m kiteMethod) Call(method string, args *dnode.Partial, tr dnode.Transport)
 
 	// Call response callback function.
 	if err = responseCallback(err, result); err != nil {
-		m.kite.Log.Error(err.Error())
+		kite.Log.Error(err.Error())
 	}
 }
 
@@ -107,7 +105,7 @@ type HandlerFunc func(*Request) (result interface{}, err error)
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
 func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
-	k.server.Handle(method, kiteMethod{k, method, handler})
+	k.server.HandleFunc(method, handler)
 }
 
 type Request struct {
@@ -126,25 +124,20 @@ func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(`"[Function]"`), nil
 }
 
-func (c Callback) WrapArgs(args []interface{}, tr dnode.Transport) []interface{} {
-	return []interface{}{&callOptionsOut{
-		WithArgs: args,
-		CallOptions: CallOptions{
-			Kite: tr.Properties()["localKite"].(*Kite).Kite,
-		},
-	}}
-}
-
-// Call is called when a callback method call is received from remote.
-func (c Callback) Call(method string, args *dnode.Partial, tr dnode.Transport) {
+// runCallback is called when a callback method call is received from remote.
+func runCallback(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
 	k := tr.Properties()["localKite"].(*Kite)
-	req, _, err := k.parseRequest(method, args, tr)
+
+	request, _, err := k.parseRequest(method, args, tr)
 	if err != nil {
 		k.Log.Notice("Did not understand callback message: %s. method: %q args: %q", err, method, args)
 		return
 	}
 
-	recoverArgumentError(func() { c(req) })
+	recoverArgumentError(func() {
+		callArgs := []reflect.Value{reflect.ValueOf(request)}
+		handlerFunc.Call(callArgs)
+	})
 }
 
 // parseRequest is used to read a dnode message.

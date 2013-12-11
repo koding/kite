@@ -53,8 +53,14 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	}
 	r.SetTellTimeout(DefaultTellTimeout)
 
+	// Required for customizing dnode protocol for Kite.
+	r.client.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback)
+
 	// We need a reference to the local kite when a method call is received.
 	r.client.Properties()["localKite"] = k
+
+	// We need a reference to the remote kite when sending a message to remote.
+	r.client.Properties()["remoteKite"] = r
 
 	r.OnConnect(func() {
 		if r.Authentication.ValidUntil == nil {
@@ -76,6 +82,15 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	return r
 }
 
+func wrapCallbackArgs(args interface{}, tr dnode.Transport) []interface{} {
+	return []interface{}{&callOptionsOut{
+		WithArgs: args,
+		CallOptions: CallOptions{
+			Kite: tr.Properties()["localKite"].(*Kite).Kite,
+		},
+	}}
+}
+
 // newRemoteKiteWithClient returns a pointer to new RemoteKite instance.
 // The client will be replaced with the given client.
 // Used to give the Kite method handler a working RemoteKite to call methods
@@ -83,7 +98,9 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth Authentication, client *rpc.Client) *RemoteKite {
 	r := k.NewRemoteKite(kite, auth)
 	r.client = client
+	r.client.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback)
 	r.client.Properties()["localKite"] = k
+	r.client.Properties()["remoteKite"] = r
 	return r
 }
 
@@ -191,14 +208,16 @@ type callOptionsOut struct {
 }
 
 // That's what we send as a first argument in dnode message.
-func (r *RemoteKite) makeOptions(args interface{}) *callOptionsOut {
-	return &callOptionsOut{
+func wrapMethodArgs(args interface{}, tr dnode.Transport) []interface{} {
+	r := tr.Properties()["remoteKite"].(*RemoteKite)
+	options := callOptionsOut{
 		WithArgs: args,
 		CallOptions: CallOptions{
 			Kite:           r.localKite.Kite,
 			Authentication: r.Authentication,
 		},
 	}
+	return []interface{}{options}
 }
 
 type Authentication struct {
@@ -258,13 +277,12 @@ func (r *RemoteKite) send(method string, args interface{}, timeout time.Duration
 	// When a callback is called it will send the response to this channel.
 	doneChan := make(chan *response, 1)
 
-	opts := r.makeOptions(args)
 	cb := r.makeResponseCallback(doneChan, removeCallback)
 
 	// BUG: This sometimes does not return an error, even if the remote
 	// kite is disconnected. I could not find out why.
 	// Timeout below in goroutine saves us in this case.
-	callbacks, err := r.client.Call(method, opts, cb)
+	callbacks, err := r.client.CallWithExtraArgs(method, args, []interface{}{cb})
 	if err != nil {
 		responseChan <- &response{
 			Result: nil,
@@ -350,12 +368,14 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 		}
 
 		// Read the error argument in response.
-		var kiteErr *Error
-		err = responseArgs[0].Unmarshal(kiteErr)
+		var kiteErr Error
+		err = responseArgs[0].Unmarshal(&kiteErr)
 		if err != nil {
+			r.Log.Warning(err.Error())
 			return
 		}
 
-		err = kiteErr
+		r.Log.Warning("Error in remote Kite: %s", kiteErr.Error())
+		err = &kiteErr
 	})
 }

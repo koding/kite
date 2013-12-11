@@ -98,6 +98,7 @@ func exp2() *Kite {
 	}
 
 	k := New(options)
+	k.KontrolEnabled = false
 	return k
 }
 
@@ -111,6 +112,7 @@ func mathWorker() *Kite {
 	}
 
 	k := New(options)
+	k.KontrolEnabled = false
 	k.HandleFunc("square", Square)
 	k.HandleFunc("square2", Square2)
 	return k
