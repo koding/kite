@@ -11,14 +11,36 @@ import (
 
 // Call sends the method and arguments to remote.
 func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, error) {
+	args := d.prepareArgs(method, arguments)
+	return d.send(method, args)
+}
+
+// CallWithExtraArgs behaves like Call() but appends extra arguments to the message.
+// Useful when you want to wrap your arguments but also want to append some arguments
+// to the dnode message.
+func (d *Dnode) CallWithExtraArgs(method string, arguments interface{}, extra []interface{}) (map[string]Path, error) {
+	args := d.prepareArgs(method, arguments).([]interface{})
+	args = append(args, extra...)
+	return d.send(method, args)
+}
+
+func (d *Dnode) prepareArgs(method string, arguments interface{}) interface{} {
 	if method == "" {
 		panic("Empty method name")
 	}
 
-	return d.call(method, arguments...)
+	// Wrap method arguments.
+	var args interface{}
+	if d.WrapMethodArgs != nil {
+		args = d.WrapMethodArgs(arguments, d.transport)
+	} else {
+		args = arguments
+	}
+
+	return args
 }
 
-func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]Path, error) {
+func (d *Dnode) send(method interface{}, arguments interface{}) (map[string]Path, error) {
 	l.Printf("Call method: %s arguments: %+v\n", fmt.Sprint(method), arguments)
 
 	var err error
@@ -34,6 +56,11 @@ func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]P
 	// Do not encode empty arguments as "null", make it "[]".
 	if arguments == nil {
 		arguments = make([]interface{}, 0)
+	}
+
+	if reflect.ValueOf(arguments).Kind() != reflect.Slice {
+		err = fmt.Errorf("arguments must be slice: %+v", arguments)
+		return nil, err
 	}
 
 	rawArgs, err := json.Marshal(arguments)
@@ -65,7 +92,7 @@ func (d *Dnode) call(method interface{}, arguments ...interface{}) (map[string]P
 	return callbacks, nil
 }
 
-// Used to remove callbacks after error occurs in call().
+// Used to remove callbacks after error occurs in send().
 func (d *Dnode) removeCallbacks(callbacks map[string]Path) {
 	for id, _ := range callbacks {
 		delete(d.handlers, id)
@@ -73,7 +100,7 @@ func (d *Dnode) removeCallbacks(callbacks map[string]Path) {
 }
 
 // collectCallbacks walks over the rawObj and populates callbackMap
-// with callbacks. This is a recursive function. The top level call must
+// with callbacks. This is a recursive function. The top level send must
 // sends arguments as rawObj, an empty path and empty callbackMap parameter.
 func (d *Dnode) collectCallbacks(rawObj interface{}, path Path, callbackMap map[string]Path) {
 	switch obj := rawObj.(type) {
@@ -161,9 +188,5 @@ func (d *Dnode) registerCallback(val reflect.Value, path Path, callbackMap map[s
 	callbackMap[seq] = pathCopy
 
 	// Save in client callbacks so we can call it when we receive a call.
-	if fn, ok := val.Interface().(Handler); ok {
-		d.callbacks[next] = fn
-	} else {
-		d.callbacks[next] = SimpleFunc(val)
-	}
+	d.callbacks[next] = val
 }
