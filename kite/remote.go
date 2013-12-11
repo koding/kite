@@ -63,7 +63,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	r.client.Properties()["remoteKite"] = r
 
 	r.OnConnect(func() {
-		if r.Authentication.ValidUntil == nil {
+		if r.Authentication.validUntil == nil {
 			return
 		}
 
@@ -138,7 +138,7 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 func (r *RemoteKite) tokenRenewer() {
 	for {
 		// Token will be renewed before it expires.
-		renewTime := r.Authentication.ValidUntil.Add(-30 * time.Second)
+		renewTime := r.Authentication.validUntil.Add(-30 * time.Second)
 		select {
 		case <-time.After(renewTime.Sub(time.Now().UTC())):
 			if err := r.renewTokenUntilDisconnect(); err != nil {
@@ -184,7 +184,7 @@ func (r *RemoteKite) renewToken() error {
 
 	validUntil := time.Now().UTC().Add(time.Duration(tkn.TTL) * time.Second)
 	r.Authentication.Key = tkn.Key
-	r.Authentication.ValidUntil = &validUntil
+	r.Authentication.validUntil = &validUntil
 
 	return nil
 }
@@ -224,7 +224,7 @@ type Authentication struct {
 	// Type can be "kodingKey", "token" or "sessionID" for now.
 	Type       string     `json:"type"`
 	Key        string     `json:"key"`
-	ValidUntil *time.Time `json:"-"`
+	validUntil *time.Time `json:"-"`
 }
 
 type response struct {

@@ -123,7 +123,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 			Kite:   remoteKite.Kite,
 			Token: &protocol.Token{
 				Key: remoteKite.Authentication.Key,
-				TTL: int(remoteKite.Authentication.ValidUntil.Sub(time.Now().UTC()) / time.Second),
+				TTL: int(remoteKite.Authentication.validUntil.Sub(time.Now().UTC()) / time.Second),
 			},
 		}
 
@@ -166,7 +166,7 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 		auth := Authentication{
 			Type:       "token",
 			Key:        kite.Token.Key,
-			ValidUntil: &validUntil,
+			validUntil: &validUntil,
 		}
 
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
