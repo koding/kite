@@ -153,16 +153,16 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey string) (*protocol.Regi
 }
 
 func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) error {
-	heartbeatFunc := func(p *dnode.Partial) {
+	heartbeatFunc := func(req *kite.Request) {
 		prev, err := setterFunc()
 		if err == nil && prev == "" {
-			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", r.ID)
+			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", req.RemoteKite.ID)
 		}
 	}
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		dnode.Callback(heartbeatFunc),
+		kite.Callback(heartbeatFunc),
 	}
 
 	_, err := r.Tell("heartbeat", heartbeatArgs)
