@@ -16,7 +16,7 @@ func TestKite(t *testing.T) {
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
-		s := r.Args[0].MustString()
+		s := r.Args.One().MustString()
 		fmt.Printf("Message received: %s\n", s)
 		fooChan <- s
 		return nil, nil
@@ -65,8 +65,7 @@ func TestKite(t *testing.T) {
 	resultChan := make(chan float64, 1)
 	resultCallback := func(r *Request) {
 		fmt.Printf("Request: %#v\n", r)
-		args := r.Args.MustSliceOfLength(1)
-		n := args[0].MustFloat64()
+		n := r.Args.One().MustFloat64()
 		resultChan <- n
 	}
 

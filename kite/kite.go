@@ -218,7 +218,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 
 // handleLog prints a log message to stdout.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
-	msg := r.Args.MustSliceOfLength(1)[0].MustString()
+	msg := r.Args.One().MustString()
 	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, msg))
 	return nil, nil
 }

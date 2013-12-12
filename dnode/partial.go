@@ -195,3 +195,8 @@ func (a Arguments) MustSliceOfLength(length int) []*Partial {
 	checkError(err)
 	return p
 }
+
+func (a Arguments) One() *Partial {
+	a.MustSliceOfLength(1)
+	return a[0]
+}
