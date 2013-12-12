@@ -4,6 +4,7 @@
     <background mime-type="image/png" file="bg.png"/>
     <options customize="never" allow-external-scripts="no"/>
     <domains enable_localSystem="true" />
+    <!-- <options rootVolumeOnly="true" /> -->
     <installation-check script="installCheck();"/>
     <script>
 function installCheck() {

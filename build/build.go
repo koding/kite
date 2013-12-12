@@ -17,7 +17,7 @@ func main() {
 func (b *Build) darwin() {
 	version := "1.0.0"
 	scriptDir := "./darwin/scripts"
-	root := "/Users/fatih/Code/koding/go/src/koding/newkite/build/root/"
+	installRoot := "./root"
 	tempDest, err := ioutil.TempDir("", "tempDest")
 	if err != nil {
 		return
@@ -28,7 +28,7 @@ func (b *Build) darwin() {
 		"--identifier", "com.koding.kd.pkg",
 		"--version", version,
 		"--scripts", scriptDir,
-		"--root", root,
+		"--root", installRoot,
 		"--install-location", "/",
 		tempDest+"/com.koding.kd.pkg", // used for next step, also set up for distribution.xml
 	)
