@@ -5,15 +5,26 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 type Build struct{}
 
 func main() {
 	build := new(Build)
-	build.darwin()
+	build.do()
 }
 
+func (b *Build) do() {
+	switch runtime.GOOS {
+	case "darwin":
+		b.darwin()
+	default:
+		fmt.Printf("not supported os: %s.\n", runtime.GOOS)
+	}
+}
+
+// darwin is building a new .pkg installer for darwin based OS'es.
 func (b *Build) darwin() {
 	version := "1.0.0"
 	scriptDir := "./darwin/scripts"
