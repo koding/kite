@@ -16,9 +16,8 @@ func main() {
 
 func (b *Build) darwin() {
 	version := "1.0.0"
-	scriptDir := "darwin/scripts"
-	pkgContent := "pkgContent"
-
+	scriptDir := "./darwin/scripts"
+	root := "/Users/fatih/Code/koding/go/src/koding/newkite/build/root/"
 	tempDest, err := ioutil.TempDir("", "tempDest")
 	if err != nil {
 		return
@@ -29,9 +28,9 @@ func (b *Build) darwin() {
 		"--identifier", "com.koding.kd.pkg",
 		"--version", version,
 		"--scripts", scriptDir,
-		"--root", pkgContent,
+		"--root", root,
 		"--install-location", "/",
-		tempDest+"/tmp.pkg", // this is used for second step
+		tempDest+"/com.koding.kd.pkg", // used for next step, also set up for distribution.xml
 	)
 
 	res, err := cmdPkg.CombinedOutput()
@@ -40,8 +39,8 @@ func (b *Build) darwin() {
 		return
 	}
 
-	distribution := "darwin/Distribution"
-	resources := "darwin/Resources"
+	distribution := "./darwin/Distribution.xml"
+	resources := "./darwin/Resources"
 	targetFile := "koding-kd-tool.pkg"
 
 	cmdBuild := exec.Command("productbuild",
