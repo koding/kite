@@ -32,7 +32,7 @@ type Kite struct {
 	Region string `bson:"region" json:"region"`
 
 	// Is this Kite public or private?
-	Visibility Visibility
+	Visibility Visibility `bson:"visibility" json:"visibility"`
 
 	Version  string `bson:"version" json:"version"`
 	Hostname string `bson:"hostname" json:"hostname"`
