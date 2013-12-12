@@ -1,0 +1,6 @@
+KDFILE=/usr/local/bin/kd
+
+echo "Removing previous installation"
+if [ -x $KDFILE  ]; then
+    rm -r $KDFILE
+fi
