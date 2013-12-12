@@ -291,7 +291,7 @@ func (k *Kite) listenAndServe() (err error) {
 	if err != nil {
 		return err
 	}
-	k.Log.Info("Listening: %s", k.listener.Addr().String())
+	k.Log.Notice("Listening: %s", k.listener.Addr().String())
 
 	// Port is known here if "0" is used as port number
 	_, k.Port, _ = net.SplitHostPort(k.listener.Addr().String())
