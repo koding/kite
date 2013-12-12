@@ -66,7 +66,7 @@ func TestKontrol(t *testing.T) {
 
 	kites, err := exp2Kite.Kontrol.GetKites(query)
 	if err != nil {
-		fmt.Println(err)
+		t.Errorf(err.Error())
 		return
 	}
 
@@ -124,7 +124,7 @@ func mathWorker() *kite.Kite {
 }
 
 func Square(r *kite.Request) (interface{}, error) {
-	a, err := r.Args.Float64()
+	a, err := r.Args[0].Float64()
 	if err != nil {
 		return nil, err
 	}

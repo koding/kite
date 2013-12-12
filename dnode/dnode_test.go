@@ -20,7 +20,7 @@ func TestSimpleMethodCall(t *testing.T) {
 		l.Unlock()
 		fmt.Println(string(p.Raw))
 	}
-	receiver.HandleSimple("print", Callback(printFunc))
+	receiver.HandleFunc("print", printFunc)
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -66,7 +66,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 		p.Unmarshal(&callbacks)
 		callbacks[0](6)
 	}
-	receiver.HandleSimple("foo", Callback(fooFunc))
+	receiver.HandleFunc("foo", fooFunc)
 	go receiver.Run()
 	defer tr1.Close()
 
@@ -101,7 +101,7 @@ func TestCallMessage(t *testing.T) {
 	}
 
 	// Send a single integer method.
-	go d.call(5, "hello", "world")
+	go d.send(5, []interface{}{"hello", "world"})
 	expected = `{"method":5,"arguments":["hello","world"],"callbacks":{},"links":[]}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {

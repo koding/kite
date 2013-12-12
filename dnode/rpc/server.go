@@ -18,31 +18,36 @@ type Server struct {
 
 	// Called when a client is disconnected
 	onDisconnectHandlers []func(*Client)
+
+	// A space for saving/reading extra properties to be passed to all clients.
+	properties map[string]interface{}
 }
 
 func NewServer() *Server {
-	s := &Server{dnode: dnode.New(nil)}
+	s := &Server{
+		dnode:      dnode.New(nil),
+		properties: make(map[string]interface{}),
+	}
 	// Need to set this because websocket.Server is embedded.
 	s.Handler = s.handleWS
 	return s
 }
 
-// Handle registers the handler for the given method.
-// If a handler already exists for method, Handle panics.
-func (s *Server) Handle(method string, handler dnode.Handler) {
-	s.dnode.Handle(method, handler)
+func (s *Server) SetConcurrent(value bool) {
+	s.dnode.SetConcurrent(value)
 }
 
-// HandleFunc registers the handler function for the given method.
-func (s *Server) HandleFunc(method string, handler func(string, *dnode.Partial, dnode.Transport)) {
+func (s *Server) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner) {
+	s.dnode.WrapMethodArgs = wrapMethodArgs
+	s.dnode.WrapCallbackArgs = wrapCallbackArgs
+	s.dnode.RunMethod = runMethod
+	s.dnode.RunCallback = runCallback
+}
+
+// HandleFunc registers the handler for the given method.
+// If a handler already exists for method, HandleFunc panics.
+func (s *Server) HandleFunc(method string, handler interface{}) {
 	s.dnode.HandleFunc(method, handler)
-}
-
-// HandleSimple registers the handler function for given method.
-// The difference from HandleFunc() that all dnode message arguments are passed
-// directly to the handler instead of Message and Transport.
-func (s *Server) HandleSimple(method string, handler interface{}) {
-	s.dnode.HandleSimple(method, handler)
 }
 
 // handleWS is the websocket connection handler.
@@ -67,7 +72,12 @@ func (s *Server) handleWS(ws *websocket.Conn) {
 func (s *Server) NewClientWithHandlers() *Client {
 	c := NewClient()
 	c.dnode = s.dnode.Copy(c)
+	c.properties["localKite"] = s.properties["localKite"]
 	return c
+}
+
+func (s *Server) Properties() map[string]interface{} {
+	return s.properties
 }
 
 func (s *Server) OnConnect(handler func(*Client)) {

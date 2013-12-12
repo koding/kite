@@ -16,7 +16,7 @@ func TestKite(t *testing.T) {
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
-		s := r.Args.MustString()
+		s := r.Args.One().MustString()
 		fmt.Printf("Message received: %s\n", s)
 		fooChan <- s
 		return nil, nil
@@ -25,7 +25,7 @@ func TestKite(t *testing.T) {
 	exp2Kite.HandleFunc("foo", handleFoo)
 
 	// Use the kodingKey auth type since they are on same host.
-	auth := callAuthentication{
+	auth := Authentication{
 		Type: "kodingKey",
 		Key:  exp2Kite.KodingKey,
 	}
@@ -65,13 +65,11 @@ func TestKite(t *testing.T) {
 	resultChan := make(chan float64, 1)
 	resultCallback := func(r *Request) {
 		fmt.Printf("Request: %#v\n", r)
-		args := r.Args.MustSliceOfLength(1)
-		n := args[0].MustFloat64()
+		n := r.Args.One().MustFloat64()
 		resultChan <- n
 	}
 
-	args := []interface{}{3, Callback(resultCallback)}
-	result, err = remote.Tell("square2", args)
+	result, err = remote.Tell("square2", 3, Callback(resultCallback))
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -98,6 +96,7 @@ func exp2() *Kite {
 	}
 
 	k := New(options)
+	k.KontrolEnabled = false
 	return k
 }
 
@@ -111,6 +110,7 @@ func mathWorker() *Kite {
 	}
 
 	k := New(options)
+	k.KontrolEnabled = false
 	k.HandleFunc("square", Square)
 	k.HandleFunc("square2", Square2)
 	return k
@@ -118,7 +118,7 @@ func mathWorker() *Kite {
 
 // Returns the result. Also tests reverse call.
 func Square(r *Request) (interface{}, error) {
-	a := r.Args.MustFloat64()
+	a := r.Args[0].MustFloat64()
 	result := a * a
 
 	fmt.Printf("Kite call, sending result '%f' back\n", result)

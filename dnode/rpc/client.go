@@ -63,6 +63,13 @@ func NewClient() *Client {
 	return c
 }
 
+func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner) {
+	c.dnode.WrapMethodArgs = wrapMethodArgs
+	c.dnode.WrapCallbackArgs = wrapCallbackArgs
+	c.dnode.RunMethod = runMethod
+	c.dnode.RunCallback = runCallback
+}
+
 // Dial connects to the dnode server on "url" and starts a goroutine
 // that processes incoming messages.
 //

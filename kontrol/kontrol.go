@@ -153,19 +153,19 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey string) (*protocol.Regi
 }
 
 func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) error {
-	heartbeatFunc := func(p *dnode.Partial) {
+	heartbeatFunc := func(req *kite.Request) {
 		prev, err := setterFunc()
 		if err == nil && prev == "" {
-			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", r.ID)
+			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", req.RemoteKite.ID)
 		}
 	}
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		dnode.Callback(heartbeatFunc),
+		kite.Callback(heartbeatFunc),
 	}
 
-	_, err := r.Tell("heartbeat", heartbeatArgs)
+	_, err := r.Tell("heartbeat", heartbeatArgs...)
 	return err
 }
 
@@ -278,22 +278,20 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	args := r.Args.MustSlice()
-
-	if len(args) != 1 && len(args) != 2 {
+	if len(r.Args) != 1 && len(r.Args) != 2 {
 		return nil, errors.New("Invalid number of arguments")
 	}
 
 	var query protocol.KontrolQuery
-	err := args[0].Unmarshal(&query)
+	err := r.Args[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid query argument")
 	}
 
 	// To be called when a Kite is registered or deregistered matching the query.
 	var watchCallback dnode.Function
-	if len(args) == 2 {
-		watchCallback = args[1].MustFunction()
+	if len(r.Args) == 2 {
+		watchCallback = r.Args[1].MustFunction()
 	}
 
 	kites, err := k.getKites(r, query, watchCallback)
@@ -484,7 +482,7 @@ func (k *Kontrol) WatchEtcd() {
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	var kite *protocol.Kite
-	err := r.Args.Unmarshal(&kite)
+	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&kite)
 	if err != nil {
 		return nil, errors.New("Invalid Kite")
 	}

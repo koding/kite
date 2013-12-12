@@ -61,6 +61,11 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	return nil
 }
 
+func (p *Partial) MustUnmarshal(v interface{}) {
+	err := p.Unmarshal(v)
+	checkError(err)
+}
+
 //-------------------------------------------
 // Helper methods for unmarshaling JSON types
 //-------------------------------------------
@@ -173,4 +178,25 @@ func (p *Partial) MustFunction() Function {
 	f, err := p.Function()
 	checkError(err)
 	return f
+}
+
+type Arguments []*Partial
+
+func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
+	if len(a) != length {
+		return nil, errors.New("Invalid array length")
+	}
+
+	return []*Partial(a), nil
+}
+
+func (a Arguments) MustSliceOfLength(length int) []*Partial {
+	p, err := a.SliceOfLength(length)
+	checkError(err)
+	return p
+}
+
+func (a Arguments) One() *Partial {
+	a.MustSliceOfLength(1)
+	return a[0]
 }

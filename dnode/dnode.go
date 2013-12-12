@@ -4,7 +4,6 @@
 package dnode
 
 import (
-	"errors"
 	"io/ioutil"
 	"log"
 	"reflect"
@@ -17,10 +16,10 @@ var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
 
 type Dnode struct {
 	// Registered methods are saved in this map.
-	handlers map[string]Handler
+	handlers map[string]reflect.Value
 
 	// Reference to sent callbacks are saved in this map.
-	callbacks map[uint64]Handler
+	callbacks map[uint64]reflect.Value
 
 	// Next callback number.
 	// Incremented atomically by registerCallback().
@@ -28,7 +27,21 @@ type Dnode struct {
 
 	// For sending and receiving messages
 	transport Transport
+
+	// Should handlers run concurrently?
+	concurrent bool
+
+	// Argument wrappers to be called when sending/receiving.
+	WrapMethodArgs   Wrapper
+	WrapCallbackArgs Wrapper
+
+	// Dnode message processors.
+	RunMethod   Runner
+	RunCallback Runner
 }
+
+type Wrapper func(args []interface{}, tr Transport) []interface{}
+type Runner func(method string, handlerFunc reflect.Value, args *Partial, tr Transport)
 
 // Transport is an interface for sending and receiving data on network.
 // Each Transport must be unique for each Client.
@@ -44,16 +57,6 @@ type Transport interface {
 
 	// A place to save/read extra information about the client
 	Properties() map[string]interface{}
-}
-
-// Objects implementing the Handler interface can be
-// registered to serve a particular method in the dnode processor.
-type Handler interface {
-	// Wrap arguments before sending to remote.
-	WrapArgs(args []interface{}, tr Transport) []interface{}
-
-	// Unwrap arguments and call the handler function.
-	Call(method string, args *Partial, tr Transport)
 }
 
 // Message is the JSON object to call a method at the other side.
@@ -74,24 +77,34 @@ type Message struct {
 // New returns a pointer to a new Dnode.
 func New(transport Transport) *Dnode {
 	return &Dnode{
-		handlers:  make(map[string]Handler),
-		callbacks: make(map[uint64]Handler),
-		transport: transport,
+		handlers:   make(map[string]reflect.Value),
+		callbacks:  make(map[uint64]reflect.Value),
+		transport:  transport,
+		concurrent: true,
 	}
 }
 
 // Copy returns a pointer to a new Dnode with the same handlers as d but empty callbacks.
 func (d *Dnode) Copy(transport Transport) *Dnode {
 	return &Dnode{
-		handlers:  d.handlers,
-		callbacks: make(map[uint64]Handler),
-		transport: transport,
+		handlers:         d.handlers,
+		callbacks:        make(map[uint64]reflect.Value),
+		transport:        transport,
+		concurrent:       d.concurrent,
+		WrapMethodArgs:   d.WrapMethodArgs,
+		WrapCallbackArgs: d.WrapCallbackArgs,
+		RunMethod:        d.RunMethod,
+		RunCallback:      d.RunCallback,
 	}
 }
 
-// Handle registers the handler for the given method.
-// If a handler already exists for method, Handle panics.
-func (d *Dnode) Handle(method string, handler Handler) {
+func (d *Dnode) SetConcurrent(value bool) {
+	d.concurrent = value
+}
+
+// HandleFunc registers the handler for the given method.
+// If a handler already exists for method, HandleFunc panics.
+func (d *Dnode) HandleFunc(method string, handler interface{}) {
 	if method == "" {
 		panic("dnode: invalid method " + method)
 	}
@@ -101,47 +114,12 @@ func (d *Dnode) Handle(method string, handler Handler) {
 	if _, ok := d.handlers[method]; ok {
 		panic("dnode: handler already exists for method")
 	}
-
-	d.handlers[method] = handler
-}
-
-// HandleFunc registers the handler function for the given method.
-func (d *Dnode) HandleFunc(method string, handler func(string, *Partial, Transport)) {
-	d.Handle(method, HandlerFunc(handler))
-}
-
-type HandlerFunc func(method string, args *Partial, tr Transport)
-
-func (f HandlerFunc) Call(method string, args *Partial, tr Transport) {
-	f(method, args, tr)
-}
-
-func (f HandlerFunc) WrapArgs(args []interface{}, tr Transport) []interface{} {
-	return args
-}
-
-// HandleSimple registers the handler function for given method.
-// The difference from HandleFunc() that all dnode message arguments are passed
-// directly to the handler instead of Message and Transport.
-func (d *Dnode) HandleSimple(method string, handler interface{}) {
-	v := reflect.ValueOf(handler)
-	if v.Kind() != reflect.Func {
-		panic(errors.New("dnode: handler is not a func"))
+	val := reflect.ValueOf(handler)
+	if val.Kind() != reflect.Func {
+		panic("dnode: handler must be a func")
 	}
 
-	d.Handle(method, SimpleFunc(v))
-}
-
-type SimpleFunc reflect.Value
-
-func (f SimpleFunc) Call(method string, args *Partial, tr Transport) {
-	// Call the handler with arguments.
-	callArgs := []reflect.Value{reflect.ValueOf(args)}
-	reflect.Value(f).Call(callArgs)
-}
-
-func (f SimpleFunc) WrapArgs(args []interface{}, tr Transport) []interface{} {
-	return args
+	d.handlers[method] = val
 }
 
 // Run processes incoming messages. Blocking.
@@ -152,7 +130,12 @@ func (d *Dnode) Run() error {
 			return err
 		}
 
-		go d.processMessage(msg)
+		if d.concurrent {
+			go d.processMessage(msg)
+		} else {
+			d.processMessage(msg)
+		}
+
 	}
 }
 

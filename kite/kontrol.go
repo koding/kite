@@ -30,7 +30,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 		Name:     "kontrol", // for logging purposes
 	}
 
-	auth := callAuthentication{
+	auth := Authentication{
 		Type: "kodingKey",
 		Key:  k.KodingKey,
 	}
@@ -60,7 +60,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
 func (k *Kontrol) Register() error {
-	response, err := k.RemoteKite.Tell("register", nil)
+	response, err := k.RemoteKite.Tell("register")
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 			Kite:   remoteKite.Kite,
 			Token: &protocol.Token{
 				Key: remoteKite.Authentication.Key,
-				TTL: int(remoteKite.Authentication.ValidUntil.Sub(time.Now().UTC()) / time.Second),
+				TTL: int(remoteKite.Authentication.validUntil.Sub(time.Now().UTC()) / time.Second),
 			},
 		}
 
@@ -145,7 +145,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
 func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	<-k.ready
 
-	response, err := k.RemoteKite.Tell("getKites", args)
+	response, err := k.RemoteKite.Tell("getKites", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -163,10 +163,10 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	remoteKites := make([]*RemoteKite, len(kites))
 	for i, kite := range kites {
 		validUntil := time.Now().UTC().Add(time.Duration(kite.Token.TTL) * time.Second)
-		auth := callAuthentication{
+		auth := Authentication{
 			Type:       "token",
 			Key:        kite.Token.Key,
-			ValidUntil: &validUntil,
+			validUntil: &validUntil,
 		}
 
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
