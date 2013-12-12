@@ -12,32 +12,32 @@ import (
 // username.environment.name.version.region.hostname.id
 type Kite struct {
 	// Short name identifying the type of the kite. Example: fs, terminal...
-	Name string `bson:"name" json:"name"`
+	Name string `json:"name"`
 
 	// Owner of the Kite
-	Username string `bson:"username" json:"username"`
+	Username string `json:"username"`
 
 	// Every Kite instance has different identifier.
 	// If a kite is restarted, it's id will change.
 	// This is generated on the Kite.
-	ID string `bson:"_id" json:"id"`
+	ID string `json:"id"`
 
 	// Environment is defines as something like "production", "testing",
 	// "staging" or whatever.  This allows you to differentiate between a
 	// cluster of kites.
-	Environment string `bson:"environment" json:"environment"`
+	Environment string `json:"environment"`
 
 	// Region of the kite it is running. Like "Europe", "Asia" or some other
 	// locations.
-	Region string `bson:"region" json:"region"`
+	Region string `json:"region"`
 
 	// Is this Kite public or private?
-	Visibility Visibility `bson:"visibility" json:"visibility"`
+	Visibility Visibility `json:"visibility"`
 
-	Version  string `bson:"version" json:"version"`
-	Hostname string `bson:"hostname" json:"hostname"`
-	PublicIP string `bson:"publicIP" json:"publicIP"`
-	Port     string `bson:"port" json:"port"`
+	Version  string `json:"version"`
+	Hostname string `json:"hostname"`
+	PublicIP string `json:"publicIP"`
+	Port     string `json:"port"`
 }
 
 func (k *Kite) Addr() string {
