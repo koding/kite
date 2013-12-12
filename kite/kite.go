@@ -167,8 +167,8 @@ func New(options *Options) *Kite {
 	return k
 }
 
-func (k *Kite) SetConcurrent(value bool) {
-	k.server.SetConcurrent(value)
+func (k *Kite) DisableConcurrency() {
+	k.server.SetConcurrent(false)
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
