@@ -19,9 +19,6 @@ import (
 )
 
 func init() {
-	// Use all available CPUS.
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	// Debugging helper: Prints stacktrace on SIGUSR1.
 	c := make(chan os.Signal)
 	signal.Notify(c, syscall.SIGUSR1)
