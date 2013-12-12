@@ -69,6 +69,9 @@ type Kite struct {
 	// method map for exported methods
 	handlers map[string]HandlerFunc
 
+	// Should handlers run concurrently? Default is true.
+	concurrent bool
+
 	// Dnode rpc server
 	server *rpc.Server
 
@@ -131,6 +134,7 @@ func New(options *Options) *Kite {
 		},
 		KodingKey:         kodingKey,
 		server:            rpc.NewServer(),
+		concurrent:        true,
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*Request) error),
@@ -164,6 +168,10 @@ func New(options *Options) *Kite {
 	k.HandleFunc("log", k.handleLog)
 
 	return k
+}
+
+func (k *Kite) SetConcurrent(value bool) {
+	k.server.SetConcurrent(value)
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests

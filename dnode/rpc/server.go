@@ -33,6 +33,10 @@ func NewServer() *Server {
 	return s
 }
 
+func (s *Server) SetConcurrent(value bool) {
+	s.dnode.SetConcurrent(value)
+}
+
 func (s *Server) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner) {
 	s.dnode.WrapMethodArgs = wrapMethodArgs
 	s.dnode.WrapCallbackArgs = wrapCallbackArgs

@@ -28,6 +28,9 @@ type Dnode struct {
 	// For sending and receiving messages
 	transport Transport
 
+	// Should handlers run concurrently?
+	concurrent bool
+
 	// Argument wrappers to be called when sending/receiving.
 	WrapMethodArgs   Wrapper
 	WrapCallbackArgs Wrapper
@@ -74,9 +77,10 @@ type Message struct {
 // New returns a pointer to a new Dnode.
 func New(transport Transport) *Dnode {
 	return &Dnode{
-		handlers:  make(map[string]reflect.Value),
-		callbacks: make(map[uint64]reflect.Value),
-		transport: transport,
+		handlers:   make(map[string]reflect.Value),
+		callbacks:  make(map[uint64]reflect.Value),
+		transport:  transport,
+		concurrent: true,
 	}
 }
 
@@ -86,11 +90,16 @@ func (d *Dnode) Copy(transport Transport) *Dnode {
 		handlers:         d.handlers,
 		callbacks:        make(map[uint64]reflect.Value),
 		transport:        transport,
+		concurrent:       d.concurrent,
 		WrapMethodArgs:   d.WrapMethodArgs,
 		WrapCallbackArgs: d.WrapCallbackArgs,
 		RunMethod:        d.RunMethod,
 		RunCallback:      d.RunCallback,
 	}
+}
+
+func (d *Dnode) SetConcurrent(value bool) {
+	d.concurrent = value
 }
 
 // HandleFunc registers the handler for the given method.
@@ -121,7 +130,12 @@ func (d *Dnode) Run() error {
 			return err
 		}
 
-		go d.processMessage(msg)
+		if d.concurrent {
+			go d.processMessage(msg)
+		} else {
+			d.processMessage(msg)
+		}
+
 	}
 }
 
