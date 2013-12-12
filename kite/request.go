@@ -12,63 +12,76 @@ import (
 
 // runMethod is called when a method is received from remote.
 func runMethod(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
+	var (
+		// Will hold the return values from handler func.
+		values []reflect.Value
+
+		// First value to the response.
+		result interface{}
+
+		// Second value to the response.
+		kiteError *Error
+
+		// Will send the response when called.
+		callback dnode.Function
+	)
+
 	kite := tr.Properties()["localKite"].(*Kite)
 
-	request, responseCallback, err := kite.parseRequest(method, args, tr)
+	defer func() {
+		if callback == nil {
+			return
+		}
+
+		// Only argument to the callback.
+		response := callbackArg{
+			Result: result,
+			Error:  errorForSending(kiteError),
+		}
+
+		// Call response callback function.
+		if err := callback(response); err != nil {
+			kite.Log.Error(err.Error())
+		}
+	}()
+
+	request, callback, err := kite.parseRequest(method, args, tr)
 	if err != nil {
 		kite.Log.Notice("Did not understand request: %s", err)
 		return
 	}
 
-	err = request.authenticate()
-	if kiteErr, ok := err.(*Error); ok && kiteErr.Type == "authenticationError" {
-		err = responseCallback(kiteErr, nil)
-	}
-	if err != nil {
-		kite.Log.Error(err.Error())
+	kiteError = request.authenticate()
+	if kiteError != nil {
 		return
-	}
-
-	var result interface{}
-	var values []reflect.Value
-
-	// Wrap handler func.
-	handler := func() {
-		callArgs := []reflect.Value{reflect.ValueOf(request)}
-		values = handlerFunc.Call(callArgs)
 	}
 
 	// Recover dnode argument errors.
 	// The caller can use functions like MustString(), MustSlice()...
 	// without the fear of panic.
-	argumentErr := recoverArgumentError(handler)
-
-	if responseCallback == nil {
+	argumentError := recoverArgumentError(func() {
+		callArgs := []reflect.Value{reflect.ValueOf(request)}
+		// Call the handler.
+		values = handlerFunc.Call(callArgs)
+	})
+	if argumentError != nil {
+		kiteError = &Error{"argumentError", argumentError.Error()}
 		return
 	}
 
 	result = values[0].Interface()
+
 	errVal := values[1].Interface()
-	if errVal != nil {
-		err = errVal.(error)
-	} else {
-		err = nil
+	if errVal == nil {
+		return
 	}
 
-	// Prepare error argument.
-	if argumentErr != nil {
-		err = &Error{"argumentError", argumentErr.Error()}
-	} else if err != nil {
-		// Convert all errors to kite.Error type.
-		if _, ok := err.(*Error); !ok {
-			err = &Error{"serverError", err.Error()}
-		}
+	var ok bool
+	if kiteError, ok = errVal.(*Error); ok {
+		return
 	}
 
-	// Call response callback function.
-	if err = responseCallback(err, result); err != nil {
-		kite.Log.Error(err.Error())
-	}
+	kiteError = &Error{"genericError", errVal.(error).Error()}
 }
 
 // Error is the type of the first argument in response callback.
@@ -80,6 +93,17 @@ type Error struct {
 func (e *Error) Error() string {
 	return fmt.Sprintf("Kite error: %s: %s", e.Type, e.Message)
 }
+
+// When a callback is called we always pass this as the only argument.
+type callbackArg struct {
+	Error  errorForSending `json:"error"`
+	Result interface{}     `json:"result"`
+}
+
+// errorForSending is a for sending the error as an argument in a dnode message.
+// Normally Error method of the Error struct is sent as a callback since it is
+// exported. We do not want this behavior.
+type errorForSending *Error
 
 // recoverArgumentError takes a function and tries to recover a dnode.ArgumentError
 // if it panics.
@@ -190,7 +214,7 @@ func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Tr
 
 // authenticate tries to authenticate the user by selecting appropriate
 // authenticator function.
-func (r *Request) authenticate() error {
+func (r *Request) authenticate() *Error {
 	// Trust the Kite if we have initiated the connection.
 	// RemoteAddr() returns "" if this is an outgoing connection.
 	if r.RemoteAddr == "" {

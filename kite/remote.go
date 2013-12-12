@@ -367,25 +367,24 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
-		// Arguments to our response callback:
-		// The first argument is the error struct and
-		// the second argument is the result.
-		responseArgs := request.Args.MustSliceOfLength(2)
+		// Unmarshal callback response.
+		responseArgs := request.Args.MustSliceOfLength(1)
+		var response struct {
+			Error  *Error         `json:"error"`
+			Result *dnode.Partial `json:"result"`
+		}
+		responseArgs[0].MustUnmarshal(&response)
 
-		result = responseArgs[1]
+		result = response.Result
 
 		// This is the error argument. Unmarshal panics if it is null.
-		if responseArgs[0] == nil {
+		if response.Error == nil {
 			return
 		}
 
 		// Read the error argument in response.
 		var kiteErr Error
-		err = responseArgs[0].Unmarshal(&kiteErr)
-		if err != nil {
-			r.Log.Warning(err.Error())
-			return
-		}
+		responseArgs[0].MustUnmarshal(&kiteErr)
 
 		r.Log.Warning("Error in remote Kite: %s", kiteErr.Error())
 		err = &kiteErr

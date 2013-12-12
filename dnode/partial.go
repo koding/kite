@@ -61,6 +61,11 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	return nil
 }
 
+func (p *Partial) MustUnmarshal(v interface{}) {
+	err := p.Unmarshal(v)
+	checkError(err)
+}
+
 //-------------------------------------------
 // Helper methods for unmarshaling JSON types
 //-------------------------------------------
