@@ -11,36 +11,18 @@ import (
 
 // Call sends the method and arguments to remote.
 func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, error) {
-	args := d.prepareArgs(method, arguments)
-	return d.send(method, args)
-}
-
-// CallWithExtraArgs behaves like Call() but appends extra arguments to the message.
-// Useful when you want to wrap your arguments but also want to append some arguments
-// to the dnode message.
-func (d *Dnode) CallWithExtraArgs(method string, arguments interface{}, extra []interface{}) (map[string]Path, error) {
-	args := d.prepareArgs(method, arguments).([]interface{})
-	args = append(args, extra...)
-	return d.send(method, args)
-}
-
-func (d *Dnode) prepareArgs(method string, arguments interface{}) interface{} {
 	if method == "" {
 		panic("Empty method name")
 	}
 
-	// Wrap method arguments.
-	var args interface{}
 	if d.WrapMethodArgs != nil {
-		args = d.WrapMethodArgs(arguments, d.transport)
-	} else {
-		args = arguments
+		arguments = d.WrapMethodArgs(arguments, d.transport)
 	}
 
-	return args
+	return d.send(method, arguments)
 }
 
-func (d *Dnode) send(method interface{}, arguments interface{}) (map[string]Path, error) {
+func (d *Dnode) send(method interface{}, arguments []interface{}) (map[string]Path, error) {
 	l.Printf("Call method: %s arguments: %+v\n", fmt.Sprint(method), arguments)
 
 	var err error
@@ -56,11 +38,6 @@ func (d *Dnode) send(method interface{}, arguments interface{}) (map[string]Path
 	// Do not encode empty arguments as "null", make it "[]".
 	if arguments == nil {
 		arguments = make([]interface{}, 0)
-	}
-
-	if reflect.ValueOf(arguments).Kind() != reflect.Slice {
-		err = fmt.Errorf("arguments must be slice: %+v", arguments)
-		return nil, err
 	}
 
 	rawArgs, err := json.Marshal(arguments)
@@ -151,12 +128,31 @@ func (d *Dnode) collectFields(v reflect.Value, path Path, callbackMap map[string
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Type().Field(i)
 
-		name := f.Tag.Get("json")
-		if name == "" {
+		if f.PkgPath != "" { // unexported
+			continue
+		}
+
+		// Do not collect callbacks for "-" tagged fields.
+		tag := f.Tag.Get("dnode")
+		if tag == "-" {
+			continue
+		}
+
+		tag = f.Tag.Get("json")
+		if tag == "-" {
+			continue
+		}
+
+		var name string
+		if tag != "" {
+			name = tag
+		} else {
 			name = f.Name
 		}
 
-		if f.PkgPath == "" && name != "-" { // exported
+		if f.Anonymous {
+			d.collectCallbacks(v.Field(i).Interface(), path, callbackMap)
+		} else {
 			d.collectCallbacks(v.Field(i).Interface(), append(path, name), callbackMap)
 		}
 	}

@@ -201,11 +201,6 @@ func (c *Client) Call(method string, args ...interface{}) (map[string]dnode.Path
 	return c.dnode.Call(method, args...)
 }
 
-// CallWithExtraArgs calls a method on the dnode server.
-func (c *Client) CallWithExtraArgs(method string, arguments interface{}, extra []interface{}) (map[string]dnode.Path, error) {
-	return c.dnode.CallWithExtraArgs(method, arguments, extra)
-}
-
 // OnConnect registers a function to run on client connect.
 func (c *Client) OnConnect(handler func()) {
 	c.onConnectHandlers = append(c.onConnectHandlers, handler)

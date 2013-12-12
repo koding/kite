@@ -110,11 +110,11 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 
 type Request struct {
 	Method         string
-	Args           *dnode.Partial
+	Args           dnode.Arguments
 	LocalKite      *Kite
 	RemoteKite     *RemoteKite
 	Username       string
-	Authentication *Authentication
+	Authentication Authentication
 	RemoteAddr     string
 }
 
@@ -143,29 +143,21 @@ func runCallback(method string, handlerFunc reflect.Value, args *dnode.Partial, 
 // parseRequest is used to read a dnode message.
 // It is called when a method or callback is received.
 func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport) (
-	request *Request, response dnode.Function, err error) {
+	request *Request, responseCallback dnode.Function, err error) {
 
-	// Parse dnode method arguments [options, response]
-	args, err := arguments.Slice()
+	// Parse dnode method arguments: [options]
+	args, err := arguments.SliceOfLength(1)
 	if err != nil {
 		return
 	}
-	if len(args) != 1 && len(args) != 2 {
-		return nil, nil, errors.New("Invalid number of arguments")
-	}
 
 	// Parse options argument
-	var options CallOptions
+	var options callOptions
 	if err = args[0].Unmarshal(&options); err != nil {
 		return
 	}
 
-	// Parse response callback if present
-	if len(args) > 1 && args[1] != nil {
-		if err = args[1].Unmarshal(&response); err != nil {
-			return
-		}
-	}
+	responseCallback = options.ResponseCallback
 
 	// Properties about the client...
 	properties := tr.Properties()
@@ -190,7 +182,7 @@ func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Tr
 		RemoteKite:     properties["remoteKite"].(*RemoteKite),
 		RemoteAddr:     tr.RemoteAddr(),
 		Username:       options.Kite.Username,
-		Authentication: &options.Authentication,
+		Authentication: options.Authentication,
 	}
 
 	return

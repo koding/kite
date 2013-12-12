@@ -60,7 +60,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
 func (k *Kontrol) Register() error {
-	response, err := k.RemoteKite.Tell("register", nil)
+	response, err := k.RemoteKite.Tell("register")
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
 func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 	<-k.ready
 
-	response, err := k.RemoteKite.Tell("getKites", args)
+	response, err := k.RemoteKite.Tell("getKites", args...)
 	if err != nil {
 		return nil, err
 	}

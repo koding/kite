@@ -37,7 +37,7 @@ type Dnode struct {
 	RunCallback Runner
 }
 
-type Wrapper func(args interface{}, tr Transport) []interface{}
+type Wrapper func(args []interface{}, tr Transport) []interface{}
 type Runner func(method string, handlerFunc reflect.Value, args *Partial, tr Transport)
 
 // Transport is an interface for sending and receiving data on network.
