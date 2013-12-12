@@ -18,15 +18,19 @@ import (
 
 const KeyLength = 64
 
-var AuthServer = "https://koding.com"
+var (
+	AuthServer      = "https://koding.com"
+	AuthServerLocal = "http://localhost:3020"
+)
 
-// TODO change this before deploying to production
-// var AuthServer = "http://localhost:3020"
-
-type Register struct{}
+type Register struct {
+	authServer string
+}
 
 func NewRegister() *Register {
-	return &Register{}
+	return &Register{
+		authServer: AuthServer,
+	}
 }
 
 func (r *Register) Definition() string {
@@ -34,6 +38,11 @@ func (r *Register) Definition() string {
 }
 
 func (r *Register) Exec(args []string) error {
+	// change authServer address if debug mode is enabled
+	if len(args) == 1 && (args[0] == "--debug" || args[0] == "-d") {
+		r.authServer = AuthServerLocal
+	}
+
 	id, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -51,18 +60,18 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", AuthServer, hostID, key)
+	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", r.authServer, hostID, key)
 
 	fmt.Printf("Please open the following url for authentication:\n\n")
 	fmt.Println(registerUrl)
 	fmt.Printf("\nwaiting . ")
 
-	return checker(key)
+	return r.checker(key)
 }
 
 // checker checks if the user has browsed the register URL by polling the check URL.
-func checker(key string) error {
-	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", AuthServer, key)
+func (r *Register) checker(key string) error {
+	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", r.authServer, key)
 
 	// check the result every two seconds
 	ticker := time.NewTicker(2 * time.Second).C
