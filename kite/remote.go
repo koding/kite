@@ -216,8 +216,8 @@ type callOptionsOut struct {
 func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 	r := tr.Properties()["remoteKite"].(*RemoteKite)
 
-	responseCallback := args[len(args)-1:][0].(Callback)
-	args = args[:len(args)-1]
+	responseCallback := args[len(args)-1].(Callback) // last item
+	args = args[:len(args)-1]                        // previout items
 
 	options := callOptionsOut{
 		WithArgs:         args,
