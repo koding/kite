@@ -11,7 +11,7 @@ const functionPlaceholder = `"[Function]"`
 
 // Callback is a function to send in arguments.
 // Wrap your function to make it marshalable before sending.
-type Callback func(*Partial)
+type Callback func(Arguments)
 
 func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(functionPlaceholder), nil

@@ -53,15 +53,22 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
+	// Must do this after parsing callbacks.
+	var arguments []*Partial
+	err = msg.Arguments.Unmarshal(&arguments)
+	if err != nil {
+		return err
+	}
+
 	if runner == nil {
 		runner = defaultRunner
 	}
 
-	runner(fmt.Sprint(msg.Method), handler, msg.Arguments, d.transport)
+	runner(fmt.Sprint(msg.Method), handler, Arguments(arguments), d.transport)
 	return nil
 }
 
-func defaultRunner(method string, handlerFunc reflect.Value, args *Partial, tr Transport) {
+func defaultRunner(method string, handlerFunc reflect.Value, args Arguments, tr Transport) {
 	// Call the handler with arguments.
 	callArgs := []reflect.Value{reflect.ValueOf(args)}
 	handlerFunc.Call(callArgs)

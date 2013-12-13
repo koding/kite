@@ -194,10 +194,10 @@ func (r *RemoteKite) renewToken() error {
 // It is used when unmarshalling a dnode message.
 type callOptions struct {
 	// Arguments to the method
-	Kite             protocol.Kite    `json:"kite"`
-	Authentication   Authentication   `json:"authentication"`
-	WithArgs         []*dnode.Partial `json:"withArgs" dnode:"-"`
-	ResponseCallback dnode.Function   `json:"responseCallback" dnode:"-"`
+	Kite             protocol.Kite   `json:"kite"`
+	Authentication   Authentication  `json:"authentication"`
+	WithArgs         dnode.Arguments `json:"withArgs" dnode:"-"`
+	ResponseCallback dnode.Function  `json:"responseCallback" dnode:"-"`
 }
 
 // callOptionsOut is the same structure with callOptions.

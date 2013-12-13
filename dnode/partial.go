@@ -180,6 +180,10 @@ func (p *Partial) MustFunction() Function {
 	return f
 }
 
+//----------------------------------------------------------------
+// Arguments
+//----------------------------------------------------------------
+
 type Arguments []*Partial
 
 func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
@@ -199,4 +203,70 @@ func (a Arguments) MustSliceOfLength(length int) []*Partial {
 func (a Arguments) One() *Partial {
 	a.MustSliceOfLength(1)
 	return a[0]
+}
+
+func (a Arguments) MustUnmarshal(v interface{}) {
+	err := a.Unmarshal(v)
+	checkError(err)
+}
+
+func (a Arguments) Unmarshal(v interface{}) error {
+	if a == nil {
+		return errors.New("Cannot unmarshal nil argument")
+	}
+
+	value := reflect.ValueOf(v)
+	if value.Kind() != reflect.Ptr {
+		panic("v must be a pointer")
+	}
+
+	kind := value.Elem().Kind()
+	if kind != reflect.Slice {
+		return errors.New("Argument must be a slice")
+	}
+
+	switch value.Elem().Type() {
+	case reflect.TypeOf([]string{}):
+		newSlice := make([]string, len(a))
+		for i, arg := range a {
+			s, err := arg.String()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into string: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]float64{}):
+		newSlice := make([]float64, len(a))
+		for i, arg := range a {
+			s, err := arg.Float64()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into float64: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]bool{}):
+		newSlice := make([]bool, len(a))
+		for i, arg := range a {
+			s, err := arg.Bool()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into bool: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]Function{}):
+		newSlice := make([]Function, len(a))
+		for i, arg := range a {
+			s, err := arg.Function()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into Function: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	}
+
+	return nil
 }

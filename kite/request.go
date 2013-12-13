@@ -11,7 +11,7 @@ import (
 )
 
 // runMethod is called when a method is received from remote.
-func runMethod(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
+func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
 	var (
 		// Will hold the return values from handler func.
 		values []reflect.Value
@@ -45,21 +45,24 @@ func runMethod(method string, handlerFunc reflect.Value, args *dnode.Partial, tr
 		}
 	}()
 
-	request, callback, err := kite.parseRequest(method, args, tr)
-	if err != nil {
-		kite.Log.Notice("Did not understand request: %s", err)
-		return
-	}
-
-	kiteError = request.authenticate()
-	if kiteError != nil {
-		return
-	}
-
 	// Recover dnode argument errors.
 	// The caller can use functions like MustString(), MustSlice()...
 	// without the fear of panic.
 	argumentError := recoverArgumentError(func() {
+		var request *Request
+		var err error
+
+		request, callback, err = kite.parseRequest(method, args, tr)
+		if err != nil {
+			kite.Log.Notice("Did not understand request: %s", err)
+			return
+		}
+
+		kiteError = request.authenticate()
+		if kiteError != nil {
+			return
+		}
+
 		callArgs := []reflect.Value{reflect.ValueOf(request)}
 		// Call the handler.
 		values = handlerFunc.Call(callArgs)
@@ -149,7 +152,7 @@ func (c Callback) MarshalJSON() ([]byte, error) {
 }
 
 // runCallback is called when a callback method call is received from remote.
-func runCallback(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
+func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
 	k := tr.Properties()["localKite"].(*Kite)
 
 	request, _, err := k.parseRequest(method, args, tr)
@@ -166,20 +169,12 @@ func runCallback(method string, handlerFunc reflect.Value, args *dnode.Partial, 
 
 // parseRequest is used to read a dnode message.
 // It is called when a method or callback is received.
-func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport) (
+func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.Transport) (
 	request *Request, responseCallback dnode.Function, err error) {
 
 	// Parse dnode method arguments: [options]
-	args, err := arguments.SliceOfLength(1)
-	if err != nil {
-		return
-	}
-
-	// Parse options argument
 	var options callOptions
-	if err = args[0].Unmarshal(&options); err != nil {
-		return
-	}
+	arguments.One().MustUnmarshal(&options)
 
 	responseCallback = options.ResponseCallback
 
