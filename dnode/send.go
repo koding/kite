@@ -14,6 +14,9 @@ func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, 
 		panic("Empty method name")
 	}
 
+	if arguments == nil {
+		arguments = make([]interface{}, 0)
+	}
 	if d.WrapMethodArgs != nil {
 		arguments = d.WrapMethodArgs(arguments, d.transport)
 	}

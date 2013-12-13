@@ -74,6 +74,9 @@ func (d *Dnode) parseCallbacks(msg *Message) error {
 
 		// When the callback is called, we must send the method to the remote.
 		f := Function(func(args ...interface{}) error {
+			if args == nil {
+				args = make([]interface{}, 0)
+			}
 			if d.WrapCallbackArgs != nil {
 				args = d.WrapCallbackArgs(args, d.transport)
 			}
