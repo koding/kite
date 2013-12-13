@@ -32,8 +32,6 @@ func (p *Partial) UnmarshalJSON(data []byte) error {
 // Unmarshal unmarshals the raw data (p.Raw) into v and prepares callbacks.
 // v must be a struct that is the type of expected arguments.
 func (p *Partial) Unmarshal(v interface{}) error {
-	l.Printf("Unmarshal Partial")
-
 	if p == nil {
 		return fmt.Errorf("Cannot unmarshal nil argument")
 	}
@@ -43,17 +41,12 @@ func (p *Partial) Unmarshal(v interface{}) error {
 		panic("v must be a pointer")
 	}
 
-	err := json.Unmarshal(p.Raw, &v)
-	if err != nil {
-		l.Println(err)
+	if err := json.Unmarshal(p.Raw, &v); err != nil {
 		return err
 	}
 
 	for _, spec := range p.CallbackSpecs {
-		l.Printf("spec: %#v", spec)
-		err := spec.Apply(value)
-		if err != nil {
-			l.Println(err)
+		if err := spec.Apply(value); err != nil {
 			return err
 		}
 	}

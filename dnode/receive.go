@@ -10,8 +10,6 @@ import (
 // processMessage processes a single message and call the previously
 // added callbacks.
 func (d *Dnode) processMessage(data []byte) error {
-	l.Printf("processMessage: %s", string(data))
-
 	var (
 		err     error
 		msg     Message
@@ -19,18 +17,11 @@ func (d *Dnode) processMessage(data []byte) error {
 		runner  Runner
 	)
 
-	defer func() {
-		if err != nil {
-			l.Printf("Cannot process message: %s", err)
-		}
-	}()
-
 	if err = json.Unmarshal(data, &msg); err != nil {
 		return err
 	}
 
 	// Get the handler function. Method may be string or integer.
-	l.Printf("Received method: %s", fmt.Sprint(msg.Method))
 	switch method := msg.Method.(type) {
 	case float64:
 		handler = d.callbacks[uint64(method)]
@@ -39,14 +30,12 @@ func (d *Dnode) processMessage(data []byte) error {
 		handler = d.handlers[method]
 		runner = d.RunMethod
 	default:
-		err = fmt.Errorf("Invalid method: %s", msg.Method)
-		return err
+		return fmt.Errorf("Invalid method: %s", msg.Method)
 	}
 
 	// Method is not found.
 	if handler == reflect.ValueOf(nil) {
-		err = fmt.Errorf("Unknown method: %v", msg.Method)
-		return err
+		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
 	if err = d.parseCallbacks(&msg); err != nil {
@@ -55,8 +44,7 @@ func (d *Dnode) processMessage(data []byte) error {
 
 	// Must do this after parsing callbacks.
 	var arguments []*Partial
-	err = msg.Arguments.Unmarshal(&arguments)
-	if err != nil {
+	if err = msg.Arguments.Unmarshal(&arguments); err != nil {
 		return err
 	}
 
@@ -78,11 +66,7 @@ func defaultRunner(method string, handlerFunc reflect.Value, args Arguments, tr 
 // callback functions in "arguments" field.
 func (d *Dnode) parseCallbacks(msg *Message) error {
 	// Parse callbacks field and create callback functions.
-	l.Printf("Received message callbacks: %#v", msg.Callbacks)
-
 	for methodID, path := range msg.Callbacks {
-		l.Printf("MehodID: %s", methodID)
-
 		id, err := strconv.ParseUint(methodID, 10, 64)
 		if err != nil {
 			return err
