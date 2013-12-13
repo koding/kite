@@ -24,7 +24,8 @@ func (b *Build) do() {
 	}
 }
 
-// darwin is building a new .pkg installer for darwin based OS'es.
+// darwin is building a new .pkg installer for darwin based OS'es. create a
+// folder called "root", which will be used as the installer content.
 func (b *Build) darwin() {
 	version := "1.0.0"
 	scriptDir := "./darwin/scripts"
@@ -50,7 +51,7 @@ func (b *Build) darwin() {
 		return
 	}
 
-	distribution := "./darwin/Distribution.xml"
+	distribution := "./darwin/Distribution.xml" // TODO: create it via a template
 	resources := "./darwin/Resources"
 	targetFile := "koding-kd-tool.pkg"
 
