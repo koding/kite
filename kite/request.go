@@ -155,13 +155,13 @@ func (c Callback) MarshalJSON() ([]byte, error) {
 func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
 	k := tr.Properties()["localKite"].(*Kite)
 
-	request, _, err := k.parseRequest(method, args, tr)
-	if err != nil {
-		k.Log.Notice("Did not understand callback message: %s. method: %q args: %q", err, method, args)
-		return
-	}
-
 	recoverArgumentError(func() {
+		request, _, err := k.parseRequest(method, args, tr)
+		if err != nil {
+			k.Log.Notice("Did not understand callback message: %s. method: %q args: %q", err, method, args)
+			return
+		}
+
 		callArgs := []reflect.Value{reflect.ValueOf(request)}
 		handlerFunc.Call(callArgs)
 	})
