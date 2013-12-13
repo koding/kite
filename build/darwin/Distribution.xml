@@ -1,27 +1,33 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <installer-script minSpecVersion="1.000000">
-    <title>Koding KD Tool</title>
+    <title>Koding Kite</title>
     <background mime-type="image/png" file="bg.png"/>
     <options customize="never" allow-external-scripts="no"/>
-    <domains enable_localSystem="true" />
-    <!-- <options rootVolumeOnly="true" /> -->
+    <!-- <domains enable_localSystem="true" /> -->
+    <options rootVolumeOnly="true" />
     <installation-check script="installCheck();"/>
     <script>
 function installCheck() {
     if(system.files.fileExistsAtPath('/usr/local/bin/kd')) {
 	    my.result.title = 'Previous Installation Detected';
-	    my.result.message = 'A previous installation of Koding KD Tool exists at  /usr/local/bin. This installer will remove the previous installation prior to installing. Please back up any data before proceeding.';
+	    my.result.message = 'A previous installation of Koding Kite Tool exists at  /usr/local/bin. This installer will remove the previous installation prior to installing. Please back up any data before proceeding.';
 	    my.result.type = 'Warning';
 	    return false;
 	}
     return true;
 }
     </script>
+    <!-- List all component packages -->
+    <pkg-ref
+        id="com.koding.kd.pkg"
+        auth="root">output.pkg</pkg-ref>
     <choices-outline>
         <line choice="com.koding.kd.choice"/>
     </choices-outline>
-    <choice id="com.koding.kd.choice" title="Koding KD Tool" customLocation="/">
+    <choice
+        id="com.koding.kd.choice"
+        title="Koding Kite"
+        customLocation="/">
         <pkg-ref id="com.koding.kd.pkg"/>
     </choice>
-    <pkg-ref id="com.koding.kd.pkg" auth="Root">com.koding.kd.pkg</pkg-ref>
 </installer-script>

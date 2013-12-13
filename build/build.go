@@ -42,7 +42,7 @@ func (b *Build) darwin() {
 		"--scripts", scriptDir,
 		"--root", installRoot,
 		"--install-location", "/",
-		tempDest+"/com.koding.kd.pkg", // used for next step, also set up for distribution.xml
+		tempDest+"/output.pkg", // used for next step, also set up for distribution.xml
 	)
 
 	res, err := cmdPkg.CombinedOutput()
