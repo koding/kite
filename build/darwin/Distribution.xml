@@ -19,15 +19,15 @@ function installCheck() {
     </script>
     <!-- List all component packages -->
     <pkg-ref
-        id="com.koding.kd.pkg"
-        auth="root">output.pkg</pkg-ref>
+        id="com.koding.kite.pkg"
+        auth="root">com.koding.kite.pkg</pkg-ref>
     <choices-outline>
-        <line choice="com.koding.kd.choice"/>
+        <line choice="com.koding.kite.choice"/>
     </choices-outline>
     <choice
-        id="com.koding.kd.choice"
+        id="com.koding.kite.choice"
         title="Koding Kite"
         customLocation="/">
-        <pkg-ref id="com.koding.kd.pkg"/>
+        <pkg-ref id="com.koding.kite.pkg"/>
     </choice>
 </installer-script>

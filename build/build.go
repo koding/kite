@@ -37,12 +37,12 @@ func (b *Build) darwin() {
 	defer os.RemoveAll(tempDest)
 
 	cmdPkg := exec.Command("pkgbuild",
-		"--identifier", "com.koding.kd.pkg",
+		"--identifier", "com.koding.kite.pkg",
 		"--version", version,
 		"--scripts", scriptDir,
 		"--root", installRoot,
 		"--install-location", "/",
-		tempDest+"/output.pkg", // used for next step, also set up for distribution.xml
+		tempDest+"/com.koding.kite.pkg", // used for next step, also set up for distribution.xml
 	)
 
 	res, err := cmdPkg.CombinedOutput()

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+KITE_PLIST="/Library/LaunchAgents/com.koding.kite.plist"
+chown root:wheel ${KITE_PLIST}
+chmod 644 ${KITE_PLIST}
+
+echo $USER
+su $USER -c "/bin/launchctl load ${KITE_PLIST}"
+
+exit 0
