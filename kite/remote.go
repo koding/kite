@@ -2,7 +2,6 @@ package kite
 
 import (
 	"errors"
-	"fmt"
 	"github.com/op/go-logging"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
@@ -238,6 +237,7 @@ type Authentication struct {
 	validUntil *time.Time `json:"-"`
 }
 
+// response is the type of the return value of Tell() and Go() methods.
 type response struct {
 	Result *dnode.Partial
 	Err    error
@@ -298,8 +298,7 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 	if err != nil {
 		responseChan <- &response{
 			Result: nil,
-			Err: fmt.Errorf("Telling method [%s] on [%s] error: %s",
-				method, r.Kite.Name, err),
+			Err:    &Error{"sendError", err.Error()},
 		}
 		return
 	}
@@ -315,9 +314,9 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 		case resp := <-doneChan:
 			responseChan <- resp
 		case <-r.disconnect:
-			responseChan <- &response{nil, errors.New("Client disconnected")}
+			responseChan <- &response{nil, &Error{"disconnect", "Remote kite has disconnected"}}
 		case <-time.After(timeout):
-			responseChan <- &response{nil, errors.New("Timeout")}
+			responseChan <- &response{nil, &Error{"timeout", "Did not get the response in allowed time"}}
 
 			// Remove the callback function from the map so we do not
 			// consume memory for unused callbacks.
@@ -353,13 +352,21 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
 // Sets theResponse and notifies the caller by sending to done channel.
 func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
 	return Callback(func(request *Request) {
-		var (
-			err    error          // First argument
-			result *dnode.Partial // Second argument
-		)
+		// Single argument of response callback.
+		var resp struct {
+			Result *dnode.Partial `json:"result"`
+			Err    *Error         `json:"error"`
+		}
 
 		// Notify that the callback is finished.
-		defer func() { doneChan <- &response{result, err} }()
+		defer func() {
+			if resp.Err != nil {
+				r.Log.Warning("Error in remote Kite: %s", resp.Err.Error())
+				doneChan <- &response{resp.Result, resp.Err}
+			} else {
+				doneChan <- &response{resp.Result, nil}
+			}
+		}()
 
 		// Remove the callback function from the map so we do not
 		// consume memory for unused callbacks.
@@ -367,26 +374,7 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
-		// Unmarshal callback response.
-		responseArgs := request.Args.MustSliceOfLength(1)
-		var response struct {
-			Error  *Error         `json:"error"`
-			Result *dnode.Partial `json:"result"`
-		}
-		responseArgs[0].MustUnmarshal(&response)
-
-		result = response.Result
-
-		// This is the error argument. Unmarshal panics if it is null.
-		if response.Error == nil {
-			return
-		}
-
-		// Read the error argument in response.
-		var kiteErr Error
-		responseArgs[0].MustUnmarshal(&kiteErr)
-
-		r.Log.Warning("Error in remote Kite: %s", kiteErr.Error())
-		err = &kiteErr
+		// Unmarshal callback response argument.
+		request.Args.One().MustUnmarshal(&resp)
 	})
 }

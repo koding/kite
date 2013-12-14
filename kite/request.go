@@ -78,7 +78,7 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-func (e *Error) Error() string {
+func (e Error) Error() string {
 	return fmt.Sprintf("Kite error: %s: %s", e.Type, e.Message)
 }
 
