@@ -82,38 +82,48 @@ func (r *Register) checker(key string) error {
 	for {
 		select {
 		case <-ticker:
-			resp, err := http.Get(checkUrl)
+			err := checkResponse(checkUrl)
 			if err != nil {
 				return err
 			}
 
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-
-			resp.Body.Close()
-			fmt.Printf(". ")
-
-			if resp.StatusCode == 200 {
-				type Result struct {
-					Result string `json:"result"`
-				}
-
-				res := Result{}
-
-				err := json.Unmarshal(bytes.TrimSpace(body), &res)
-				if err != nil {
-					return err
-				}
-
-				fmt.Println(res.Result)
-				return nil
-			}
+			// continue until timeout
 		case <-timeout:
 			return errors.New("timeout")
 		}
 	}
+}
+
+func checkResponse(checkUrl string) error {
+	resp, err := http.Get(checkUrl)
+	if err != nil {
+		return err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	fmt.Printf(". ") // animation
+
+	if resp.StatusCode != 200 {
+		return errors.New("non 200 response")
+	}
+
+	type Result struct {
+		Result string `json:"result"`
+	}
+
+	res := Result{}
+	err = json.Unmarshal(bytes.TrimSpace(body), &res)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(res.Result)
+	return nil
 }
 
 // getOrCreateKey combines the two functions: getKey and writeNewKey
@@ -138,7 +148,7 @@ func getOrCreateKey() (string, error) {
 
 }
 
-// getKey returns the Koding key from ~/.kd/koding.key
+// getKey returns the Koding key content from ~/.kd/koding.key
 func getKey(keyPath string) (string, error) {
 	data, err := ioutil.ReadFile(keyPath)
 	if err != nil {
