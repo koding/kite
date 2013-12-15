@@ -34,7 +34,7 @@ func setupTest(t *testing.T) {
 	}
 
 	etcdClient := etcd.NewClient(nil)
-	_, err = etcdClient.DeleteAll("/kites/devrim")
+	_, err = etcdClient.Delete("/kites/devrim", true)
 	if err != nil {
 		if err.(etcd.EtcdError).ErrorCode != 100 { // Key Not Found
 			t.Errorf("Cannot delete keys from etcd: %s", err)

@@ -2,7 +2,6 @@ package dnode
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -15,6 +14,9 @@ func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, 
 		panic("Empty method name")
 	}
 
+	if arguments == nil {
+		arguments = make([]interface{}, 0)
+	}
 	if d.WrapMethodArgs != nil {
 		arguments = d.WrapMethodArgs(arguments, d.transport)
 	}
@@ -23,8 +25,6 @@ func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, 
 }
 
 func (d *Dnode) send(method interface{}, arguments []interface{}) (map[string]Path, error) {
-	l.Printf("Call method: %s arguments: %+v\n", fmt.Sprint(method), arguments)
-
 	var err error
 	callbacks := make(map[string]Path)
 	defer func() {
@@ -42,7 +42,6 @@ func (d *Dnode) send(method interface{}, arguments []interface{}) (map[string]Pa
 
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		l.Printf("Cannot marshal arguments: %s: %#v", err, arguments)
 		return nil, err
 	}
 
@@ -55,13 +54,11 @@ func (d *Dnode) send(method interface{}, arguments []interface{}) (map[string]Pa
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		l.Printf("Cannot marshal message: %s: %#v", err, msg)
 		return nil, err
 	}
 
 	err = d.transport.Send(data)
 	if err != nil {
-		l.Printf("Cannot send message over transport: %s", err)
 		return nil, err
 	}
 

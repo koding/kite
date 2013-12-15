@@ -4,15 +4,8 @@
 package dnode
 
 import (
-	"io/ioutil"
-	"log"
 	"reflect"
 )
-
-var l *log.Logger = log.New(ioutil.Discard, "", log.Lshortfile)
-
-// Uncomment following to see log messages.
-// var l *log.Logger = log.New(os.Stderr, "", log.Lshortfile)
 
 type Dnode struct {
 	// Registered methods are saved in this map.
@@ -41,7 +34,7 @@ type Dnode struct {
 }
 
 type Wrapper func(args []interface{}, tr Transport) []interface{}
-type Runner func(method string, handlerFunc reflect.Value, args *Partial, tr Transport)
+type Runner func(method string, handlerFunc reflect.Value, args Arguments, tr Transport)
 
 // Transport is an interface for sending and receiving data on network.
 // Each Transport must be unique for each Client.

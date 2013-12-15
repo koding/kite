@@ -95,8 +95,8 @@ const (
 // Token is the type of the struct given to a Kite in order to authenticate
 // itself to the remote Kite.
 type Token struct {
-	Key string
-	TTL int
+	Key string `json:"key"`
+	TTL int    `json:"ttl"`
 }
 
 // KontrolQuery is a structure of message sent to Kontrol. It is used for

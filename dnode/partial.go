@@ -32,8 +32,6 @@ func (p *Partial) UnmarshalJSON(data []byte) error {
 // Unmarshal unmarshals the raw data (p.Raw) into v and prepares callbacks.
 // v must be a struct that is the type of expected arguments.
 func (p *Partial) Unmarshal(v interface{}) error {
-	l.Printf("Unmarshal Partial")
-
 	if p == nil {
 		return fmt.Errorf("Cannot unmarshal nil argument")
 	}
@@ -43,17 +41,12 @@ func (p *Partial) Unmarshal(v interface{}) error {
 		panic("v must be a pointer")
 	}
 
-	err := json.Unmarshal(p.Raw, &v)
-	if err != nil {
-		l.Println(err)
+	if err := json.Unmarshal(p.Raw, &v); err != nil {
 		return err
 	}
 
 	for _, spec := range p.CallbackSpecs {
-		l.Printf("spec: %#v", spec)
-		err := spec.Apply(value)
-		if err != nil {
-			l.Println(err)
+		if err := spec.Apply(value); err != nil {
 			return err
 		}
 	}
@@ -180,6 +173,10 @@ func (p *Partial) MustFunction() Function {
 	return f
 }
 
+//----------------------------------------------------------------
+// Arguments
+//----------------------------------------------------------------
+
 type Arguments []*Partial
 
 func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
@@ -199,4 +196,70 @@ func (a Arguments) MustSliceOfLength(length int) []*Partial {
 func (a Arguments) One() *Partial {
 	a.MustSliceOfLength(1)
 	return a[0]
+}
+
+func (a Arguments) MustUnmarshal(v interface{}) {
+	err := a.Unmarshal(v)
+	checkError(err)
+}
+
+func (a Arguments) Unmarshal(v interface{}) error {
+	if a == nil {
+		return errors.New("Cannot unmarshal nil argument")
+	}
+
+	value := reflect.ValueOf(v)
+	if value.Kind() != reflect.Ptr {
+		panic("v must be a pointer")
+	}
+
+	kind := value.Elem().Kind()
+	if kind != reflect.Slice {
+		return errors.New("Argument must be a slice")
+	}
+
+	switch value.Elem().Type() {
+	case reflect.TypeOf([]string{}):
+		newSlice := make([]string, len(a))
+		for i, arg := range a {
+			s, err := arg.String()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into string: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]float64{}):
+		newSlice := make([]float64, len(a))
+		for i, arg := range a {
+			s, err := arg.Float64()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into float64: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]bool{}):
+		newSlice := make([]bool, len(a))
+		for i, arg := range a {
+			s, err := arg.Bool()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into bool: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	case reflect.TypeOf([]Function{}):
+		newSlice := make([]Function, len(a))
+		for i, arg := range a {
+			s, err := arg.Function()
+			if err != nil {
+				return fmt.Errorf("Cannot unmarshal %+q into Function: %s", arg.Raw, err)
+			}
+			newSlice[i] = s
+		}
+		value.Elem().Set(reflect.ValueOf(newSlice))
+	}
+
+	return nil
 }

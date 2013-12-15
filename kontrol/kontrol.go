@@ -141,7 +141,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey string) (*protocol.Regi
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.etcd.Delete(key)
+		k.etcd.Delete(key, false)
 	})
 
 	// send response back to the kite, also identify him with the new name
@@ -190,7 +190,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) fun
 			return
 		}
 
-		prevValue = resp.PrevValue
+		prevValue = resp.Node.PrevValue
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
 		_, err = k.etcd.UpdateDir(KitesPrefix+"/"+kite.Username, ttl)
@@ -315,7 +315,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
-	resp, err := k.etcd.GetAll(key, false)
+	resp, err := k.etcd.Get(key, false, true)
 	if err != nil {
 		if etcdErr, ok := err.(etcd.EtcdError); ok {
 			if etcdErr.ErrorCode == 100 { // Key Not Found
@@ -326,7 +326,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("Internal error")
 	}
 
-	kvs := flatten(resp.Kvs)
+	kvs := flatten(resp.Node.Nodes)
 
 	kitesWithToken, err := addTokenToKites(kvs, r.Username)
 	if err != nil {
@@ -343,26 +343,24 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 }
 
 // flatten converts the recursive etcd directory structure to flat one that contains Kites.
-func flatten(in []etcd.KeyValuePair) []etcd.KeyValuePair {
-	var out []etcd.KeyValuePair
-
-	for _, kv := range in {
-		if kv.Dir {
-			out = append(out, flatten(kv.KVPairs)...)
+func flatten(in etcd.Nodes) (out etcd.Nodes) {
+	for _, node := range in {
+		if node.Dir {
+			out = append(out, flatten(node.Nodes)...)
 			continue
 		}
 
-		out = append(out, kv)
+		out = append(out, node)
 	}
 
-	return out
+	return
 }
 
-func addTokenToKites(kvs []etcd.KeyValuePair, username string) ([]*protocol.KiteWithToken, error) {
-	kitesWithToken := make([]*protocol.KiteWithToken, len(kvs))
+func addTokenToKites(nodes etcd.Nodes, username string) ([]*protocol.KiteWithToken, error) {
+	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
-	for i, kv := range kvs {
-		kite, kodingKey, err := kiteFromEtcdKV(kv.Key, kv.Value)
+	for i, node := range nodes {
+		kite, kodingKey, err := kiteFromEtcdKV(node.Key, node.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -450,14 +448,14 @@ func (k *Kontrol) WatchEtcd() {
 		time.Sleep(time.Second)
 	}
 
-	index := resp.ModifiedIndex
+	index := resp.Node.ModifiedIndex
 	log.Info("etcd: index = %d", index)
 
 	receiver := make(chan *etcd.Response)
 
 	go func() {
 		for {
-			_, err := k.etcd.WatchAll(KitesPrefix, index+1, receiver, nil)
+			_, err := k.etcd.Watch(KitesPrefix, index+1, true, receiver, nil)
 			if err != nil {
 				log.Critical("etcd error 2: %s", err)
 				time.Sleep(time.Second)
@@ -468,11 +466,11 @@ func (k *Kontrol) WatchEtcd() {
 	// Channel is never closed.
 	for resp := range receiver {
 		// log.Debug("etcd: change received: %#v", resp)
-		index = resp.ModifiedIndex
+		index = resp.Node.ModifiedIndex
 
 		// Notify deregistration events.
-		if strings.HasPrefix(resp.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
-			kite, _, err := kiteFromEtcdKV(resp.Key, resp.Value)
+		if strings.HasPrefix(resp.Node.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
+			kite, _, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
 			if err == nil {
 				k.watcherHub.Notify(kite, protocol.Deregister, "")
 			}
@@ -496,13 +494,13 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	resp, err := k.etcd.Get(kiteKey, false)
+	resp, err := k.etcd.Get(kiteKey, false, false)
 	if err != nil {
 		return nil, err
 	}
 
 	var kiteVal registerValue
-	err = json.Unmarshal([]byte(resp.Value), &kiteVal)
+	err = json.Unmarshal([]byte(resp.Node.Value), &kiteVal)
 	if err != nil {
 		return nil, err
 	}

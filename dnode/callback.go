@@ -11,7 +11,7 @@ const functionPlaceholder = `"[Function]"`
 
 // Callback is a function to send in arguments.
 // Wrap your function to make it marshalable before sending.
-type Callback func(*Partial)
+type Callback func(Arguments)
 
 func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(functionPlaceholder), nil
@@ -40,11 +40,8 @@ type CallbackSpec struct {
 }
 
 func (c *CallbackSpec) Apply(value reflect.Value) error {
-	l.Printf("Apply: %#v\n", value.Interface())
 	i := 0
 	for {
-		l.Printf("Apply value: %#v\n", value)
-		l.Printf("value.Kind(): %s\n", value.Kind())
 		switch value.Kind() {
 		case reflect.Slice:
 			if i == len(c.Path) {
