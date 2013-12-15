@@ -3,7 +3,6 @@ package kite
 import (
 	"flag"
 	"fmt"
-	"github.com/op/go-logging"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
 func init() {
@@ -84,6 +85,9 @@ type Kite struct {
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*Request) error
 
+	// Should kite invoke authenticators for incoming requests? Default is true
+	authenticate bool
+
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
 	ready chan bool
@@ -135,6 +139,7 @@ func New(options *Options) *Kite {
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*Request) error),
+		authenticate:      true,
 		handlers:          make(map[string]HandlerFunc),
 		ready:             make(chan bool),
 		end:               make(chan bool, 1),
@@ -169,6 +174,12 @@ func New(options *Options) *Kite {
 
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
+}
+
+// DisableAuthentication disables authentication for every incoming request.
+// This makes all methods accessible for everyone.
+func (k *Kite) DisableAuthentication() {
+	k.authenticate = false
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests

@@ -49,16 +49,17 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 		}
 	}()
 
-	// Recover dnode argument errors.
-	// The caller can use functions like MustString(), MustSlice()...
-	// without the fear of panic.
+	// Recover dnode argument errors. The caller can use functions like
+	// MustString(), MustSlice()... without the fear of panic.
 	defer kite.recoverError(kiteErr)()
 
 	request, callback = kite.parseRequest(method, args, tr)
 
-	kiteErr = request.authenticate()
-	if kiteErr != nil {
-		return
+	if kite.authenticate {
+		kiteErr = request.authenticate()
+		if kiteErr != nil {
+			return
+		}
 	}
 
 	// Call the handler function.
