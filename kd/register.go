@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	uuid "github.com/nu7hatch/gouuid"
 	"io/ioutil"
 	"koding/newkite/kd/util"
 	"koding/newkite/kodingkey"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 const KeyLength = 64
@@ -21,6 +23,8 @@ const KeyLength = 64
 var (
 	AuthServer      = "https://koding.com"
 	AuthServerLocal = "http://localhost:3020"
+	KdPath          = util.GetKdPath()
+	KeyPath         = filepath.Join(KdPath, "koding.key")
 )
 
 type Register struct {
@@ -43,21 +47,25 @@ func (r *Register) Exec(args []string) error {
 		r.authServer = AuthServerLocal
 	}
 
-	id, err := uuid.NewV4()
+	hostID, err := hostID()
 	if err != nil {
 		return err
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
+	var key string
+	keyExist := false
 
-	hostID := hostname + "-" + id.String()
-
-	key, err := getOrCreateKey()
+	key, err = getKey()
 	if err != nil {
-		return err
+		k, err := kodingkey.NewKodingKey()
+		if err != nil {
+			return err
+		}
+
+		key = k.String()
+	} else {
+		fmt.Printf("Found a key under '%s'. Going to use it to register\n", KdPath)
+		keyExist = true
 	}
 
 	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", r.authServer, hostID, key)
@@ -66,7 +74,22 @@ func (r *Register) Exec(args []string) error {
 	fmt.Println(registerUrl)
 	fmt.Printf("\nwaiting . ")
 
-	return r.checker(key)
+	err = r.checker(key)
+	if err != nil {
+		return err
+	}
+	fmt.Println("successfully authenticated.")
+
+	if keyExist {
+		return nil
+	}
+
+	err = writeKey(key)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // checker checks if the user has browsed the register URL by polling the check URL.
@@ -84,10 +107,11 @@ func (r *Register) checker(key string) error {
 		case <-ticker:
 			err := checkResponse(checkUrl)
 			if err != nil {
-				return err
+				// we didn't get OK message, continue until timout
+				continue
 			}
 
-			// continue until timeout
+			return nil
 		case <-timeout:
 			return errors.New("timeout")
 		}
@@ -119,38 +143,15 @@ func checkResponse(checkUrl string) error {
 	res := Result{}
 	err = json.Unmarshal(bytes.TrimSpace(body), &res)
 	if err != nil {
-		return err
+		log.Fatalln(err) // this should not happen, exit here
 	}
 
-	fmt.Println(res.Result)
 	return nil
 }
 
-// getOrCreateKey combines the two functions: getKey and writeNewKey
-func getOrCreateKey() (string, error) {
-	kdPath := util.GetKdPath()
-	keyPath := filepath.Join(kdPath, "koding.key")
-	key, err := getKey(keyPath)
-	if err == nil {
-		return key, nil
-	}
-
-	if !os.IsNotExist(err) {
-		return "", err
-	}
-
-	key, err = writeNewKey(kdPath, keyPath)
-	if err != nil {
-		return "", err
-	}
-
-	return key, nil
-
-}
-
 // getKey returns the Koding key content from ~/.kd/koding.key
-func getKey(keyPath string) (string, error) {
-	data, err := ioutil.ReadFile(keyPath)
+func getKey() (string, error) {
+	data, err := ioutil.ReadFile(KeyPath)
 	if err != nil {
 		return "", err
 	}
@@ -160,21 +161,29 @@ func getKey(keyPath string) (string, error) {
 	return key, nil
 }
 
-// writeNewKey generates a new Koding key and writes to ~/.kd/koding.key
-func writeNewKey(kdPath, keyPath string) (string, error) {
-	fmt.Println("Koding key is not found on this host. A new key will be created.")
+// writeKey writes the content of the given key to ~/.kd/koding.key
+func writeKey(key string) error {
+	os.Mkdir(KdPath, 0700) // create if not exists
 
-	err := os.Mkdir(kdPath, 0700)
+	err := ioutil.WriteFile(KeyPath, []byte(key), 0600)
+	if err != nil {
+		return err
+	}
 
-	key, err := kodingkey.NewKodingKey()
+	return nil
+}
+
+// hostID returns a unique string that defines a machine
+func hostID() (string, error) {
+	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
 	}
 
-	err = ioutil.WriteFile(keyPath, []byte(key.String()), 0600)
+	hostname, err := os.Hostname()
 	if err != nil {
 		return "", err
 	}
 
-	return key.String(), nil
+	return hostname + "-" + id.String(), nil
 }
