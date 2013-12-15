@@ -48,7 +48,7 @@ func TestKite(t *testing.T) {
 	fmt.Printf("rpc result: %f\n", number)
 
 	if number != 4 {
-		t.Errorf("Invalid result: %d", number)
+		t.Errorf("Invalid result: %f", number)
 	}
 
 	select {
