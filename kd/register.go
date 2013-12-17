@@ -57,7 +57,7 @@ func (r *Register) Exec(args []string) error {
 
 		key = k.String()
 	} else {
-		fmt.Printf("Found a key under '%s'. Going to use it to register\n", KdPath)
+		fmt.Printf("Found a key under '%s'. Going to use it to register\n", util.GetKdPath())
 		keyExist = true
 	}
 
