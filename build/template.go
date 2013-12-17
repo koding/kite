@@ -15,17 +15,17 @@ exit 0
 
 	preInstall = `#!/bin/sh
 
+echo "Checking for plist"
+if /bin/launchctl list "com.koding.kite.{{.}}.plist" &> /dev/null; then
+    echo "Unloading plist"
+    /bin/launchctl unload "/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
+fi
+
 KDFILE=/usr/local/bin/{{.}}
 
 echo "Removing previous installation"
 if [ -f $KDFILE  ]; then
     rm -r $KDFILE
-fi
-
-echo "Checking for plist"
-if /bin/launchctl list "com.koding.kite.{{.}}.plist" &> /dev/null; then
-    echo "Unloading plist"
-    /bin/launchctl unload "/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
 fi
 
 exit 0
