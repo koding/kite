@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"text/template"
 )
 
 type Build struct{}
@@ -27,6 +28,38 @@ func (b *Build) do() {
 // darwin is building a new .pkg installer for darwin based OS'es. create a
 // folder called "root", which will be used as the installer content.
 func (b *Build) darwin() {
+	const (
+		postInstall = `#!/bin/bash
+
+KITE_PLIST="/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
+chown root:wheel ${KITE_PLIST}
+chmod 644 ${KITE_PLIST}
+
+echo $USER
+su $USER -c "/bin/launchctl load ${KITE_PLIST}"
+
+exit 0
+`
+
+		preInstall = `#!/bin/sh
+
+KDFILE=/usr/local/bin/{{.}}
+
+echo "Removing previous installation"
+if [ -f $KDFILE  ]; then
+    rm -r $KDFILE
+fi
+
+echo "Checking for plist"
+if /bin/launchctl list "com.koding.kite.{{.}}.plist" &> /dev/null; then
+    echo "Unloading plist"
+    /bin/launchctl unload "/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
+fi
+
+exit 0
+`
+	)
+
 	version := "1.0.0"
 	scriptDir := "./darwin/scripts"
 	installRoot := "./root"
@@ -35,6 +68,12 @@ func (b *Build) darwin() {
 		return
 	}
 	defer os.RemoveAll(tempDest)
+
+	templatePost := template.Must(template.New("postInstall").Parse(postInstall))
+	templatePost.Execute(os.Stdout, "fatih")
+
+	templatePre := template.Must(template.New("preInstall").Parse(preInstall))
+	templatePre.Execute(os.Stdout, "fatih")
 
 	cmdPkg := exec.Command("pkgbuild",
 		"--identifier", "com.koding.kite.pkg",
