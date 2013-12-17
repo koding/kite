@@ -62,12 +62,21 @@ func (r *Register) Exec(args []string) error {
 	}
 
 	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", r.authServer, hostID, key)
+	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", r.authServer, key)
+
+	// first check if the user is alrady registered
+	err = checkResponse(checkUrl)
+	if err == nil {
+		fmt.Printf("... you are already registered.\n")
+		return nil
+	}
 
 	fmt.Printf("Please open the following url for authentication:\n\n")
 	fmt.Println(registerUrl)
 	fmt.Printf("\nwaiting . ")
 
-	err = r.checker(key)
+	// .. if not let the user register himself
+	err = checker(checkUrl)
 	if err != nil {
 		return err
 	}
@@ -86,9 +95,7 @@ func (r *Register) Exec(args []string) error {
 }
 
 // checker checks if the user has browsed the register URL by polling the check URL.
-func (r *Register) checker(key string) error {
-	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", r.authServer, key)
-
+func checker(checkUrl string) error {
 	// check the result every two seconds
 	ticker := time.NewTicker(2 * time.Second).C
 
@@ -101,6 +108,7 @@ func (r *Register) checker(key string) error {
 			err := checkResponse(checkUrl)
 			if err != nil {
 				// we didn't get OK message, continue until timout
+				fmt.Printf(". ") // animation
 				continue
 			}
 
@@ -122,8 +130,6 @@ func checkResponse(checkUrl string) error {
 		return err
 	}
 	resp.Body.Close()
-
-	fmt.Printf(". ") // animation
 
 	if resp.StatusCode != 200 {
 		return errors.New("non 200 response")
