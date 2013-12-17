@@ -10,12 +10,7 @@ import (
 	"koding/newkite/kodingkey"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
-
-	uuid "github.com/nu7hatch/gouuid"
 )
 
 const KeyLength = 64
@@ -23,8 +18,6 @@ const KeyLength = 64
 var (
 	AuthServer      = "https://koding.com"
 	AuthServerLocal = "http://localhost:3020"
-	KdPath          = util.GetKdPath()
-	KeyPath         = filepath.Join(KdPath, "koding.key")
 )
 
 type Register struct {
@@ -47,7 +40,7 @@ func (r *Register) Exec(args []string) error {
 		r.authServer = AuthServerLocal
 	}
 
-	hostID, err := hostID()
+	hostID, err := util.HostID()
 	if err != nil {
 		return err
 	}
@@ -55,7 +48,7 @@ func (r *Register) Exec(args []string) error {
 	var key string
 	keyExist := false
 
-	key, err = getKey()
+	key, err = util.GetKey()
 	if err != nil {
 		k, err := kodingkey.NewKodingKey()
 		if err != nil {
@@ -84,7 +77,7 @@ func (r *Register) Exec(args []string) error {
 		return nil
 	}
 
-	err = writeKey(key)
+	err = util.WriteKey(key)
 	if err != nil {
 		return err
 	}
@@ -147,43 +140,4 @@ func checkResponse(checkUrl string) error {
 	}
 
 	return nil
-}
-
-// getKey returns the Koding key content from ~/.kd/koding.key
-func getKey() (string, error) {
-	data, err := ioutil.ReadFile(KeyPath)
-	if err != nil {
-		return "", err
-	}
-
-	key := strings.TrimSpace(string(data))
-
-	return key, nil
-}
-
-// writeKey writes the content of the given key to ~/.kd/koding.key
-func writeKey(key string) error {
-	os.Mkdir(KdPath, 0700) // create if not exists
-
-	err := ioutil.WriteFile(KeyPath, []byte(key), 0600)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// hostID returns a unique string that defines a machine
-func hostID() (string, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-
-	return hostname + "-" + id.String(), nil
 }
