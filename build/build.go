@@ -1,25 +1,48 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"text/template"
 )
 
+var binaryPath = flag.String("bin", "", "binary to be included into the package")
+
 type Build struct {
-	appName string
-	version string
-	output  string
+	appName    string
+	version    string
+	output     string
+	binaryPath string
 }
 
 func main() {
+	flag.Parse()
+
+	if *binaryPath == "" {
+		fmt.Println("please specify application binary with --bin flag")
+		os.Exit(1)
+	}
+
+	if !fileExist(*binaryPath) {
+		fmt.Printf("specified binary doesn't exist: %s\n", *binaryPath)
+		os.Exit(1)
+	}
+
+	// use binary name as appName
+	appName := filepath.Base(*binaryPath)
+
 	build := &Build{
-		appName: "kd",
-		version: "0.0.1",
+		appName:    appName,
+		version:    "0.0.1",
+		binaryPath: *binaryPath,
 	}
 
 	build.do()
@@ -34,8 +57,7 @@ func (b *Build) do() {
 	}
 }
 
-// darwin is building a new .pkg installer for darwin based OS'es. create a
-// folder called "root", which will be used as the installer content.
+// darwin is building a new .pkg installer for darwin based OS'es.
 func (b *Build) darwin() {
 	version := b.version
 	if b.output == "" {
@@ -44,6 +66,14 @@ func (b *Build) darwin() {
 
 	scriptDir := "./darwin/scripts"
 	installRoot := "./root"
+	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
+
+	os.MkdirAll(installRootUsr, 0755)
+	err := copyFile(b.binaryPath, installRootUsr+"/"+b.appName)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	tempDest, err := ioutil.TempDir("", "tempDest")
 	if err != nil {
@@ -142,7 +172,7 @@ func (b *Build) createScripts(scriptDir string) {
 	t.Execute(preInstallFile, b.appName)
 }
 
-func dirExist(dir string) bool {
+func fileExist(dir string) bool {
 	var err error
 	_, err = os.Stat(dir)
 	if err == nil {
@@ -154,4 +184,33 @@ func dirExist(dir string) bool {
 	}
 
 	panic(err) // permission errors or something else bad
+}
+
+func copyFile(src, dst string) error {
+	sf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+
+	fi, err := sf.Stat()
+	if err != nil {
+		return err
+	}
+
+	if fi.IsDir() {
+		return errors.New("src is a directory, please provide a file")
+	}
+
+	df, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fi.Mode())
+	if err != nil {
+		return err
+	}
+	defer df.Close()
+
+	if _, err := io.Copy(df, sf); err != nil {
+		return err
+	}
+
+	return nil
 }
