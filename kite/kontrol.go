@@ -27,6 +27,7 @@ func (k *Kite) NewKontrol(addr string) *Kontrol {
 	kite := protocol.Kite{
 		PublicIP: host,
 		Port:     port,
+		TLS:      true,
 		Name:     "kontrol", // for logging purposes
 	}
 

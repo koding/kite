@@ -4,10 +4,10 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"errors"
 	"koding/newkite/dnode"
+	"net/url"
 	"time"
 )
 
-const origin = "http://localhost"
 const redialDurationStart = 1 * time.Second
 const redialDurationMax = 60 * time.Second
 
@@ -31,14 +31,14 @@ type Client struct {
 	// Websocket connection
 	Conn *websocket.Conn
 
+	// Websocket connection options.
+	Config *websocket.Config
+
 	// Dnode message processor.
 	dnode *dnode.Dnode
 
 	// A space for saving/reading extra properties about this client.
 	properties map[string]interface{}
-
-	// Dialled URL, used to re-connect again.
-	url string
 
 	// Should we reconnect if disconnected?
 	Reconnect bool
@@ -55,10 +55,21 @@ type Client struct {
 // NewClient returns a pointer to new Client.
 // You need to call Dial() before interacting with the Server.
 func NewClient() *Client {
+	// Must send an "Origin" header. Does not checked on server.
+	origin, _ := url.Parse("")
+
+	config := &websocket.Config{
+		Version: websocket.ProtocolVersionHybi13,
+		Origin:  origin,
+		// Location will be set when dialing.
+	}
+
 	c := &Client{
 		properties:     make(map[string]interface{}),
 		redialDuration: redialDurationStart,
+		Config:         config,
 	}
+
 	c.dnode = dnode.New(c)
 	return c
 }
@@ -75,20 +86,23 @@ func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, run
 //
 // Do not forget to register your handlers on Client.Dnode
 // before calling Dial() to prevent race conditions.
-func (c *Client) Dial(url string) error {
-	c.url = url
-	err := c.dial()
-	if err != nil {
-		return err
+func (c *Client) Dial(url_ string) (err error) {
+	if c.Config.Location, err = url.Parse(url_); err != nil {
+		return
+	}
+
+	if err = c.dial(); err != nil {
+		return
 	}
 
 	go c.run()
-	return nil
+
+	return
 }
 
 // dial makes a single Dial() and run onConnectHandlers if connects.
-func (c *Client) dial() error {
-	ws, err := websocket.Dial(c.url, "", origin)
+func (c *Client) dial() (err error) {
+	ws, err := websocket.DialConfig(c.Config)
 	if err != nil {
 		return err
 	}
@@ -108,9 +122,14 @@ func (c *Client) dial() error {
 
 // DialForever connects to the server in background.
 // If the connection drops, it reconnects again.
-func (c *Client) DialForever(url string) {
-	c.url = url
+func (c *Client) DialForever(url_ string) (err error) {
+	if c.Config.Location, err = url.Parse(url_); err != nil {
+		return
+	}
+
 	go c.dialForever()
+
+	return
 }
 
 func (c *Client) dialForever() {

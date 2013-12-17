@@ -38,6 +38,7 @@ type Kite struct {
 	Hostname string `json:"hostname"`
 	PublicIP string `json:"publicIP"`
 	Port     string `json:"port"`
+	TLS      bool   `json:"tls"`
 }
 
 func (k *Kite) Addr() string {

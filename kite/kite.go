@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"koding/newkite/dnode/rpc"
@@ -182,6 +183,19 @@ func (k *Kite) DisableAuthentication() {
 	k.authenticate = false
 }
 
+func (k *Kite) EnableTLS(certPEMBlock, keyPEMBlock []byte) {
+	cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	if err != nil {
+		k.Log.Fatal(err.Error())
+	}
+
+	k.server.TlsConfig = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	k.Kite.TLS = true
+}
+
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously.
 func (k *Kite) Run() {
@@ -304,6 +318,11 @@ func (k *Kite) listenAndServe() (err error) {
 	}
 	k.Log.Notice("Listening: %s", k.listener.Addr().String())
 
+	// Enable TLS
+	if k.server.TlsConfig != nil {
+		k.listener = tls.NewListener(k.listener, k.server.TlsConfig)
+	}
+
 	// Port is known here if "0" is used as port number
 	_, k.Port, _ = net.SplitHostPort(k.listener.Addr().String())
 
@@ -313,7 +332,9 @@ func (k *Kite) listenAndServe() (err error) {
 			k.Kontrol.OnConnect(k.registerToKontrol)
 		}
 
-		k.Kontrol.DialForever()
+		if err = k.Kontrol.DialForever(); err != nil {
+			return
+		}
 	}
 
 	k.ready <- true // listener is ready, means we are ready too
