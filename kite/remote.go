@@ -8,6 +8,7 @@ import (
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -40,7 +41,7 @@ type RemoteKite struct {
 	tellTimeout time.Duration
 
 	// URL to connect.
-	url string
+	url url.URL
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
@@ -66,20 +67,19 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	// We need a reference to the remote kite when sending a message to remote.
 	r.client.Properties()["remoteKite"] = r
 
-	var scheme string
-
 	if kite.TLS {
 		// Check if the certificate of the remote Kite is signed by Kontrol.
 		pool := x509.NewCertPool()
 		pool.AppendCertsFromPEM(kontrol_pem())
 		r.client.Config.TlsConfig = &tls.Config{RootCAs: pool}
 
-		scheme = "wss"
+		r.url.Scheme = "wss"
 	} else {
-		scheme = "ws"
+		r.url.Scheme = "ws"
 	}
 
-	r.url = scheme + "://" + r.Kite.Addr() + "/dnode"
+	r.url.Host = r.Kite.Addr()
+	r.url.Path = "/dnode"
 
 	r.OnConnect(func() {
 		if r.Authentication.validUntil == nil {
@@ -128,14 +128,14 @@ func (r *RemoteKite) SetTellTimeout(d time.Duration) { r.tellTimeout = d }
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
-	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.url)
-	return r.client.Dial(r.url)
+	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.url.String())
+	return r.client.Dial(r.url.String())
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
 func (r *RemoteKite) DialForever() error {
-	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.url)
-	return r.client.DialForever(r.url)
+	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.url.String())
+	return r.client.DialForever(r.url.String())
 }
 
 func (r *RemoteKite) Close() {
