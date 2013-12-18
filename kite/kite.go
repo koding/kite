@@ -85,8 +85,8 @@ type Kite struct {
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*Request) error
 
-	// Should kite invoke authenticators for incoming requests? Default is true
-	authenticate bool
+	// Should kite disable authenticators for incoming requests? Disabled by default
+	disableAuthenticate bool
 
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
@@ -114,15 +114,10 @@ func New(options *Options) *Kite {
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
 
+	// Enable authentication. options.DisableAuthentication is false by
+	// default due to Go's varible initialization.
 	var kodingKey string
-	var authenticate bool
-
-	// options.Authentication behaves as a tri-state variable. By default it's
-	// nil and therefore means authentication is enabled. Setting it to false
-	// disables it. We can't use a non-pointer bool type, because it's
-	// get initialized to false by default.
-	if options.Authentication == nil || *options.Authentication {
-		authenticate = true
+	if !options.DisableAuthentication {
 		kodingKey, err = utils.GetKodingKey()
 		if err != nil {
 			log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
@@ -144,16 +139,16 @@ func New(options *Options) *Kite {
 			// PublicIP will be set by Kontrol after registering if it is not set.
 			PublicIP: options.PublicIP,
 		},
-		KodingKey:         kodingKey,
-		server:            rpc.NewServer(),
-		concurrent:        true,
-		KontrolEnabled:    true,
-		RegisterToKontrol: true,
-		Authenticators:    make(map[string]func(*Request) error),
-		authenticate:      authenticate,
-		handlers:          make(map[string]HandlerFunc),
-		ready:             make(chan bool),
-		end:               make(chan bool, 1),
+		KodingKey:           kodingKey,
+		server:              rpc.NewServer(),
+		concurrent:          true,
+		KontrolEnabled:      true,
+		RegisterToKontrol:   true,
+		Authenticators:      make(map[string]func(*Request) error),
+		disableAuthenticate: options.DisableAuthentication,
+		handlers:            make(map[string]HandlerFunc),
+		ready:               make(chan bool),
+		end:                 make(chan bool, 1),
 	}
 
 	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback)
