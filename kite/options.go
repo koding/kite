@@ -10,17 +10,18 @@ import (
 
 // Options is used to define a Kite.
 type Options struct {
-	Username     string
-	Kitename     string
-	LocalIP      string
-	PublicIP     string
-	Environment  string
-	Region       string
-	Port         string
-	Version      string
-	KontrolAddr  string
-	Dependencies string
-	Visibility   protocol.Visibility
+	Username       string
+	Kitename       string
+	LocalIP        string
+	PublicIP       string
+	Environment    string
+	Region         string
+	Port           string
+	Version        string
+	KontrolAddr    string
+	Authentication *bool
+	Dependencies   string
+	Visibility     protocol.Visibility
 }
 
 // validate is validating the fields of the options struct. It exits if an

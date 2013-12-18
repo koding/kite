@@ -113,9 +113,20 @@ func New(options *Options) *Kite {
 
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
-	kodingKey, err := utils.GetKodingKey()
-	if err != nil {
-		log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
+
+	var kodingKey string
+	var authenticate bool
+
+	// options.Authentication behaves as a tri-state variable. By default it's
+	// nil and therefore means authentication is enabled. Setting it to false
+	// disables it. We can't use a non-pointer bool type, because it's
+	// get initialized to false by default.
+	if options.Authentication == nil || *options.Authentication {
+		authenticate = true
+		kodingKey, err = utils.GetKodingKey()
+		if err != nil {
+			log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
+		}
 	}
 
 	k := &Kite{
@@ -139,7 +150,7 @@ func New(options *Options) *Kite {
 		KontrolEnabled:    true,
 		RegisterToKontrol: true,
 		Authenticators:    make(map[string]func(*Request) error),
-		authenticate:      true,
+		authenticate:      authenticate,
 		handlers:          make(map[string]HandlerFunc),
 		ready:             make(chan bool),
 		end:               make(chan bool, 1),
@@ -174,12 +185,6 @@ func New(options *Options) *Kite {
 
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
-}
-
-// DisableAuthentication disables authentication for every incoming request.
-// This makes all methods accessible for everyone.
-func (k *Kite) DisableAuthentication() {
-	k.authenticate = false
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
