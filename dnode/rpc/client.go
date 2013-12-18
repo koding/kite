@@ -86,10 +86,10 @@ func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, run
 //
 // Do not forget to register your handlers on Client.Dnode
 // before calling Dial() to prevent race conditions.
-func (c *Client) Dial(url_ string) error {
+func (c *Client) Dial(serverURL string) error {
 	var err error
 
-	if c.Config.Location, err = url.Parse(url_); err != nil {
+	if c.Config.Location, err = url.Parse(serverURL); err != nil {
 		return err
 	}
 
@@ -124,8 +124,8 @@ func (c *Client) dial() error {
 
 // DialForever connects to the server in background.
 // If the connection drops, it reconnects again.
-func (c *Client) DialForever(url_ string) (err error) {
-	if c.Config.Location, err = url.Parse(url_); err != nil {
+func (c *Client) DialForever(serverURL string) (err error) {
+	if c.Config.Location, err = url.Parse(serverURL); err != nil {
 		return
 	}
 
