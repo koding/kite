@@ -65,11 +65,14 @@ func (b *Build) darwin() {
 	}
 
 	scriptDir := "./darwin/scripts"
-	installRoot := "./root"
+	installRoot := "./root" // TODO REMOVE
+
+	os.RemoveAll(installRoot) // clean up old build before we continue
+
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
 
 	os.MkdirAll(installRootUsr, 0755)
-	err := copyFile(b.binaryPath, installRootUsr+"/"+b.appName)
+	err = copyFile(b.binaryPath, installRootUsr+"/"+b.appName)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
