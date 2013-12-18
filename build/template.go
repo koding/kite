@@ -1,25 +1,18 @@
 package main
 
 const (
-	postInstall = `#!/bin/bash
-
-KITE_PLIST="/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
-chown root:wheel ${KITE_PLIST}
-chmod 644 ${KITE_PLIST}
-
-echo $USER
-su $USER -c "/bin/launchctl load ${KITE_PLIST}"
-
-exit 0
-`
-
 	preInstall = `#!/bin/sh
 
-echo "Checking for plist"
-if /bin/launchctl list "com.koding.kite.{{.}}.plist" &> /dev/null; then
-    echo "Unloading plist"
-    /bin/launchctl unload "/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
-fi
+KITE_PLIST="/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
+
+# see: https://lists.macosforge.org/pipermail/launchd-dev/2011-January/000890.html
+echo "Checking to unload plist"
+for pid_uid in $(ps -axo pid,uid,args | grep -i "[l]oginwindow.app" | awk '{print $1 "," $2}'); do
+    pid=$(echo $pid_uid | cut -d, -f1)
+    uid=$(echo $pid_uid | cut -d, -f2)
+    echo "unloading launch agent"
+    launchctl bsexec "$pid" chroot -u "$uid" / launchctl unload ${KITE_PLIST}
+done
 
 KDFILE=/usr/local/bin/{{.}}
 
@@ -27,6 +20,27 @@ echo "Removing previous installation"
 if [ -f $KDFILE  ]; then
     rm -r $KDFILE
 fi
+
+exit 0
+`
+	postInstall = `#!/bin/bash
+
+KITE_PLIST="/Library/LaunchAgents/com.koding.kite.{{.}}.plist"
+chown root:wheel ${KITE_PLIST}
+chmod 644 ${KITE_PLIST}
+
+# this is simpler than below, but it doesn't get the USER env always, don't know why.
+# echo $USER
+# su $USER -c "/bin/launchctl load ${KITE_PLIST}"
+
+# see: https://lists.macosforge.org/pipermail/launchd-dev/2011-January/000890.html
+echo "running postinstall actions for all logged in users."
+for pid_uid in $(ps -axo pid,uid,args | grep -i "[l]oginwindow.app" | awk '{print $1 "," $2}'); do
+    pid=$(echo $pid_uid | cut -d, -f1)
+    uid=$(echo $pid_uid | cut -d, -f2)
+    echo "loading launch agent"
+    launchctl bsexec "$pid" chroot -u "$uid" / launchctl load ${KITE_PLIST}
+done
 
 exit 0
 `
