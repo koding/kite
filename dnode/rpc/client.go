@@ -86,22 +86,24 @@ func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, run
 //
 // Do not forget to register your handlers on Client.Dnode
 // before calling Dial() to prevent race conditions.
-func (c *Client) Dial(url_ string) (err error) {
+func (c *Client) Dial(url_ string) error {
+	var err error
+
 	if c.Config.Location, err = url.Parse(url_); err != nil {
-		return
+		return err
 	}
 
 	if err = c.dial(); err != nil {
-		return
+		return err
 	}
 
 	go c.run()
 
-	return
+	return nil
 }
 
 // dial makes a single Dial() and run onConnectHandlers if connects.
-func (c *Client) dial() (err error) {
+func (c *Client) dial() error {
 	ws, err := websocket.DialConfig(c.Config)
 	if err != nil {
 		return err
