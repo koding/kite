@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"koding/newkite/protocol"
 	"log"
+	"net/url"
 	"strings"
 )
 
@@ -12,13 +13,12 @@ import (
 type Options struct {
 	Username     string
 	Kitename     string
-	LocalIP      string
 	PublicIP     string
 	Environment  string
 	Region       string
 	Port         string
 	Version      string
-	KontrolAddr  string
+	KontrolURL   *url.URL
 	Dependencies string
 	Visibility   protocol.Visibility
 }
@@ -46,8 +46,12 @@ func (o *Options) validate() {
 		log.Fatal("ERROR: please use 3-digits semantic versioning for options.version")
 	}
 
-	if o.KontrolAddr == "" {
-		o.KontrolAddr = "127.0.0.1:4000" // local fallback address
+	if o.KontrolURL == nil {
+		o.KontrolURL = &url.URL{
+			Scheme: "wss",
+			Host:   "127.0.0.1:4000", // local fallback address
+			Path:   "/dnode",
+		}
 	}
 
 	if o.Visibility == protocol.Visibility("") {

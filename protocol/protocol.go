@@ -3,10 +3,6 @@
 // designed to be sent between those components.
 package protocol
 
-import (
-	"net"
-)
-
 // Kite is the base struct containing the public fields. It is usually embeded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
@@ -34,15 +30,14 @@ type Kite struct {
 	// Is this Kite public or private?
 	Visibility Visibility `json:"visibility"`
 
-	Version  string `json:"version"`
-	Hostname string `json:"hostname"`
-	PublicIP string `json:"publicIP"`
-	Port     string `json:"port"`
-	TLS      bool   `json:"tls"`
-}
+	// 3-digit semantic version.
+	Version string `json:"version"`
 
-func (k *Kite) Addr() string {
-	return net.JoinHostPort(k.PublicIP, k.Port)
+	// os.Hostname() of the Kite.
+	Hostname string `json:"hostname"`
+
+	// The URL that the Kite can be reached from. Marshaled as string.
+	URL KiteURL `json:"url" dnode:"-"`
 }
 
 type Visibility string

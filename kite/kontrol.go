@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"koding/newkite/protocol"
 	"net"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -21,14 +22,11 @@ type Kontrol struct {
 }
 
 // NewKontrol returns a pointer to new Kontrol instance.
-func (k *Kite) NewKontrol(addr string) *Kontrol {
+func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 	// Only the address is required to connect Kontrol
-	host, port, _ := net.SplitHostPort(addr)
 	kite := protocol.Kite{
-		PublicIP: host,
-		Port:     port,
-		TLS:      true,
-		Name:     "kontrol", // for logging purposes
+		Name: "kontrol", // for logging purposes
+		URL:  protocol.KiteURL{kontrolURL},
 	}
 
 	auth := Authentication{
@@ -80,12 +78,13 @@ func (k *Kontrol) Register() error {
 		kite.Username = rr.Username
 
 		// Set the correct PublicIP if left empty in options.
-		if kite.PublicIP == "" {
-			kite.PublicIP = rr.PublicIP
+		ip, port, _ := net.SplitHostPort(kite.URL.Host)
+		if ip == "" {
+			kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
 		}
 
-		k.Log.Info("Registered to kontrol with addr: %s version: %s uuid: %s",
-			kite.Addr(), kite.Version, kite.ID)
+		k.Log.Info("Registered to kontrol with URL: %s version: %s uuid: %s",
+			kite.URL.String(), kite.Version, kite.ID)
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")
 	default:
