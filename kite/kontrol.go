@@ -85,8 +85,7 @@ func (k *Kontrol) Register() error {
 			kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
 		}
 
-		k.Log.Info("Registered to kontrol with URL: %s version: %s uuid: %s",
-			kite.URL.String(), kite.Version, kite.ID)
+		k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")
 	default:

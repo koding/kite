@@ -387,7 +387,7 @@ func (k *Kite) registerToKontrol(urls chan *url.URL) {
 				time.Sleep(60 * time.Second)
 			}
 
-			k.Log.Info("Registered to Kontrol with URL: %s", k.URL.String())
+			// Registered to Kontrol.
 			break
 		}
 	}
