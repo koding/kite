@@ -38,6 +38,7 @@ func (d *Dnode) processMessage(data []byte) error {
 		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
+	// Replace function placeholders with real functions.
 	if err = d.parseCallbacks(&msg); err != nil {
 		return err
 	}

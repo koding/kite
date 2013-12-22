@@ -59,6 +59,8 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
 func (k *Kontrol) Register() error {
+	<-k.ready
+
 	response, err := k.RemoteKite.Tell("register")
 	if err != nil {
 		return err

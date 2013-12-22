@@ -175,6 +175,12 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 
 		// Notify Kite.OnConnect handlers.
 		k.notifyRemoteKiteConnected(remoteKite)
+	} else {
+		remoteKite := properties["remoteKite"].(*RemoteKite)
+		remoteKite.Kite = options.Kite
+
+		// TODO can't set Authentication. Fix it.
+		// remoteKite.Authentication = options.Authentication
 	}
 
 	request := &Request{
