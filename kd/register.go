@@ -1,33 +1,19 @@
 package kd
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"koding/newkite/kd/util"
 	"koding/newkite/kodingkey"
-	"log"
-	"net/http"
 	"time"
 )
 
 const KeyLength = 64
 
-var (
-	AuthServer      = "https://koding.com"
-	AuthServerLocal = "http://localhost:3020"
-)
-
-type Register struct {
-	authServer string
-}
+type Register struct{}
 
 func NewRegister() *Register {
-	return &Register{
-		authServer: AuthServer,
-	}
+	return &Register{}
 }
 
 func (r *Register) Definition() string {
@@ -35,9 +21,11 @@ func (r *Register) Definition() string {
 }
 
 func (r *Register) Exec(args []string) error {
+	authServer := util.AuthServer
+
 	// change authServer address if debug mode is enabled
 	if len(args) == 1 && (args[0] == "--debug" || args[0] == "-d") {
-		r.authServer = AuthServerLocal
+		authServer = util.AuthServerLocal
 	}
 
 	hostID, err := util.HostID()
@@ -61,13 +49,21 @@ func (r *Register) Exec(args []string) error {
 		keyExist = true
 	}
 
-	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", r.authServer, hostID, key)
+	registerUrl := fmt.Sprintf("%s/-/auth/register/%s/%s", authServer, hostID, key)
+
+	// first check if the user is alrady registered
+	err = util.CheckKey(authServer, key)
+	if err == nil {
+		fmt.Printf("... you are already registered.\n")
+		return nil
+	}
 
 	fmt.Printf("Please open the following url for authentication:\n\n")
 	fmt.Println(registerUrl)
 	fmt.Printf("\nwaiting . ")
 
-	err = r.checker(key)
+	// .. if not let the user register himself
+	err = checker(authServer, key)
 	if err != nil {
 		return err
 	}
@@ -86,9 +82,7 @@ func (r *Register) Exec(args []string) error {
 }
 
 // checker checks if the user has browsed the register URL by polling the check URL.
-func (r *Register) checker(key string) error {
-	checkUrl := fmt.Sprintf("%s/-/auth/check/%s", r.authServer, key)
-
+func checker(authServer, key string) error {
 	// check the result every two seconds
 	ticker := time.NewTicker(2 * time.Second).C
 
@@ -98,9 +92,10 @@ func (r *Register) checker(key string) error {
 	for {
 		select {
 		case <-ticker:
-			err := checkResponse(checkUrl)
+			err := util.CheckKey(authServer, key)
 			if err != nil {
 				// we didn't get OK message, continue until timout
+				fmt.Printf(". ") // animation
 				continue
 			}
 
@@ -109,35 +104,4 @@ func (r *Register) checker(key string) error {
 			return errors.New("timeout")
 		}
 	}
-}
-
-func checkResponse(checkUrl string) error {
-	resp, err := http.Get(checkUrl)
-	if err != nil {
-		return err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-
-	fmt.Printf(". ") // animation
-
-	if resp.StatusCode != 200 {
-		return errors.New("non 200 response")
-	}
-
-	type Result struct {
-		Result string `json:"result"`
-	}
-
-	res := Result{}
-	err = json.Unmarshal(bytes.TrimSpace(body), &res)
-	if err != nil {
-		log.Fatalln(err) // this should not happen, exit here
-	}
-
-	return nil
 }

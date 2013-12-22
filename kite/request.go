@@ -55,7 +55,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 
 	request, callback = kite.parseRequest(method, args, tr)
 
-	if kite.authenticate {
+	if !kite.disableAuthenticate {
 		kiteErr = request.authenticate()
 		if kiteErr != nil {
 			return

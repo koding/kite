@@ -93,8 +93,8 @@ type Kite struct {
 	// Keys are the authentication types (options.authentication.type).
 	Authenticators map[string]func(*Request) error
 
-	// Should kite invoke authenticators for incoming requests? Default is true
-	authenticate bool
+	// Should kite disable authenticators for incoming requests? Disabled by default
+	disableAuthenticate bool
 
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
@@ -121,9 +121,15 @@ func New(options *Options) *Kite {
 
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
-	kodingKey, err := utils.GetKodingKey()
-	if err != nil {
-		log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
+
+	// Enable authentication. options.DisableAuthentication is false by
+	// default due to Go's varible initialization.
+	var kodingKey string
+	if !options.DisableAuthentication {
+		kodingKey, err = utils.GetKodingKey()
+		if err != nil {
+			log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
+		}
 	}
 
 	k := &Kite{
@@ -144,16 +150,16 @@ func New(options *Options) *Kite {
 				},
 			},
 		},
-		KodingKey:         kodingKey,
-		server:            rpc.NewServer(),
-		concurrent:        true,
-		KontrolEnabled:    true,
-		RegisterToKontrol: true,
-		Authenticators:    make(map[string]func(*Request) error),
-		authenticate:      true,
-		handlers:          make(map[string]HandlerFunc),
-		ready:             make(chan bool),
-		end:               make(chan bool, 1),
+		KodingKey:           kodingKey,
+		server:              rpc.NewServer(),
+		concurrent:          true,
+		KontrolEnabled:      true,
+		RegisterToKontrol:   true,
+		Authenticators:      make(map[string]func(*Request) error),
+		disableAuthenticate: options.DisableAuthentication,
+		handlers:            make(map[string]HandlerFunc),
+		ready:               make(chan bool),
+		end:                 make(chan bool, 1),
 	}
 
 	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback)
@@ -185,12 +191,6 @@ func New(options *Options) *Kite {
 
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
-}
-
-// DisableAuthentication disables authentication for every incoming request.
-// This makes all methods accessible for everyone.
-func (k *Kite) DisableAuthentication() {
-	k.authenticate = false
 }
 
 func (k *Kite) EnableTLS(certFile, keyFile string) {
