@@ -117,14 +117,6 @@ func (p *Partial) Function() (f Function, err error) {
 // Helper methods for unmarshaling JSON types that panic on errors
 //----------------------------------------------------------------
 
-type ArgumentError struct {
-	s string
-}
-
-func (err ArgumentError) Error() string {
-	return err.s
-}
-
 func checkError(err error) {
 	if err != nil {
 		panic(&ArgumentError{err.Error()})

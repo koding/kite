@@ -31,6 +31,8 @@ type Dnode struct {
 	// Dnode message processors.
 	RunMethod   Runner
 	RunCallback Runner
+
+	OnError func(err error)
 }
 
 type Wrapper func(args []interface{}, tr Transport) []interface{}

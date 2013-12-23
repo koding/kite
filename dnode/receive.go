@@ -12,30 +12,21 @@ import (
 func (d *Dnode) processMessage(data []byte) error {
 	var (
 		err     error
+		ok      bool
 		msg     Message
 		handler reflect.Value
 		runner  Runner
 	)
 
+	// Call error handler.
+	defer func() {
+		if d.OnError != nil {
+			d.OnError(err)
+		}
+	}()
+
 	if err = json.Unmarshal(data, &msg); err != nil {
 		return err
-	}
-
-	// Get the handler function. Method may be string or integer.
-	switch method := msg.Method.(type) {
-	case float64:
-		handler = d.callbacks[uint64(method)]
-		runner = d.RunCallback
-	case string:
-		handler = d.handlers[method]
-		runner = d.RunMethod
-	default:
-		return fmt.Errorf("Invalid method: %s", msg.Method)
-	}
-
-	// Method is not found.
-	if handler == reflect.ValueOf(nil) {
-		return fmt.Errorf("Unknown method: %v", msg.Method)
 	}
 
 	// Replace function placeholders with real functions.
@@ -44,8 +35,28 @@ func (d *Dnode) processMessage(data []byte) error {
 	}
 
 	// Must do this after parsing callbacks.
-	var arguments []*Partial
-	if err = msg.Arguments.Unmarshal(&arguments); err != nil {
+	var args Arguments
+	if err = msg.Arguments.Unmarshal(&args); err != nil {
+		return err
+	}
+
+	// Find the handler function. Method may be string or integer.
+	switch method := msg.Method.(type) {
+	case float64:
+		id := uint64(method)
+		runner = d.RunCallback
+		if handler, ok = d.callbacks[id]; !ok {
+			err = CallbackNotFoundError{id, args}
+			return err
+		}
+	case string:
+		runner = d.RunMethod
+		if handler, ok = d.handlers[method]; !ok {
+			err = MethodNotFoundError{method, args}
+			return err
+		}
+	default:
+		err = fmt.Errorf("Mehtod is not string or integer: %q", msg.Method)
 		return err
 	}
 
@@ -53,7 +64,8 @@ func (d *Dnode) processMessage(data []byte) error {
 		runner = defaultRunner
 	}
 
-	runner(fmt.Sprint(msg.Method), handler, Arguments(arguments), d.transport)
+	runner(fmt.Sprint(msg.Method), handler, args, d.transport)
+
 	return nil
 }
 

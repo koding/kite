@@ -4,13 +4,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"github.com/op/go-logging"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
 const DefaultTellTimeout = 4 * time.Second
@@ -223,7 +224,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 	r := tr.Properties()["remoteKite"].(*RemoteKite)
 
 	responseCallback := args[len(args)-1].(Callback) // last item
-	args = args[:len(args)-1]                        // previout items
+	args = args[:len(args)-1]                        // previous items
 
 	options := callOptionsOut{
 		WithArgs:         args,
