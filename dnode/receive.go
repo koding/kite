@@ -20,7 +20,7 @@ func (d *Dnode) processMessage(data []byte) error {
 
 	// Call error handler.
 	defer func() {
-		if d.OnError != nil {
+		if err != nil && d.OnError != nil {
 			d.OnError(err)
 		}
 	}()

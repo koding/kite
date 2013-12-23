@@ -12,7 +12,7 @@ type MethodNotFoundError struct {
 }
 
 func (e MethodNotFoundError) Error() string {
-	return fmt.Sprint("Unknown method: %s", e.Method)
+	return fmt.Sprintf("Method not found: %s", e.Method)
 }
 
 // CallbackNotFoundError is returned when there is no registered callback for
@@ -23,7 +23,7 @@ type CallbackNotFoundError struct {
 }
 
 func (e CallbackNotFoundError) Error() string {
-	return fmt.Sprint("Unknown callback ID: %d", e.ID)
+	return fmt.Sprintf("Callback ID not found: %d", e.ID)
 }
 
 // ArgumentError is returned when received message contains invalid arguments.

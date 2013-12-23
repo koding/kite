@@ -1,11 +1,12 @@
 package rpc
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"errors"
 	"koding/newkite/dnode"
 	"net/url"
 	"time"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 const redialDurationStart = 1 * time.Second
@@ -74,11 +75,12 @@ func NewClient() *Client {
 	return c
 }
 
-func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner) {
+func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner, onError func(error)) {
 	c.dnode.WrapMethodArgs = wrapMethodArgs
 	c.dnode.WrapCallbackArgs = wrapCallbackArgs
 	c.dnode.RunMethod = runMethod
 	c.dnode.RunCallback = runCallback
+	c.dnode.OnError = onError
 }
 
 // Dial connects to the dnode server on "url" and starts a goroutine

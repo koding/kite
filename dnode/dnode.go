@@ -90,6 +90,7 @@ func (d *Dnode) Copy(transport Transport) *Dnode {
 		WrapCallbackArgs: d.WrapCallbackArgs,
 		RunMethod:        d.RunMethod,
 		RunCallback:      d.RunCallback,
+		OnError:          d.OnError,
 	}
 }
 

@@ -51,7 +51,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 
 	// Recover dnode argument errors. The caller can use functions like
 	// MustString(), MustSlice()... without the fear of panic.
-	defer kite.recoverError(kiteErr)()
+	defer kite.recoverError(&kiteErr)()
 
 	request, callback = kite.parseRequest(method, args, tr)
 
@@ -96,7 +96,7 @@ type errorForSending *Error
 
 // recoverError returns a function which recovers the error and sets to the
 // given argument as kite.Error.
-func (k *Kite) recoverError(kiteErr *Error) func() {
+func (k *Kite) recoverError(kiteErr **Error) func() {
 	return func() {
 		r := recover()
 		if r == nil {
@@ -105,16 +105,16 @@ func (k *Kite) recoverError(kiteErr *Error) func() {
 
 		switch err := r.(type) {
 		case *Error:
-			kiteErr = err
+			*kiteErr = err
 		case *dnode.ArgumentError:
-			kiteErr = &Error{"argumentError", err.Error()}
+			*kiteErr = &Error{"argumentError", err.Error()}
 		case error:
-			kiteErr = &Error{"genericError", err.Error()}
+			*kiteErr = &Error{"genericError", err.Error()}
 		default:
-			kiteErr = &Error{"genericError", fmt.Sprint(r)}
+			*kiteErr = &Error{"genericError", fmt.Sprint(r)}
 		}
 
-		k.Log.Warning("Error in received message: %s", kiteErr.Error())
+		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
 	}
 }
 
@@ -145,7 +145,8 @@ func (c Callback) MarshalJSON() ([]byte, error) {
 func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
 	kite := tr.Properties()["localKite"].(*Kite)
 
-	defer kite.recoverError(new(Error))() // Do not panic no matter what.
+	kiteErr := new(Error)               // Not used. For recovering the error.
+	defer kite.recoverError(&kiteErr)() // Do not panic no matter what.
 
 	request, _ := kite.parseRequest(method, args, tr)
 

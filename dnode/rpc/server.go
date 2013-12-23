@@ -1,8 +1,9 @@
 package rpc
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"koding/newkite/dnode"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 // Server is a websocket server serving each dnode messages with registered handlers.
@@ -37,11 +38,12 @@ func (s *Server) SetConcurrent(value bool) {
 	s.dnode.SetConcurrent(value)
 }
 
-func (s *Server) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner) {
+func (s *Server) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, runMethod, runCallback dnode.Runner, onError func(error)) {
 	s.dnode.WrapMethodArgs = wrapMethodArgs
 	s.dnode.WrapCallbackArgs = wrapCallbackArgs
 	s.dnode.RunMethod = runMethod
 	s.dnode.RunCallback = runCallback
+	s.dnode.OnError = onError
 }
 
 // HandleFunc registers the handler for the given method.
