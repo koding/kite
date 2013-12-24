@@ -66,10 +66,10 @@ type Kite struct {
 	// Wheter we want to register our Kite to Kontrol, true by default.
 	RegisterToKontrol bool
 
-	// Use Koding.com's TLS reverse-proxy server for incoming connections.
-	// Instead of the Kite's address, address of the TLS proxy will be
+	// Use Koding.com's reverse-proxy server for incoming connections.
+	// Instead of the Kite's address, address of the Proxy Kite will be
 	// registered to Kontrol.
-	tlsProxyEnabled bool
+	proxyEnabled bool
 
 	// method map for exported methods
 	handlers map[string]HandlerFunc
@@ -205,8 +205,8 @@ func (k *Kite) EnableTLS(certFile, keyFile string) {
 	k.Kite.URL.Scheme = "wss"
 }
 
-func (k *Kite) EnableTLSProxy() {
-	k.tlsProxyEnabled = true
+func (k *Kite) EnableProxy() {
+	k.proxyEnabled = true
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests
@@ -339,9 +339,9 @@ func (k *Kite) listenAndServe() (err error) {
 
 	registerURLs := make(chan *url.URL, 1)
 
-	if k.tlsProxyEnabled {
-		// Register to TLS Kite and stay connected.
-		// Fill the channel with registered TLS URLs.
+	if k.proxyEnabled {
+		// Register to Proxy Kite and stay connected.
+		// Fill the channel with registered Proxy URLs.
 		go k.keepRegisteredToProxyKite(registerURLs)
 	} else {
 		// Register with Kite's own URL.
