@@ -14,7 +14,7 @@ var proxyQuery = protocol.KontrolQuery{
 	// TODO Do not forget to change to "koding" before running on production.
 	Username:    "devrim",
 	Environment: "production",
-	Name:        "tls",
+	Name:        "proxy",
 }
 
 func (k *Kite) keepRegisteredToProxyKite(urls chan *url.URL) {
