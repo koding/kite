@@ -4,6 +4,7 @@ import (
 	"errors"
 	"koding/newkite/dnode"
 	"net/url"
+	"sync"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
@@ -51,6 +52,9 @@ type Client struct {
 	// connect/disconnect.
 	onConnectHandlers    []func()
 	onDisconnectHandlers []func()
+
+	// For protecting access over OnConnect and OnDisconnect handlers.
+	m sync.RWMutex
 }
 
 // NewClient returns a pointer to new Client.
@@ -226,24 +230,38 @@ func (c *Client) Call(method string, args ...interface{}) (map[string]dnode.Path
 
 // OnConnect registers a function to run on client connect.
 func (c *Client) OnConnect(handler func()) {
+	c.m.Lock()
 	c.onConnectHandlers = append(c.onConnectHandlers, handler)
+	c.m.Unlock()
 }
 
 // OnDisconnect registers a function to run on client disconnect.
 func (c *Client) OnDisconnect(handler func()) {
+	c.m.Lock()
 	c.onDisconnectHandlers = append(c.onDisconnectHandlers, handler)
+	c.m.Unlock()
 }
 
 // callOnConnectHandlers runs the registered connect handlers.
 func (c *Client) callOnConnectHandlers() {
+	c.m.RLock()
 	for _, handler := range c.onConnectHandlers {
-		go handler()
+		func() {
+			defer recover()
+			handler()
+		}()
 	}
+	c.m.RUnlock()
 }
 
 // callOnDisconnectHandlers runs the registered disconnect handlers.
 func (c *Client) callOnDisconnectHandlers() {
+	c.m.RLock()
 	for _, handler := range c.onDisconnectHandlers {
-		go handler()
+		func() {
+			defer recover()
+			handler()
+		}()
 	}
+	c.m.RUnlock()
 }

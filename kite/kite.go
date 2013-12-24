@@ -8,7 +8,6 @@ import (
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -343,7 +342,7 @@ func (k *Kite) listenAndServe() (err error) {
 	if k.tlsProxyEnabled {
 		// Register to TLS Kite and stay connected.
 		// Fill the channel with registered TLS URLs.
-		go k.registerToTLS(registerURLs)
+		go k.keepRegisteredToProxyKite(registerURLs)
 	} else {
 		// Register with Kite's own URL.
 		registerURLs <- k.URL.URL
@@ -356,7 +355,7 @@ func (k *Kite) listenAndServe() (err error) {
 		}
 
 		if k.RegisterToKontrol {
-			go k.registerToKontrol(registerURLs)
+			go k.keepRegisteredToKontrol(registerURLs)
 		}
 	}
 
@@ -376,87 +375,6 @@ func (k *Kite) listenAndServe() (err error) {
 	k.end <- true // Serving is finished.
 
 	return err
-}
-
-func (k *Kite) registerToKontrol(urls chan *url.URL) {
-	for k.URL.URL = range urls {
-		for {
-			err := k.Kontrol.Register()
-			if err != nil {
-				k.Log.Fatalf("Cannot register to Kontrol: %s", err)
-				time.Sleep(60 * time.Second)
-			}
-
-			// Registered to Kontrol.
-			break
-		}
-	}
-}
-
-func (k *Kite) registerToTLS(urls chan *url.URL) {
-	query := protocol.KontrolQuery{
-		Username:    "devrim",
-		Environment: "production",
-		Name:        "tls",
-	}
-
-	for {
-		kites, err := k.Kontrol.GetKites(query)
-		if err != nil {
-			k.Log.Error("Cannot get TLS kites from Kontrol: %s", err.Error())
-			time.Sleep(1)
-			continue
-		}
-
-		tls := kites[rand.Int()%len(kites)]
-
-		// Notify us on disconnect
-		disconnect := make(chan bool, 1)
-		tls.OnDisconnect(func() {
-			select {
-			case disconnect <- true:
-			default:
-			}
-		})
-
-		err = tls.Dial()
-		if err != nil {
-			k.Log.Error("Cannot connect to TLS kite: %s", err.Error())
-			time.Sleep(1)
-			continue
-		}
-
-		result, err := tls.Tell("register")
-		if err != nil {
-			k.Log.Error("TLS register error: %s", err.Error())
-			tls.Close()
-			time.Sleep(1)
-			continue
-		}
-
-		tlsURL, err := result.String()
-		if err != nil {
-			k.Log.Error("TLS register result error: %s", err.Error())
-			tls.Close()
-			time.Sleep(1)
-			continue
-		}
-
-		parsed, err := url.Parse(tlsURL)
-		if err != nil {
-			k.Log.Error("Cannot parse TLS URL: %s", err.Error())
-			tls.Close()
-			time.Sleep(1)
-			continue
-		}
-
-		if k.KontrolEnabled && k.RegisterToKontrol {
-			urls <- parsed
-		}
-
-		// Block until disconnect from TLS Kite.
-		<-disconnect
-	}
 }
 
 // OnConnect registers a function to run when a Kite connects to this Kite.
