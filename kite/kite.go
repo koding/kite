@@ -355,7 +355,7 @@ func (k *Kite) listenAndServe() (err error) {
 		}
 
 		if k.RegisterToKontrol {
-			go k.registerToKontrol(registerURLs)
+			go k.keepRegisteredToKontrol(registerURLs)
 		}
 	}
 
@@ -375,21 +375,6 @@ func (k *Kite) listenAndServe() (err error) {
 	k.end <- true // Serving is finished.
 
 	return err
-}
-
-func (k *Kite) registerToKontrol(urls chan *url.URL) {
-	for k.URL.URL = range urls {
-		for {
-			err := k.Kontrol.Register()
-			if err != nil {
-				k.Log.Fatalf("Cannot register to Kontrol: %s", err)
-				time.Sleep(60 * time.Second)
-			}
-
-			// Registered to Kontrol.
-			break
-		}
-	}
 }
 
 // OnConnect registers a function to run when a Kite connects to this Kite.

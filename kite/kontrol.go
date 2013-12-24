@@ -12,6 +12,23 @@ import (
 
 var ErrNoKitesAvailable = errors.New("no kites availabile")
 
+const registerKontrolRetryDuration = time.Minute
+
+func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
+	for k.URL.URL = range urls {
+		for {
+			err := k.Kontrol.Register()
+			if err != nil {
+				k.Log.Fatalf("Cannot register to Kontrol: %s", err)
+				time.Sleep(registerKontrolRetryDuration)
+			}
+
+			// Registered to Kontrol.
+			break
+		}
+	}
+}
+
 // Kontrol embeds RemoteKite which has additional special helper methods.
 type Kontrol struct {
 	*RemoteKite
