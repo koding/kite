@@ -93,7 +93,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 
 func onError(err error) {
 	switch e := err.(type) {
-	case dnode.MethodNotFoundError:
+	case dnode.MethodNotFoundError: // Tell the requester "method is not found".
 		if len(e.Args) == 0 {
 			return
 		}
