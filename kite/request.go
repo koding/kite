@@ -96,6 +96,9 @@ type errorForSending *Error
 
 // recoverError returns a function which recovers the error and sets to the
 // given argument as kite.Error.
+
+//TODO: change that it doesn't use a pointer of  pointer, a simpler and
+//cleaner solution would work in the future
 func (k *Kite) recoverError(kiteErr **Error) func() {
 	return func() {
 		r := recover()
