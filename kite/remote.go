@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/op/go-logging"
 )
 
@@ -64,11 +66,10 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	// We need a reference to the remote kite when sending a message to remote.
 	r.client.Properties()["remoteKite"] = r
 
-	if r.Kite.URL.Scheme == "wss" {
-		// Check if the certificate of the remote Kite is signed by Kontrol.
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(kontrol_pem())
-		r.client.Config.TlsConfig = &tls.Config{RootCAs: pool}
+	// Add trusted root certificates for client.
+	r.client.Config.TlsConfig = &tls.Config{RootCAs: x509.NewCertPool()}
+	for _, cert := range k.tlsCertificates {
+		r.client.Config.TlsConfig.RootCAs.AppendCertsFromPEM(cert)
 	}
 
 	r.OnConnect(func() {
@@ -206,16 +207,38 @@ loop:
 }
 
 func (r *RemoteKite) renewToken() error {
-	tkn, err := r.localKite.Kontrol.GetToken(&r.Kite)
+	tokenString, err := r.localKite.Kontrol.GetToken(&r.Kite)
 	if err != nil {
 		return err
 	}
 
-	validUntil := time.Now().UTC().Add(time.Duration(tkn.TTL) * time.Second)
-	r.Authentication.Key = tkn.Key
-	r.Authentication.validUntil = &validUntil
+	token, err := jwt.Parse(tokenString, r.localKite.getRSAKey)
+	if err != nil {
+		return errors.New("Cannot parse token")
+	}
+
+	exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
+
+	r.Authentication.Key = tokenString
+	r.Authentication.validUntil = &exp
 
 	return nil
+}
+
+// getRSAKey returns the corresponding public key for the issuer of the token.
+// It is called by jwt-go package when validating the signature in the token.
+func (k *Kite) getRSAKey(token *jwt.Token) ([]byte, error) {
+	issuer, ok := token.Claims["iss"].(string)
+	if !ok {
+		return nil, errors.New("Token does not contain a valid issuer claim")
+	}
+
+	key, ok := k.trustedKontrolKeys[issuer]
+	if !ok {
+		return nil, fmt.Errorf("Issuer is not trusted: %s", issuer)
+	}
+
+	return key, nil
 }
 
 // callOptions is the type of first argument in the dnode message.
