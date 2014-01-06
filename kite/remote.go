@@ -64,7 +64,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	// We need a reference to the remote kite when sending a message to remote.
 	r.client.Properties()["remoteKite"] = r
 
-	if r.Kite.URL.Scheme == "wss" {
+	if r.Kite.URL.URL != nil && r.Kite.URL.Scheme == "wss" {
 		// Check if the certificate of the remote Kite is signed by Kontrol.
 		pool := x509.NewCertPool()
 		pool.AppendCertsFromPEM(kontrol_pem())
