@@ -2,8 +2,10 @@ package rpc
 
 import (
 	"errors"
+	"fmt"
 	"koding/newkite/dnode"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -191,7 +193,10 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Send(msg []byte) error {
-	// println("\nSending...", string(msg))
+	if os.Getenv("DNODE_PRINT_SEND") != "" {
+		fmt.Fprintf(os.Stderr, "\nSending: %s\n", string(msg))
+	}
+
 	if c.Conn == nil {
 		return errors.New("Not connected")
 	}
@@ -203,7 +208,11 @@ func (c *Client) Receive() ([]byte, error) {
 	// println("Receiving...")
 	var msg []byte
 	err := websocket.Message.Receive(c.Conn, &msg)
-	// println("\nReceived:", string(msg))
+
+	if os.Getenv("DNODE_PRINT_RECV") != "" {
+		fmt.Fprintf(os.Stderr, "\nReceived: %s\n", string(msg))
+	}
+
 	return msg, err
 }
 
