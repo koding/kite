@@ -404,7 +404,27 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
+		// We must only get one argument for response callback.
+		arg, err := request.Args.SliceOfLength(1)
+		if err != nil {
+			resp.Err = &Error{Type: "invalidResponse", Message: err.Error()}
+			return
+		}
+
 		// Unmarshal callback response argument.
-		request.Args.One().MustUnmarshal(&resp)
+		err = arg[0].Unmarshal(&resp)
+		if err != nil {
+			resp.Err = &Error{Type: "invalidResponse", Message: err.Error()}
+			return
+		}
+
+		// At least result or error must be sent.
+		if resp.Result == nil && resp.Err == nil {
+			resp.Err = &Error{
+				Type:    "invalidResponse",
+				Message: "Server has sent invalid response arguments",
+			}
+			return
+		}
 	})
 }

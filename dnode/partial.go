@@ -42,7 +42,7 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	}
 
 	if err := json.Unmarshal(p.Raw, &v); err != nil {
-		return err
+		return fmt.Errorf("%s. Data: %s", err.Error(), string(p.Raw))
 	}
 
 	for _, spec := range p.CallbackSpecs {
@@ -175,7 +175,9 @@ func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
 	if len(a) != length {
 		items := make([]string, len(a))
 		for i, item := range a {
-			items[i] = string(item.Raw)
+			if item != nil {
+				items[i] = string(item.Raw)
+			}
 		}
 
 		return nil, fmt.Errorf("Invalid array length: %d, expected: %d, array: %+v", len(a), length, items)
