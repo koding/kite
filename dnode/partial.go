@@ -173,7 +173,12 @@ type Arguments []*Partial
 
 func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
 	if len(a) != length {
-		return nil, errors.New("Invalid array length")
+		items := make([]string, len(a))
+		for i, item := range a {
+			items[i] = string(item.Raw)
+		}
+
+		return nil, fmt.Errorf("Invalid array length: %d, expected: %d, array: %+v", len(a), length, items)
 	}
 
 	return []*Partial(a), nil
