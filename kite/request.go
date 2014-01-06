@@ -8,6 +8,7 @@ import (
 	"koding/newkite/kodingkey"
 	"koding/newkite/token"
 	"reflect"
+	"runtime/debug"
 )
 
 // runMethod is called when a method is received from remote Kite.
@@ -118,6 +119,8 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 		}
 
 		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
+
+		debug.PrintStack()
 	}
 }
 
