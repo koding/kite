@@ -420,7 +420,11 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 		}
 
 		// At least result or error must be sent.
-		if resp.Result == nil && resp.Err == nil {
+		keys := make(map[string]interface{})
+		err = arg[0].Unmarshal(&keys)
+		_, ok1 := keys["result"]
+		_, ok2 := keys["error"]
+		if !ok1 && !ok2 {
 			resp.Err = &Error{
 				Type:    "invalidResponse",
 				Message: "Server has sent invalid response arguments",
