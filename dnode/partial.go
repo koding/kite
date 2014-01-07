@@ -172,18 +172,18 @@ func (p *Partial) MustFunction() Function {
 type Arguments []*Partial
 
 func (a Arguments) SliceOfLength(length int) ([]*Partial, error) {
-	if len(a) != length {
-		items := make([]string, len(a))
-		for i, item := range a {
-			if item != nil {
-				items[i] = string(item.Raw)
-			}
-		}
-
-		return nil, fmt.Errorf("Invalid array length: %d, expected: %d, array: %+v", len(a), length, items)
+	if length == len(a) {
+		return []*Partial(a), nil
 	}
 
-	return []*Partial(a), nil
+	items := make([]string, len(a))
+	for i, item := range a {
+		if item != nil {
+			items[i] = string(item.Raw)
+		}
+	}
+
+	return nil, fmt.Errorf("Invalid array length: %d, expected: %d, array: %+v", len(a), length, items)
 }
 
 func (a Arguments) MustSliceOfLength(length int) []*Partial {
