@@ -384,6 +384,7 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 
 // sendCallbackID send the callback number to be deleted after response is received.
 func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
+	// TODO now, it is not the max id that is response callback.
 	if len(callbacks) > 0 {
 		// Find max callback ID.
 		max := uint64(0)
@@ -427,7 +428,31 @@ func (r *RemoteKite) makeResponseCallback(doneChan chan *response, removeCallbac
 			r.client.RemoveCallback(id)
 		}
 
+		// We must only get one argument for response callback.
+		arg, err := request.Args.SliceOfLength(1)
+		if err != nil {
+			resp.Err = &Error{Type: "invalidResponse", Message: err.Error()}
+			return
+		}
+
 		// Unmarshal callback response argument.
-		request.Args.One().MustUnmarshal(&resp)
+		err = arg[0].Unmarshal(&resp)
+		if err != nil {
+			resp.Err = &Error{Type: "invalidResponse", Message: err.Error()}
+			return
+		}
+
+		// At least result or error must be sent.
+		keys := make(map[string]interface{})
+		err = arg[0].Unmarshal(&keys)
+		_, ok1 := keys["result"]
+		_, ok2 := keys["error"]
+		if !ok1 && !ok2 {
+			resp.Err = &Error{
+				Type:    "invalidResponse",
+				Message: "Server has sent invalid response arguments",
+			}
+			return
+		}
 	})
 }

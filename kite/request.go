@@ -6,6 +6,7 @@ import (
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
 	"reflect"
+	"runtime/debug"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -119,6 +120,8 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 		}
 
 		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
+
+		debug.PrintStack()
 	}
 }
 
