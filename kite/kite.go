@@ -95,6 +95,15 @@ type Kite struct {
 	// Should kite disable authenticators for incoming requests? Disabled by default
 	disableAuthenticate bool
 
+	// Kontrol keys to trust. Kontrol will issue access tokens for kites
+	// that are signed with the private counterpart of these keys.
+	// Key data must be PEM encoded.
+	trustedKontrolKeys map[string][]byte
+
+	// Trusted root certificates for TLS connections (wss://).
+	// Certificate data must be PEM encoded.
+	tlsCertificates [][]byte
+
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
 	ready chan bool
@@ -154,12 +163,16 @@ func New(options *Options) *Kite {
 		concurrent:          true,
 		KontrolEnabled:      true,
 		RegisterToKontrol:   true,
+		trustedKontrolKeys:  make(map[string][]byte),
 		Authenticators:      make(map[string]func(*Request) error),
 		disableAuthenticate: options.DisableAuthentication,
 		handlers:            make(map[string]HandlerFunc),
 		ready:               make(chan bool),
 		end:                 make(chan bool, 1),
 	}
+
+	k.TrustKontrolKey("koding.com", kodingKontrolPub)
+	k.AddRootCertificate(kontrol_pem())
 
 	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback, onError)
 	k.server.Properties()["localKite"] = k
@@ -207,6 +220,14 @@ func (k *Kite) EnableTLS(certFile, keyFile string) {
 
 func (k *Kite) EnableProxy() {
 	k.proxyEnabled = true
+}
+
+func (k *Kite) TrustKontrolKey(issuer string, key []byte) {
+	k.trustedKontrolKeys[issuer] = key
+}
+
+func (k *Kite) AddRootCertificate(cert []byte) {
+	k.tlsCertificates = append(k.tlsCertificates, cert)
 }
 
 // Run is a blocking method. It runs the kite server and then accepts requests

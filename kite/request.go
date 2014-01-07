@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"koding/newkite/dnode"
 	"koding/newkite/dnode/rpc"
-	"koding/newkite/kodingkey"
-	"koding/newkite/token"
 	"reflect"
 	"runtime/debug"
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 // runMethod is called when a method is received from remote Kite.
@@ -239,21 +240,28 @@ func (r *Request) authenticate() *Error {
 
 // AuthenticateFromToken is the default Authenticator for Kite.
 func (k *Kite) AuthenticateFromToken(r *Request) error {
-	key, err := kodingkey.FromString(k.KodingKey)
+	token, err := jwt.Parse(r.Authentication.Key, r.LocalKite.getRSAKey)
 	if err != nil {
-		return fmt.Errorf("Invalid Koding Key: %s", k.KodingKey)
+		return err
 	}
 
-	tkn, err := token.DecryptString(r.Authentication.Key, key)
-	if err != nil {
-		return fmt.Errorf("Invalid token: %s", r.Authentication.Key)
+	if audience, ok := token.Claims["aud"].(string); !ok || audience != k.ID {
+		return errors.New("Invalid audience in token")
 	}
 
-	if !tkn.IsValid(k.ID) {
-		return fmt.Errorf("Invalid token: %s", tkn)
+	if expiration, ok := token.Claims["exp"].(float64); !ok || int64(expiration) < time.Now().UTC().Unix() {
+		return errors.New("Token is expired")
 	}
 
-	r.Username = tkn.Username
+	if notBefore, ok := token.Claims["nbf"].(float64); !ok || int64(notBefore) > time.Now().UTC().Unix() {
+		return errors.New("Token is not valid yet")
+	}
+
+	if username, ok := token.Claims["sub"].(string); !ok {
+		return errors.New("Username is not present in token")
+	} else {
+		r.Username = username
+	}
 
 	return nil
 }

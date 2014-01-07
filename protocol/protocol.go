@@ -67,8 +67,8 @@ const (
 )
 
 type KiteWithToken struct {
-	Kite  Kite  `json:"kite"`
-	Token Token `json:"token"`
+	Kite  Kite   `json:"kite"`
+	Token string `json:"token"`
 }
 
 // KiteEvent is the struct that is sent as an argument in watchCallback of
@@ -78,7 +78,7 @@ type KiteEvent struct {
 	Kite   Kite       `json:"kite"`
 
 	// Required when Action == Register
-	Token *Token `json:"token,omitempty"`
+	Token string `json:"token,omitempty"`
 }
 
 type KiteAction string
@@ -87,13 +87,6 @@ const (
 	Register   KiteAction = "REGISTER"
 	Deregister KiteAction = "DEREGISTER"
 )
-
-// Token is the type of the struct given to a Kite in order to authenticate
-// itself to the remote Kite.
-type Token struct {
-	Key string `json:"key"`
-	TTL int    `json:"ttl"`
-}
 
 // KontrolQuery is a structure of message sent to Kontrol. It is used for
 // querying kites based on the incoming field parameters. Missing fields are
