@@ -9,6 +9,9 @@ import (
 type KiteURL struct{ *url.URL }
 
 func (u KiteURL) MarshalJSON() ([]byte, error) {
+	if u.URL == nil {
+		return json.Marshal(nil)
+	}
 	return json.Marshal(u.String())
 }
 
