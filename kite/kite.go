@@ -410,7 +410,7 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 
 // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
 func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	k.Log.Info("Client is connected to us: %s", r.Name)
+	k.Log.Info("Client is connected: %s", r.Name)
 
 	for _, handler := range k.onConnectHandlers {
 		go handler(r)
