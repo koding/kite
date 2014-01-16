@@ -82,7 +82,7 @@ type Error struct {
 }
 
 func (e Error) Error() string {
-	return fmt.Sprintf("Kite error: %s: %s", e.Type, e.Message)
+	return fmt.Sprintf("kite error %s - %s", e.Type, e.Message)
 }
 
 // When a callback is called we always pass this as the only argument.
@@ -119,7 +119,7 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 			*kiteErr = &Error{"genericError", fmt.Sprint(r)}
 		}
 
-		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
+		k.Log.Warning("Error in received message %s", (*kiteErr).Error())
 
 		debug.PrintStack()
 	}
