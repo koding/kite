@@ -28,6 +28,12 @@ func (r *Register) Exec(args []string) error {
 		authServer = util.AuthServerLocal
 	}
 
+	// i.e: kd register to latest.koding.com
+	//  	kd register to localhost:4000
+	if len(args) == 2 && args[0] == "to" {
+		authServer = fmt.Sprintf("http://%s", args[1])
+	}
+
 	hostID, err := util.HostID()
 	if err != nil {
 		return err
@@ -81,7 +87,8 @@ func (r *Register) Exec(args []string) error {
 	return nil
 }
 
-// checker checks if the user has browsed the register URL by polling the check URL.
+// checker checks if the user has browsed the register URL by polling the
+// check URL.
 func checker(authServer, key string) error {
 	// check the result every two seconds
 	ticker := time.NewTicker(2 * time.Second).C
