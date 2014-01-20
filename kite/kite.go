@@ -7,7 +7,6 @@ import (
 	"koding/newkite/dnode/rpc"
 	"koding/newkite/protocol"
 	"koding/newkite/utils"
-	"koding/tools/logger"
 	"log"
 	"net"
 	"net/http"
@@ -283,14 +282,27 @@ func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	return nil, nil
 }
 
+func init() {
+	// These logging related stuff needs to be called once because stupid
+	// logging library uses global variables and resets the backends every time.
+	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
+	stderrBackend := logging.NewLogBackend(os.Stderr, "", log.LstdFlags)
+	stderrBackend.Color = true
+	syslogBackend, _ := logging.NewSyslogBackend("")
+	logging.SetBackend(stderrBackend, syslogBackend)
+}
+
 // newLogger returns a new logger object for desired name and level.
 func newLogger(name string, debug bool) *logging.Logger {
-	level := "info"
+	logger := logging.MustGetLogger(name)
+
+	level := logging.INFO
 	if debug {
-		level = "debug"
+		level = logging.DEBUG
 	}
 
-	return logger.CreateLogger(name, level)
+	logging.SetLevel(level, name)
+	return logger
 }
 
 // If the user wants to call flag.Parse() the flag must be defined in advance.
