@@ -188,6 +188,10 @@ func New(options *Options) *Kite {
 		}
 	})
 
+	k.server.OnConnect(func(c *rpc.Client) {
+		k.Log.Info("Client is connected: %s", c.Conn.Request().RemoteAddr)
+	})
+
 	// Every kite should be able to authenticate the user from token.
 	k.Authenticators["token"] = k.AuthenticateFromToken
 	// A kite accepts requests from Kontrol.
@@ -410,7 +414,8 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 
 // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
 func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	k.Log.Info("Client is connected: %s", r.Name)
+	k.Log.Info("Client '%s' is identified as '%s'",
+		r.client.Conn.Request().RemoteAddr, r.Name)
 
 	for _, handler := range k.onConnectHandlers {
 		go handler(r)
