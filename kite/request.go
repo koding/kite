@@ -174,18 +174,23 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 
 	// Create a new RemoteKite instance to pass it to the handler, so
 	// the handler can call methods on the other site on the same connection.
+	var remoteKite *RemoteKite
 	if properties["remoteKite"] == nil {
 		// Do not create a new RemoteKite on every request,
 		// cache it in Transport.Properties().
 		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
-		remoteKite := k.newRemoteKiteWithClient(options.Kite, options.Authentication, client)
+		remoteKite = k.newRemoteKiteWithClient(options.Kite, options.Authentication, client)
 		properties["remoteKite"] = remoteKite
 
 		// Notify Kite.OnConnect handlers.
 		k.notifyRemoteKiteConnected(remoteKite)
 	} else {
-		remoteKite := properties["remoteKite"].(*RemoteKite)
+		remoteKite = properties["remoteKite"].(*RemoteKite)
+
+		// Update Kite info but do not change the value of username.
+		username := remoteKite.Kite.Username
 		remoteKite.Kite = options.Kite
+		remoteKite.Kite.Username = username
 
 		// TODO can't set Authentication. Fix it.
 		// remoteKite.Authentication = options.Authentication
@@ -195,9 +200,8 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		Method:         method,
 		Args:           options.WithArgs,
 		LocalKite:      k,
-		RemoteKite:     properties["remoteKite"].(*RemoteKite),
+		RemoteKite:     remoteKite,
 		RemoteAddr:     tr.RemoteAddr(),
-		Username:       options.Kite.Username,
 		Authentication: options.Authentication,
 	}
 
