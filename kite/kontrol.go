@@ -21,7 +21,8 @@ func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
 		for {
 			err := k.Kontrol.Register()
 			if err != nil {
-				k.Log.Fatalf("Cannot register to Kontrol: %s", err)
+				// do not exit, because existing applications might import the kite package
+				k.Log.Error("Cannot register to Kontrol: %s", err)
 				time.Sleep(registerKontrolRetryDuration)
 			}
 
