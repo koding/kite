@@ -136,7 +136,8 @@ func New(options *Options) *Kite {
 	if !options.DisableAuthentication {
 		kodingKey, err = utils.GetKodingKey()
 		if err != nil {
-			log.Fatal("Couldn't find koding.key. Please run 'kd register'.")
+			// don't fatal until we find a better way to integrate kite into other applications
+			log.Println("Couldn't find koding.key. Please run 'kd register'.")
 		}
 	}
 
