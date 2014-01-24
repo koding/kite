@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"koding/newkite/protocol"
+	"koding/kite/protocol"
 )
 
 // Event is the struct that is sent as an argument in watchCallback of
