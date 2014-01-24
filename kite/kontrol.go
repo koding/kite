@@ -3,7 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/kite/protocol"
+	"koding/newkite/protocol"
 	"net"
 	"net/url"
 	"sync"
@@ -134,11 +134,11 @@ func (k *Kontrol) Register() error {
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
-func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol.KiteEvent)) error {
+func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event)) error {
 	<-k.ready
 
 	queueEvents := func(r *Request) {
-		var event protocol.KiteEvent
+		event := Event{localKite: k.localKite}
 		err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&event)
 		if err != nil {
 			k.Log.Error(err.Error())
@@ -156,10 +156,13 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*protocol
 
 	// also put the current kites to the eventChan.
 	for _, remoteKite := range remoteKites {
-		event := protocol.KiteEvent{
-			Action: protocol.Register,
-			Kite:   remoteKite.Kite,
-			Token:  remoteKite.Authentication.Key,
+		event := Event{
+			KiteEvent: protocol.KiteEvent{
+				Action: protocol.Register,
+				Kite:   remoteKite.Kite,
+				Token:  remoteKite.Authentication.Key,
+			},
+			localKite: k.localKite,
 		}
 
 		onEvent(&event)

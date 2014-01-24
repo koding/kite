@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"koding/kite/kite"
-	"koding/kite/protocol"
+	"koding/newkite/kite"
+	"koding/newkite/protocol"
 	"time"
 )
 
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// To demonstrate we can receive notifications matcing to our query.
-	onEvent := func(e *protocol.KiteEvent) {
+	onEvent := func(e *kite.Event) {
 		fmt.Printf("--- kite event: %#v\n", e)
 	}
 
@@ -53,7 +53,7 @@ func main() {
 	set := func(k string, v string) {
 		// we cant simply call, right ??
 		// response, err := datastore.Call("set", k, v )
-		response, err := datastore.Call("set", []string{k, v} )
+		response, err := datastore.Call("set", []string{k, v})
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -69,9 +69,8 @@ func main() {
 		fmt.Printf("input: %d  rpc result: %d\n", k, result)
 	}
 
-
 	get := func(k string) (error, string) {
-		response, err := datastore.Call("get", k )
+		response, err := datastore.Call("get", k)
 		if err != nil {
 			fmt.Println(err)
 			return err, ""

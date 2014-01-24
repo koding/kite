@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"koding/kite/kite"
-	"koding/kite/protocol"
+	"koding/newkite/kite"
+	"koding/newkite/protocol"
 	"math/rand"
 	"time"
 )
@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// To demonstrate we can receive notifications matcing to our query.
-	onEvent := func(e *protocol.KiteEvent) {
+	onEvent := func(e *kite.Event) {
 		fmt.Printf("--- kite event: %#v\n", e)
 	}
 
