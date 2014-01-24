@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"fmt"
-	"koding/newkite/dnode"
+	"koding/kite/dnode"
 	"net/http"
 	"testing"
 	"time"

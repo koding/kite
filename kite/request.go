@@ -3,8 +3,8 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/dnode"
-	"koding/newkite/dnode/rpc"
+	"koding/kite/dnode"
+	"koding/kite/dnode/rpc"
 	"reflect"
 	"runtime/debug"
 	"time"

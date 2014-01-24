@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	"koding/newkite/dnode"
+	"koding/kite/dnode"
 
 	"code.google.com/p/go.net/websocket"
 )

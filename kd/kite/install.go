@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/newkite/kd/util"
+	"koding/kite/kd/util"
 	"net/http"
 	"os"
 	"path/filepath"

@@ -2,7 +2,7 @@ package kite
 
 import (
 	"errors"
-	"koding/newkite/kd/util"
+	"koding/kite/kd/util"
 	"os"
 	"path/filepath"
 	"syscall"

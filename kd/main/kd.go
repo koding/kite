@@ -1,9 +1,9 @@
 package main
 
 import (
-	"koding/newkite/kd"
-	"koding/newkite/kd/cli"
-	"koding/newkite/kd/kite"
+	"koding/kite/kd"
+	"koding/kite/kd/cli"
+	"koding/kite/kd/kite"
 )
 
 func main() {

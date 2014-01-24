@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"koding/newkite/kite"
+	"koding/kite/kite"
 	"net"
 )
 

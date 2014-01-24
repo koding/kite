@@ -3,8 +3,8 @@ package kd
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/kd/util"
-	"koding/newkite/kodingkey"
+	"koding/kite/kd/util"
+	"koding/kite/kodingkey"
 	"time"
 )
 

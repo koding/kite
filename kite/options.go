@@ -3,7 +3,7 @@ package kite
 import (
 	"encoding/json"
 	"io/ioutil"
-	"koding/newkite/protocol"
+	"koding/kite/protocol"
 	"log"
 	"net/url"
 	"strings"

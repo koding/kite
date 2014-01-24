@@ -3,9 +3,9 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/kite"
-	"koding/newkite/protocol"
-	"koding/newkite/utils"
+	"koding/kite/kite"
+	"koding/kite/protocol"
+	"koding/kite/utils"
 	"net/url"
 	"strconv"
 )

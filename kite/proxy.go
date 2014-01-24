@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"koding/newkite/protocol"
+	"koding/kite/protocol"
 	"math/rand"
 	"net/url"
 	"time"

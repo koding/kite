@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"koding/newkite/kite"
-	"koding/newkite/protocol"
+	"koding/kite/kite"
+	"koding/kite/protocol"
 	"os"
 )
 

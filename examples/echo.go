@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"koding/newkite/kite"
+	"koding/kite/kite"
 	"koding/tools/config"
 	"net/url"
 	"strconv"

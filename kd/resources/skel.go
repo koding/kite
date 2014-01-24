@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"koding/newkite/kite"
-	"koding/newkite/protocol"
+	"koding/kite/kite"
+	"koding/kite/protocol"
 )
 
 type Sample struct{}

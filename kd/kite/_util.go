@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/newkite/protocol"
+	"koding/kite/protocol"
 	"koding/tools/process"
 	"os"
 	"os/exec"

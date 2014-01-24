@@ -3,7 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/protocol"
+	"koding/kite/protocol"
 	"net"
 	"net/url"
 	"sync"

@@ -3,7 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"koding/newkite/kd/util"
+	"koding/kite/kd/util"
 	"os"
 	"path/filepath"
 )
