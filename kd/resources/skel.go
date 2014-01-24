@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"koding/kite/kite"
+	"koding/kite"
 	"koding/kite/protocol"
 )
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"kite/kite"
+	"kite"
 	"kite/protocol"
 )
 

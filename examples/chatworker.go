@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"koding/kite/kite"
+	"koding/kite"
 	"koding/kite/protocol"
 	"strings"
 )
