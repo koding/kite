@@ -49,7 +49,7 @@ func (o *Options) validate() {
 
 	if o.KontrolURL == nil {
 		o.KontrolURL = &url.URL{
-			Scheme: "wss",
+			Scheme: "ws",
 			Host:   "127.0.0.1:4000", // local fallback address
 			Path:   "/dnode",
 		}
