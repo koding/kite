@@ -301,7 +301,7 @@ func init() {
 func newLogger(name string, debug bool) *logging.Logger {
 	logger := logging.MustGetLogger(name)
 
-	level := logging.INFO
+	level := logging.NOTICE
 	if debug {
 		level = logging.DEBUG
 	}
