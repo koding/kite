@@ -203,7 +203,7 @@ How can I write a new Kite?
 * Add your method handlers with `k.HandleFunc()`.
 * Call `k.Run()`
 
-See [go/src/koding/newkite/examples/mathworker.go](https://git.sj.koding.com/koding/koding/blob/master/go/src/koding/newkite/examples/mathworker.go)
+See [mathworker example](http://git.sj.koding.com/koding/kite/blob/master/examples/mathworker.go)
 for an example Kite code.
 
-Or read some real Kite code in [go/src/koding/kites](https://git.sj.koding.com/koding/koding/tree/master/go/src/koding/kites).
+Or read some real Kite code in [koding repository](http://git.sj.koding.com/koding/koding/tree/master/go/src/koding/kites).
