@@ -1,7 +1,7 @@
 package main
 
 import (
-	"koding/kites/kontrol"
+	"koding/kite/kontrol"
 )
 
 func main() {
