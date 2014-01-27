@@ -45,20 +45,30 @@ func main() {
 		binaryPath: *binaryPath,
 	}
 
-	build.do()
+	err := build.do()
+	if err != nil {
+		log.Println(err)
+	} else {
+		fmt.Println("build successfull")
+	}
+
 }
 
-func (b *Build) do() {
+func (b *Build) do() error {
 	switch runtime.GOOS {
 	case "darwin":
-		b.darwin()
+		return b.darwin()
 	default:
-		fmt.Printf("not supported os: %s.\n", runtime.GOOS)
+		return fmt.Errorf("not supported os: %s.\n", runtime.GOOS)
 	}
 }
 
+func (b *Build) linux() error {
+	return nil
+}
+
 // darwin is building a new .pkg installer for darwin based OS'es.
-func (b *Build) darwin() {
+func (b *Build) darwin() error {
 	version := b.version
 	if b.output == "" {
 		b.output = fmt.Sprintf("koding-%s", b.appName)
@@ -73,13 +83,12 @@ func (b *Build) darwin() {
 	os.MkdirAll(installRootUsr, 0755)
 	err := copyFile(b.binaryPath, installRootUsr+"/"+b.appName)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	tempDest, err := ioutil.TempDir("", "tempDest")
 	if err != nil {
-		return
+		return err
 	}
 	defer os.RemoveAll(tempDest)
 
@@ -96,10 +105,9 @@ func (b *Build) darwin() {
 		// used for next step, also set up for distribution.xml
 	)
 
-	res, err := cmdPkg.CombinedOutput()
+	_, err = cmdPkg.CombinedOutput()
 	if err != nil {
-		fmt.Println("res, err", string(res), err)
-		return
+		return err
 	}
 
 	distributionFile := "./darwin/Distribution.xml"
@@ -115,14 +123,12 @@ func (b *Build) darwin() {
 		targetFile,
 	)
 
-	res, err = cmdBuild.CombinedOutput()
+	_, err = cmdBuild.CombinedOutput()
 	if err != nil {
-		fmt.Println("res, err", string(res), err)
-		return
+		return err
 	}
 
-	fmt.Println("everything is ok")
-
+	return nil
 }
 
 func (b *Build) createLaunchAgent(rootDir string) {
