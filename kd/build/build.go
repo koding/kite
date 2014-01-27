@@ -3,8 +3,8 @@ package build
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"koding/kite/kd/util"
 	"log"
 	"os"
 	"os/exec"
@@ -78,7 +78,7 @@ func (b *Build) darwin() error {
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
 
 	os.MkdirAll(installRootUsr, 0755)
-	err := copyFile(b.binaryPath, installRootUsr+"/"+b.appName)
+	err := util.CopyFile(b.binaryPath, installRootUsr+"/"+b.appName)
 	if err != nil {
 		return err
 	}
@@ -189,33 +189,4 @@ func fileExist(dir string) bool {
 	}
 
 	panic(err) // permission errors or something else bad
-}
-
-func copyFile(src, dst string) error {
-	sf, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sf.Close()
-
-	fi, err := sf.Stat()
-	if err != nil {
-		return err
-	}
-
-	if fi.IsDir() {
-		return errors.New("src is a directory, please provide a file")
-	}
-
-	df, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fi.Mode())
-	if err != nil {
-		return err
-	}
-	defer df.Close()
-
-	if _, err := io.Copy(df, sf); err != nil {
-		return err
-	}
-
-	return nil
 }
