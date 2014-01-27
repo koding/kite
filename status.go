@@ -1,7 +1,6 @@
 package kite
 
 import (
-	sigar "github.com/cloudfoundry/gosigar"
 	"os/user"
 	"runtime"
 )
@@ -28,27 +27,6 @@ type disk struct {
 	Total uint64 `json:"diskTotal"`
 }
 
-func memoryStats() *memory {
-	m := new(memory)
-	mem := sigar.Mem{}
-	if err := mem.Get(); err == nil {
-		m.Usage = mem.ActualUsed
-		m.Total = mem.Total
-	}
-
-	return m
-}
-
-func diskStats() *disk {
-	d := new(disk)
-	space := sigar.FileSystemUsage{}
-	if err := space.Get("/"); err == nil {
-		d.Total = space.Total
-		d.Usage = space.Used
-	}
-	return d
-}
-
 func homeDir() string {
 	usr, err := user.Current()
 	if err != nil {
@@ -58,9 +36,16 @@ func homeDir() string {
 	return usr.HomeDir
 }
 
-func systemInfo() *Info {
-	disk := diskStats()
-	mem := memoryStats()
+func systemInfo() (*Info, error) {
+	disk, err := diskStats()
+	if err != nil {
+		return nil, err
+	}
+
+	mem, err := memoryStats()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Info{
 		State:       "RUNNING", // needed for client side compatibility
@@ -70,9 +55,9 @@ func systemInfo() *Info {
 		MemoryTotal: mem.Total,
 		HomeDir:     homeDir(),
 		Uname:       runtime.GOOS,
-	}
+	}, nil
 }
 
 func (Status) Info(r *Request) (interface{}, error) {
-	return systemInfo(), nil
+	return systemInfo()
 }
