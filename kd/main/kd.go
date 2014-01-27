@@ -2,6 +2,7 @@ package main
 
 import (
 	"koding/kite/kd"
+	"koding/kite/kd/build"
 	"koding/kite/kd/cli"
 	"koding/kite/kd/kite"
 )
@@ -10,6 +11,7 @@ func main() {
 	root := cli.NewCLI()
 	root.AddCommand("version", kd.NewVersion())
 	root.AddCommand("register", kd.NewRegister())
+	root.AddCommand("build", build.NewBuild())
 
 	k := root.AddSubCommand("kite")
 	k.AddCommand("install", kite.NewInstall())

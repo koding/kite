@@ -1,4 +1,4 @@
-package main
+package build
 
 const (
 	preInstall = `#!/bin/sh

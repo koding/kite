@@ -1,8 +1,7 @@
-package main
+package build
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,8 +13,6 @@ import (
 	"text/template"
 )
 
-var binaryPath = flag.String("bin", "", "binary to be included into the package")
-
 type Build struct {
 	appName    string
 	version    string
@@ -23,35 +20,35 @@ type Build struct {
 	binaryPath string
 }
 
-func main() {
-	flag.Parse()
+func NewBuild() *Build {
+	return &Build{}
+}
 
-	if *binaryPath == "" {
-		fmt.Println("please specify application binary with --bin flag")
-		os.Exit(1)
-	}
+func (b *Build) Definition() string {
+	return "Build deployable install packages"
+}
 
-	if !fileExist(*binaryPath) {
-		fmt.Printf("specified binary doesn't exist: %s\n", *binaryPath)
-		os.Exit(1)
+func (b *Build) Exec(args []string) error {
+	if len(args) == 0 {
+		return errors.New("Usage: kd build <importPath>")
 	}
 
 	// use binary name as appName
-	appName := filepath.Base(*binaryPath)
+	appName := filepath.Base(args[0])
 
 	build := &Build{
 		appName:    appName,
 		version:    "0.0.1",
-		binaryPath: *binaryPath,
+		binaryPath: args[0],
 	}
 
 	err := build.do()
 	if err != nil {
-		log.Println(err)
-	} else {
-		fmt.Println("build successfull")
+		return err
 	}
 
+	fmt.Println("build successfull")
+	return nil
 }
 
 func (b *Build) do() error {
