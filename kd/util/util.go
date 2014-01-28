@@ -134,7 +134,7 @@ func MakeTar(targ, workdir string) error {
 			name = name[1:]
 		}
 
-		log.Printf("adding to tar: %s", name)
+		// log.Printf("adding to tar: %s", name)
 
 		target, _ := os.Readlink(path)
 		hdr, err := tar.FileInfoHeader(fi, target)

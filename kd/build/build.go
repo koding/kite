@@ -2,6 +2,7 @@ package build
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"koding/kite/kd/util"
@@ -22,6 +23,7 @@ type Build struct {
 	output     string
 	binaryPath string
 	importPath string
+	files      string
 }
 
 func NewBuild() *Build {
@@ -33,23 +35,25 @@ func (b *Build) Definition() string {
 }
 
 func (b *Build) Exec(args []string) error {
-	usage := "Usage: kd build --import <importPath> || --bin <binaryPath>"
+	usage := "Usage: kd build --import <importPath> || --bin <binaryPath> --files <filesPath>"
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
 
-	if len(args) == 2 && (args[0] != "--bin" && args[0] != "--import") {
-		return errors.New(usage)
+	f := flag.NewFlagSet("build", flag.ContinueOnError)
+	f.StringVar(&b.importPath, "import", "", "Go importpath to be packaged")
+	f.StringVar(&b.binaryPath, "bin", "", "Binary to be packaged")
+	f.StringVar(&b.files, "files", "", "Files to be included with the package")
+	f.Parse(args)
+
+	if b.binaryPath != "" {
+		b.appName = filepath.Base(b.binaryPath)
+	} else if b.importPath != "" {
+		b.appName = filepath.Base(b.importPath)
+	} else {
+		return errors.New("build: --import or --bin should be defined.")
 	}
 
-	switch args[0] {
-	case "--bin":
-		b.binaryPath = args[1]
-	case "--import":
-		b.importPath = args[1]
-	}
-
-	b.appName = filepath.Base(args[1])
 	b.version = "0.0.1"
 	b.output = fmt.Sprintf("%s.%s-%s", b.appName, runtime.GOOS, runtime.GOARCH)
 
@@ -58,7 +62,6 @@ func (b *Build) Exec(args []string) error {
 		return err
 	}
 
-	fmt.Println("build successful: ", b.output)
 	return nil
 }
 
@@ -110,17 +113,16 @@ func (b *Build) tarGzFile() error {
 		}
 
 		buildFolder = filepath.Join(d.BuildGoPath, b.appName)
-
-		// copy package files, such as templates
-		assets := []string{filepath.Join(gopath, "src", b.importPath, "files")}
-		for _, assetDir := range assets {
-			err := file.Copy(assetDir, buildFolder)
-			if err != nil {
-				log.Println("copy assets", err)
-			}
-		}
 	} else {
 		err := file.Copy(b.binaryPath, buildFolder)
+		if err != nil {
+			log.Println("copy assets", err)
+		}
+	}
+
+	// copy package files, such as templates
+	if b.files != "" {
+		err := file.Copy(b.files, buildFolder)
 		if err != nil {
 			log.Println("copy assets", err)
 		}
@@ -198,6 +200,7 @@ func (b *Build) darwin() error {
 		return err
 	}
 
+	fmt.Printf("'%s' is created and ready for deploy\n", targetFile)
 	return nil
 }
 
