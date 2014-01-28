@@ -29,7 +29,9 @@ type Build struct {
 }
 
 func NewBuild() *Build {
-	return &Build{}
+	return &Build{
+		Version: "0.0.1",
+	}
 }
 
 func (b *Build) Definition() string {
@@ -49,6 +51,23 @@ func (b *Build) Exec(args []string) error {
 	f.StringVar(&b.Identifier, "identifier", "com.koding", "Pkg identifier")
 	f.Parse(args)
 
+	err := b.InitializeAppName()
+	if err != nil {
+		return err
+	}
+
+	b.Version = "0.0.1"
+	b.Output = fmt.Sprintf("%s.%s-%s", b.AppName, runtime.GOOS, runtime.GOARCH)
+
+	err = b.Do()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *Build) InitializeAppName() error {
 	if b.BinaryPath != "" {
 		b.AppName = filepath.Base(b.BinaryPath)
 	} else if b.ImportPath != "" {
@@ -57,40 +76,32 @@ func (b *Build) Exec(args []string) error {
 		return errors.New("build: --import or --bin should be defined.")
 	}
 
-	b.Version = "0.0.1"
-	b.Output = fmt.Sprintf("%s.%s-%s", b.AppName, runtime.GOOS, runtime.GOARCH)
-
-	err := b.do()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func (b *Build) do() error {
+func (b *Build) Do() error {
 	switch runtime.GOOS {
 	case "darwin":
-		err := b.darwin()
+		err := b.Darwin()
 		if err != nil {
 			log.Println("darwin:", err)
 		}
 	case "linux":
-		err := b.linux()
+		err := b.Linux()
 		if err != nil {
 			log.Println("linux:", err)
 		}
 	}
 
 	// also create a tar.gz regardless of os
-	return b.tarGzFile()
+	return b.TarGzFile()
 }
 
-func (b *Build) linux() error {
+func (b *Build) Linux() error {
 	return nil
 }
 
-func (b *Build) tarGzFile() error {
+func (b *Build) TarGzFile() error {
 	buildFolder, err := ioutil.TempDir(".", "kd-build")
 	if err != nil {
 		return err
@@ -146,7 +157,7 @@ func (b *Build) tarGzFile() error {
 }
 
 // darwin is building a new .pkg installer for darwin based OS'es.
-func (b *Build) darwin() error {
+func (b *Build) Darwin() error {
 	version := b.Version
 	if b.Output == "" {
 		b.Output = fmt.Sprintf("kite-%s", b.AppName)
