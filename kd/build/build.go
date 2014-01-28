@@ -156,13 +156,13 @@ func (b *Build) darwin() error {
 	if err != nil {
 		return err
 	}
-	// defer os.RemoveAll(installRoot)
+	defer os.RemoveAll(installRoot)
 
 	buildFolder, err := ioutil.TempDir(".", "kd-build-darwin_")
 	if err != nil {
 		return err
 	}
-	// defer os.RemoveAll(buildFolder)
+	defer os.RemoveAll(buildFolder)
 
 	scriptDir := filepath.Join(buildFolder, "scripts")
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
