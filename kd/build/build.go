@@ -127,6 +127,8 @@ func (b *Build) TarGzFile() error {
 		}
 
 		buildFolder = filepath.Join(d.BuildGoPath, b.AppName)
+		defer os.RemoveAll(d.BuildGoPath)
+
 	} else {
 		err := util.Copy(b.BinaryPath, buildFolder)
 		if err != nil {
