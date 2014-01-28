@@ -1,7 +1,6 @@
 package build
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -36,17 +35,14 @@ func (b *Build) Definition() string {
 
 func (b *Build) Exec(args []string) error {
 	usage := "Usage: kd build --import <importPath> || --bin <binaryPath>"
+	fmt.Println("args", args)
 
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
 
-	if len(args) == 2 && (args[0] != "--bin" || args[0] != "--import") {
+	if len(args) == 2 && (args[0] != "--bin" && args[0] != "--import") {
 		return errors.New(usage)
-	}
-
-	build := &Build{
-		version: "0.0.1",
 	}
 
 	switch args[0] {
@@ -56,9 +52,13 @@ func (b *Build) Exec(args []string) error {
 		b.importPath = args[1]
 	}
 
-	b.appName = filepath.Base(args[0])
+	b.appName = filepath.Base(b.binaryPath)
+	b.version = "0.0.1"
+	b.output = fmt.Sprintf("%s.%s-%s", b.appName, runtime.GOOS, runtime.GOARCH)
 
-	err := build.do()
+	fmt.Println(b)
+
+	err := b.do()
 	if err != nil {
 		return err
 	}
@@ -92,17 +92,6 @@ func (b *Build) linux() error {
 		return err
 	}
 
-	err = d.WriteJSON()
-	if err != nil {
-		return err
-	}
-
-	out, err := json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("installing packages to '%s'\n%s\n", d.BuildGoPath, string(out))
 	err = d.InstallDeps()
 	if err != nil {
 		return err
@@ -152,7 +141,7 @@ func (b *Build) darwin() error {
 		b.output = fmt.Sprintf("koding-%s", b.appName)
 	}
 
-	scriptDir := "./darwin/scripts"
+	scriptDir := "build/darwin/scripts"
 	installRoot := "./root" // TODO REMOVE
 
 	os.RemoveAll(installRoot) // clean up old build before we continue
@@ -188,8 +177,8 @@ func (b *Build) darwin() error {
 		return err
 	}
 
-	distributionFile := "./darwin/Distribution.xml"
-	resources := "./darwin/Resources"
+	distributionFile := "build/darwin/Distribution.xml"
+	resources := "build/darwin/Resources"
 	targetFile := b.output + ".pkg"
 
 	b.createDistribution(distributionFile)
