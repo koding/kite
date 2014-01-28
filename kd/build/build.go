@@ -1,16 +1,21 @@
 package build
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"koding/kite/kd/util"
+	"koding/tools/deps"
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"text/template"
+
+	"github.com/fatih/file"
 )
 
 type Build struct {
@@ -18,6 +23,7 @@ type Build struct {
 	version    string
 	output     string
 	binaryPath string
+	importPath string
 }
 
 func NewBuild() *Build {
@@ -29,18 +35,28 @@ func (b *Build) Definition() string {
 }
 
 func (b *Build) Exec(args []string) error {
+	usage := "Usage: kd build --import <importPath> || --bin <binaryPath>"
+
 	if len(args) == 0 {
-		return errors.New("Usage: kd build <importPath>")
+		return errors.New(usage)
 	}
 
-	// use binary name as appName
-	appName := filepath.Base(args[0])
+	if len(args) == 2 && (args[0] != "--bin" || args[0] != "--import") {
+		return errors.New(usage)
+	}
 
 	build := &Build{
-		appName:    appName,
-		version:    "0.0.1",
-		binaryPath: args[0],
+		version: "0.0.1",
 	}
+
+	switch args[0] {
+	case "--bin":
+		b.binaryPath = args[1]
+	case "--import":
+		b.importPath = args[1]
+	}
+
+	b.appName = filepath.Base(args[0])
 
 	err := build.do()
 	if err != nil {
@@ -61,6 +77,71 @@ func (b *Build) do() error {
 }
 
 func (b *Build) linux() error {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		return errors.New("GOPATH is not set")
+	}
+
+	pkgname := path.Base(b.importPath)
+
+	// or use "go list koding/..." for all packages and commands
+	packages := []string{b.importPath}
+
+	d, err := deps.LoadDeps(packages...)
+	if err != nil {
+		return err
+	}
+
+	err = d.WriteJSON()
+	if err != nil {
+		return err
+	}
+
+	out, err := json.MarshalIndent(d, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("installing packages to '%s'\n%s\n", d.BuildGoPath, string(out))
+	err = d.InstallDeps()
+	if err != nil {
+		return err
+	}
+
+	packagePath := filepath.Join(d.BuildGoPath, pkgname)
+
+	// prepare config folder
+	// configPath := filepath.Join(packagePath, "config")
+	// os.MkdirAll(configPath, 0755)
+
+	// config, err := exec.Command("node", "-e", "require('koding-config-manager').printJson('main."+*profile+"')").CombinedOutput()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// configFile := fmt.Sprintf("%s/main.%s.json", configPath, *profile)
+	// err = ioutil.WriteFile(configFile, config, 0755)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// copy package files, such as templates
+	assets := []string{filepath.Join(gopath, "src", b.importPath, "files")}
+	for _, assetDir := range assets {
+		err := file.Copy(assetDir, packagePath)
+		if err != nil {
+			log.Println("copy assets", err)
+		}
+	}
+
+	// create tar.gz file from final director
+	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", pkgname, runtime.GOOS, runtime.GOARCH)
+	err = util.MakeTar(tarFile, packagePath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("'%s' is created and ready for deploy\n", tarFile)
 	return nil
 }
 
