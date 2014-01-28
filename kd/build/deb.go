@@ -15,7 +15,10 @@ import (
 	"github.com/blakesmith/ar"
 )
 
-const controlFile = `Package: %s
+const (
+	installPrefix = "./opt/kite/"
+
+	controlFile = `Package: %s
 Version: %s
 Architecture: %s
 Maintainer: Koding Developers <hello@koding.com>
@@ -24,40 +27,39 @@ Section: devel
 Priority: extra
 Description: %s Kite
 `
+)
 
 func (b *Build) Linux() error {
-	debName := b.Output + ".deb"
+	debFile := b.Output + ".deb"
 	tarFile := b.Output + ".tar.gz"
 
-	deb, err := os.Create(debName + ".inprogress")
+	deb, err := os.Create(debFile + ".inprogress")
 	if err != nil {
 		return fmt.Errorf("cannot create deb: %v", err)
 	}
 	defer deb.Close()
 
 	// create first tar file
-	fmt.Println("creating tarfile", tarFile)
 	if err := b.TarGzFile(); err != nil {
 		return err
 	}
 
-	fmt.Println("openening tarfile", tarFile)
 	tf, err := os.Open(tarFile)
 	if err != nil {
 		return err
 	}
 	defer tf.Close()
 
-	fmt.Println("creating debfile from tarfile")
 	if err := b.createDeb(tf, deb); err != nil {
 		return err
 	}
 
-	if err := os.Rename(debName+".inprogress", debName); err != nil {
+	if err := os.Rename(debFile+".inprogress", debFile); err != nil {
 		return err
 	}
 
-	fmt.Println("package", debName, "ready")
+	fmt.Println("package", debFile, "ready")
+	fmt.Println("tarfile", tarFile, "ready")
 	return nil
 }
 
@@ -125,7 +127,6 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 	}
 
 	in := tar.NewReader(uncompress)
-	first := true
 	for {
 		h, err := in.Next()
 		if err == io.EOF {
@@ -137,21 +138,19 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 
 		instSize += h.Size
 		h.Name = strings.TrimLeft(h.Name, "./")
-		if first && h.Name != b.AppName && h.Name != b.AppName+"/" {
-			h := tar.Header{
-				Name:     "./opt/koding/" + b.AppName,
-				Mode:     0755,
-				ModTime:  h.ModTime,
-				Typeflag: tar.TypeDir,
-			}
 
-			if err := out.WriteHeader(&h); err != nil {
-				return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
-			}
+		ha := tar.Header{
+			Name:     installPrefix,
+			Mode:     0755,
+			ModTime:  h.ModTime,
+			Typeflag: tar.TypeDir,
 		}
 
-		const prefix = "./opt/koding/"
-		h.Name = prefix + h.Name
+		if err := out.WriteHeader(&ha); err != nil {
+			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
+		}
+
+		h.Name = installPrefix + h.Name
 		if h.Typeflag == tar.TypeDir && !strings.HasSuffix(h.Name, "/") {
 			h.Name += "/"
 		}
@@ -160,8 +159,7 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
 		}
 
-		fmt.Println("tar: packing", h.Name[len(prefix):])
-
+		// fmt.Println("tar: packing", h.Name[len(installPrefix):])
 		if h.Typeflag == tar.TypeDir {
 			continue
 		}
