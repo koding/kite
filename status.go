@@ -5,9 +5,9 @@ import (
 	"runtime"
 )
 
-type Status struct{}
+type status struct{}
 
-type Info struct {
+type info struct {
 	State       string `json:"state"`
 	DiskUsage   uint64 `json:"diskUsage"`
 	DiskTotal   uint64 `json:"diskTotal"`
@@ -36,7 +36,7 @@ func homeDir() string {
 	return usr.HomeDir
 }
 
-func systemInfo() (*Info, error) {
+func systemInfo() (*info, error) {
 	disk, err := diskStats()
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func systemInfo() (*Info, error) {
 		return nil, err
 	}
 
-	return &Info{
+	return &info{
 		State:       "RUNNING", // needed for client side compatibility
 		DiskUsage:   disk.Usage,
 		DiskTotal:   disk.Total,
@@ -58,6 +58,6 @@ func systemInfo() (*Info, error) {
 	}, nil
 }
 
-func (Status) Info(r *Request) (interface{}, error) {
+func (status) Info(r *Request) (interface{}, error) {
 	return systemInfo()
 }
