@@ -78,53 +78,71 @@ func (b *Build) InitializeAppName() error {
 }
 
 func (b *Build) Do() error {
+	var pkgFile string
+	var err error
+
 	switch runtime.GOOS {
 	case "darwin":
-		err := b.Darwin()
+		pkgFile, err = b.Darwin()
 		if err != nil {
 			log.Println("darwin:", err)
 		}
 	case "linux":
-		err := b.Linux()
+		pkgFile, err = b.Linux()
 		if err != nil {
 			log.Println("linux:", err)
 		}
 	}
 
-	// also create a tar.gz regardless of os
-	return b.TarGzFile()
-}
-
-func (b *Build) TarGzFile() error {
-	buildFolder, err := ioutil.TempDir(".", "kd-build")
+	// also create a tar.gz regardless of GOOS
+	tarFile, err := b.TarGzFile()
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(buildFolder)
+
+	fmt.Println("package  :", pkgFile, "ready")
+	fmt.Println("tar file :", tarFile, "ready")
+
+	return nil
+}
+
+// TarGzFile creates and returns the filename of the created file
+func (b *Build) TarGzFile() (string, error) {
+
+	var buildFolder string
 
 	if b.ImportPath != "" {
 		gopath := os.Getenv("GOPATH")
 		if gopath == "" {
-			return errors.New("GOPATH is not set")
+			return "", errors.New("GOPATH is not set")
 		}
 
 		// or use "go list <importPath>" for all packages and commands
 		packages := []string{b.ImportPath}
 		d, err := deps.LoadDeps(packages...)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		err = d.InstallDeps()
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		buildFolder = filepath.Join(d.BuildGoPath, b.AppName)
 		defer os.RemoveAll(d.BuildGoPath)
 
 	} else {
-		err := util.Copy(b.BinaryPath, buildFolder)
+		tmpDir, err := ioutil.TempDir(".", "kd-build")
+		if err != nil {
+			return "", err
+		}
+		defer os.RemoveAll(tmpDir)
+
+		buildFolder = filepath.Join(tmpDir, b.AppName)
+		os.MkdirAll(buildFolder, 0755)
+
+		err = util.Copy(b.BinaryPath, buildFolder)
 		if err != nil {
 			log.Println("copy binaryPath", err)
 		}
@@ -143,11 +161,10 @@ func (b *Build) TarGzFile() error {
 
 	// create tar.gz file from final director
 	tarFile := b.Output + ".tar.gz"
-	err = util.MakeTar(tarFile, filepath.Dir(buildFolder))
+	err := util.MakeTar(tarFile, filepath.Dir(buildFolder))
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	fmt.Printf("'%s' is created and ready for deploy\n", tarFile)
-	return nil
+	return tarFile, nil
 }

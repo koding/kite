@@ -109,7 +109,7 @@ func (d *Deps) populateGoPaths() error {
 	return nil
 }
 
-// InstallDeps calls "go install -v" on the given packages and installs them
+// InstallDeps calls "go install" on the given packages and installs them
 // to deps.BuildGoPath/pkgname
 func (d *Deps) InstallDeps() error {
 	if !compareGoVersions(d.GoVersion, runtime.Version()) {
@@ -131,7 +131,7 @@ func (d *Deps) InstallDeps() error {
 		os.MkdirAll(binpath, 0755)
 		os.Setenv("GOBIN", binpath)
 
-		args := []string{"install", "-v", pkg}
+		args := []string{"install", pkg}
 		cmd := exec.Command("go", args...)
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 

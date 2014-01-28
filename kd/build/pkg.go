@@ -11,8 +11,9 @@ import (
 	"text/template"
 )
 
-// darwin is building a new .pkg installer for darwin based OS'es.
-func (b *Build) Darwin() error {
+// Darwin is building a new .pkg installer for darwin based OS'es. It returns
+// the created filename of the .pkg file.
+func (b *Build) Darwin() (string, error) {
 	version := b.Version
 	if b.Output == "" {
 		b.Output = fmt.Sprintf("kite-%s", b.AppName)
@@ -20,13 +21,13 @@ func (b *Build) Darwin() error {
 
 	installRoot, err := ioutil.TempDir(".", "kd-build-darwin_")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.RemoveAll(installRoot)
 
 	buildFolder, err := ioutil.TempDir(".", "kd-build-darwin_")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.RemoveAll(buildFolder)
 
@@ -36,12 +37,12 @@ func (b *Build) Darwin() error {
 	os.MkdirAll(installRootUsr, 0755)
 	err = util.Copy(b.BinaryPath, installRootUsr+"/"+b.AppName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	tempDest, err := ioutil.TempDir("", "tempDest")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.RemoveAll(tempDest)
 
@@ -60,7 +61,7 @@ func (b *Build) Darwin() error {
 
 	_, err = cmdPkg.CombinedOutput()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	distributionFile := filepath.Join(buildFolder, "Distribution.xml")
@@ -79,11 +80,10 @@ func (b *Build) Darwin() error {
 
 	_, err = cmdBuild.CombinedOutput()
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	fmt.Printf("'%s' is created and ready for deploy\n", targetFile)
-	return nil
+	return targetFile, nil
 }
 
 func (b *Build) createLaunchAgent(rootDir string) {

@@ -29,38 +29,37 @@ Description: %s Kite
 `
 )
 
-func (b *Build) Linux() error {
+func (b *Build) Linux() (string, error) {
 	debFile := b.Output + ".deb"
-	tarFile := b.Output + ".tar.gz"
-
 	deb, err := os.Create(debFile + ".inprogress")
 	if err != nil {
-		return fmt.Errorf("cannot create deb: %v", err)
+		return "", fmt.Errorf("cannot create deb: %v", err)
 	}
+
 	defer deb.Close()
 
-	// create first tar file
-	if err := b.TarGzFile(); err != nil {
-		return err
+	// create first a preprared tar file
+	tarFile, err := b.TarGzFile()
+	if err != nil {
+		return "", err
 	}
+	defer os.Remove(tarFile)
 
 	tf, err := os.Open(tarFile)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer tf.Close()
 
 	if err := b.createDeb(tf, deb); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := os.Rename(debFile+".inprogress", debFile); err != nil {
-		return err
+		return "", err
 	}
 
-	fmt.Println("package", debFile, "ready")
-	fmt.Println("tarfile", tarFile, "ready")
-	return nil
+	return debFile, err
 }
 
 func debArch() string {
