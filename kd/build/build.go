@@ -46,7 +46,7 @@ func (b *Build) Exec(args []string) error {
 	f.StringVar(&b.ImportPath, "import", "", "Go importpath to be packaged")
 	f.StringVar(&b.BinaryPath, "bin", "", "Binary to be packaged")
 	f.StringVar(&b.Files, "files", "", "Files to be included with the package")
-	f.StringVar(&b.Identifier, "identifier", "koding", "Pkg identifier")
+	f.StringVar(&b.Identifier, "identifier", "com.koding", "Pkg identifier")
 	f.Parse(args)
 
 	if b.BinaryPath != "" {
@@ -183,12 +183,12 @@ func (b *Build) darwin() error {
 	b.createLaunchAgent(installRoot)
 
 	cmdPkg := exec.Command("pkgbuild",
-		"--identifier", fmt.Sprintf("com.%s.kite.%s.pkg", b.Identifier, b.AppName),
+		"--identifier", fmt.Sprintf("%s.kite.%s.pkg", b.Identifier, b.AppName),
 		"--version", version,
 		"--scripts", scriptDir,
 		"--root", installRoot,
 		"--install-location", "/",
-		fmt.Sprintf("%s/com.%s.kite.%s.pkg", tempDest, b.Identifier, b.AppName),
+		fmt.Sprintf("%s/%s.kite.%s.pkg", tempDest, b.Identifier, b.AppName),
 		// used for next step, also set up for distribution.xml
 	)
 
@@ -226,7 +226,7 @@ func (b *Build) createLaunchAgent(rootDir string) {
 
 	fmt.Println(b.Identifier)
 
-	launchFile := fmt.Sprintf("%s/com.%s.kite.%s.plist", launchDir, b.Identifier, b.AppName)
+	launchFile := fmt.Sprintf("%s/%s.kite.%s.plist", launchDir, b.Identifier, b.AppName)
 
 	lFile, err := os.Create(launchFile)
 	if err != nil {

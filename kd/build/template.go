@@ -3,7 +3,7 @@ package build
 const (
 	preInstall = `#!/bin/sh
 
-KITE_PLIST="/Library/LaunchAgents/com.{{.Identifier}}.kite.{{.AppName}}.plist"
+KITE_PLIST="/Library/LaunchAgents/{{.Identifier}}.kite.{{.AppName}}.plist"
 
 # see: https://lists.macosforge.org/pipermail/launchd-dev/2011-January/000890.html
 echo "Checking to unload plist"
@@ -25,7 +25,7 @@ exit 0
 `
 	postInstall = `#!/bin/bash
 
-KITE_PLIST="/Library/LaunchAgents/com.{{.Identifier}}.kite.{{.AppName}}.plist"
+KITE_PLIST="/Library/LaunchAgents/{{.Identifier}}.kite.{{.AppName}}.plist"
 chown root:wheel ${KITE_PLIST}
 chmod 644 ${KITE_PLIST}
 
@@ -66,16 +66,16 @@ function installCheck() {
     </script>
     <!-- List all component packages -->
     <pkg-ref
-        id="com.{{.Identifier}}.kite.{{.AppName}}.pkg"
-        auth="root">com.{{.Identifier}}.kite.{{.AppName}}.pkg</pkg-ref>
+        id="{{.Identifier}}.kite.{{.AppName}}.pkg"
+        auth="root">{{.Identifier}}.kite.{{.AppName}}.pkg</pkg-ref>
     <choices-outline>
-        <line choice="com.{{.Identifier}}.kite.{{.AppName}}.choice"/>
+        <line choice="{{.Identifier}}.kite.{{.AppName}}.choice"/>
     </choices-outline>
     <choice
-        id="com.{{.Identifier}}.kite.{{.AppName}}.choice"
+        id="{{.Identifier}}.kite.{{.AppName}}.choice"
         title="Koding Kite"
         customLocation="/">
-        <pkg-ref id="com.{{.Identifier}}.kite.{{.AppName}}.pkg"/>
+        <pkg-ref id="{{.Identifier}}.kite.{{.AppName}}.pkg"/>
     </choice>
 </installer-script>
 `
@@ -90,7 +90,7 @@ function installCheck() {
         <true/>
     </dict>
     <key>Label</key>
-    <string>com.{{.Identifier}}.kite.{{.AppName}}</string>
+    <string>{{.Identifier}}.kite.{{.AppName}}</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/{{.AppName}}</string>
