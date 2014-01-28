@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"text/template"
@@ -35,8 +34,6 @@ func (b *Build) Definition() string {
 
 func (b *Build) Exec(args []string) error {
 	usage := "Usage: kd build --import <importPath> || --bin <binaryPath>"
-	fmt.Println("args", args)
-
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
@@ -52,80 +49,86 @@ func (b *Build) Exec(args []string) error {
 		b.importPath = args[1]
 	}
 
-	b.appName = filepath.Base(b.binaryPath)
+	b.appName = filepath.Base(args[1])
 	b.version = "0.0.1"
 	b.output = fmt.Sprintf("%s.%s-%s", b.appName, runtime.GOOS, runtime.GOARCH)
-
-	fmt.Println(b)
 
 	err := b.do()
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("build successfull")
+	fmt.Println("build successful: ", b.output)
 	return nil
 }
 
 func (b *Build) do() error {
 	switch runtime.GOOS {
 	case "darwin":
-		return b.darwin()
-	default:
-		return fmt.Errorf("not supported os: %s.\n", runtime.GOOS)
+		err := b.darwin()
+		if err != nil {
+			log.Println("darwin:", err)
+		}
+	case "linux":
+		err := b.linux()
+		if err != nil {
+			log.Println("linux:", err)
+		}
 	}
+
+	// also create a tar.gz regardless of os
+	return b.tarGzFile()
 }
 
 func (b *Build) linux() error {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		return errors.New("GOPATH is not set")
-	}
+	return nil
+}
 
-	pkgname := path.Base(b.importPath)
-
-	// or use "go list koding/..." for all packages and commands
-	packages := []string{b.importPath}
-
-	d, err := deps.LoadDeps(packages...)
+func (b *Build) tarGzFile() error {
+	buildFolder, err := ioutil.TempDir(".", "kd-build")
 	if err != nil {
 		return err
 	}
+	defer os.RemoveAll(buildFolder)
 
-	err = d.InstallDeps()
-	if err != nil {
-		return err
-	}
+	if b.importPath != "" {
+		gopath := os.Getenv("GOPATH")
+		if gopath == "" {
+			return errors.New("GOPATH is not set")
+		}
 
-	packagePath := filepath.Join(d.BuildGoPath, pkgname)
+		// or use "go list koding/..." for all packages and commands
+		packages := []string{b.importPath}
+		d, err := deps.LoadDeps(packages...)
+		if err != nil {
+			return err
+		}
 
-	// prepare config folder
-	// configPath := filepath.Join(packagePath, "config")
-	// os.MkdirAll(configPath, 0755)
+		err = d.InstallDeps()
+		if err != nil {
+			return err
+		}
 
-	// config, err := exec.Command("node", "-e", "require('koding-config-manager').printJson('main."+*profile+"')").CombinedOutput()
-	// if err != nil {
-	// 	return err
-	// }
+		buildFolder = filepath.Join(d.BuildGoPath, b.appName)
 
-	// configFile := fmt.Sprintf("%s/main.%s.json", configPath, *profile)
-	// err = ioutil.WriteFile(configFile, config, 0755)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// copy package files, such as templates
-	assets := []string{filepath.Join(gopath, "src", b.importPath, "files")}
-	for _, assetDir := range assets {
-		err := file.Copy(assetDir, packagePath)
+		// copy package files, such as templates
+		assets := []string{filepath.Join(gopath, "src", b.importPath, "files")}
+		for _, assetDir := range assets {
+			err := file.Copy(assetDir, buildFolder)
+			if err != nil {
+				log.Println("copy assets", err)
+			}
+		}
+	} else {
+		err := file.Copy(b.binaryPath, buildFolder)
 		if err != nil {
 			log.Println("copy assets", err)
 		}
 	}
 
 	// create tar.gz file from final director
-	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", pkgname, runtime.GOOS, runtime.GOARCH)
-	err = util.MakeTar(tarFile, packagePath)
+	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", b.appName, runtime.GOOS, runtime.GOARCH)
+	err = util.MakeTar(tarFile, buildFolder)
 	if err != nil {
 		return err
 	}
