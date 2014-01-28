@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"text/template"
 
 	"github.com/fatih/file"
@@ -120,11 +121,14 @@ func (b *Build) tarGzFile() error {
 		}
 	}
 
-	// copy package files, such as templates
+	// include given files
 	if b.files != "" {
-		err := file.Copy(b.files, buildFolder)
-		if err != nil {
-			log.Println("copy assets", err)
+		files := strings.Split(b.files, ",")
+		for _, path := range files {
+			err := file.Copy(path, buildFolder)
+			if err != nil {
+				log.Println("copy assets", err)
+			}
 		}
 	}
 
