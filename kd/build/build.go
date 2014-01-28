@@ -17,12 +17,15 @@ import (
 )
 
 type Build struct {
-	appName    string
-	version    string
-	output     string
-	binaryPath string
-	importPath string
-	files      string
+	AppName    string
+	Version    string
+	Output     string
+	BinaryPath string
+	ImportPath string
+	Files      string
+
+	// used for pkg packaging
+	Identifier string
 }
 
 func NewBuild() *Build {
@@ -40,21 +43,22 @@ func (b *Build) Exec(args []string) error {
 	}
 
 	f := flag.NewFlagSet("build", flag.ContinueOnError)
-	f.StringVar(&b.importPath, "import", "", "Go importpath to be packaged")
-	f.StringVar(&b.binaryPath, "bin", "", "Binary to be packaged")
-	f.StringVar(&b.files, "files", "", "Files to be included with the package")
+	f.StringVar(&b.ImportPath, "import", "", "Go importpath to be packaged")
+	f.StringVar(&b.BinaryPath, "bin", "", "Binary to be packaged")
+	f.StringVar(&b.Files, "files", "", "Files to be included with the package")
+	f.StringVar(&b.Identifier, "identifier", "koding", "Pkg identifier")
 	f.Parse(args)
 
-	if b.binaryPath != "" {
-		b.appName = filepath.Base(b.binaryPath)
-	} else if b.importPath != "" {
-		b.appName = filepath.Base(b.importPath)
+	if b.BinaryPath != "" {
+		b.AppName = filepath.Base(b.BinaryPath)
+	} else if b.ImportPath != "" {
+		b.AppName = filepath.Base(b.ImportPath)
 	} else {
 		return errors.New("build: --import or --bin should be defined.")
 	}
 
-	b.version = "0.0.1"
-	b.output = fmt.Sprintf("%s.%s-%s", b.appName, runtime.GOOS, runtime.GOARCH)
+	b.Version = "0.0.1"
+	b.Output = fmt.Sprintf("%s.%s-%s", b.AppName, runtime.GOOS, runtime.GOARCH)
 
 	err := b.do()
 	if err != nil {
@@ -93,14 +97,14 @@ func (b *Build) tarGzFile() error {
 	}
 	defer os.RemoveAll(buildFolder)
 
-	if b.importPath != "" {
+	if b.ImportPath != "" {
 		gopath := os.Getenv("GOPATH")
 		if gopath == "" {
 			return errors.New("GOPATH is not set")
 		}
 
 		// or use "go list <importPath>" for all packages and commands
-		packages := []string{b.importPath}
+		packages := []string{b.ImportPath}
 		d, err := deps.LoadDeps(packages...)
 		if err != nil {
 			return err
@@ -111,17 +115,17 @@ func (b *Build) tarGzFile() error {
 			return err
 		}
 
-		buildFolder = filepath.Join(d.BuildGoPath, b.appName)
+		buildFolder = filepath.Join(d.BuildGoPath, b.AppName)
 	} else {
-		err := util.Copy(b.binaryPath, buildFolder)
+		err := util.Copy(b.BinaryPath, buildFolder)
 		if err != nil {
 			log.Println("copy assets", err)
 		}
 	}
 
 	// include given files
-	if b.files != "" {
-		files := strings.Split(b.files, ",")
+	if b.Files != "" {
+		files := strings.Split(b.Files, ",")
 		for _, path := range files {
 			err := util.Copy(path, buildFolder)
 			if err != nil {
@@ -131,7 +135,7 @@ func (b *Build) tarGzFile() error {
 	}
 
 	// create tar.gz file from final director
-	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", b.appName, runtime.GOOS, runtime.GOARCH)
+	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", b.AppName, runtime.GOOS, runtime.GOARCH)
 	err = util.MakeTar(tarFile, buildFolder)
 	if err != nil {
 		return err
@@ -143,28 +147,28 @@ func (b *Build) tarGzFile() error {
 
 // darwin is building a new .pkg installer for darwin based OS'es.
 func (b *Build) darwin() error {
-	version := b.version
-	if b.output == "" {
-		b.output = fmt.Sprintf("kite-%s", b.appName)
+	version := b.Version
+	if b.Output == "" {
+		b.Output = fmt.Sprintf("kite-%s", b.AppName)
 	}
 
 	installRoot, err := ioutil.TempDir(".", "kd-build-darwin_")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(installRoot)
+	// defer os.RemoveAll(installRoot)
 
 	buildFolder, err := ioutil.TempDir(".", "kd-build-darwin_")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(buildFolder)
+	// defer os.RemoveAll(buildFolder)
 
 	scriptDir := filepath.Join(buildFolder, "scripts")
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
 
 	os.MkdirAll(installRootUsr, 0755)
-	err = util.Copy(b.binaryPath, installRootUsr+"/"+b.appName)
+	err = util.Copy(b.BinaryPath, installRootUsr+"/"+b.AppName)
 	if err != nil {
 		return err
 	}
@@ -179,12 +183,12 @@ func (b *Build) darwin() error {
 	b.createLaunchAgent(installRoot)
 
 	cmdPkg := exec.Command("pkgbuild",
-		"--identifier", fmt.Sprintf("com.kite.%s.pkg", b.appName),
+		"--identifier", fmt.Sprintf("com.%s.kite.%s.pkg", b.Identifier, b.AppName),
 		"--version", version,
 		"--scripts", scriptDir,
 		"--root", installRoot,
 		"--install-location", "/",
-		fmt.Sprintf("%s/com.kite.%s.pkg", tempDest, b.appName),
+		fmt.Sprintf("%s/com.%s.kite.%s.pkg", tempDest, b.Identifier, b.AppName),
 		// used for next step, also set up for distribution.xml
 	)
 
@@ -196,7 +200,7 @@ func (b *Build) darwin() error {
 	distributionFile := filepath.Join(buildFolder, "Distribution.xml")
 	resources := filepath.Join(buildFolder, "Resources")
 
-	targetFile := b.output + ".pkg"
+	targetFile := b.Output + ".pkg"
 
 	b.createDistribution(distributionFile)
 
@@ -220,7 +224,9 @@ func (b *Build) createLaunchAgent(rootDir string) {
 	launchDir := fmt.Sprintf("%s/Library/LaunchAgents/", rootDir)
 	os.MkdirAll(launchDir, 0700)
 
-	launchFile := fmt.Sprintf("%s/com.kite.%s.plist", launchDir, b.appName)
+	fmt.Println(b.Identifier)
+
+	launchFile := fmt.Sprintf("%s/com.%s.kite.%s.plist", launchDir, b.Identifier, b.AppName)
 
 	lFile, err := os.Create(launchFile)
 	if err != nil {
@@ -228,7 +234,7 @@ func (b *Build) createLaunchAgent(rootDir string) {
 	}
 
 	t := template.Must(template.New("launchAgent").Parse(launchAgent))
-	t.Execute(lFile, b.appName)
+	t.Execute(lFile, b)
 
 }
 
@@ -239,7 +245,7 @@ func (b *Build) createDistribution(file string) {
 	}
 
 	t := template.Must(template.New("distribution").Parse(distribution))
-	t.Execute(distFile, b.appName)
+	t.Execute(distFile, b)
 
 }
 
@@ -259,10 +265,10 @@ func (b *Build) createScripts(scriptDir string) {
 	preInstallFile.Chmod(0755)
 
 	t := template.Must(template.New("postInstall").Parse(postInstall))
-	t.Execute(postInstallFile, b.appName)
+	t.Execute(postInstallFile, b)
 
 	t = template.Must(template.New("preInstall").Parse(preInstall))
-	t.Execute(preInstallFile, b.appName)
+	t.Execute(preInstallFile, b)
 }
 
 func fileExist(dir string) bool {

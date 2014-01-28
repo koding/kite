@@ -11,10 +11,10 @@ func main() {
 	root := cli.NewCLI()
 	root.AddCommand("version", kd.NewVersion())
 	root.AddCommand("register", kd.NewRegister())
-	root.AddCommand("build", build.NewBuild())
 
 	k := root.AddSubCommand("kite")
 	k.AddCommand("install", kite.NewInstall())
+	k.AddCommand("build", build.NewBuild())
 	k.AddCommand("list", kite.NewList())
 	k.AddCommand("run", kite.NewRun())
 	k.AddCommand("tell", kite.NewTell())
