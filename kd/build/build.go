@@ -143,7 +143,7 @@ func (b *Build) TarGzFile() error {
 
 	// create tar.gz file from final director
 	tarFile := b.Output + ".tar.gz"
-	err = util.MakeTar(tarFile, buildFolder)
+	err = util.MakeTar(tarFile, filepath.Dir(buildFolder))
 	if err != nil {
 		return err
 	}

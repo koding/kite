@@ -134,6 +134,10 @@ func MakeTar(targ, workdir string) error {
 			name = name[1:]
 		}
 
+		if name == "" {
+			return nil // do not inclue empty paths
+		}
+
 		// log.Printf("adding to tar: %s", name)
 
 		target, _ := os.Readlink(path)
