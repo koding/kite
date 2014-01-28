@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"koding/kite/kd/util"
-	"koding/tools/deps"
+	"koding/kite/kd/util/deps"
 	"log"
 	"os"
 	"os/exec"
@@ -14,8 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
-
-	"github.com/fatih/file"
 )
 
 type Build struct {
@@ -101,7 +99,7 @@ func (b *Build) tarGzFile() error {
 			return errors.New("GOPATH is not set")
 		}
 
-		// or use "go list koding/..." for all packages and commands
+		// or use "go list <importPath>" for all packages and commands
 		packages := []string{b.importPath}
 		d, err := deps.LoadDeps(packages...)
 		if err != nil {
@@ -115,7 +113,7 @@ func (b *Build) tarGzFile() error {
 
 		buildFolder = filepath.Join(d.BuildGoPath, b.appName)
 	} else {
-		err := file.Copy(b.binaryPath, buildFolder)
+		err := util.Copy(b.binaryPath, buildFolder)
 		if err != nil {
 			log.Println("copy assets", err)
 		}
@@ -125,7 +123,7 @@ func (b *Build) tarGzFile() error {
 	if b.files != "" {
 		files := strings.Split(b.files, ",")
 		for _, path := range files {
-			err := file.Copy(path, buildFolder)
+			err := util.Copy(path, buildFolder)
 			if err != nil {
 				log.Println("copy assets", err)
 			}
@@ -147,7 +145,7 @@ func (b *Build) tarGzFile() error {
 func (b *Build) darwin() error {
 	version := b.version
 	if b.output == "" {
-		b.output = fmt.Sprintf("koding-%s", b.appName)
+		b.output = fmt.Sprintf("kite-%s", b.appName)
 	}
 
 	installRoot, err := ioutil.TempDir(".", "kd-build-darwin_")
@@ -166,7 +164,7 @@ func (b *Build) darwin() error {
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
 
 	os.MkdirAll(installRootUsr, 0755)
-	err = util.CopyFile(b.binaryPath, installRootUsr+"/"+b.appName)
+	err = util.Copy(b.binaryPath, installRootUsr+"/"+b.appName)
 	if err != nil {
 		return err
 	}
@@ -181,12 +179,12 @@ func (b *Build) darwin() error {
 	b.createLaunchAgent(installRoot)
 
 	cmdPkg := exec.Command("pkgbuild",
-		"--identifier", fmt.Sprintf("com.koding.kite.%s.pkg", b.appName),
+		"--identifier", fmt.Sprintf("com.kite.%s.pkg", b.appName),
 		"--version", version,
 		"--scripts", scriptDir,
 		"--root", installRoot,
 		"--install-location", "/",
-		fmt.Sprintf("%s/com.koding.kite.%s.pkg", tempDest, b.appName),
+		fmt.Sprintf("%s/com.kite.%s.pkg", tempDest, b.appName),
 		// used for next step, also set up for distribution.xml
 	)
 
@@ -222,7 +220,7 @@ func (b *Build) createLaunchAgent(rootDir string) {
 	launchDir := fmt.Sprintf("%s/Library/LaunchAgents/", rootDir)
 	os.MkdirAll(launchDir, 0700)
 
-	launchFile := fmt.Sprintf("%s/com.koding.kite.%s.plist", launchDir, b.appName)
+	launchFile := fmt.Sprintf("%s/com.kite.%s.plist", launchDir, b.appName)
 
 	lFile, err := os.Create(launchFile)
 	if err != nil {
