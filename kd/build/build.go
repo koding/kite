@@ -224,8 +224,6 @@ func (b *Build) createLaunchAgent(rootDir string) {
 	launchDir := fmt.Sprintf("%s/Library/LaunchAgents/", rootDir)
 	os.MkdirAll(launchDir, 0700)
 
-	fmt.Println(b.Identifier)
-
 	launchFile := fmt.Sprintf("%s/%s.kite.%s.plist", launchDir, b.Identifier, b.AppName)
 
 	lFile, err := os.Create(launchFile)
