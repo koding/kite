@@ -15,7 +15,7 @@ import (
 	"github.com/blakesmith/ar"
 )
 
-const control = `Package: %s
+const controlFile = `Package: %s
 Version: %s
 Architecture: %s
 Maintainer: Koding Developers <hello@koding.com>
@@ -204,7 +204,15 @@ func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (co
 	compress := gzip.NewWriter(buf)
 	tarball := tar.NewWriter(compress)
 
-	body := []byte(fmt.Sprintf(control, b.Version, debArch(), instSize/1024))
+	body := []byte(fmt.Sprintf(
+		controlFile,
+		b.AppName,     // Package
+		b.Version,     // Version
+		debArch(),     // Architecture
+		instSize/1024, // Installed-Size
+		b.AppName,     // Description
+	))
+
 	hdr := tar.Header{
 		Name:     "control",
 		Size:     int64(len(body)),
