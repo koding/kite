@@ -119,7 +119,7 @@ func (b *Build) tarGzFile() error {
 	} else {
 		err := util.Copy(b.BinaryPath, buildFolder)
 		if err != nil {
-			log.Println("copy assets", err)
+			log.Println("copy binaryPath", err)
 		}
 	}
 

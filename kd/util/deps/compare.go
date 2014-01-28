@@ -4,7 +4,6 @@ package deps
 // We don't use any third party imports for the sake of simplicity
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,7 +30,6 @@ func compareGoVersions(a, b string) bool {
 	goprefix := "go"
 	a = strings.TrimPrefix(a, goprefix)
 	b = strings.TrimPrefix(b, goprefix)
-	fmt.Println("a, b", a, b)
 	return compare(a, b, "<=")
 }
 

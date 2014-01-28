@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/fatih/set" // TODO: replace with custom map
+	"github.com/fatih/set"
 )
 
 const (
@@ -40,6 +40,10 @@ type Deps struct {
 	currentGoPath string
 }
 
+// LoadDeps returns a new Deps struct with the given packages. It founds the
+// dependencies and populates the fields in Deps. After LoadDeps one can use
+// InstallDeps() to install/build the binary for the given pkg or use
+// GetDeps() to download and vendorize the dependencies of the given pkg.
 func LoadDeps(pkgs ...string) (*Deps, error) {
 	packages, err := listPackages(pkgs...)
 	if err != nil {
@@ -105,6 +109,8 @@ func (d *Deps) populateGoPaths() error {
 	return nil
 }
 
+// InstallDeps calls "go install -v" on the given packages and installs them
+// to deps.BuildGoPath/pkgname
 func (d *Deps) InstallDeps() error {
 	if !compareGoVersions(d.GoVersion, runtime.Version()) {
 		return fmt.Errorf("Go Version is not satisfied\nSystem Go Version: '%s' Expected: '%s'",
@@ -125,7 +131,6 @@ func (d *Deps) InstallDeps() error {
 		os.MkdirAll(binpath, 0755)
 		os.Setenv("GOBIN", binpath)
 
-		fmt.Println("installing", pkgname)
 		args := []string{"install", "-v", pkg}
 		cmd := exec.Command("go", args...)
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
@@ -148,6 +153,8 @@ func goPackagePath() string {
 	return path.Join(pwd, gopackageFile)
 }
 
+// WriteJSON writes the state of d into a json file, useful to restore again
+// with ReadJSON().
 func (d *Deps) WriteJSON() error {
 	data, err := json.MarshalIndent(d, "", "  ")
 	if err != nil {
@@ -162,6 +169,7 @@ func (d *Deps) WriteJSON() error {
 	return nil
 }
 
+// ReadJSON() restores a given gopackage.json to create a new deps struct.
 func ReadJson() (*Deps, error) {
 	data, err := ioutil.ReadFile(goPackagePath())
 	if err != nil {
@@ -182,6 +190,8 @@ func ReadJson() (*Deps, error) {
 	return d, nil
 }
 
+// GetDeps calls "go get -d" to download all dependencies for the packages
+// defined in d.
 func (d *Deps) GetDeps() error {
 	os.MkdirAll(d.BuildGoPath, 0755)
 	os.Setenv("GOPATH", d.BuildGoPath)
