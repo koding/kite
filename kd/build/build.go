@@ -150,14 +150,23 @@ func (b *Build) darwin() error {
 		b.output = fmt.Sprintf("koding-%s", b.appName)
 	}
 
-	scriptDir := "build/darwin/scripts"
-	installRoot := "./root" // TODO REMOVE
+	installRoot, err := ioutil.TempDir(".", "kd-build-darwin_")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(installRoot)
 
-	os.RemoveAll(installRoot) // clean up old build before we continue
+	buildFolder, err := ioutil.TempDir(".", "kd-build-darwin_")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(buildFolder)
+
+	scriptDir := filepath.Join(buildFolder, "scripts")
 	installRootUsr := filepath.Join(installRoot, "/usr/local/bin")
 
 	os.MkdirAll(installRootUsr, 0755)
-	err := util.CopyFile(b.binaryPath, installRootUsr+"/"+b.appName)
+	err = util.CopyFile(b.binaryPath, installRootUsr+"/"+b.appName)
 	if err != nil {
 		return err
 	}
@@ -186,8 +195,9 @@ func (b *Build) darwin() error {
 		return err
 	}
 
-	distributionFile := "build/darwin/Distribution.xml"
-	resources := "build/darwin/Resources"
+	distributionFile := filepath.Join(buildFolder, "Distribution.xml")
+	resources := filepath.Join(buildFolder, "Resources")
+
 	targetFile := b.output + ".pkg"
 
 	b.createDistribution(distributionFile)
