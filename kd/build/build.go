@@ -57,7 +57,7 @@ func (b *Build) Exec(args []string) error {
 	}
 
 	b.Version = "0.0.1"
-	b.Output = fmt.Sprintf("%s.%s-%s", b.AppName, runtime.GOOS, runtime.GOARCH)
+	b.Output = fmt.Sprintf("%s-%s.%s-%s", b.AppName, b.Version, runtime.GOOS, runtime.GOARCH)
 
 	err = b.Do()
 	if err != nil {
@@ -148,7 +148,7 @@ func (b *Build) TarGzFile() error {
 	}
 
 	// create tar.gz file from final director
-	tarFile := fmt.Sprintf("%s.%s-%s.tar.gz", b.AppName, runtime.GOOS, runtime.GOARCH)
+	tarFile := b.Output + ".tar.gz"
 	err = util.MakeTar(tarFile, buildFolder)
 	if err != nil {
 		return err
