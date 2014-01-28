@@ -268,17 +268,3 @@ func (b *Build) createScripts(scriptDir string) {
 	t = template.Must(template.New("preInstall").Parse(preInstall))
 	t.Execute(preInstallFile, b)
 }
-
-func fileExist(dir string) bool {
-	var err error
-	_, err = os.Stat(dir)
-	if err == nil {
-		return true // file exist
-	}
-
-	if os.IsNotExist(err) {
-		return false // file does not exist
-	}
-
-	panic(err) // permission errors or something else bad
-}
