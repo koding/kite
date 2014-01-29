@@ -6,6 +6,54 @@ import (
 	"time"
 )
 
+// This example shows a simple method call between two kites.
+func Example() {
+	// Start adder kite
+	opts := &Options{
+		Kitename:    "adder",
+		Version:     "0.0.1",
+		Environment: "development",
+		Region:      "localhost",
+		PublicIP:    "127.0.0.1",
+		Port:        "10001",
+		DisableAuthentication: true, // open to anyone
+	}
+	adder := New(opts)
+	adder.HandleFunc("add", add)
+	adder.Start()
+
+	// Start foo kite
+	opts = &Options{
+		Kitename:    "foo",
+		Version:     "0.0.1",
+		Environment: "development",
+		Region:      "localhost",
+		PublicIP:    "127.0.0.1",
+		Port:        "10002",
+	}
+	foo := New(opts)
+	foo.Start()
+
+	// foo kite calls the "add" method of adder kite
+	remote := foo.NewRemoteKite(adder.Kite, Authentication{})
+	err := remote.Dial()
+	if err != nil {
+		panic(err)
+	}
+	result, err := remote.Tell("add", 2, 3)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Result is %d\n", int(result.MustFloat64()))
+	// Output: Result is 5
+}
+
+func add(r *Request) (interface{}, error) {
+	args := r.Args.MustSliceOfLength(2)
+	return args[0].MustFloat64() + args[1].MustFloat64(), nil
+}
+
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
 	mathKite := mathWorker()

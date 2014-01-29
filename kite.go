@@ -1,3 +1,7 @@
+// Package kite is a library for creating small micro-services.
+// Two main types implemented by this package are
+// Kite for creating a micro-service server called "Kite" and
+// RemoteKite for communicating with another kites.
 package kite
 
 import (
@@ -44,10 +48,10 @@ func init() {
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
 // Server. That means it can receive request, process them, but it also can
-// make request to other kites. A Kite can be anything. It can be simple Image
-// processing kite (which would process data), it could be a Chat kite that
-// enables peer-to-peer chat. For examples we have FileSystem kite that expose
-// the file system to a client, which in order build the filetree.
+// make request to other kites.
+//
+// Do not use this struct directly. Use kite.New function, add your handlers
+// with HandleFunc mehtod, then call Start or Run method.
 type Kite struct {
 	protocol.Kite
 
@@ -206,10 +210,14 @@ func New(options *Options) *Kite {
 	return k
 }
 
+// Normally, each incoming request is processed in a new goroutine.
+// If you disable concurrency, requests will be processed synchronously.
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
 }
 
+// EnableTLS enables "wss://" protocol".
+// It uses the same port and disables "ws://".
 func (k *Kite) EnableTLS(certFile, keyFile string) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
@@ -223,14 +231,17 @@ func (k *Kite) EnableTLS(certFile, keyFile string) {
 	k.Kite.URL.Scheme = "wss"
 }
 
+// Put this kite behind a reverse-proxy. Useful under firewall or NAT.
 func (k *Kite) EnableProxy() {
 	k.proxyEnabled = true
 }
 
+// Trust a Kontrol key for validating tokens.
 func (k *Kite) TrustKontrolKey(issuer string, key []byte) {
 	k.trustedKontrolKeys[issuer] = key
 }
 
+// Add new trusted root certificate for TLS.
 func (k *Kite) AddRootCertificate(cert []byte) {
 	k.tlsCertificates = append(k.tlsCertificates, cert)
 }

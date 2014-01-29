@@ -16,6 +16,8 @@ import (
 	"github.com/op/go-logging"
 )
 
+// Default timeout value for RemoteKite.Tell method.
+// It can be overriden with RemoteKite.SetTellTimeout.
 const DefaultTellTimeout = 4 * time.Second
 
 // RemoteKite is the client for communicating with another Kite.
@@ -283,6 +285,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 	return []interface{}{options}
 }
 
+// Authentication is used when connecting a RemoteKite.
 type Authentication struct {
 	// Type can be "kodingKey", "token" or "sessionID" for now.
 	Type       string     `json:"type"`
