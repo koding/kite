@@ -82,7 +82,7 @@ func (d *Deb) Build() (string, error) {
 		case <-ticker:
 			fmt.Printf(".  ")
 		case <-done:
-			fmt.Println("")
+			fmt.Printf("\n\n")
 			return d.Output, nil
 		}
 	}
