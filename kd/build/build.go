@@ -21,9 +21,6 @@ type Build struct {
 	BinaryPath string
 	ImportPath string
 	Files      string
-
-	// used for pkg packaging
-	Identifier string
 }
 
 func NewBuild() *Build {
@@ -46,7 +43,8 @@ func (b *Build) Exec(args []string) error {
 	f.StringVar(&b.ImportPath, "import", "", "Go importpath to be packaged")
 	f.StringVar(&b.BinaryPath, "bin", "", "Binary to be packaged")
 	f.StringVar(&b.Files, "files", "", "Files to be included with the package")
-	f.StringVar(&b.Identifier, "identifier", "com.koding", "Pkg identifier")
+	identifier := f.String("identifier", "com.koding", "Pkg identifier")
+
 	f.Parse(args)
 
 	err := b.InitializeAppName()
@@ -57,33 +55,19 @@ func (b *Build) Exec(args []string) error {
 	b.Version = "0.0.1"
 	b.Output = fmt.Sprintf("%s-%s.%s-%s", b.AppName, b.Version, runtime.GOOS, runtime.GOARCH)
 
-	err = b.Do()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *Build) InitializeAppName() error {
-	if b.BinaryPath != "" {
-		b.AppName = filepath.Base(b.BinaryPath)
-	} else if b.ImportPath != "" {
-		b.AppName = filepath.Base(b.ImportPath)
-	} else {
-		return errors.New("build: --import or --bin should be defined.")
-	}
-
-	return nil
-}
-
-func (b *Build) Do() error {
 	var pkgFile string
-	var err error
 
 	switch runtime.GOOS {
 	case "darwin":
-		pkgFile, err = b.Darwin()
+		d := &Darwin{
+			AppName:    b.AppName,
+			BinaryPath: b.BinaryPath,
+			Version:    b.Version,
+			Identifier: *identifier,
+			Output:     b.Output,
+		}
+
+		pkgFile, err = d.Build()
 		if err != nil {
 			log.Println("darwin:", err)
 		}
@@ -102,6 +86,18 @@ func (b *Build) Do() error {
 
 	fmt.Println("package  :", pkgFile, "ready")
 	fmt.Println("tar file :", tarFile, "ready")
+
+	return nil
+}
+
+func (b *Build) InitializeAppName() error {
+	if b.BinaryPath != "" {
+		b.AppName = filepath.Base(b.BinaryPath)
+	} else if b.ImportPath != "" {
+		b.AppName = filepath.Base(b.ImportPath)
+	} else {
+		return errors.New("build: --import or --bin should be defined.")
+	}
 
 	return nil
 }
