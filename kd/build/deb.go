@@ -1,66 +1,213 @@
 package build
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
-	"crypto/md5"
+	"errors"
 	"fmt"
 	"go/build"
-	"io"
+	"koding/kite/kd/util"
+	"koding/kite/kd/util/deps"
+	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/blakesmith/ar"
+	"text/template"
 )
 
-const controlFile = `Package: %s
-Version: %s
-Architecture: %s
-Maintainer: Koding Developers <hello@koding.com>
-Installed-Size: %d
+func debianTemplates() map[string]string {
+	t := make(map[string]string)
+	t["control"] = `Source: {{.AppName}}
 Section: devel
 Priority: extra
-Description: %s Kite
+Standards-Version: {{.Version}}
+Maintainer: Koding Developers <hello@koding.com>
+Homepage: https://koding.com
+
+Package: {{.AppName}}
+Architecture: {{.Arch}}
+Description: {{.Desc}}
 `
 
+	t["rules"] = `#!/usr/bin/make -f
+%:
+	dh $@
+`
+	t["changelog"] = `{{.AppName}} ({{.Version}}) raring; urgency=low
+
+  * Initial release.
+
+ -- Koding Developers <hello@koding.com>  Tue, 28 Jan 2014 22:17:54 -0800
+`
+	t["compat"] = "9"
+	t["install"] = "{{.InstallPrefix}}/ /"
+
+	return t
+}
+
 type Deb struct {
-	AppName       string
-	Version       string
-	Output        string
-	TarFile       string
-	InstallPrefix string
-	UpstartScript string
+	// App informations
+	AppName string
+	Version string
+	Desc    string
+	Arch    string
+
+	// Build fields
+	Output          string
+	ImportPath      string
+	InstallPrefix   string
+	BuildFolder     string
+	Files           string
+	UpstartScript   string
+	DebianTemplates map[string]string
 }
 
 // Deb is building a new .deb package with the provided tarFile It returns the
 // created filename of the .deb file.
 func (d *Deb) Build() (string, error) {
-	debFile := d.Output + ".deb"
-	deb, err := os.Create(debFile + ".inprogress")
+	d.BuildFolder = deps.DepsGoPath
+	// defer os.RemoveAll(d.BuildFolder)
+	defer d.cleanDebianBuild()
+
+	d.Arch = debArch()
+	d.Desc = d.AppName + " Kite"
+	d.DebianTemplates = debianTemplates()
+	d.Output = fmt.Sprintf("%s_%s_%s", d.AppName, d.Version, d.Arch)
+
+	if err := d.createDebianDir(); err != nil {
+		return "", err
+	}
+
+	if err := d.createInstallDir(); err != nil {
+		return "", err
+	}
+
+	// finally build with debuild to create .deb file
+	cmd := exec.Command("debuild", "-us", "-uc")
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	cmd.Dir = d.BuildFolder
+
+	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("cannot create deb: %v", err)
+		log.Println(err)
 	}
 
-	defer deb.Close()
+	return d.Output, nil
+}
 
-	// create first a preprared tar file
-	tf, err := os.Open(d.TarFile)
+func (d *Deb) cleanDebianBuild() {
+	exts := []string{"build", "changes"}
+	output := fmt.Sprintf("%s_%s_%s", d.AppName, d.Version, d.Arch)
+	for _, ext := range exts {
+		os.Remove(output + "." + ext)
+	}
+
+	exts = []string{"dsc", "tar.gz"}
+	output = fmt.Sprintf("%s_%s", d.AppName, d.Version)
+	for _, ext := range exts {
+		os.Remove(output + "." + ext)
+	}
+}
+
+func (d *Deb) createInstallDir() error {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		return errors.New("GOPATH is not set")
+	}
+
+	// or use "go list <importPath>" for all packages and commands
+	packages := []string{d.ImportPath}
+	dp, err := deps.LoadDeps(packages...)
 	if err != nil {
-		return "", err
-	}
-	defer tf.Close()
-
-	if err := d.createDeb(tf, deb); err != nil {
-		return "", err
+		return err
 	}
 
-	if err := os.Rename(debFile+".inprogress", debFile); err != nil {
-		return "", err
+	err = dp.InstallDeps()
+	if err != nil {
+		return err
 	}
 
-	return debFile, err
+	appFolder := filepath.Join(dp.BuildGoPath, d.AppName)
+
+	if d.Files != "" {
+		files := strings.Split(d.Files, ",")
+		for _, path := range files {
+			err := util.Copy(path, appFolder)
+			if err != nil {
+				log.Println("copy assets", err)
+			}
+		}
+	}
+
+	if d.UpstartScript != "" {
+		upstartPath := filepath.Join(d.BuildFolder, "debian/")
+		upstartFile := filepath.Base(d.UpstartScript)
+
+		err := util.Copy(d.UpstartScript, upstartPath)
+		if err != nil {
+			log.Println("copy assets", err)
+		}
+
+		oldFile := filepath.Join(upstartPath, upstartFile)
+		newFile := filepath.Join(upstartPath, d.AppName+".upstart")
+
+		err = os.Rename(oldFile, newFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	// move files to installprefix
+	os.MkdirAll(filepath.Join(d.BuildFolder, d.InstallPrefix), 0755)
+	installFolder := filepath.Join(d.BuildFolder, d.InstallPrefix, d.AppName)
+	if err := os.Rename(appFolder, installFolder); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Deb) createDebianDir() error {
+	debianFolder := filepath.Join(d.BuildFolder, "debian")
+	os.MkdirAll(debianFolder, 0755)
+
+	if err := d.createDebianFile("control"); err != nil {
+		return err
+	}
+
+	if err := d.createDebianFile("rules"); err != nil {
+		return err
+	}
+
+	// make debian/rules executable
+	os.Chmod(filepath.Join(debianFolder, "rules"), 0755)
+
+	if err := d.createDebianFile("compat"); err != nil {
+		return err
+	}
+
+	if err := d.createDebianFile("install"); err != nil {
+		return err
+	}
+
+	if err := d.createDebianFile("changelog"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Deb) createDebianFile(name string) error {
+	debianFile := filepath.Join(d.BuildFolder, "debian", name)
+	file, err := os.Create(debianFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return template.
+		Must(template.New("controlFile").
+		Parse(d.DebianTemplates[name])).
+		Execute(file, d)
 }
 
 func debArch() string {
@@ -69,186 +216,4 @@ func debArch() string {
 		return "i386"
 	}
 	return arch
-}
-
-func (d *Deb) createDeb(tarball io.Reader, deb io.Writer) error {
-	now := time.Now()
-	dataTarGz, md5sums, instSize, err := d.translateTarball(now, tarball)
-	if err != nil {
-		return err
-	}
-
-	controlTarGz, err := d.createControl(now, instSize, md5sums)
-	if err != nil {
-		return err
-	}
-
-	w := ar.NewWriter(deb)
-	if err := w.WriteGlobalHeader(); err != nil {
-		return fmt.Errorf("cannot write ar header to deb file: %v", err)
-	}
-
-	if err := addArFile(now, w, "debian-binary", []byte("2.0\n")); err != nil {
-		return fmt.Errorf("cannot pack debian-binary: %v", err)
-	}
-
-	if err := addArFile(now, w, "control.tar.gz", controlTarGz); err != nil {
-		return fmt.Errorf("cannot add control.tar.gz to deb: %v", err)
-	}
-
-	if err := addArFile(now, w, "data.tar.gz", dataTarGz); err != nil {
-		return fmt.Errorf("cannot add data.tar.gz to deb: %v", err)
-	}
-
-	return nil
-}
-
-func (d *Deb) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, md5sums []byte, instSize int64, err error) {
-	buf := &bytes.Buffer{}
-	compress := gzip.NewWriter(buf)
-	out := tar.NewWriter(compress)
-
-	md5buf := &bytes.Buffer{}
-	md5tmp := make([]byte, 0, md5.Size)
-
-	uncompress, err := gzip.NewReader(tarball)
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("cannot uncompress tarball: %v", err)
-	}
-
-	in := tar.NewReader(uncompress)
-	for {
-		h, err := in.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, nil, 0, fmt.Errorf("cannot read tarball: %v", err)
-		}
-
-		instSize += h.Size
-		h.Name = strings.TrimLeft(h.Name, "./")
-
-		ha := tar.Header{
-			Name:     d.InstallPrefix,
-			Mode:     0755,
-			ModTime:  h.ModTime,
-			Typeflag: tar.TypeDir,
-		}
-
-		if err := out.WriteHeader(&ha); err != nil {
-			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
-		}
-
-		h.Name = d.InstallPrefix + h.Name
-		if h.Typeflag == tar.TypeDir && !strings.HasSuffix(h.Name, "/") {
-			h.Name += "/"
-		}
-
-		if err := out.WriteHeader(h); err != nil {
-			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
-		}
-
-		// fmt.Println("tar: packing", h.Name[len(d.InstallPrefix):])
-		if h.Typeflag == tar.TypeDir {
-			continue
-		}
-
-		digest := md5.New()
-		if _, err := io.Copy(out, io.TeeReader(in, digest)); err != nil {
-			return nil, nil, 0, err
-		}
-
-		fmt.Fprintf(md5buf, "%x  %s\n", digest.Sum(md5tmp), h.Name[2:])
-	}
-
-	if err := out.Close(); err != nil {
-		return nil, nil, 0, err
-	}
-
-	if err := compress.Close(); err != nil {
-		return nil, nil, 0, err
-	}
-
-	return buf.Bytes(), md5buf.Bytes(), instSize, nil
-}
-
-func (d *Deb) createControl(now time.Time, instSize int64, md5sums []byte) (controlTarGz []byte, err error) {
-	buf := &bytes.Buffer{}
-	compress := gzip.NewWriter(buf)
-	tarball := tar.NewWriter(compress)
-
-	// controlfile
-	body := []byte(fmt.Sprintf(
-		controlFile,
-		d.AppName,     // Package
-		d.Version,     // Version
-		debArch(),     // Architecture
-		instSize/1024, // Installed-Size
-		d.AppName,     // Description
-	))
-
-	if err := addTarFile(now, tarball, "control", body); err != nil {
-		return nil, fmt.Errorf("cannot tar control: %v", err)
-	}
-
-	if err := addTarFile(now, tarball, "md5sums", md5sums); err != nil {
-		return nil, fmt.Errorf("cannot tar md5sums: %v", err)
-	}
-
-	if err := tarball.Close(); err != nil {
-		return nil, fmt.Errorf("closing control.tar.gz: %v", err)
-	}
-	if err := compress.Close(); err != nil {
-		return nil, fmt.Errorf("closing control.tar.gz: %v", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func addTarFile(now time.Time, tarball *tar.Writer, name string, body []byte) error {
-	hdr := tar.Header{
-		Name:     name,
-		Size:     int64(len(body)),
-		Mode:     0644,
-		ModTime:  now,
-		Typeflag: tar.TypeReg,
-	}
-
-	if err := tarball.WriteHeader(&hdr); err != nil {
-		return fmt.Errorf("cannot write header of '%s' file: %v", name, err)
-	}
-
-	if _, err := tarball.Write(body); err != nil {
-		return fmt.Errorf("cannot write body of '%s' file: %v", name, err)
-	}
-
-	return nil
-}
-
-func addTarSymlink(now time.Time, out *tar.Writer, name, target string) error {
-	h := tar.Header{
-		Name:     name,
-		Linkname: target,
-		Mode:     0777,
-		ModTime:  now,
-		Typeflag: tar.TypeSymlink,
-	}
-	if err := out.WriteHeader(&h); err != nil {
-		return fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
-	}
-	return nil
-}
-
-func addArFile(now time.Time, w *ar.Writer, name string, body []byte) error {
-	hdr := ar.Header{
-		Name:    name,
-		Size:    int64(len(body)),
-		Mode:    0644,
-		ModTime: now,
-	}
-	if err := w.WriteHeader(&hdr); err != nil {
-		return fmt.Errorf("cannot write file header: %v", err)
-	}
-	_, err := w.Write(body)
-	return err
 }

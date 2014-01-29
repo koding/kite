@@ -32,6 +32,7 @@ func (b *Build) Exec(args []string) error {
 	importPath := f.String("import", "", "Go importpath to be packaged")
 	files := f.String("files", "", "Files to be included with the package")
 	identifier := f.String("identifier", "com.koding", "Pkg identifier")
+	upstart := f.String("upstart", "", "Ubuntu upstart package")
 
 	f.Parse(args)
 
@@ -67,25 +68,14 @@ func (b *Build) Exec(args []string) error {
 			log.Println("darwin:", err)
 		}
 	case "linux":
-		tar := &Tar{
-			AppName:    appName,
-			Files:      *files,
-			ImportPath: *importPath,
-			BinaryPath: *binaryPath,
-			Output:     output,
-		}
-
-		tarFile, err := tar.Build()
-		if err != nil {
-			return err
-		}
-
 		deb := &Deb{
 			AppName:       appName,
 			Version:       *version,
 			Output:        output,
-			TarFile:       tarFile,
-			InstallPrefix: "/opt/kite",
+			ImportPath:    *importPath,
+			Files:         *files,
+			UpstartScript: *upstart,
+			InstallPrefix: "opt/kite",
 		}
 
 		pkgFile, err = deb.Build()

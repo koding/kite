@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	depsGoPath    = "gopackage"
+	DepsGoPath    = "gopackage"
 	gopackageFile = "gopackage.json"
 )
 
@@ -105,7 +105,7 @@ func (d *Deps) populateGoPaths() error {
 	}
 
 	d.currentGoPath = gopath
-	d.BuildGoPath = path.Join(pwd, depsGoPath)
+	d.BuildGoPath = path.Join(pwd, DepsGoPath)
 	return nil
 }
 
