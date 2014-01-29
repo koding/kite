@@ -15,10 +15,7 @@ import (
 	"github.com/blakesmith/ar"
 )
 
-const (
-	installPrefix = "./opt/kite/"
-
-	controlFile = `Package: %s
+const controlFile = `Package: %s
 Version: %s
 Architecture: %s
 Maintainer: Koding Developers <hello@koding.com>
@@ -27,10 +24,20 @@ Section: devel
 Priority: extra
 Description: %s Kite
 `
-)
 
-func (b *Build) Linux() (string, error) {
-	debFile := b.Output + ".deb"
+type Deb struct {
+	AppName       string
+	Version       string
+	Output        string
+	TarFile       string
+	InstallPrefix string
+	UpstartScript string
+}
+
+// Deb is building a new .deb package with the provided tarFile It returns the
+// created filename of the .deb file.
+func (d *Deb) Build() (string, error) {
+	debFile := d.Output + ".deb"
 	deb, err := os.Create(debFile + ".inprogress")
 	if err != nil {
 		return "", fmt.Errorf("cannot create deb: %v", err)
@@ -39,19 +46,13 @@ func (b *Build) Linux() (string, error) {
 	defer deb.Close()
 
 	// create first a preprared tar file
-	tarFile, err := b.TarGzFile()
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tarFile)
-
-	tf, err := os.Open(tarFile)
+	tf, err := os.Open(d.TarFile)
 	if err != nil {
 		return "", err
 	}
 	defer tf.Close()
 
-	if err := b.createDeb(tf, deb); err != nil {
+	if err := d.createDeb(tf, deb); err != nil {
 		return "", err
 	}
 
@@ -70,17 +71,18 @@ func debArch() string {
 	return arch
 }
 
-func (b *Build) createDeb(tarball io.Reader, deb io.Writer) error {
+func (d *Deb) createDeb(tarball io.Reader, deb io.Writer) error {
 	now := time.Now()
-	dataTarGz, md5sums, instSize, err := b.translateTarball(now, tarball)
+	dataTarGz, md5sums, instSize, err := d.translateTarball(now, tarball)
 	if err != nil {
 		return err
 	}
 
-	controlTarGz, err := b.createControl(now, instSize, md5sums)
+	controlTarGz, err := d.createControl(now, instSize, md5sums)
 	if err != nil {
 		return err
 	}
+
 	w := ar.NewWriter(deb)
 	if err := w.WriteGlobalHeader(); err != nil {
 		return fmt.Errorf("cannot write ar header to deb file: %v", err)
@@ -89,16 +91,19 @@ func (b *Build) createDeb(tarball io.Reader, deb io.Writer) error {
 	if err := addArFile(now, w, "debian-binary", []byte("2.0\n")); err != nil {
 		return fmt.Errorf("cannot pack debian-binary: %v", err)
 	}
+
 	if err := addArFile(now, w, "control.tar.gz", controlTarGz); err != nil {
 		return fmt.Errorf("cannot add control.tar.gz to deb: %v", err)
 	}
+
 	if err := addArFile(now, w, "data.tar.gz", dataTarGz); err != nil {
 		return fmt.Errorf("cannot add data.tar.gz to deb: %v", err)
 	}
+
 	return nil
 }
 
-func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, md5sums []byte, instSize int64, err error) {
+func (d *Deb) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, md5sums []byte, instSize int64, err error) {
 	buf := &bytes.Buffer{}
 	compress := gzip.NewWriter(buf)
 	out := tar.NewWriter(compress)
@@ -125,7 +130,7 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 		h.Name = strings.TrimLeft(h.Name, "./")
 
 		ha := tar.Header{
-			Name:     installPrefix,
+			Name:     d.InstallPrefix,
 			Mode:     0755,
 			ModTime:  h.ModTime,
 			Typeflag: tar.TypeDir,
@@ -135,7 +140,7 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
 		}
 
-		h.Name = installPrefix + h.Name
+		h.Name = d.InstallPrefix + h.Name
 		if h.Typeflag == tar.TypeDir && !strings.HasSuffix(h.Name, "/") {
 			h.Name += "/"
 		}
@@ -144,7 +149,7 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 			return nil, nil, 0, fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
 		}
 
-		// fmt.Println("tar: packing", h.Name[len(installPrefix):])
+		// fmt.Println("tar: packing", h.Name[len(d.InstallPrefix):])
 		if h.Typeflag == tar.TypeDir {
 			continue
 		}
@@ -168,21 +173,7 @@ func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, m
 	return buf.Bytes(), md5buf.Bytes(), instSize, nil
 }
 
-func addTarSymlink(now time.Time, out *tar.Writer, name, target string) error {
-	h := tar.Header{
-		Name:     name,
-		Linkname: target,
-		Mode:     0777,
-		ModTime:  now,
-		Typeflag: tar.TypeSymlink,
-	}
-	if err := out.WriteHeader(&h); err != nil {
-		return fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
-	}
-	return nil
-}
-
-func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (controlTarGz []byte, err error) {
+func (d *Deb) createControl(now time.Time, instSize int64, md5sums []byte) (controlTarGz []byte, err error) {
 	buf := &bytes.Buffer{}
 	compress := gzip.NewWriter(buf)
 	tarball := tar.NewWriter(compress)
@@ -190,11 +181,11 @@ func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (co
 	// controlfile
 	body := []byte(fmt.Sprintf(
 		controlFile,
-		b.AppName,     // Package
-		b.Version,     // Version
+		d.AppName,     // Package
+		d.Version,     // Version
 		debArch(),     // Architecture
 		instSize/1024, // Installed-Size
-		b.AppName,     // Description
+		d.AppName,     // Description
 	))
 
 	if err := addTarFile(now, tarball, "control", body); err != nil {
@@ -231,6 +222,20 @@ func addTarFile(now time.Time, tarball *tar.Writer, name string, body []byte) er
 		return fmt.Errorf("cannot write body of '%s' file: %v", name, err)
 	}
 
+	return nil
+}
+
+func addTarSymlink(now time.Time, out *tar.Writer, name, target string) error {
+	h := tar.Header{
+		Name:     name,
+		Linkname: target,
+		Mode:     0777,
+		ModTime:  now,
+		Typeflag: tar.TypeSymlink,
+	}
+	if err := out.WriteHeader(&h); err != nil {
+		return fmt.Errorf("cannot write header of %s to data.tar.gz: %v", h.Name, err)
+	}
 	return nil
 }
 

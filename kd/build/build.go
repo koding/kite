@@ -4,29 +4,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"koding/kite/kd/util"
-	"koding/kite/kd/util/deps"
 	"log"
-	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
-type Build struct {
-	AppName    string
-	Version    string
-	Output     string
-	BinaryPath string
-	ImportPath string
-	Files      string
-}
+type Build struct{}
 
 func NewBuild() *Build {
-	return &Build{
-		Version: "0.0.1",
-	}
+	return &Build{}
 }
 
 func (b *Build) Definition() string {
@@ -40,127 +26,74 @@ func (b *Build) Exec(args []string) error {
 	}
 
 	f := flag.NewFlagSet("build", flag.ContinueOnError)
-	f.StringVar(&b.ImportPath, "import", "", "Go importpath to be packaged")
-	f.StringVar(&b.BinaryPath, "bin", "", "Binary to be packaged")
-	f.StringVar(&b.Files, "files", "", "Files to be included with the package")
+
+	version := f.String("version", "0.0.1", "Version of the package")
+	binaryPath := f.String("bin", "", "Binary to be packaged")
+	importPath := f.String("import", "", "Go importpath to be packaged")
+	files := f.String("files", "", "Files to be included with the package")
 	identifier := f.String("identifier", "com.koding", "Pkg identifier")
 
 	f.Parse(args)
 
-	err := b.InitializeAppName()
-	if err != nil {
-		return err
+	var (
+		appName string
+		pkgFile string
+		err     error
+	)
+
+	if *binaryPath != "" {
+		appName = filepath.Base(*binaryPath)
+	} else if *importPath != "" {
+		appName = filepath.Base(*importPath)
+	} else {
+		return errors.New("build: --import or --bin should be defined.")
 	}
 
-	b.Version = "0.0.1"
-	b.Output = fmt.Sprintf("%s-%s.%s-%s", b.AppName, b.Version, runtime.GOOS, runtime.GOARCH)
-
-	var pkgFile string
+	output := fmt.Sprintf("%s-%s.%s-%s",
+		appName, *version, runtime.GOOS, runtime.GOARCH)
 
 	switch runtime.GOOS {
 	case "darwin":
-		d := &Darwin{
-			AppName:    b.AppName,
-			BinaryPath: b.BinaryPath,
-			Version:    b.Version,
+		darwin := &Darwin{
+			AppName:    appName,
+			BinaryPath: *binaryPath,
+			Version:    *version,
 			Identifier: *identifier,
-			Output:     b.Output,
+			Output:     output,
 		}
 
-		pkgFile, err = d.Build()
+		pkgFile, err = darwin.Build()
 		if err != nil {
 			log.Println("darwin:", err)
 		}
 	case "linux":
-		pkgFile, err = b.Linux()
+		tar := &Tar{
+			AppName:    appName,
+			Files:      *files,
+			ImportPath: *importPath,
+			BinaryPath: *binaryPath,
+			Output:     output,
+		}
+
+		tarFile, err := tar.Build()
+		if err != nil {
+			return err
+		}
+
+		deb := &Deb{
+			AppName:       appName,
+			Version:       *version,
+			Output:        output,
+			TarFile:       tarFile,
+			InstallPrefix: "/opt/kite",
+		}
+
+		pkgFile, err = deb.Build()
 		if err != nil {
 			log.Println("linux:", err)
 		}
 	}
 
-	// also create a tar.gz regardless of GOOS
-	tarFile, err := b.TarGzFile()
-	if err != nil {
-		return err
-	}
-
 	fmt.Println("package  :", pkgFile, "ready")
-	fmt.Println("tar file :", tarFile, "ready")
-
 	return nil
-}
-
-func (b *Build) InitializeAppName() error {
-	if b.BinaryPath != "" {
-		b.AppName = filepath.Base(b.BinaryPath)
-	} else if b.ImportPath != "" {
-		b.AppName = filepath.Base(b.ImportPath)
-	} else {
-		return errors.New("build: --import or --bin should be defined.")
-	}
-
-	return nil
-}
-
-// TarGzFile creates and returns the filename of the created file
-func (b *Build) TarGzFile() (string, error) {
-
-	var buildFolder string
-
-	if b.ImportPath != "" {
-		gopath := os.Getenv("GOPATH")
-		if gopath == "" {
-			return "", errors.New("GOPATH is not set")
-		}
-
-		// or use "go list <importPath>" for all packages and commands
-		packages := []string{b.ImportPath}
-		d, err := deps.LoadDeps(packages...)
-		if err != nil {
-			return "", err
-		}
-
-		err = d.InstallDeps()
-		if err != nil {
-			return "", err
-		}
-
-		buildFolder = filepath.Join(d.BuildGoPath, b.AppName)
-		defer os.RemoveAll(d.BuildGoPath)
-
-	} else {
-		tmpDir, err := ioutil.TempDir(".", "kd-build")
-		if err != nil {
-			return "", err
-		}
-		defer os.RemoveAll(tmpDir)
-
-		buildFolder = filepath.Join(tmpDir, b.AppName)
-		os.MkdirAll(buildFolder, 0755)
-
-		err = util.Copy(b.BinaryPath, buildFolder)
-		if err != nil {
-			log.Println("copy binaryPath", err)
-		}
-	}
-
-	// include given files
-	if b.Files != "" {
-		files := strings.Split(b.Files, ",")
-		for _, path := range files {
-			err := util.Copy(path, buildFolder)
-			if err != nil {
-				log.Println("copy assets", err)
-			}
-		}
-	}
-
-	// create tar.gz file from final director
-	tarFile := b.Output + ".tar.gz"
-	err := util.MakeTar(tarFile, filepath.Dir(buildFolder))
-	if err != nil {
-		return "", err
-	}
-
-	return tarFile, nil
 }
