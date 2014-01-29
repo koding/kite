@@ -75,7 +75,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 	}
 }
 
-// Error is the type of the first argument in response callback.
+// Error is the type of the kite related errors returned from kite package.
 type Error struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
@@ -125,6 +125,8 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 	}
 }
 
+// HandlerFunc is the type of the handlers registered to Kite.
+// The returned result must be Marshalable with json package.
 type HandlerFunc func(*Request) (result interface{}, err error)
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
@@ -132,6 +134,7 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 	k.server.HandleFunc(method, handler)
 }
 
+// Request contains information about the incoming request.
 type Request struct {
 	Method         string
 	Args           dnode.Arguments
@@ -142,6 +145,7 @@ type Request struct {
 	RemoteAddr     string
 }
 
+// Wrap your function with Callback to send it as an argument to a RemoteKite.
 type Callback func(r *Request)
 
 func (c Callback) MarshalJSON() ([]byte, error) {

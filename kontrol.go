@@ -12,6 +12,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+// Returned from GetKites when query matches no kites.
 var ErrNoKitesAvailable = errors.New("no kites availabile")
 
 const registerKontrolRetryDuration = time.Minute
@@ -32,7 +33,7 @@ func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
 	}
 }
 
-// Kontrol embeds RemoteKite which has additional special helper methods.
+// Kontrol is a client for registering and querying Kontrol Kite.
 type Kontrol struct {
 	*RemoteKite
 

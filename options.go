@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Options is used to define a Kite.
+// Options is passed to kite.New when creating new instance.
 type Options struct {
 	Username              string
 	Kitename              string
@@ -60,6 +60,7 @@ func (o *Options) validate() {
 	}
 }
 
+// Read options from a file.
 func ReadKiteOptions(configfile string) (*Options, error) {
 	file, err := ioutil.ReadFile(configfile)
 	if err != nil {
