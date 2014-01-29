@@ -133,6 +133,8 @@ func (c *Client) dial() error {
 // DialForever connects to the server in background.
 // If the connection drops, it reconnects again.
 func (c *Client) DialForever(serverURL string) (err error) {
+	c.Reconnect = true
+
 	if c.Config.Location, err = url.Parse(serverURL); err != nil {
 		return
 	}

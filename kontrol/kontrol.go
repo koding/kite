@@ -549,6 +549,9 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 
 	resp, err := k.etcd.Get(kiteKey, false, false)
 	if err != nil {
+		if etcdErr, ok := err.(*etcd.EtcdError); ok && etcdErr.ErrorCode == 100 {
+			return nil, errors.New("Kite not found")
+		}
 		return nil, err
 	}
 
