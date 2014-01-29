@@ -1,3 +1,7 @@
+// Package kite is a library for creating small micro-services.
+// Two main types implemented by this package are
+// Kite for creating a micro-service server called "Kite" and
+// RemoteKite for communicating with another kites.
 package kite
 
 import (
