@@ -14,36 +14,6 @@ import (
 	"text/template"
 )
 
-func debianTemplates() map[string]string {
-	t := make(map[string]string)
-	t["control"] = `Source: {{.AppName}}
-Section: devel
-Priority: extra
-Standards-Version: {{.Version}}
-Maintainer: Koding Developers <hello@koding.com>
-Homepage: https://koding.com
-
-Package: {{.AppName}}
-Architecture: {{.Arch}}
-Description: {{.Desc}}
-`
-
-	t["rules"] = `#!/usr/bin/make -f
-%:
-	dh $@
-`
-	t["changelog"] = `{{.AppName}} ({{.Version}}) raring; urgency=low
-
-  * Initial release.
-
- -- Koding Developers <hello@koding.com>  Tue, 28 Jan 2014 22:17:54 -0800
-`
-	t["compat"] = "9"
-	t["install"] = "{{.InstallPrefix}}/ /"
-
-	return t
-}
-
 type Deb struct {
 	// App informations
 	AppName string
@@ -64,13 +34,12 @@ type Deb struct {
 // Deb is building a new .deb package with the provided tarFile It returns the
 // created filename of the .deb file.
 func (d *Deb) Build() (string, error) {
-	d.BuildFolder = deps.DepsGoPath
-	// defer os.RemoveAll(d.BuildFolder)
 	defer d.cleanDebianBuild()
 
+	d.BuildFolder = deps.DepsGoPath
 	d.Arch = debArch()
 	d.Desc = d.AppName + " Kite"
-	d.DebianTemplates = debianTemplates()
+	d.DebianTemplates = d.debianTemplates()
 	d.Output = fmt.Sprintf("%s_%s_%s", d.AppName, d.Version, d.Arch)
 
 	if err := d.createDebianDir(); err != nil {
@@ -88,13 +57,15 @@ func (d *Deb) Build() (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		log.Println(err)
+		return "", err
 	}
 
 	return d.Output, nil
 }
 
 func (d *Deb) cleanDebianBuild() {
+	os.RemoveAll(d.BuildFolder)
+
 	exts := []string{"build", "changes"}
 	output := fmt.Sprintf("%s_%s_%s", d.AppName, d.Version, d.Arch)
 	for _, ext := range exts {
@@ -208,6 +179,39 @@ func (d *Deb) createDebianFile(name string) error {
 		Must(template.New("controlFile").
 		Parse(d.DebianTemplates[name])).
 		Execute(file, d)
+}
+
+func (d *Deb) debianTemplates() map[string]string {
+	t := make(map[string]string)
+	t["control"] = `Source: {{.AppName}}
+Section: devel
+Priority: extra
+Standards-Version: {{.Version}}
+Maintainer: Koding Developers <hello@koding.com>
+Homepage: https://koding.com
+
+Package: {{.AppName}}
+Architecture: {{.Arch}}
+Description: {{.Desc}}
+`
+
+	t["rules"] = `#!/usr/bin/make -f
+%:
+	dh $@
+`
+
+	t["changelog"] = `{{.AppName}} ({{.Version}}) raring; urgency=low
+
+  * Initial release.
+
+ -- Koding Developers <hello@koding.com>  Tue, 28 Jan 2014 22:17:54 -0800
+`
+
+	t["compat"] = "9"
+
+	t["install"] = fmt.Sprintf("%s/ /", filepath.Dir(d.InstallPrefix))
+
+	return t
 }
 
 func debArch() string {
