@@ -98,20 +98,6 @@ func (b *Build) createDeb(tarball io.Reader, deb io.Writer) error {
 	return nil
 }
 
-func addArFile(now time.Time, w *ar.Writer, name string, body []byte) error {
-	hdr := ar.Header{
-		Name:    name,
-		Size:    int64(len(body)),
-		Mode:    0644,
-		ModTime: now,
-	}
-	if err := w.WriteHeader(&hdr); err != nil {
-		return fmt.Errorf("cannot write file header: %v", err)
-	}
-	_, err := w.Write(body)
-	return err
-}
-
 func (b *Build) translateTarball(now time.Time, tarball io.Reader) (dataTarGz, md5sums []byte, instSize int64, err error) {
 	buf := &bytes.Buffer{}
 	compress := gzip.NewWriter(buf)
@@ -201,6 +187,7 @@ func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (co
 	compress := gzip.NewWriter(buf)
 	tarball := tar.NewWriter(compress)
 
+	// controlfile
 	body := []byte(fmt.Sprintf(
 		controlFile,
 		b.AppName,     // Package
@@ -210,32 +197,12 @@ func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (co
 		b.AppName,     // Description
 	))
 
-	hdr := tar.Header{
-		Name:     "control",
-		Size:     int64(len(body)),
-		Mode:     0644,
-		ModTime:  now,
-		Typeflag: tar.TypeReg,
-	}
-	if err := tarball.WriteHeader(&hdr); err != nil {
-		return nil, fmt.Errorf("cannot write header of control file to control.tar.gz: %v", err)
-	}
-	if _, err := tarball.Write(body); err != nil {
-		return nil, fmt.Errorf("cannot write control file to control.tar.gz: %v", err)
+	if err := addTarFile(now, tarball, "control", body); err != nil {
+		return nil, fmt.Errorf("cannot tar control: %v", err)
 	}
 
-	hdr = tar.Header{
-		Name:     "md5sums",
-		Size:     int64(len(md5sums)),
-		Mode:     0644,
-		ModTime:  now,
-		Typeflag: tar.TypeReg,
-	}
-	if err := tarball.WriteHeader(&hdr); err != nil {
-		return nil, fmt.Errorf("cannot write header of md5sums file to control.tar.gz: %v", err)
-	}
-	if _, err := tarball.Write(md5sums); err != nil {
-		return nil, fmt.Errorf("cannot write md5sums file to control.tar.gz: %v", err)
+	if err := addTarFile(now, tarball, "md5sums", md5sums); err != nil {
+		return nil, fmt.Errorf("cannot tar md5sums: %v", err)
 	}
 
 	if err := tarball.Close(); err != nil {
@@ -245,4 +212,38 @@ func (b *Build) createControl(now time.Time, instSize int64, md5sums []byte) (co
 		return nil, fmt.Errorf("closing control.tar.gz: %v", err)
 	}
 	return buf.Bytes(), nil
+}
+
+func addTarFile(now time.Time, tarball *tar.Writer, name string, body []byte) error {
+	hdr := tar.Header{
+		Name:     name,
+		Size:     int64(len(body)),
+		Mode:     0644,
+		ModTime:  now,
+		Typeflag: tar.TypeReg,
+	}
+
+	if err := tarball.WriteHeader(&hdr); err != nil {
+		return fmt.Errorf("cannot write header of '%s' file: %v", name, err)
+	}
+
+	if _, err := tarball.Write(body); err != nil {
+		return fmt.Errorf("cannot write body of '%s' file: %v", name, err)
+	}
+
+	return nil
+}
+
+func addArFile(now time.Time, w *ar.Writer, name string, body []byte) error {
+	hdr := ar.Header{
+		Name:    name,
+		Size:    int64(len(body)),
+		Mode:    0644,
+		ModTime: now,
+	}
+	if err := w.WriteHeader(&hdr); err != nil {
+		return fmt.Errorf("cannot write file header: %v", err)
+	}
+	_, err := w.Write(body)
+	return err
 }
