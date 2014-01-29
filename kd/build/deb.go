@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 )
 
 type Deb struct {
@@ -40,8 +41,9 @@ func (d *Deb) Build() (string, error) {
 	d.Arch = debArch()
 	d.Desc = d.AppName + " Kite"
 	d.DebianTemplates = d.debianTemplates()
-	d.Output = fmt.Sprintf("%s_%s_%s", d.AppName, d.Version, d.Arch)
+	d.Output = fmt.Sprintf("%s_%s_%s.deb", d.AppName, d.Version, d.Arch)
 
+	fmt.Println("preparing build folders")
 	if err := d.createDebianDir(); err != nil {
 		return "", err
 	}
@@ -52,15 +54,38 @@ func (d *Deb) Build() (string, error) {
 
 	// finally build with debuild to create .deb file
 	cmd := exec.Command("debuild", "-us", "-uc")
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+
+	// Debug
+	// cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	cmd.Dir = d.BuildFolder
 
-	err := cmd.Run()
+	fmt.Println("starting build process ")
+	err := cmd.Start()
 	if err != nil {
 		return "", err
 	}
 
-	return d.Output, nil
+	done := make(chan bool)
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			log.Fatalln(err) // exit if something goes wrong
+		}
+		done <- true
+	}()
+
+	// check the result every two seconds
+	ticker := time.NewTicker(2 * time.Second).C
+
+	for {
+		select {
+		case <-ticker:
+			fmt.Printf(".  ")
+		case <-done:
+			fmt.Println("")
+			return d.Output, nil
+		}
+	}
 }
 
 func (d *Deb) cleanDebianBuild() {
