@@ -17,7 +17,7 @@ func setupTest(t *testing.T) {
 	kodingKey := modelhelper.NewKodingKeys()
 	kodingKey.Id = bson.ObjectIdHex("528e1b36a819430000000001")
 	kodingKey.Key = "FmJpq9nof261Fa50GBb4x1naxQbB9sToQ9cSQ5RUsFgxgH0R9-DHxPwfhpXRe5PM"
-	kodingKey.Owner = "5196fcb0bc9bdb0000000011"
+	kodingKey.Owner = "5196fcb0bc9bdb0000000011" // devrim from jAccounts collection
 	kodingKey.Hostname = "tardis.local-39612b01-b08b-4df7-49f7-641e58541459"
 
 	err := modelhelper.AddKodingKeys(kodingKey)
@@ -34,19 +34,26 @@ func setupTest(t *testing.T) {
 	}
 
 	etcdClient := etcd.NewClient(nil)
-	_, err = etcdClient.Delete("/kites/devrim", true)
-	if err != nil {
-		if err.(etcd.EtcdError).ErrorCode != 100 { // Key Not Found
-			t.Errorf("Cannot delete keys from etcd: %s", err)
-			return
-		}
+	_, err = etcdClient.Delete("/kites", true)
+	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
+		t.Errorf("Cannot delete keys from etcd: %s", err)
+		return
 	}
 }
 
 func TestKontrol(t *testing.T) {
 	setupTest(t)
 
-	kon := New()
+	kontrolOpts := &kite.Options{
+		Kitename:    "kontrol",
+		Version:     "0.0.1",
+		Port:        "4000",
+		Region:      "sj",
+		Environment: "development",
+		Username:    "devrim",
+	}
+
+	kon := New(kontrolOpts, nil)
 	kon.Start()
 
 	mathKite := mathWorker()
@@ -132,9 +139,6 @@ func Square(r *kite.Request) (interface{}, error) {
 	result := a * a
 
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
-
-	// Reverse method call
-	r.RemoteKite.Go("foo", "bar")
 
 	return result, nil
 }

@@ -98,9 +98,9 @@ type errorForSending *Error
 
 // recoverError returns a function which recovers the error and sets to the
 // given argument as kite.Error.
-
-//TODO: change that it doesn't use a pointer of  pointer, a simpler and
-//cleaner solution would work in the future
+//
+// TODO: change that it doesn't use a pointer of pointer,
+// a simpler and cleaner solution would work in the future,
 func (k *Kite) recoverError(kiteErr **Error) func() {
 	return func() {
 		r := recover()
@@ -113,15 +113,13 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 			*kiteErr = err
 		case *dnode.ArgumentError:
 			*kiteErr = &Error{"argumentError", err.Error()}
-		case error:
-			*kiteErr = &Error{"genericError", err.Error()}
 		default:
 			*kiteErr = &Error{"genericError", fmt.Sprint(r)}
+			debug.PrintStack()
 		}
 
 		k.Log.Warning("Error in received message %s", (*kiteErr).Error())
 
-		debug.PrintStack()
 	}
 }
 
@@ -281,9 +279,9 @@ func (k *Kite) AuthenticateFromKodingKey(r *Request) error {
 		return errors.New("Invalid Koding Key")
 	}
 
-	// Set the username if missing.
-	if r.RemoteKite.Username == "" && k.Username != "" {
-		r.RemoteKite.Username = k.Username
+	// Remote kite must have the same username if koding keys match.
+	if r.Username == "" && k.Username != "" {
+		r.Username = k.Username
 	}
 
 	return nil
