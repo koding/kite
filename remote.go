@@ -78,8 +78,20 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 		r.client.Config.TlsConfig.RootCAs.AppendCertsFromPEM(cert)
 	}
 
+	// Parse token for setting validUntil field
+	if auth.Type == "token" && auth.validUntil == nil {
+		var exp time.Time
+		token, err := jwt.Parse(auth.Key, k.getRSAKey)
+		if err != nil {
+			exp = time.Now().UTC()
+		} else {
+			exp = time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
+		}
+		r.Authentication.validUntil = &exp
+	}
+
 	r.OnConnect(func() {
-		if r.Authentication.validUntil == nil {
+		if r.Authentication.Type != "token" {
 			return
 		}
 
