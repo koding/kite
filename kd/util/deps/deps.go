@@ -122,6 +122,9 @@ func (d *Deps) InstallDeps() error {
 		os.Setenv("GOPATH", fmt.Sprintf("%s:%s", d.BuildGoPath, d.currentGoPath))
 	}
 
+	// revert gopath back, so that we don't mess up gopath for other applications
+	defer os.Setenv("GOPATH", d.currentGoPath)
+
 	// another approach is let them building with a single gobin and then move
 	// the final binaries into new directories based on the binary filename.
 	for _, pkg := range d.Packages {
