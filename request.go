@@ -113,15 +113,13 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 			*kiteErr = err
 		case *dnode.ArgumentError:
 			*kiteErr = &Error{"argumentError", err.Error()}
-		case error:
-			*kiteErr = &Error{"genericError", err.Error()}
 		default:
 			*kiteErr = &Error{"genericError", fmt.Sprint(r)}
+			debug.PrintStack()
 		}
 
 		k.Log.Warning("Error in received message %s", (*kiteErr).Error())
 
-		debug.PrintStack()
 	}
 }
 
