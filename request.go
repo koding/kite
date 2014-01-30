@@ -279,9 +279,9 @@ func (k *Kite) AuthenticateFromKodingKey(r *Request) error {
 		return errors.New("Invalid Koding Key")
 	}
 
-	// Set the username if missing.
-	if r.RemoteKite.Username == "" && k.Username != "" {
-		r.RemoteKite.Username = k.Username
+	// Remote kite must have the same username if koding keys match.
+	if r.Username == "" && k.Username != "" {
+		r.Username = k.Username
 	}
 
 	return nil
