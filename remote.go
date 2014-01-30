@@ -43,6 +43,9 @@ type RemoteKite struct {
 
 	// Duration to wait reply from remote when making a request with Tell().
 	tellTimeout time.Duration
+
+	// For forcing token to renew.
+	signalRenewToken chan struct{}
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
@@ -50,12 +53,13 @@ type RemoteKite struct {
 // Tell() and Go() methods.
 func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKite {
 	r := &RemoteKite{
-		Kite:           kite,
-		localKite:      k,
-		Log:            k.Log,
-		Authentication: auth,
-		client:         k.server.NewClientWithHandlers(),
-		disconnect:     make(chan bool),
+		Kite:             kite,
+		localKite:        k,
+		Log:              k.Log,
+		Authentication:   auth,
+		client:           k.server.NewClientWithHandlers(),
+		disconnect:       make(chan bool),
+		signalRenewToken: make(chan struct{}),
 	}
 	r.SetTellTimeout(DefaultTellTimeout)
 
@@ -195,10 +199,13 @@ loop:
 		select {
 		case <-time.After(retryInterval):
 			if err := r.renewToken(); err != nil {
-				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval)
-				continue
+				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
 			}
-
+			break loop
+		case <-r.signalRenewToken:
+			if err := r.renewToken(); err != nil {
+				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
+			}
 			break loop
 		case <-r.disconnect:
 			return errors.New("disconnect")
@@ -368,6 +375,12 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 	go func() {
 		select {
 		case resp := <-doneChan:
+			if kiteErr, ok := resp.Err.(*Error); ok && kiteErr.Type == "authenticationError" {
+				select {
+				case r.signalRenewToken <- struct{}{}:
+				default:
+				}
+			}
 			responseChan <- resp
 		case <-r.disconnect:
 			responseChan <- &response{nil, &Error{"disconnect", "Remote kite has disconnected"}}
