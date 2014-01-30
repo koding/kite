@@ -39,7 +39,7 @@ type RemoteKite struct {
 	client *rpc.Client
 
 	// To signal waiters of Go() on disconnect.
-	disconnect chan bool
+	disconnect chan struct{}
 
 	// Duration to wait reply from remote when making a request with Tell().
 	tellTimeout time.Duration
@@ -58,7 +58,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 		Log:              k.Log,
 		Authentication:   auth,
 		client:           k.server.NewClientWithHandlers(),
-		disconnect:       make(chan bool),
+		disconnect:       make(chan struct{}),
 		signalRenewToken: make(chan struct{}, 1),
 	}
 	r.SetTellTimeout(DefaultTellTimeout)
@@ -91,7 +91,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	r.OnDisconnect(func() {
 		m.Lock()
 		close(r.disconnect)
-		r.disconnect = make(chan bool)
+		r.disconnect = make(chan struct{})
 		m.Unlock()
 	})
 
