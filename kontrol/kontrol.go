@@ -138,15 +138,13 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey, remoteAddr string) (*p
 	setKey := k.makeSetter(kite, key, kodingkey)
 
 	// Register to etcd.
-	prev, err := setKey()
+	err = setKey()
 	if err != nil {
 		log.Critical("etcd setKey error: %s", err)
 		return nil, errors.New("internal error - register")
 	}
 
-	if prev != "" {
-		log.Notice("Kite (%s) is already registered. Doing nothing.", key)
-	} else if err := requestHeartbeat(r, setKey); err != nil {
+	if err := requestHeartbeat(r, setKey); err != nil {
 		return nil, err
 	}
 
@@ -168,17 +166,10 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey, remoteAddr string) (*p
 	}, nil
 }
 
-func requestHeartbeat(r *kite.RemoteKite, setterFunc func() (string, error)) error {
-	heartbeatFunc := func(req *kite.Request) {
-		prev, err := setterFunc()
-		if err == nil && prev == "" {
-			log.Warning("Came heartbeat but the Kite (%s) is not registered. Re-registering it. It may be an indication that the heartbeat delay is too short.", req.RemoteKite.ID)
-		}
-	}
-
+func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		kite.Callback(heartbeatFunc),
+		kite.Callback(func(r *kite.Request) { setterFunc() }),
 	}
 
 	_, err := r.Tell("heartbeat", heartbeatArgs...)
@@ -194,7 +185,7 @@ func (k *Kontrol) registerSelf() {
 
 	setter := k.makeSetter(&k.kite.Kite, key, k.kite.KodingKey)
 	for {
-		if _, err := setter(); err != nil {
+		if err := setter(); err != nil {
 			log.Critical(err.Error())
 			time.Sleep(time.Second)
 			continue
@@ -205,7 +196,7 @@ func (k *Kontrol) registerSelf() {
 }
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) func() (string, error) {
+func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) func() error {
 	rv := &registerValue{
 		URL:        kite.URL,
 		KodingKey:  kodingkey,
@@ -217,25 +208,21 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) fun
 
 	ttl := uint64(HeartbeatDelay / time.Second)
 
-	return func() (prevValue string, err error) {
-		resp, err := k.etcd.Set(etcdKey, value, ttl)
+	return func() error {
+		_, err := k.etcd.Set(etcdKey, value, ttl)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
-			return
-		}
-
-		if resp.PrevNode != nil {
-			prevValue = resp.PrevNode.Value
+			return err
 		}
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
 		_, err = k.etcd.UpdateDir(KitesPrefix+"/"+kite.Username, ttl)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
-			return
+			return err
 		}
 
-		return
+		return nil
 	}
 }
 
