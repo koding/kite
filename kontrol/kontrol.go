@@ -24,6 +24,8 @@ const (
 	HeartbeatInterval = 1 * time.Minute
 	HeartbeatDelay    = 2 * time.Minute
 	KitesPrefix       = "/kites"
+	TokenTTL          = 1 * time.Hour
+	TokenLeeway       = 1 * time.Minute
 )
 
 var log *logging.Logger
@@ -424,11 +426,11 @@ func generateToken(kite *protocol.Kite, username string) (string, error) {
 
 	// Identifies the expiration time after which the JWT MUST NOT be accepted
 	// for processing.
-	ttl := 1 * time.Hour
+	ttl := TokenTTL
 
 	// Implementers MAY provide for some small leeway, usually no more than
 	// a few minutes, to account for clock skew.
-	leeway := 1 * time.Minute
+	leeway := TokenLeeway
 
 	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
 	tkn.Claims["iss"] = "koding.com"                                 // Issuer

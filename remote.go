@@ -59,7 +59,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 		Authentication:   auth,
 		client:           k.server.NewClientWithHandlers(),
 		disconnect:       make(chan bool),
-		signalRenewToken: make(chan struct{}),
+		signalRenewToken: make(chan struct{}, 1),
 	}
 	r.SetTellTimeout(DefaultTellTimeout)
 
@@ -84,7 +84,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 		}
 
 		// Start a goroutine that will renew the token before it expires.
-		go r.tokenRenewer()
+		r.startTokenRenewer()
 	})
 
 	var m sync.Mutex
@@ -171,48 +171,45 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
-func (r *RemoteKite) tokenRenewer() {
-	for {
-		// Token will be renewed before it expires.
-		renewTime := r.Authentication.validUntil.Add(-30 * time.Second)
-		select {
-		case <-time.After(renewTime.Sub(time.Now().UTC())):
-			if err := r.renewTokenUntilDisconnect(); err != nil {
+func (r *RemoteKite) startTokenRenewer() {
+	const (
+		renewBefore   = 30 * time.Second
+		retryInterval = 10 * time.Second
+	)
+
+	// The duration from now to the time token needs to be renewed.
+	// Needs to be calculated after renewing the token.
+	renewDuration := func() time.Duration {
+		return r.Authentication.validUntil.Add(-renewBefore).Sub(time.Now().UTC())
+	}
+
+	// renews token before it expires (sends the first signal to the goroutine below)
+	go time.AfterFunc(renewDuration(), r.sendRenewTokenSignal)
+
+	// renews token on signal
+	go func() {
+		for {
+			select {
+			case <-r.signalRenewToken:
+				if err := r.renewToken(); err != nil {
+					r.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
+					go time.AfterFunc(retryInterval, r.sendRenewTokenSignal)
+				} else {
+					go time.AfterFunc(renewDuration(), r.sendRenewTokenSignal)
+				}
+			case <-r.disconnect:
 				return
 			}
-		case <-r.disconnect:
-			return
 		}
-	}
+	}()
 }
 
-// renewToken retries until the request is successful or disconnect.
-func (r *RemoteKite) renewTokenUntilDisconnect() error {
-	const retryInterval = 10 * time.Second
-
-	if err := r.renewToken(); err == nil {
-		return nil
+func (r *RemoteKite) sendRenewTokenSignal() {
+	// Needs to be non-blocking because tokenRenewer may be stopped.
+	select {
+	case r.signalRenewToken <- struct{}{}:
+	default:
 	}
-
-loop:
-	for {
-		select {
-		case <-time.After(retryInterval):
-			if err := r.renewToken(); err != nil {
-				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
-			}
-			break loop
-		case <-r.signalRenewToken:
-			if err := r.renewToken(); err != nil {
-				r.Log.Error("error: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
-			}
-			break loop
-		case <-r.disconnect:
-			return errors.New("disconnect")
-		}
-	}
-
-	return nil
 }
 
 func (r *RemoteKite) renewToken() error {
@@ -376,10 +373,7 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 		select {
 		case resp := <-doneChan:
 			if kiteErr, ok := resp.Err.(*Error); ok && kiteErr.Type == "authenticationError" {
-				select {
-				case r.signalRenewToken <- struct{}{}:
-				default:
-				}
+				r.sendRenewTokenSignal()
 			}
 			responseChan <- resp
 		case <-r.disconnect:
