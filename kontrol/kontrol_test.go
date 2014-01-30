@@ -133,9 +133,6 @@ func Square(r *kite.Request) (interface{}, error) {
 
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
 
-	// Reverse method call
-	r.RemoteKite.Go("foo", "bar")
-
 	return result, nil
 }
 
