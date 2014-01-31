@@ -1,9 +1,9 @@
-package kite
+package cmd
 
 import (
 	"errors"
 	"fmt"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"os"
 	"path/filepath"
 )

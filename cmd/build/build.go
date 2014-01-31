@@ -16,7 +16,7 @@ func NewBuild() *Build {
 }
 
 func (b *Build) Definition() string {
-	return "Build deployable install packages"
+	return "Build deployable kite packages"
 }
 
 func (b *Build) Exec(args []string) error {

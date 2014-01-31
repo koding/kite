@@ -3,8 +3,8 @@ package build
 import (
 	"errors"
 	"io/ioutil"
-	"koding/kite/kd/util"
-	"koding/kite/kd/util/deps"
+	"koding/kite/cmd/util"
+	"koding/kite/cmd/util/deps"
 	"log"
 	"os"
 	"path/filepath"

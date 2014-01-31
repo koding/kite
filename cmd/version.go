@@ -1,4 +1,4 @@
-package kd
+package cmd
 
 import "fmt"
 
@@ -13,7 +13,7 @@ func NewVersion() *Version {
 }
 
 func (v Version) Definition() string {
-	return "Show version"
+	return "Show version of this command"
 }
 
 func (v Version) Exec(args []string) error {

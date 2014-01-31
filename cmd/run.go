@@ -1,8 +1,8 @@
-package kite
+package cmd
 
 import (
 	"errors"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"os"
 	"path/filepath"
 	"syscall"

@@ -1,4 +1,4 @@
-package kite
+package cmd
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ func NewTell() *Tell {
 }
 
 func (*Tell) Definition() string {
-	return "Call a method on a Kite"
+	return "Call a method on a kite"
 }
 
 func (*Tell) Exec(args []string) error {

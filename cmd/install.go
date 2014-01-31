@@ -1,4 +1,4 @@
-package kite
+package cmd
 
 import (
 	"archive/tar"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,7 +22,7 @@ func NewInstall() *Install {
 }
 
 func (*Install) Definition() string {
-	return "Install a kite from Koding repository"
+	return "Install a kite from repository"
 }
 
 const S3URL = "http://koding-kites.s3.amazonaws.com/"

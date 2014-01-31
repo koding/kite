@@ -1,23 +1,22 @@
-// Package kite implements the "kd kite" sub-commands.
-package kite
+package main
 
 import (
-	"path/filepath"
+	"koding/kite/cmd"
+	"koding/kite/cmd/build"
+	"koding/kite/cmd/cli"
 )
 
-type Kite struct {
-	KiteName string
-	Folder   string
-	// gives path for kite executable
-	KiteExecutable string
-}
+func main() {
+	root := cli.NewCLI()
 
-func NewKite(kiteName string) *Kite {
-	folder := kiteName + ".kite"
-	kiteExecutable := "./" + filepath.Join(filepath.Join(folder, kiteName+"-kite"))
-	return &Kite{
-		KiteName:       kiteName,
-		Folder:         folder,
-		KiteExecutable: kiteExecutable,
-	}
+	root.AddCommand("version", cmd.NewVersion())
+	root.AddCommand("register", cmd.NewRegister())
+	root.AddCommand("install", cmd.NewInstall())
+	root.AddCommand("build", build.NewBuild())
+	root.AddCommand("list", cmd.NewList())
+	root.AddCommand("run", cmd.NewRun())
+	root.AddCommand("tell", cmd.NewTell())
+	root.AddCommand("uninstall", cmd.NewUninstall())
+
+	root.Run()
 }

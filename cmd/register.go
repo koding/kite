@@ -1,9 +1,9 @@
-package kd
+package cmd
 
 import (
 	"errors"
 	"fmt"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"koding/kite/kodingkey"
 	"time"
 )
@@ -17,7 +17,7 @@ func NewRegister() *Register {
 }
 
 func (r *Register) Definition() string {
-	return "Register this host to Koding"
+	return "Register this host to a kite authority"
 }
 
 func (r *Register) Exec(args []string) error {

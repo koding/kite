@@ -3,7 +3,7 @@ package build
 import (
 	"fmt"
 	"io/ioutil"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"log"
 	"os"
 	"os/exec"

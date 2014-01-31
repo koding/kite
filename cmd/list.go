@@ -1,9 +1,9 @@
-package kite
+package cmd
 
 import (
 	"fmt"
 	"io/ioutil"
-	"koding/kite/kd/util"
+	"koding/kite/cmd/util"
 	"os"
 	"path/filepath"
 	"strings"
