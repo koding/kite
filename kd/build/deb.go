@@ -54,10 +54,10 @@ func (d *Deb) Build() (string, error) {
 
 	// finally build with debuild to create .deb file
 	cmd := exec.Command("debuild", "-us", "-uc")
+	cmd.Dir = d.BuildFolder
 
 	// Debug
 	// cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	cmd.Dir = d.BuildFolder
 
 	fmt.Println("starting build process ")
 	err := cmd.Start()
@@ -110,9 +110,7 @@ func (d *Deb) createInstallDir() error {
 		return errors.New("GOPATH is not set")
 	}
 
-	// or use "go list <importPath>" for all packages and commands
-	packages := []string{d.ImportPath}
-	dp, err := deps.LoadDeps(packages...)
+	dp, err := deps.LoadDeps(deps.NewPkg(d.ImportPath, d.AppName))
 	if err != nil {
 		return err
 	}
@@ -123,7 +121,6 @@ func (d *Deb) createInstallDir() error {
 	}
 
 	appFolder := filepath.Join(dp.BuildGoPath, d.AppName)
-
 	if d.Files != "" {
 		files := strings.Split(d.Files, ",")
 		for _, path := range files {

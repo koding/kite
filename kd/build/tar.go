@@ -30,8 +30,7 @@ func (t *Tar) Build() (string, error) {
 		}
 
 		// or use "go list <importPath>" for all packages and commands
-		packages := []string{t.ImportPath}
-		d, err := deps.LoadDeps(packages...)
+		d, err := deps.LoadDeps(deps.NewPkg(t.ImportPath, t.AppName))
 		if err != nil {
 			return "", err
 		}

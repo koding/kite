@@ -18,11 +18,16 @@ type Package struct {
 	Deps       []string
 }
 
-func listPackages(pkgs ...string) ([]*Package, error) {
+func listPackages(pkgs ...Pkg) ([]*Package, error) {
 	packages := make([]*Package, 0)
 	args := []string{"list", "-e", "-json"}
 
-	cmd := exec.Command("go", append(args, pkgs...)...)
+	goPkgs := make([]string, len(pkgs))
+	for i, p := range pkgs {
+		goPkgs[i] = p.ImportPath
+	}
+
+	cmd := exec.Command("go", append(args, goPkgs...)...)
 	cmd.Stderr = os.Stderr
 	r, err := cmd.StdoutPipe()
 	if err != nil {

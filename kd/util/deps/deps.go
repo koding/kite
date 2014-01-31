@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sort"
 
@@ -21,9 +22,23 @@ const (
 	gopackageFile = "gopackage.json"
 )
 
+// Pkg defines a single go package entity
+type Pkg struct {
+	ImportPath string `json:"importPath"`
+	Output     string `json:"output"`
+}
+
+// NewPkg returns a new Pkg struct. If output is empty, t
+func NewPkg(importPath, output string) Pkg {
+	return Pkg{
+		ImportPath: importPath,
+		Output:     output,
+	}
+}
+
 type Deps struct {
 	// Packages is written as the importPath of a given package(s).
-	Packages []string `json:"packages"`
+	Packages []Pkg `json:"packages"`
 
 	// GoVersion defines the Go version needed at least as a minumum.
 	GoVersion string `json:"goVersion"`
@@ -44,7 +59,7 @@ type Deps struct {
 // dependencies and populates the fields in Deps. After LoadDeps one can use
 // InstallDeps() to install/build the binary for the given pkg or use
 // GetDeps() to download and vendorize the dependencies of the given pkg.
-func LoadDeps(pkgs ...string) (*Deps, error) {
+func LoadDeps(pkgs ...Pkg) (*Deps, error) {
 	packages, err := listPackages(pkgs...)
 	if err != nil {
 		fmt.Println(err)
@@ -109,7 +124,7 @@ func (d *Deps) populateGoPaths() error {
 	return nil
 }
 
-// InstallDeps calls "go install" on the given packages and installs them
+// InstallDeps calls "go build" on the given packages and installs them
 // to deps.BuildGoPath/pkgname
 func (d *Deps) InstallDeps() error {
 	if !compareGoVersions(d.GoVersion, runtime.Version()) {
@@ -117,24 +132,20 @@ func (d *Deps) InstallDeps() error {
 			runtime.Version(), d.GoVersion)
 	}
 
-	// expand current path
-	if d.BuildGoPath != d.currentGoPath {
-		os.Setenv("GOPATH", fmt.Sprintf("%s:%s", d.BuildGoPath, d.currentGoPath))
-	}
-
-	// revert gopath back, so that we don't mess up gopath for other applications
-	defer os.Setenv("GOPATH", d.currentGoPath)
-
 	// another approach is let them building with a single gobin and then move
 	// the final binaries into new directories based on the binary filename.
 	for _, pkg := range d.Packages {
-		pkgname := path.Base(pkg)
-		binpath := fmt.Sprintf("%s/%s/", d.BuildGoPath, pkgname)
+		var binPath string
+		if pkg.Output == "" {
+			binPath = filepath.Join(d.BuildGoPath, filepath.Base(pkg.ImportPath))
+		} else {
+			binPath = filepath.Join(d.BuildGoPath, pkg.Output)
+		}
+		os.MkdirAll(binPath, 0755)
 
-		os.MkdirAll(binpath, 0755)
-		os.Setenv("GOBIN", binpath)
+		binFile := filepath.Join(binPath, filepath.Base(binPath))
 
-		args := []string{"install", pkg}
+		args := []string{"build", "-o", binFile, pkg.ImportPath}
 		cmd := exec.Command("go", args...)
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
