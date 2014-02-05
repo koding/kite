@@ -3,6 +3,7 @@ package kite
 import (
 	"encoding/json"
 	"io/ioutil"
+	"koding/kite/cmd/util"
 	"koding/kite/protocol"
 	"log"
 	"net/url"
@@ -69,6 +70,13 @@ func (o *Options) validate() {
 
 	if o.Visibility == protocol.Visibility("") {
 		o.Visibility = protocol.Private
+	}
+
+	token, _ := util.ParseKiteKey()
+	if token != nil && token.Claims["sub"] != "" {
+		if username, ok := token.Claims["sub"].(string); ok {
+			o.Username = username
+		}
 	}
 }
 
