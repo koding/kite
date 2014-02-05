@@ -58,8 +58,8 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 	}
 
 	auth := Authentication{
-		Type: "kodingKey",
-		Key:  k.KodingKey,
+		Type: "kiteKey",
+		Key:  k.kiteKey,
 	}
 
 	remoteKite := k.NewRemoteKite(kite, auth)

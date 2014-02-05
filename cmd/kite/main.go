@@ -15,6 +15,7 @@ func main() {
 		Environment: "production",
 	}
 	client := kite.New(options)
+	client.KontrolEnabled = false
 
 	root := cli.NewCLI()
 	root.AddCommand("version", cmd.NewVersion())

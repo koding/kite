@@ -8,6 +8,8 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
+	"kite/cmd/util"
 	"kite/dnode/rpc"
 	"kite/protocol"
 	"kite/utils"
@@ -55,14 +57,14 @@ func init() {
 type Kite struct {
 	protocol.Kite
 
-	// KodingKey is used for authenticate to Kontrol.
-	KodingKey string
-
 	// Is this Kite Public or Private? Default is Private.
 	Visibility protocol.Visibility
 
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
+
+	kiteKey    string
+	kontrolKey []byte
 
 	// Wheter we want to connect to Kontrol on startup, true by default.
 	KontrolEnabled bool
@@ -134,17 +136,6 @@ func New(options *Options) *Kite {
 	hostname, _ := os.Hostname()
 	kiteID := utils.GenerateUUID()
 
-	// Enable authentication. options.DisableAuthentication is false by
-	// default due to Go's varible initialization.
-	var kodingKey string
-	if !options.DisableAuthentication {
-		kodingKey, err = utils.GetKodingKey()
-		if err != nil {
-			// don't fatal until we find a better way to integrate kite into other applications
-			log.Println("Couldn't find koding.key. Please run 'kd register'.")
-		}
-	}
-
 	k := &Kite{
 		Kite: protocol.Kite{
 			Name:        options.Kitename,
@@ -163,7 +154,6 @@ func New(options *Options) *Kite {
 				},
 			},
 		},
-		KodingKey:           kodingKey,
 		server:              rpc.NewServer(),
 		concurrent:          true,
 		KontrolEnabled:      true,
@@ -176,8 +166,28 @@ func New(options *Options) *Kite {
 		end:                 make(chan bool, 1),
 	}
 
-	k.TrustKontrolKey("koding.com", kodingKontrolPub)
-	k.AddRootCertificate(kontrol_pem())
+	if !options.DisableAuthentication {
+		kiteKey, err := util.KiteKey()
+		if err != nil {
+			panic(err)
+		}
+
+		k.kiteKey = string(kiteKey)
+
+		if k.KontrolEnabled {
+			k.kontrolKey, err = util.KontrolKey()
+			if err != nil {
+				panic(err)
+			}
+
+			token, err := jwt.Parse(k.kiteKey, func(token *jwt.Token) ([]byte, error) { return k.kontrolKey, nil })
+			if err != nil {
+				panic(err)
+			}
+
+			k.TrustKontrolKey(token.Claims["iss"].(string), []byte(k.kontrolKey))
+		}
+	}
 
 	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback, onError)
 	k.server.Properties()["localKite"] = k

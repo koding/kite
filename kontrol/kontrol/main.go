@@ -16,6 +16,6 @@ func main() {
 		Port:        "4000",
 		Path:        "/kontrol",
 	}
-	k := kontrol.New(options, nil, testkeys.Public, testkeys.Private)
+	k := kontrol.New(options, nil, "example.com", testkeys.Public, testkeys.Private)
 	k.Run()
 }

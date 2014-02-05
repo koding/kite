@@ -47,17 +47,25 @@ func (r *Query) Exec(args []string) error {
 		return err
 	}
 
-	target := protocol.Kite{URL: protocol.KiteURL{parsed}}
-	regserv := r.client.NewRemoteKite(target, kite.Authentication{})
-	if err = regserv.Dial(); err != nil {
+	kontrol := r.client.NewKontrol(parsed)
+	if err = kontrol.Dial(); err != nil {
 		return err
 	}
 
-	result, err := regserv.Tell("getKites", query)
+	response, err := kontrol.Tell("getKites", query)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(result)
+	var kites []protocol.KiteWithToken
+	err = response.Unmarshal(&kites)
+	if err != nil {
+		return err
+	}
+
+	for i, kite := range kites {
+		fmt.Printf("\t%d.\t%+v\n", i+1, kite.Kite)
+	}
+
 	return nil
 }

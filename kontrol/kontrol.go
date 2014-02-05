@@ -31,15 +31,17 @@ type Kontrol struct {
 	kite       *kite.Kite
 	etcd       *etcd.Client
 	watcherHub *watcherHub
+	issuer     string
 	publicKey  string
 	privateKey string
 }
 
-func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
+func New(kiteOptions *kite.Options, etcdServers []string, issuer, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
 		etcd:       etcd.NewClient(etcdServers),
 		watcherHub: newWatcherHub(),
+		issuer:     issuer,
 		publicKey:  publicKey,
 		privateKey: privateKey,
 	}
@@ -88,10 +90,9 @@ type registerValue struct {
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	log.Info("Register request from: %#v", r.RemoteKite.Kite)
 
-	// Only accept requests with kodingKey because we need this info
+	// Only accept requests with kiteKey because we need this info
 	// for generating tokens for this kite.
-	// TODO no more kodingKey
-	if r.Authentication.Type != "kodingKey" {
+	if r.Authentication.Type != "kiteKey" {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
 	}
 
@@ -136,7 +137,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	}
 
 	log.Info("Kite registered: %s", key)
-	k.watcherHub.Notify(kite, protocol.Register, k.privateKey)
+	k.watcherHub.Notify(kite, protocol.Register, k.issuer, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -342,7 +343,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	kvs := flatten(resp.Node.Nodes)
 
-	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.privateKey)
+	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.issuer, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +371,7 @@ func flatten(in etcd.Nodes) (out etcd.Nodes) {
 	return
 }
 
-func addTokenToKites(nodes etcd.Nodes, username, privateKey string) ([]*protocol.KiteWithToken, error) {
+func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
@@ -379,7 +380,7 @@ func addTokenToKites(nodes etcd.Nodes, username, privateKey string) ([]*protocol
 			return nil, err
 		}
 
-		kitesWithToken[i], err = addTokenToKite(kite, username, privateKey)
+		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -388,8 +389,8 @@ func addTokenToKites(nodes etcd.Nodes, username, privateKey string) ([]*protocol
 	return kitesWithToken, nil
 }
 
-func addTokenToKite(kite *protocol.Kite, username, privateKey string) (*protocol.KiteWithToken, error) {
-	tkn, err := generateToken(kite, username, privateKey)
+func addTokenToKite(kite *protocol.Kite, username, issuer, privateKey string) (*protocol.KiteWithToken, error) {
+	tkn, err := generateToken(kite, username, issuer, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +403,7 @@ func addTokenToKite(kite *protocol.Kite, username, privateKey string) (*protocol
 
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(kite *protocol.Kite, username, privateKey string) (string, error) {
+func generateToken(kite *protocol.Kite, username, issuer, privateKey string) (string, error) {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
@@ -417,7 +418,7 @@ func generateToken(kite *protocol.Kite, username, privateKey string) (string, er
 	leeway := TokenLeeway
 
 	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
-	tkn.Claims["iss"] = "koding.com"                                 // Issuer
+	tkn.Claims["iss"] = issuer                                       // Issuer
 	tkn.Claims["sub"] = username                                     // Subject
 	tkn.Claims["aud"] = kite.ID                                      // Audience
 	tkn.Claims["exp"] = time.Now().UTC().Add(ttl).Add(leeway).Unix() // Expiration Time
@@ -498,7 +499,7 @@ func (k *Kontrol) WatchEtcd() {
 		if strings.HasPrefix(resp.Node.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
 			kite, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
 			if err == nil {
-				k.watcherHub.Notify(kite, protocol.Deregister, k.privateKey)
+				k.watcherHub.Notify(kite, protocol.Deregister, k.issuer, k.privateKey)
 			}
 		}
 	}
@@ -534,7 +535,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kite, r.Username, k.privateKey)
+	return generateToken(kite, r.Username, k.issuer, k.privateKey)
 }
 
 // canAccess makes some access control checks and returns true

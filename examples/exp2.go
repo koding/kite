@@ -20,14 +20,13 @@ func main() {
 		Port:        *port,
 		Region:      "localhost",
 		Environment: "development",
-		Username:    "devrim",
 	}
 
 	k := kite.New(options)
 	k.Start()
 
 	query := protocol.KontrolQuery{
-		Username:    "devrim",
+		Username:    k.Username,
 		Environment: "development",
 		Name:        "mathworker",
 	}

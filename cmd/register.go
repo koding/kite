@@ -30,8 +30,8 @@ func (r *Register) Exec(args []string) error {
 	to := flags.String("to", "ws://localhost:8080/regserv", "target registration server")
 	flags.Parse(args)
 
-	key, err := util.KiteKey()
-	if err == nil && key != "" {
+	_, err := util.KiteKey()
+	if err == nil {
 		return errors.New("Already registered")
 	}
 
@@ -57,8 +57,8 @@ func (r *Register) Exec(args []string) error {
 	}
 
 	var keys struct {
-		KiteKey    string `json:"kite.key"`
-		KontrolKey string `json:"kontrol.key"`
+		KiteKey    []byte `json:"kite.key"`
+		KontrolKey []byte `json:"kontrol.key"`
 	}
 
 	err = result.Unmarshal(&keys)

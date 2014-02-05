@@ -272,11 +272,11 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	return nil
 }
 
-// AuthenticateFromToken authenticates user from Koding Key.
+// AuthenticateFromKiteKey authenticates user from Koding Key.
 // Kontrol makes requests with a Koding Key.
 func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
-	if r.Authentication.Key != k.KodingKey {
-		return errors.New("Invalid Koding Key")
+	if r.Authentication.Key != k.kiteKey {
+		return errors.New("Invalid Kite Key")
 	}
 
 	// Remote kite must have the same username if koding keys match.
