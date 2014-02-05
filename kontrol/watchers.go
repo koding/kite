@@ -2,9 +2,9 @@ package kontrol
 
 import (
 	"container/list"
-	"koding/kite/dnode"
-	"koding/kite"
-	"koding/kite/protocol"
+	"kite/dnode"
+	"kite"
+	"kite/protocol"
 	"reflect"
 	"sync"
 )

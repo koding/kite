@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"koding/kite/cmd/util"
+	"kite/cmd/util"
 	"os"
 	"path/filepath"
 	"syscall"

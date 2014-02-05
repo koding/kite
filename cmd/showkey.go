@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"koding/kite/cmd/util"
+	"kite/cmd/util"
 )
 
 type ShowKey struct{}

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"koding/kite"
-	"koding/kite/kontrol"
+	"kite"
+	"kite/kontrol"
 )
 
 func main() {

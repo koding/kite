@@ -1,7 +1,7 @@
 package kontrol
 
 import (
-	"koding/kite/protocol"
+	"kite/protocol"
 	"testing"
 )
 

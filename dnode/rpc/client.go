@@ -3,7 +3,7 @@ package rpc
 import (
 	"errors"
 	"fmt"
-	"koding/kite/dnode"
+	"kite/dnode"
 	"net/url"
 	"os"
 	"sync"

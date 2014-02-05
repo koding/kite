@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
-	"koding/kite"
+	"kite"
 	"time"
 )
 

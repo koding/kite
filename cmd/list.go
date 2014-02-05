@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"koding/kite/cmd/util"
+	"kite/cmd/util"
 	"os"
 	"path/filepath"
 	"strings"

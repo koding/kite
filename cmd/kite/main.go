@@ -1,10 +1,10 @@
 package main
 
 import (
-	"koding/kite"
-	"koding/kite/cmd"
-	"koding/kite/cmd/build"
-	"koding/kite/cmd/cli"
+	"kite"
+	"kite/cmd"
+	"kite/cmd/build"
+	"kite/cmd/cli"
 )
 
 func main() {

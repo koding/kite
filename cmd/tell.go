@@ -3,9 +3,9 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"koding/kite"
-	"koding/kite/protocol"
-	"koding/kite/utils"
+	"kite"
+	"kite/protocol"
+	"kite/utils"
 	"net/url"
 	"strconv"
 )

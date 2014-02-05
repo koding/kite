@@ -3,7 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"koding/kite/cmd/util"
+	"kite/cmd/util"
 	"os"
 	"path/filepath"
 )

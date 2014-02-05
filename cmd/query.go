@@ -3,9 +3,9 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"koding/kite"
-	"koding/kite/cmd/util"
-	"koding/kite/protocol"
+	"kite"
+	"kite/cmd/util"
+	"kite/protocol"
 	"net/url"
 )
 

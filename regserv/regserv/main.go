@@ -1,9 +1,9 @@
 package main
 
 import (
-	"koding/kite"
-	"koding/kite/regserv"
-	"koding/kite/testkeys"
+	"kite"
+	"kite/regserv"
+	"kite/testkeys"
 )
 
 func main() {
