@@ -159,7 +159,7 @@ func New(options *Options) *Kite {
 				&url.URL{
 					Scheme: "ws",
 					Host:   net.JoinHostPort(options.PublicIP, options.Port),
-					Path:   "/dnode",
+					Path:   options.Path,
 				},
 			},
 		},
@@ -403,6 +403,7 @@ func (k *Kite) listenAndServe() (err error) {
 	// exported by "net" package.
 	const errClosing = "use of closed network connection"
 
+	k.Log.Notice("Serving on: %s", k.URL.URL.String())
 	err = http.Serve(k.listener, k.server)
 	if strings.Contains(err.Error(), errClosing) {
 		// The server is closed by Close() method

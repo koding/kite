@@ -17,6 +17,7 @@ type Options struct {
 	Environment           string
 	Region                string
 	Port                  string
+	Path                  string
 	Version               string
 	KontrolURL            *url.URL
 	DisableAuthentication bool
@@ -31,6 +32,10 @@ func (o *Options) validate() {
 		log.Fatal("ERROR: options.Kitename field is not set")
 	}
 
+	if digits := strings.Split(o.Version, "."); len(digits) != 3 {
+		log.Fatal("ERROR: please use 3-digits semantic versioning for options.version")
+	}
+
 	if o.Region == "" {
 		log.Fatal("ERROR: options.Region field is not set")
 	}
@@ -39,12 +44,19 @@ func (o *Options) validate() {
 		log.Fatal("ERROR: options.Environment field is not set")
 	}
 
+	if o.PublicIP == "" {
+		o.PublicIP = "127.0.0.1"
+	}
+
 	if o.Port == "" {
 		o.Port = "0" // OS binds to an automatic port
 	}
+	if o.Path == "" {
+		o.Path = "/kite"
+	}
 
-	if digits := strings.Split(o.Version, "."); len(digits) != 3 {
-		log.Fatal("ERROR: please use 3-digits semantic versioning for options.version")
+	if o.Path[0] != '/' {
+		o.Path = "/" + o.Path
 	}
 
 	if o.KontrolURL == nil {
