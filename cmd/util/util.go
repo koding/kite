@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"io"
 	"io/ioutil"
 	"log"
@@ -92,6 +93,22 @@ func WriteKeys(kiteKey, kontrolKey string) error {
 	}
 
 	return nil
+}
+
+func ParseKiteKey() (*jwt.Token, error) {
+	kiteKey, err := KiteKey()
+	if err != nil {
+		return nil, err
+	}
+	return jwt.Parse(kiteKey, getKontrolKey)
+}
+
+func getKontrolKey(token *jwt.Token) ([]byte, error) {
+	kontrolKey, err := KontrolKey()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(kontrolKey), nil
 }
 
 // got it from http://golang.org/misc/dist/bindist.go?m=text and removed go

@@ -26,6 +26,7 @@ func main() {
 	root.AddCommand("tell", cmd.NewTell(client))
 	root.AddCommand("uninstall", cmd.NewUninstall())
 	root.AddCommand("showkey", cmd.NewShowKey())
+	root.AddCommand("query", cmd.NewQuery(client))
 
 	root.Run()
 }

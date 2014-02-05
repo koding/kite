@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"koding/kite/cmd/util"
 )
 
@@ -17,12 +16,7 @@ func (v *ShowKey) Definition() string {
 }
 
 func (v *ShowKey) Exec(args []string) error {
-	kiteKey, err := util.KiteKey()
-	if err != nil {
-		return err
-	}
-
-	token, err := jwt.Parse(kiteKey, getKontrolKey)
+	token, err := util.ParseKiteKey()
 	if err != nil {
 		return err
 	}
@@ -32,12 +26,4 @@ func (v *ShowKey) Exec(args []string) error {
 	}
 
 	return nil
-}
-
-func getKontrolKey(token *jwt.Token) ([]byte, error) {
-	kontrolKey, err := util.KontrolKey()
-	if err != nil {
-		return nil, err
-	}
-	return []byte(kontrolKey), nil
 }
