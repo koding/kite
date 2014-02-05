@@ -1,10 +1,20 @@
 package main
 
 import (
+	"koding/kite"
 	"koding/kite/kontrol"
 )
 
 func main() {
-	k := kontrol.New()
+	options := &kite.Options{
+		Kitename:    "kontrol",
+		Version:     "0.0.1",
+		Region:      "localhost",
+		Environment: "production",
+		PublicIP:    "127.0.0.1",
+		Port:        "4000",
+		Path:        "/kontrol",
+	}
+	k := kontrol.New(options, nil)
 	k.Run()
 }
