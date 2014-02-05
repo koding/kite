@@ -36,18 +36,31 @@ func (*Uninstall) Exec(args []string) error {
 		return fmt.Errorf("%s is not installed", fullName)
 	}
 
-	return os.RemoveAll(getBundlePath(fullName))
+	bundlePath, err := getBundlePath(fullName)
+	if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(bundlePath)
 }
 
 // getBundlePath returns the bundle path of a given kite.
 // Example: "adsf-1.2.3" -> "~/.kd/kites/asdf-1.2.3.kite"
-func getBundlePath(fullKiteName string) string {
-	return filepath.Join(util.GetKdPath(), "kites", fullKiteName+".kite")
+func getBundlePath(fullKiteName string) (string, error) {
+	kiteHome, err := util.KiteHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(kiteHome, "kites", fullKiteName+".kite"), nil
 }
 
 // isInstalled returns true if the kite is installed.
 func isInstalled(fullKiteName string) (bool, error) {
-	return exists(getBundlePath(fullKiteName))
+	bundlePath, err := getBundlePath(fullKiteName)
+	if err != nil {
+		return false, err
+	}
+	return exists(bundlePath)
 }
 
 // exists returns whether the given file or directory exists or not.

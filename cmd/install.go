@@ -187,7 +187,12 @@ func validatePackage(tempKitePath string) (string, string, string, error) {
 
 // installBundle moves the .kite bundle into ~/kd/kites.
 func installBundle(bundlePath string) error {
-	kitesPath := filepath.Join(util.GetKdPath(), "kites")
+	kiteHome, err := util.KiteHome()
+	if err != nil {
+		return err
+	}
+
+	kitesPath := filepath.Join(kiteHome, "kites")
 	os.MkdirAll(kitesPath, 0700)
 
 	bundleName := filepath.Base(bundlePath)

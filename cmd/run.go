@@ -55,6 +55,11 @@ func (*Run) Exec(args []string) error {
 		return err
 	}
 
-	binPath = filepath.Join(util.GetKdPath(), "kites", binPath)
+	kiteHome, err := util.KiteHome()
+	if err != nil {
+		return err
+	}
+
+	binPath = filepath.Join(kiteHome, "kites", binPath)
 	return syscall.Exec(binPath, args, os.Environ())
 }

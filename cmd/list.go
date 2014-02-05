@@ -35,7 +35,11 @@ func (*List) Exec(args []string) error {
 // getIntalledKites returns installed kites in .kd/kites folder.
 // an empty argument returns all kites.
 func getInstalledKites(kiteName string) ([]string, error) {
-	kitesPath := filepath.Join(util.GetKdPath(), "kites")
+	kiteHome, err := util.KiteHome()
+	if err != nil {
+		return nil, err
+	}
+	kitesPath := filepath.Join(kiteHome, "kites")
 
 	kites, err := ioutil.ReadDir(kitesPath)
 	if err != nil {

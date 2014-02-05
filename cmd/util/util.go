@@ -3,113 +3,95 @@ package util
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
-
-	"github.com/nu7hatch/gouuid"
 )
 
-var KeyPath = filepath.Join(GetKdPath(), "koding.key")
-
-const (
-	AuthServer      = "https://koding.com"
-	AuthServerLocal = "http://localhost:3020"
-)
+const kiteKeyFileName = "kite.key"
+const kontrolKeyFileName = "kontrol.key"
 
 // getKdPath returns absolute of ~/.kd
-func GetKdPath() string {
+func KiteHome() (string, error) {
 	usr, err := user.Current()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
-	return filepath.Join(usr.HomeDir, ".kd")
+	return filepath.Join(usr.HomeDir, ".kite"), nil
 }
 
-// GetKey returns the Koding key content from ~/.kd/koding.key
-func GetKey() (string, error) {
-	data, err := ioutil.ReadFile(KeyPath)
+func KiteKeyPath() (string, error) {
+	kiteHome, err := KiteHome()
 	if err != nil {
 		return "", err
 	}
-
-	key := strings.TrimSpace(string(data))
-
-	return key, nil
+	return filepath.Join(kiteHome, kiteKeyFileName), nil
 }
 
-// WriteKey writes the content of the given key to ~/.kd/koding.key
-func WriteKey(key string) error {
-	os.Mkdir(GetKdPath(), 0700) // create if not exists
+func KontrolKeyPath() (string, error) {
+	kiteHome, err := KiteHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(kiteHome, kontrolKeyFileName), nil
+}
 
-	err := ioutil.WriteFile(KeyPath, []byte(key), 0600)
+// KiteKey returns the kite key content from ~/.kite/kite.key
+func KiteKey() (string, error) {
+	keyPath, err := KiteKeyPath()
+	if err != nil {
+		return "", err
+	}
+	data, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// KontrolKey returns the kontrol key content from ~/.kite/kontrol.key
+func KontrolKey() (string, error) {
+	kontrolKeyPath, err := KontrolKeyPath()
+	if err != nil {
+		return "", err
+	}
+	data, err := ioutil.ReadFile(kontrolKeyPath)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// WriteKiteKey writes the content of the given key to ~/.kd/koding.key
+func WriteKeys(kiteKey, kontrolKey string) error {
+	kiteHome, err := KiteHome()
 	if err != nil {
 		return err
+	}
+	os.Mkdir(kiteHome, 0700) // create if not exists
+
+	if kiteKey != "" {
+		err = ioutil.WriteFile(filepath.Join(kiteHome, kiteKeyFileName), []byte(kiteKey), 0400)
+		if err != nil {
+			return err
+		}
+	}
+
+	if kontrolKey != "" {
+		err = ioutil.WriteFile(filepath.Join(kiteHome, kontrolKeyFileName), []byte(kontrolKey), 0400)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
-}
-
-// CheckKey checks wether the key is registerd to koding, or not
-func CheckKey(authServer, key string) error {
-	checkUrl := CheckURL(authServer, key)
-
-	resp, err := http.Get(checkUrl)
-	if err != nil {
-		return err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return errors.New("non 200 response")
-	}
-
-	type Result struct {
-		Result string `json:"result"`
-	}
-
-	res := Result{}
-	err = json.Unmarshal(bytes.TrimSpace(body), &res)
-	if err != nil {
-		log.Fatalln(err) // this should not happen, exit here
-	}
-
-	return nil
-}
-
-func CheckURL(authServer, key string) string {
-	return fmt.Sprintf("%s/-/auth/check/%s", authServer, key)
-}
-
-// hostID returns a unique string that defines a machine
-func HostID() (string, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-
-	return hostname + "-" + id.String(), nil
 }
 
 // got it from http://golang.org/misc/dist/bindist.go?m=text and removed go
