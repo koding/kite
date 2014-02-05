@@ -9,10 +9,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/nu7hatch/gouuid"
 	"kite/cmd/util"
 	"kite/dnode/rpc"
 	"kite/protocol"
-	"kite/utils"
 	"log"
 	"net"
 	"net/http"
@@ -134,13 +134,17 @@ func New(options *Options) *Kite {
 	options.validate() // exits if validating fails
 
 	hostname, _ := os.Hostname()
-	kiteID := utils.GenerateUUID()
+
+	kiteID, err := uuid.NewV4()
+	if err != nil {
+		panic(err)
+	}
 
 	k := &Kite{
 		Kite: protocol.Kite{
 			Name:        options.Kitename,
 			Username:    options.Username,
-			ID:          kiteID,
+			ID:          kiteID.String(),
 			Version:     options.Version,
 			Hostname:    hostname,
 			Environment: options.Environment,
