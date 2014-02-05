@@ -200,7 +200,7 @@ func New(options *Options) *Kite {
 	// Every kite should be able to authenticate the user from token.
 	k.Authenticators["token"] = k.AuthenticateFromToken
 	// A kite accepts requests from Kontrol.
-	k.Authenticators["kodingKey"] = k.AuthenticateFromKodingKey
+	k.Authenticators["kiteKey"] = k.AuthenticateFromKiteKey
 
 	// Register our internal methods
 	k.HandleFunc("systemInfo", new(status).Info)

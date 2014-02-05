@@ -31,13 +31,17 @@ type Kontrol struct {
 	kite       *kite.Kite
 	etcd       *etcd.Client
 	watcherHub *watcherHub
+	publicKey  string
+	privateKey string
 }
 
-func New(kiteOptions *kite.Options, etcdServers []string) *Kontrol {
+func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
 		etcd:       etcd.NewClient(etcdServers),
 		watcherHub: newWatcherHub(),
+		publicKey:  publicKey,
+		privateKey: privateKey,
 	}
 
 	log = kontrol.kite.Log
@@ -47,12 +51,6 @@ func New(kiteOptions *kite.Options, etcdServers []string) *Kontrol {
 	kontrol.kite.HandleFunc("register", kontrol.handleRegister)
 	kontrol.kite.HandleFunc("getKites", kontrol.handleGetKites)
 	kontrol.kite.HandleFunc("getToken", kontrol.handleGetToken)
-
-	// Disable until we got all things set up - arslan
-	// kontrol.kite.EnableTLS(
-	// 	config.Current.NewKontrol.CertFile,
-	// 	config.Current.NewKontrol.KeyFile,
-	// )
 
 	return kontrol
 }
@@ -84,7 +82,6 @@ func (k *Kontrol) init() {
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
 	URL        protocol.KiteURL
-	KodingKey  string
 	Visibility protocol.Visibility
 }
 
@@ -93,6 +90,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// Only accept requests with kodingKey because we need this info
 	// for generating tokens for this kite.
+	// TODO no more kodingKey
 	if r.Authentication.Type != "kodingKey" {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
 	}
@@ -108,10 +106,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		r.RemoteKite.URL.Host = net.JoinHostPort(host, port)
 	}
 
-	return k.register(r.RemoteKite, r.Authentication.Key, r.RemoteAddr)
+	return k.register(r.RemoteKite, r.RemoteAddr)
 }
 
-func (k *Kontrol) register(r *kite.RemoteKite, kodingkey, remoteAddr string) (*protocol.RegisterResult, error) {
+func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.RegisterResult, error) {
 	kite := &r.Kite
 
 	if kite.Visibility != protocol.Public && kite.Visibility != protocol.Private {
@@ -124,7 +122,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey, remoteAddr string) (*p
 	}
 
 	// setKey sets the value of the Kite in etcd.
-	setKey := k.makeSetter(kite, key, kodingkey)
+	setKey := k.makeSetter(kite, key)
 
 	// Register to etcd.
 	err = setKey()
@@ -138,7 +136,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kodingkey, remoteAddr string) (*p
 	}
 
 	log.Info("Kite registered: %s", key)
-	k.watcherHub.Notify(kite, protocol.Register, kodingkey)
+	k.watcherHub.Notify(kite, protocol.Register, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -172,7 +170,7 @@ func (k *Kontrol) registerSelf() {
 		panic(err)
 	}
 
-	setter := k.makeSetter(&k.kite.Kite, key, k.kite.KodingKey)
+	setter := k.makeSetter(&k.kite.Kite, key)
 	for {
 		if err := setter(); err != nil {
 			log.Critical(err.Error())
@@ -185,10 +183,9 @@ func (k *Kontrol) registerSelf() {
 }
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey, kodingkey string) func() error {
+func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 	rv := &registerValue{
 		URL:        kite.URL,
-		KodingKey:  kodingkey,
 		Visibility: kite.Visibility,
 	}
 
@@ -345,7 +342,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	kvs := flatten(resp.Node.Nodes)
 
-	kitesWithToken, err := addTokenToKites(kvs, r.Username)
+	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -373,16 +370,16 @@ func flatten(in etcd.Nodes) (out etcd.Nodes) {
 	return
 }
 
-func addTokenToKites(nodes etcd.Nodes, username string) ([]*protocol.KiteWithToken, error) {
+func addTokenToKites(nodes etcd.Nodes, username, privateKey string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
-		kite, kodingKey, err := kiteFromEtcdKV(node.Key, node.Value)
+		kite, err := kiteFromEtcdKV(node.Key, node.Value)
 		if err != nil {
 			return nil, err
 		}
 
-		kitesWithToken[i], err = addTokenToKite(kite, username, kodingKey)
+		kitesWithToken[i], err = addTokenToKite(kite, username, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -391,8 +388,8 @@ func addTokenToKites(nodes etcd.Nodes, username string) ([]*protocol.KiteWithTok
 	return kitesWithToken, nil
 }
 
-func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.KiteWithToken, error) {
-	tkn, err := generateToken(kite, username)
+func addTokenToKite(kite *protocol.Kite, username, privateKey string) (*protocol.KiteWithToken, error) {
+	tkn, err := generateToken(kite, username, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +402,7 @@ func addTokenToKite(kite *protocol.Kite, username, kodingKey string) (*protocol.
 
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(kite *protocol.Kite, username string) (string, error) {
+func generateToken(kite *protocol.Kite, username, privateKey string) (string, error) {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
@@ -428,7 +425,7 @@ func generateToken(kite *protocol.Kite, username string) (string, error) {
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
 	tkn.Claims["jti"] = tknID.String()                               // JWT ID
 
-	signed, err := tkn.SignedString(rsaKey)
+	signed, err := tkn.SignedString([]byte(privateKey))
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
@@ -438,10 +435,10 @@ func generateToken(kite *protocol.Kite, username string) (string, error) {
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
 // etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
-func kiteFromEtcdKV(key, value string) (*protocol.Kite, string, error) {
+func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, "", fmt.Errorf("Invalid Kite: %s", key)
+		return nil, fmt.Errorf("Invalid Kite: %s", key)
 	}
 
 	kite := new(protocol.Kite)
@@ -458,7 +455,7 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, string, error) {
 
 	kite.URL = rv.URL
 
-	return kite, rv.KodingKey, nil
+	return kite, nil
 }
 
 // WatchEtcd watches all Kite changes on etcd cluster
@@ -499,9 +496,9 @@ func (k *Kontrol) WatchEtcd() {
 
 		// Notify deregistration events.
 		if strings.HasPrefix(resp.Node.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
-			kite, _, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
+			kite, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
 			if err == nil {
-				k.watcherHub.Notify(kite, protocol.Deregister, "")
+				k.watcherHub.Notify(kite, protocol.Deregister, k.privateKey)
 			}
 		}
 	}
@@ -537,7 +534,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kite, r.Username)
+	return generateToken(kite, r.Username, k.privateKey)
 }
 
 // canAccess makes some access control checks and returns true

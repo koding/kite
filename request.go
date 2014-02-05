@@ -274,7 +274,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 
 // AuthenticateFromToken authenticates user from Koding Key.
 // Kontrol makes requests with a Koding Key.
-func (k *Kite) AuthenticateFromKodingKey(r *Request) error {
+func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 	if r.Authentication.Key != k.KodingKey {
 		return errors.New("Invalid Koding Key")
 	}
