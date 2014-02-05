@@ -2,7 +2,7 @@ package main
 
 import (
 	"koding/kite"
-	"koding/kite/regserv/regserv"
+	"koding/kite/regserv"
 	"koding/kite/testkeys"
 )
 
