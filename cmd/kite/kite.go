@@ -23,7 +23,7 @@ func main() {
 	root.AddCommand("build", build.NewBuild())
 	root.AddCommand("list", cmd.NewList())
 	root.AddCommand("run", cmd.NewRun())
-	root.AddCommand("tell", cmd.NewTell())
+	root.AddCommand("tell", cmd.NewTell(client))
 	root.AddCommand("uninstall", cmd.NewUninstall())
 	root.AddCommand("showkey", cmd.NewShowKey())
 

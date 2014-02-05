@@ -10,17 +10,21 @@ import (
 	"strconv"
 )
 
-type Tell struct{}
-
-func NewTell() *Tell {
-	return &Tell{}
+type Tell struct {
+	client *kite.Kite
 }
 
-func (*Tell) Definition() string {
+func NewTell(client *kite.Kite) *Tell {
+	return &Tell{
+		client: client,
+	}
+}
+
+func (t *Tell) Definition() string {
 	return "Call a method on a kite"
 }
 
-func (*Tell) Exec(args []string) error {
+func (t *Tell) Exec(args []string) error {
 	if len(args) < 2 {
 		return errors.New("You must give a URL, method and arguments, all seperated by space")
 	}
@@ -29,15 +33,6 @@ func (*Tell) Exec(args []string) error {
 	if err != nil {
 		return err
 	}
-
-	options := &kite.Options{
-		Kitename:    "kd-tool",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "production",
-	}
-
-	k := kite.New(options)
 
 	target := protocol.Kite{URL: protocol.KiteURL{parsed}}
 
@@ -51,7 +46,7 @@ func (*Tell) Exec(args []string) error {
 		Key:  kodingKey,
 	}
 
-	remote := k.NewRemoteKite(target, auth)
+	remote := t.client.NewRemoteKite(target, auth)
 
 	if err = remote.Dial(); err != nil {
 		return err
