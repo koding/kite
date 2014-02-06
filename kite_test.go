@@ -74,8 +74,8 @@ func TestKite(t *testing.T) {
 
 	// Use the kodingKey auth type since they are on same host.
 	auth := Authentication{
-		Type: "kodingKey",
-		Key:  exp2Kite.KodingKey,
+		Type: "kiteKey",
+		Key:  exp2Kite.kiteKey.Raw,
 	}
 	remote := exp2Kite.NewRemoteKite(mathKite.Kite, auth)
 
