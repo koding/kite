@@ -16,7 +16,12 @@ const (
 )
 
 // KiteHome returns the home path of Kite directory.
+// The returned value can be overriden with KITE_HOME environment variable.
 func KiteHome() (string, error) {
+	kiteHome := os.Getenv("KITE_HOME")
+	if kiteHome != "" {
+		return kiteHome, nil
+	}
 	usr, err := user.Current()
 	if err != nil {
 		return "", err
@@ -47,14 +52,18 @@ func Read() (string, error) {
 
 // Write over the kite.key file.
 func Write(kiteKey string) error {
-	kiteHome, err := KiteHome()
+	keyPath, err := kiteKeyPath()
 	if err != nil {
 		return err
 	}
-	os.Mkdir(kiteHome, 0700) // create if not exists
-	path := filepath.Join(kiteHome, kiteKeyFileName)
-	os.Remove(path)
-	return ioutil.WriteFile(path, []byte(kiteKey), 0400)
+
+	err = os.MkdirAll(filepath.Dir(keyPath), 0700)
+	if err != nil {
+		return err
+	}
+
+	os.Remove(keyPath)
+	return ioutil.WriteFile(keyPath, []byte(kiteKey), 0400)
 }
 
 // Parse the kite.key file and return it as JWT token.
