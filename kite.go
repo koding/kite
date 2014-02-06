@@ -6,7 +6,6 @@ package kite
 
 import (
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"kite/dnode/rpc"
 	"kite/kitekey"
@@ -269,7 +268,10 @@ func (k *Kite) Run() {
 
 // Start is like Run(), but does not wait for it to complete. It's nonblocking.
 func (k *Kite) Start() {
-	k.parseVersionFlag()
+	if os.Getenv("KITE_VERSION") != "" {
+		fmt.Println(k.Version)
+		os.Exit(0)
+	}
 
 	go func() {
 		err := k.listenAndServe()
@@ -345,23 +347,6 @@ func newLogger(name string) *logging.Logger {
 
 	logging.SetLevel(level, name)
 	return logger
-}
-
-// If the user wants to call flag.Parse() the flag must be defined in advance.
-var _ = flag.Bool("version", false, "show version")
-var _ = flag.Bool("debug", false, "print debug logs")
-
-// parseVersionFlag prints the version number of the kite and exits with 0
-// if "-version" flag is enabled.
-// We did not use the "flag" package because it causes trouble if the user
-// also calls "flag.Parse()" in his code. flag.Parse() can be called only once.
-func (k *Kite) parseVersionFlag() {
-	for _, flag := range os.Args {
-		if flag == "-version" {
-			fmt.Println(k.Version)
-			os.Exit(0)
-		}
-	}
 }
 
 // listenAndServe starts our rpc server with the given addr.
