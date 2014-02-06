@@ -325,9 +325,22 @@ func init() {
 func newLogger(name string, debug bool) *logging.Logger {
 	logger := logging.MustGetLogger(name)
 
-	level := logging.INFO
-	if debug {
+	var level logging.Level
+	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
+	case "DEBUG":
 		level = logging.DEBUG
+	case "INFO":
+		level = logging.INFO
+	case "NOTICE":
+		level = logging.NOTICE
+	case "WARNING":
+		level = logging.WARNING
+	case "ERROR":
+		level = logging.ERROR
+	case "CRITICAL":
+		level = logging.CRITICAL
+	default:
+		level = logging.INFO
 	}
 
 	logging.SetLevel(level, name)
