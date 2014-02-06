@@ -173,7 +173,7 @@ func New(options *Options) *Kite {
 		end:                 make(chan bool, 1),
 	}
 
-	k.Log = newLogger(k.Name, k.hasDebugFlag())
+	k.Log = newLogger(k.Name)
 
 	k.kiteKey, err = kitekey.Parse()
 	if err != nil {
@@ -322,7 +322,7 @@ func init() {
 }
 
 // newLogger returns a new logger object for desired name and level.
-func newLogger(name string, debug bool) *logging.Logger {
+func newLogger(name string) *logging.Logger {
 	logger := logging.MustGetLogger(name)
 
 	var level logging.Level
@@ -362,23 +362,6 @@ func (k *Kite) parseVersionFlag() {
 			os.Exit(0)
 		}
 	}
-}
-
-// hasDebugFlag returns true if -debug flag is present in os.Args.
-func (k *Kite) hasDebugFlag() bool {
-	for _, flag := range os.Args {
-		if flag == "-debug" {
-			return true
-		}
-	}
-
-	// We can't use flags when running "go test" command.
-	// This is another way to print debug logs.
-	if os.Getenv("DEBUG") != "" {
-		return true
-	}
-
-	return false
 }
 
 // listenAndServe starts our rpc server with the given addr.
