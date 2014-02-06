@@ -324,6 +324,13 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
+	// Register callbacks to our watcher hub.
+	// It will call them when a Kite registered/unregistered matching the query.
+	if watchCallback != nil {
+		// Regsitering watcher should be done before making etcd.Get().
+		k.watcherHub.RegisterWatcher(r.RemoteKite, &query, watchCallback)
+	}
+
 	resp, err := k.etcd.Get(
 		key,
 		false, // sorting flag, we don't care about sorting for now
@@ -340,20 +347,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 
-	kvs := flatten(resp.Node.Nodes)
-
-	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.kite.Username, k.privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// Register callbacks to our watcher hub.
-	// It will call them when a Kite registered/unregistered matching the query.
-	if watchCallback != nil {
-		k.watcherHub.RegisterWatcher(r.RemoteKite, &query, watchCallback)
-	}
-
-	return kitesWithToken, nil
+	return addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, k.privateKey)
 }
 
 // flatten converts the recursive etcd directory structure to flat one that contains Kites.
