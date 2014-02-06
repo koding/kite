@@ -65,7 +65,7 @@ func (s *RegServ) RegisterSelf() error {
 	if err != nil {
 		return err
 	}
-	key, err := s.register(s.backend.Issuer(), hostname)
+	key, err := s.register(s.backend.Username(), hostname)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (s *RegServ) RegisterSelf() error {
 
 // Backend is the interface that is passed to New() function.
 type Backend interface {
-	Issuer() string
+	Username() string
 	KontrolURL() string
 	PublicKey() string
 	PrivateKey() string
@@ -106,7 +106,7 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
-		"iss":        s.backend.Issuer(),      // Issuer
+		"iss":        s.backend.Username(),    // Issuer
 		"sub":        username,                // Subject
 		"iat":        time.Now().UTC().Unix(), // Issued At
 		"hostname":   hostname,                // Hostname of registered machine

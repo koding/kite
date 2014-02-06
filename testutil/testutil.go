@@ -54,7 +54,7 @@ func clearEtcd() {
 
 type testBackend struct{}
 
-func (b *testBackend) Issuer() string     { return "testuser" }
+func (b *testBackend) Username() string   { return "testuser" }
 func (b *testBackend) KontrolURL() string { return "ws://localhost:3999/kontrol" }
 func (b *testBackend) PublicKey() string  { return testkeys.Public }
 func (b *testBackend) PrivateKey() string { return testkeys.Private }

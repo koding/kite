@@ -24,7 +24,7 @@ func main() {
 
 type exampleBackend struct{}
 
-func (b *exampleBackend) Issuer() string     { return "testuser" }
+func (b *exampleBackend) Username() string   { return "testuser" }
 func (b *exampleBackend) KontrolURL() string { return "ws://localhost:4000/kontrol" }
 func (b *exampleBackend) PublicKey() string  { return testkeys.Public }
 func (b *exampleBackend) PrivateKey() string { return testkeys.Private }
