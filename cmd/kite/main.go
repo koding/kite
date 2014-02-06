@@ -10,7 +10,7 @@ import (
 
 // Please use 3 digit versioning (major, minor, patch).
 // http://semver.org
-const version = "0.0.5"
+const version = "0.0.6"
 
 func main() {
 	options := &kite.Options{
