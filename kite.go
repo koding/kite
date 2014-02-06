@@ -387,6 +387,7 @@ func (k *Kite) listenAndServe() (err error) {
 	_, port, _ := net.SplitHostPort(k.listener.Addr().String())
 	k.Kite.URL.Host = net.JoinHostPort(host, port)
 
+	// Kontrol will register to the URLs sent to this channel.
 	registerURLs := make(chan *url.URL, 1)
 
 	if k.proxyEnabled {
@@ -394,14 +395,14 @@ func (k *Kite) listenAndServe() (err error) {
 		// Fill the channel with registered Proxy URLs.
 		go k.keepRegisteredToProxyKite(registerURLs)
 	} else {
-		// Register with Kite's own URL.
-		registerURLs <- k.URL.URL
+		// If proxy is not enabled, we must populate the channel ourselves.
+		registerURLs <- k.URL.URL // Register with Kite's own URL.
 	}
 
 	// We must connect to Kontrol after starting to listen on port
 	if k.KontrolEnabled && k.Kontrol != nil {
 		if err = k.Kontrol.DialForever(); err != nil {
-			return
+			k.Log.Critical(err.Error())
 		}
 
 		if k.RegisterToKontrol {

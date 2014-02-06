@@ -23,7 +23,7 @@ func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
 			err := k.Kontrol.Register()
 			if err != nil {
 				// do not exit, because existing applications might import the kite package
-				k.Log.Error("Cannot register to Kontrol: %s", err)
+				k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
 				time.Sleep(registerKontrolRetryDuration)
 			}
 
@@ -47,6 +47,9 @@ type Kontrol struct {
 	// else we are ready after connect.
 	ready     chan bool
 	onceReady sync.Once
+
+	// Saved in order to re-register on re-connect.
+	lastRegisteredURL *url.URL
 }
 
 // NewKontrol returns a pointer to new Kontrol instance.
@@ -75,6 +78,11 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 
 	remoteKite.OnConnect(func() {
 		k.Log.Info("Connected to Kontrol ")
+
+		// We need to re-register the last registered URL on re-connect.
+		if kontrol.lastRegisteredURL != nil {
+			go kontrol.Register()
+		}
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
@@ -111,7 +119,7 @@ func (k *Kontrol) Register() error {
 
 	switch rr.Result {
 	case protocol.AllowKite:
-		kite := &k.localKite.Kite
+		kite := &k.localKite.Kite // shortcut
 
 		// we know now which user that is after authentication
 		kite.Username = rr.Username
@@ -123,6 +131,11 @@ func (k *Kontrol) Register() error {
 		}
 
 		k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
+
+		// Save last registered URL to re-register on re-connect.
+		k.lastRegisteredURL = kite.URL.URL
+
+		// Notify waiters on ready channel.
 		k.onceReady.Do(func() { close(k.ready) })
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")

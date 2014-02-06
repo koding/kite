@@ -10,13 +10,17 @@ import (
 const proxyRetryDuration = 10 * time.Second
 
 var proxyQuery = protocol.KontrolQuery{
-	// Username must be "devrim" when running tests.
-	// TODO Do not forget to change to "koding" before running on production.
-	Username:    "devrim",
-	Environment: "production",
+	// TODO make this username and environment configurable.
+	Username:    "testuser",
+	Environment: "development",
 	Name:        "proxy",
 }
 
+// keepRegisteredToProxyKite finds a proxy kite by asking kontrol then registers
+// itselfs on proxy. On error, retries forever. On every successfull
+// registration, it sends the proxied URL to the urls channel. The caller must
+// receive from this channel and should register to the kontrol with that URL.
+// This function never returns.
 func (k *Kite) keepRegisteredToProxyKite(urls chan *url.URL) {
 	for {
 		kites, err := k.Kontrol.GetKites(proxyQuery)
@@ -54,6 +58,8 @@ func (k *Kite) keepRegisteredToProxyKite(urls chan *url.URL) {
 	}
 }
 
+// registerToProxyKite dials the proxy kite and calls register method then
+// returns the reverse-proxy URL.
 func registerToProxyKite(r *RemoteKite) (*url.URL, error) {
 	Log := r.localKite.Log
 
