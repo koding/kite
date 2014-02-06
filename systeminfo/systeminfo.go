@@ -1,4 +1,6 @@
-package kite
+// Package systeminfo provides a way of getting memory usage, disk usage and
+// various information about the host.
+package systeminfo
 
 import (
 	"os/user"
@@ -36,7 +38,7 @@ func homeDir() string {
 	return usr.HomeDir
 }
 
-func systemInfo() (*info, error) {
+func New() (*info, error) {
 	disk, err := diskStats()
 	if err != nil {
 		return nil, err
@@ -56,8 +58,4 @@ func systemInfo() (*info, error) {
 		HomeDir:     homeDir(),
 		Uname:       runtime.GOOS,
 	}, nil
-}
-
-func (status) Info(r *Request) (interface{}, error) {
-	return systemInfo()
 }

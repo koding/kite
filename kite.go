@@ -10,6 +10,7 @@ import (
 	"kite/dnode/rpc"
 	"kite/kitekey"
 	"kite/protocol"
+	"kite/systeminfo"
 	"log"
 	"net"
 	"net/http"
@@ -215,7 +216,7 @@ func New(options *Options) *Kite {
 	k.Authenticators["kiteKey"] = k.AuthenticateFromKiteKey
 
 	// Register our internal methods
-	k.HandleFunc("systemInfo", new(status).Info)
+	k.HandleFunc("systemInfo", func(r *Request) (interface{}, error) { return systeminfo.New() })
 	k.HandleFunc("heartbeat", k.handleHeartbeat)
 	k.HandleFunc("log", k.handleLog)
 

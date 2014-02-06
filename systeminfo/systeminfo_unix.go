@@ -1,4 +1,4 @@
-package kite
+package systeminfo
 
 // +build darwin freebsd linux netbsd openbsd
 

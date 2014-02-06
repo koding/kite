@@ -1,4 +1,4 @@
-package kite
+package systeminfo
 
 import (
 	"bytes"

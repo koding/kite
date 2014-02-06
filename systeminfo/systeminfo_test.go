@@ -1,4 +1,4 @@
-package kite
+package systeminfo
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestInfo(t *testing.T) {
-	i, err := systemInfo()
+	i, err := New()
 	if err != nil {
 		t.Errorf(err.Error())
 		return
