@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"kite"
+	"kite/kitekey"
 	"kite/protocol"
-	"kite/utils"
 	"net/url"
 	"strconv"
 )
@@ -36,7 +36,7 @@ func (t *Tell) Exec(args []string) error {
 
 	target := protocol.Kite{URL: protocol.KiteURL{parsed}}
 
-	kodingKey, err := utils.GetKodingKey()
+	kodingKey, err := kitekey.Read()
 	if err != nil {
 		return err
 	}

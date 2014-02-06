@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -187,7 +187,7 @@ func validatePackage(tempKitePath string) (string, string, string, error) {
 
 // installBundle moves the .kite bundle into ~/kd/kites.
 func installBundle(bundlePath string) error {
-	kiteHome, err := util.KiteHome()
+	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return err
 	}

@@ -256,7 +256,7 @@ func (k *Kite) getRSAKey(token *jwt.Token) ([]byte, error) {
 		return nil, fmt.Errorf("Issuer is not trusted: %s", issuer)
 	}
 
-	return key, nil
+	return []byte(key), nil
 }
 
 // callOptions is the type of first argument in the dnode message.

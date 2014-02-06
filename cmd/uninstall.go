@@ -3,7 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"os"
 	"path/filepath"
 )
@@ -47,7 +47,7 @@ func (*Uninstall) Exec(args []string) error {
 // getBundlePath returns the bundle path of a given kite.
 // Example: "adsf-1.2.3" -> "~/.kd/kites/asdf-1.2.3.kite"
 func getBundlePath(fullKiteName string) (string, error) {
-	kiteHome, err := util.KiteHome()
+	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return "", err
 	}

@@ -3,109 +3,15 @@ package util
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 )
-
-const kiteKeyFileName = "kite.key"
-const kontrolKeyFileName = "kontrol.key"
-
-// getKdPath returns absolute of ~/.kd
-func KiteHome() (string, error) {
-	usr, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(usr.HomeDir, ".kite"), nil
-}
-
-func KiteKeyPath() (string, error) {
-	kiteHome, err := KiteHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(kiteHome, kiteKeyFileName), nil
-}
-
-func KontrolKeyPath() (string, error) {
-	kiteHome, err := KiteHome()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(kiteHome, kontrolKeyFileName), nil
-}
-
-// KiteKey returns the kite key content from ~/.kite/kite.key
-func KiteKey() ([]byte, error) {
-	keyPath, err := KiteKeyPath()
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(keyPath)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.TrimSpace(data), nil
-}
-
-// KontrolKey returns the kontrol key content from ~/.kite/kontrol.key
-func KontrolKey() ([]byte, error) {
-	kontrolKeyPath, err := KontrolKeyPath()
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(kontrolKeyPath)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.TrimSpace(data), nil
-}
-
-// WriteKiteKey writes the content of the given key to ~/.kd/koding.key
-func WriteKeys(kiteKey, kontrolKey []byte) error {
-	kiteHome, err := KiteHome()
-	if err != nil {
-		return err
-	}
-	os.Mkdir(kiteHome, 0700) // create if not exists
-
-	if kiteKey != nil {
-		err = ioutil.WriteFile(filepath.Join(kiteHome, kiteKeyFileName), []byte(kiteKey), 0400)
-		if err != nil {
-			return err
-		}
-	}
-
-	if kontrolKey != nil {
-		err = ioutil.WriteFile(filepath.Join(kiteHome, kontrolKeyFileName), []byte(kontrolKey), 0400)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func ParseKiteKey() (*jwt.Token, error) {
-	kiteKey, err := KiteKey()
-	if err != nil {
-		return nil, err
-	}
-	return jwt.Parse(string(kiteKey), getKontrolKey)
-}
-
-// getKontrolKey is used as key getter func for jwt.Parse() function.
-func getKontrolKey(token *jwt.Token) ([]byte, error) { return KontrolKey() }
 
 // got it from http://golang.org/misc/dist/bindist.go?m=text and removed go
 // related stuff, works perfect. It creates a tar.gz container from the given

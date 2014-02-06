@@ -36,12 +36,11 @@ type Kontrol struct {
 	privateKey string
 }
 
-func New(kiteOptions *kite.Options, etcdServers []string, issuer, publicKey, privateKey string) *Kontrol {
+func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
 		etcd:       etcd.NewClient(etcdServers),
 		watcherHub: newWatcherHub(),
-		issuer:     issuer,
 		publicKey:  publicKey,
 		privateKey: privateKey,
 	}
@@ -137,7 +136,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	}
 
 	log.Info("Kite registered: %s", key)
-	k.watcherHub.Notify(kite, protocol.Register, k.issuer, k.privateKey)
+	k.watcherHub.Notify(kite, protocol.Register, k.kite.Username, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -343,7 +342,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	kvs := flatten(resp.Node.Nodes)
 
-	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.issuer, k.privateKey)
+	kitesWithToken, err := addTokenToKites(kvs, r.Username, k.kite.Username, k.privateKey)
 	if err != nil {
 		return nil, err
 	}

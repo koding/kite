@@ -1,15 +1,16 @@
 package cmd
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"kite"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"kite/protocol"
 	"net/url"
 	"os"
 )
+
+const defaultRegServ = "ws://localhost:8080/regserv"
 
 type Register struct {
 	client *kite.Kite
@@ -27,12 +28,12 @@ func (r *Register) Definition() string {
 
 func (r *Register) Exec(args []string) error {
 	flags := flag.NewFlagSet("register", flag.ContinueOnError)
-	to := flags.String("to", "ws://localhost:8080/regserv", "target registration server")
+	to := flags.String("to", defaultRegServ, "target registration server")
 	flags.Parse(args)
 
-	_, err := util.KiteKey()
+	_, err := kitekey.Read()
 	if err == nil {
-		return errors.New("Already registered")
+		r.client.Log.Warning("Already registered. Registering again...")
 	}
 
 	hostname, err := os.Hostname()
@@ -56,17 +57,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	var keys struct {
-		KiteKey    []byte `json:"kite.key"`
-		KontrolKey []byte `json:"kontrol.key"`
-	}
-
-	err = result.Unmarshal(&keys)
-	if err != nil {
-		return err
-	}
-
-	err = util.WriteKeys(keys.KiteKey, keys.KontrolKey)
+	err = kitekey.Write(result.MustString())
 	if err != nil {
 		return err
 	}

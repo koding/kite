@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"kite/cmd/util"
+	"kite/kitekey"
 )
 
 type ShowKey struct{}
@@ -16,7 +16,7 @@ func (v *ShowKey) Definition() string {
 }
 
 func (v *ShowKey) Exec(args []string) error {
-	token, err := util.ParseKiteKey()
+	token, err := kitekey.Parse()
 	if err != nil {
 		return err
 	}

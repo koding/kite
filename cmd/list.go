@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +35,7 @@ func (*List) Exec(args []string) error {
 // getIntalledKites returns installed kites in .kd/kites folder.
 // an empty argument returns all kites.
 func getInstalledKites(kiteName string) ([]string, error) {
-	kiteHome, err := util.KiteHome()
+	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return nil, err
 	}

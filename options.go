@@ -3,31 +3,30 @@ package kite
 import (
 	"encoding/json"
 	"io/ioutil"
-	"kite/cmd/util"
 	"kite/protocol"
 	"log"
-	"net/url"
 	"strings"
 )
 
 // Options is passed to kite.New when creating new instance.
 type Options struct {
-	Username              string
-	Kitename              string
-	PublicIP              string
-	Environment           string
-	Region                string
-	Port                  string
-	Path                  string
-	Version               string
-	KontrolURL            *url.URL
+	// Mandatory fields
+	Kitename    string
+	Version     string
+	Environment string
+	Region      string
+
+	// Optional fields
+	PublicIP   string              // default: 0.0.0.0
+	Port       string              // default: random
+	Path       string              // default: /kite
+	Visibility protocol.Visibility // default: protocol.Private
+
+	// Do not authenticate incoming requests
 	DisableAuthentication bool
-	Dependencies          string
-	Visibility            protocol.Visibility
 }
 
-// validate is validating the fields of the options struct. It exits if an
-// error is occured.
+// validate fields of the options struct. It exits if an error is occured.
 func (o *Options) validate() {
 	if o.Kitename == "" {
 		log.Fatal("ERROR: options.Kitename field is not set")
@@ -52,6 +51,7 @@ func (o *Options) validate() {
 	if o.Port == "" {
 		o.Port = "0" // OS binds to an automatic port
 	}
+
 	if o.Path == "" {
 		o.Path = "/kite"
 	}
@@ -60,23 +60,8 @@ func (o *Options) validate() {
 		o.Path = "/" + o.Path
 	}
 
-	if o.KontrolURL == nil {
-		o.KontrolURL = &url.URL{
-			Scheme: "ws",
-			Host:   "127.0.0.1:4000", // local fallback address
-			Path:   "/dnode",
-		}
-	}
-
 	if o.Visibility == protocol.Visibility("") {
 		o.Visibility = protocol.Private
-	}
-
-	token, _ := util.ParseKiteKey()
-	if token != nil && token.Claims["sub"] != "" {
-		if username, ok := token.Claims["sub"].(string); ok {
-			o.Username = username
-		}
 	}
 }
 
@@ -88,10 +73,5 @@ func ReadKiteOptions(configfile string) (*Options, error) {
 	}
 
 	options := &Options{}
-	err = json.Unmarshal(file, &options)
-	if err != nil {
-		return nil, err
-	}
-
-	return options, nil
+	return options, json.Unmarshal(file, &options)
 }

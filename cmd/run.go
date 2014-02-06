@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -55,7 +55,7 @@ func (*Run) Exec(args []string) error {
 		return err
 	}
 
-	kiteHome, err := util.KiteHome()
+	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return err
 	}

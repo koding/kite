@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"kite"
-	"kite/cmd/util"
+	"kite/kitekey"
 	"kite/protocol"
 	"net/url"
 )
@@ -24,7 +24,7 @@ func (r *Query) Definition() string {
 }
 
 func (r *Query) Exec(args []string) error {
-	token, err := util.ParseKiteKey()
+	token, err := kitekey.Parse()
 	if err != nil {
 		return err
 	}

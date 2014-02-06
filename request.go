@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"kite/dnode"
 	"kite/dnode/rpc"
+	"kite/kitekey"
 	"reflect"
 	"runtime/debug"
 	"time"
@@ -275,13 +276,15 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 // AuthenticateFromKiteKey authenticates user from Koding Key.
 // Kontrol makes requests with a Koding Key.
 func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
-	if r.Authentication.Key != k.kiteKey {
-		return errors.New("Invalid Kite Key")
+	token, err := jwt.Parse(r.Authentication.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		return err
 	}
 
-	// Remote kite must have the same username if koding keys match.
-	if r.Username == "" && k.Username != "" {
-		r.Username = k.Username
+	if username, ok := token.Claims["sub"].(string); !ok {
+		return errors.New("Username is not present in token")
+	} else {
+		r.Username = username
 	}
 
 	return nil

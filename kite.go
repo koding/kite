@@ -8,10 +8,8 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/nu7hatch/gouuid"
-	"kite/cmd/util"
 	"kite/dnode/rpc"
+	"kite/kitekey"
 	"kite/protocol"
 	"log"
 	"net"
@@ -24,6 +22,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
+	"github.com/nu7hatch/gouuid"
 	"github.com/op/go-logging"
 )
 
@@ -63,8 +63,8 @@ type Kite struct {
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
 
-	kiteKey    string
-	kontrolKey []byte
+	// Parsed JWT token from ~/.kite/kite.key
+	kiteKey *jwt.Token
 
 	// Wheter we want to connect to Kontrol on startup, true by default.
 	KontrolEnabled bool
@@ -104,7 +104,7 @@ type Kite struct {
 	// Kontrol keys to trust. Kontrol will issue access tokens for kites
 	// that are signed with the private counterpart of these keys.
 	// Key data must be PEM encoded.
-	trustedKontrolKeys map[string][]byte
+	trustedKontrolKeys map[string]string
 
 	// Trusted root certificates for TLS connections (wss://).
 	// Certificate data must be PEM encoded.
@@ -124,6 +124,7 @@ type Kite struct {
 // with several informations like Name, Port, IP and so on.
 func New(options *Options) *Kite {
 	var err error
+
 	if options == nil {
 		options, err = ReadKiteOptions("manifest.json")
 		if err != nil {
@@ -133,7 +134,10 @@ func New(options *Options) *Kite {
 
 	options.validate() // exits if validating fails
 
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
 
 	kiteID, err := uuid.NewV4()
 	if err != nil {
@@ -143,7 +147,6 @@ func New(options *Options) *Kite {
 	k := &Kite{
 		Kite: protocol.Kite{
 			Name:        options.Kitename,
-			Username:    options.Username,
 			ID:          kiteID.String(),
 			Version:     options.Version,
 			Hostname:    hostname,
@@ -162,7 +165,7 @@ func New(options *Options) *Kite {
 		concurrent:          true,
 		KontrolEnabled:      true,
 		RegisterToKontrol:   true,
-		trustedKontrolKeys:  make(map[string][]byte),
+		trustedKontrolKeys:  make(map[string]string),
 		Authenticators:      make(map[string]func(*Request) error),
 		disableAuthenticate: options.DisableAuthentication,
 		handlers:            make(map[string]HandlerFunc),
@@ -170,34 +173,34 @@ func New(options *Options) *Kite {
 		end:                 make(chan bool, 1),
 	}
 
-	if !options.DisableAuthentication {
-		kiteKey, err := util.KiteKey()
-		if err != nil {
-			panic(err)
-		}
+	k.Log = newLogger(k.Name, k.hasDebugFlag())
 
-		k.kiteKey = string(kiteKey)
+	k.kiteKey, err = kitekey.Parse()
+	if err != nil {
+		k.Log.Warning("Cannot read kite key. You must register by running \"kite register\" command.")
+	} else if !k.kiteKey.Valid {
+		panic(err)
+	} else {
+		k.Username = k.kiteKey.Claims["sub"].(string)
 
 		if k.KontrolEnabled {
-			k.kontrolKey, err = util.KontrolKey()
+			parsedURL, err := url.Parse(k.kiteKey.Claims["kontrolURL"].(string))
 			if err != nil {
 				panic(err)
 			}
 
-			token, err := jwt.Parse(k.kiteKey, func(token *jwt.Token) ([]byte, error) { return k.kontrolKey, nil })
-			if err != nil {
-				panic(err)
-			}
+			k.Kontrol = k.NewKontrol(parsedURL)
 
-			k.TrustKontrolKey(token.Claims["iss"].(string), []byte(k.kontrolKey))
+			k.TrustKontrolKey(k.kiteKey.Claims["iss"].(string), k.kiteKey.Claims["kontrolKey"].(string))
 		}
 	}
 
 	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback, onError)
 	k.server.Properties()["localKite"] = k
 
-	k.Log = newLogger(k.Name, k.hasDebugFlag())
-	k.Kontrol = k.NewKontrol(options.KontrolURL)
+	k.server.OnConnect(func(c *rpc.Client) {
+		k.Log.Info("New connection from: %s", c.Conn.Request().RemoteAddr)
+	})
 
 	// Call registered handlers when a client has disconnected.
 	k.server.OnDisconnect(func(c *rpc.Client) {
@@ -205,10 +208,6 @@ func New(options *Options) *Kite {
 			// Run OnDisconnect handlers.
 			k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
 		}
-	})
-
-	k.server.OnConnect(func(c *rpc.Client) {
-		k.Log.Info("Client is connected: %s", c.Conn.Request().RemoteAddr)
 	})
 
 	// Every kite should be able to authenticate the user from token.
@@ -251,7 +250,7 @@ func (k *Kite) EnableProxy() {
 }
 
 // Trust a Kontrol key for validating tokens.
-func (k *Kite) TrustKontrolKey(issuer string, key []byte) {
+func (k *Kite) TrustKontrolKey(issuer, key string) {
 	k.trustedKontrolKeys[issuer] = key
 }
 
@@ -400,7 +399,7 @@ func (k *Kite) listenAndServe() (err error) {
 	}
 
 	// We must connect to Kontrol after starting to listen on port
-	if k.KontrolEnabled {
+	if k.KontrolEnabled && k.Kontrol != nil {
 		if err = k.Kontrol.DialForever(); err != nil {
 			return
 		}

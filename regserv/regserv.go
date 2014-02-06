@@ -5,34 +5,72 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
 	"kite"
+	"kite/kitekey"
+	"os"
 	"time"
 )
+
+const version = "0.0.1"
 
 // RegServ is a registration kite. Users can register their machines by
 // running "kite register" command.
 type RegServ struct {
-	*kite.Kite
-	backend Backend
+	Environment string
+	Region      string
+	PublicIP    string
+	Port        string
+	backend     Backend
+	kite        *kite.Kite
 }
 
 func New(backend Backend) *RegServ {
-	regserv := &RegServ{
-		backend: backend,
+	return &RegServ{
+		Environment: "production",
+		Region:      "localhost",
+		backend:     backend,
 	}
-	opts := &kite.Options{
-		Kitename:              "regserv",
-		Version:               "0.0.1",
-		Port:                  "8080",
-		Path:                  "/regserv",
-		Region:                "localhost",
-		Environment:           "development",
-		DisableAuthentication: true,
-	}
-	regserv.Kite = kite.New(opts)
-	regserv.HandleFunc("register", regserv.handleRegister)
-	return regserv
 }
 
+func (s *RegServ) Run() {
+	if s.Environment == "" || s.Region == "" || s.PublicIP == "" || s.Port == "" {
+		panic("RegServ is not initialized properly")
+	}
+
+	_, err := kitekey.Parse()
+	if err != nil {
+		s.registerSelf() // Need to do this before creating new kite
+	}
+
+	// Create a kite and run it.
+	opts := &kite.Options{
+		Kitename:    "regserv",
+		Version:     version,
+		Environment: s.Environment,
+		Region:      s.Region,
+		PublicIP:    s.PublicIP,
+		Port:        s.Port,
+		Path:        "/regserv",
+		DisableAuthentication: true,
+	}
+	s.kite = kite.New(opts)
+	s.kite.HandleFunc("register", s.handleRegister)
+	s.kite.Run()
+}
+
+// registerSelf registers this host and writes a key to ~/.kite/kite.key
+func (s *RegServ) registerSelf() error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	key, err := s.register(s.backend.Issuer(), hostname)
+	if err != nil {
+		return err
+	}
+	return kitekey.Write(key)
+}
+
+// Backend is the interface that is passed to New() function.
 type Backend interface {
 	Issuer() string
 	KontrolURL() string
@@ -49,31 +87,31 @@ func (s *RegServ) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 	r.Args.One().MustUnmarshal(&args)
 
-	tknID, err := uuid.NewV4()
-	if err != nil {
-		return nil, errors.New("cannot generate a token")
-	}
-
 	username, err := s.backend.Authenticate(r)
 	if err != nil {
 		return nil, errors.New("cannot authenticate user")
 	}
 
-	token := jwt.New(jwt.GetSigningMethod("RS256"))
-	token.Claims["iss"] = s.backend.Issuer()            // Issuer
-	token.Claims["sub"] = username                      // Subject
-	token.Claims["iat"] = time.Now().UTC().Unix()       // Issued At
-	token.Claims["hostname"] = args.Hostname            // Hostname of registered machine
-	token.Claims["kontrolURL"] = s.backend.KontrolURL() // Kontrol URL
-	token.Claims["jti"] = tknID.String()                // JWT ID
+	return s.register(username, args.Hostname)
+}
 
-	signed, err := token.SignedString([]byte(s.backend.PrivateKey()))
+func (s *RegServ) register(username, hostname string) (kiteKey string, err error) {
+	tknID, err := uuid.NewV4()
 	if err != nil {
-		return nil, err
+		return "", errors.New("cannot generate a token")
 	}
 
-	return map[string]string{
-		"kite.key":    signed,
-		"kontrol.key": s.backend.PublicKey(),
-	}, nil
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+
+	token.Claims = map[string]interface{}{
+		"iss":        s.backend.Issuer(),      // Issuer
+		"sub":        username,                // Subject
+		"iat":        time.Now().UTC().Unix(), // Issued At
+		"hostname":   hostname,                // Hostname of registered machine
+		"kontrolURL": s.backend.KontrolURL(),  // Kontrol URL
+		"kontrolKey": s.backend.PublicKey(),   // Public key of kontrol
+		"jti":        tknID.String(),          // JWT ID
+	}
+
+	return token.SignedString([]byte(s.backend.PrivateKey()))
 }
