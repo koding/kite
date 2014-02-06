@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	kiteDirName        = ".kite"
-	kiteKeyFileName    = "kite.key"
-	kontrolKeyFileName = "kontrol.key"
+	kiteDirName     = ".kite"
+	kiteKeyFileName = "kite.key"
 )
 
 // KiteHome returns the home path of Kite directory.
