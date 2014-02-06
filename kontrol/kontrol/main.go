@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"kite"
 	"kite/kontrol"
 	"kite/testkeys"
@@ -8,14 +9,19 @@ import (
 
 func main() {
 	options := &kite.Options{
-		Kitename:    "kontrol",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "production",
-		PublicIP:    "127.0.0.1",
-		Port:        "4000",
-		Path:        "/kontrol",
+		Kitename: "kontrol",
+		Version:  "0.0.1",
+		Path:     "/kontrol",
 	}
+
+	flag.StringVar(&options.Environment, "environment", "development", "")
+	flag.StringVar(&options.Region, "region", "localhost", "")
+	flag.StringVar(&options.PublicIP, "ip", "0.0.0.0", "")
+	flag.StringVar(&options.Port, "port", "4000", "")
+
+	flag.Parse()
+
 	k := kontrol.New(options, nil, testkeys.Public, testkeys.Private)
+
 	k.Run()
 }
