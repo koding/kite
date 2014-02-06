@@ -38,7 +38,7 @@ func (s *RegServ) Run() {
 
 	_, err := kitekey.Parse()
 	if err != nil {
-		s.registerSelf() // Need to do this before creating new kite
+		s.RegisterSelf() // Need to do this before creating new kite
 	}
 
 	// Create a kite and run it.
@@ -57,8 +57,8 @@ func (s *RegServ) Run() {
 	s.kite.Run()
 }
 
-// registerSelf registers this host and writes a key to ~/.kite/kite.key
-func (s *RegServ) registerSelf() error {
+// RegisterSelf registers this host and writes a key to ~/.kite/kite.key
+func (s *RegServ) RegisterSelf() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return err
