@@ -1,3 +1,5 @@
+// Package regserv implements a registration server kite. Users can register
+// to a kite infrastructure by running "kite register" command.
 package regserv
 
 import (

@@ -185,8 +185,8 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 
 func (r *RemoteKite) startTokenRenewer() {
 	const (
-		renewBefore   = 30 * time.Second
-		retryInterval = 10 * time.Second
+		renewBefore   = 1 * time.Second
+		retryInterval = 1 * time.Second
 	)
 
 	// The duration from now to the time token needs to be renewed.

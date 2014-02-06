@@ -1,3 +1,5 @@
+// Package testutil provides a default Kontrol and RegServ kites for
+// using in tests.
 package testutil
 
 import (

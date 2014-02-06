@@ -1,3 +1,4 @@
+// Package rpc implement dnode rpc client and server.
 package rpc
 
 import (

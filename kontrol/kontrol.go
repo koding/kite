@@ -1,3 +1,5 @@
+// Package kontrol provides an implementation for the name service kite.
+// It can be queried to get the list of running kites.
 package kontrol
 
 import (
@@ -18,11 +20,11 @@ import (
 )
 
 const (
-	HeartbeatInterval = 1 * time.Minute
-	HeartbeatDelay    = 2 * time.Minute
+	HeartbeatInterval = 2 * time.Second
+	HeartbeatDelay    = 4 * time.Second
 	KitesPrefix       = "/kites"
-	TokenTTL          = 1 * time.Hour
-	TokenLeeway       = 1 * time.Minute
+	TokenTTL          = 3 * time.Second
+	TokenLeeway       = 100 * time.Millisecond
 )
 
 var log *logging.Logger

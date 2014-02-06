@@ -1,3 +1,5 @@
+// Package pool implements a kite pool for staying connected to all matching
+// kites in a query.
 package pool
 
 import (

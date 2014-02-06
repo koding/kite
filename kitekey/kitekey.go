@@ -1,3 +1,4 @@
+// Package kitekey provides method for reading and writing kite.key file.
 package kitekey
 
 import (
@@ -15,7 +16,7 @@ const (
 )
 
 // KiteHome returns the home path of Kite directory.
-// The returned value can be overriden with KITE_HOME environment variable.
+// The returned value can be overriden by setting KITE_HOME environment variable.
 func KiteHome() (string, error) {
 	kiteHome := os.Getenv("KITE_HOME")
 	if kiteHome != "" {

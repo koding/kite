@@ -1,5 +1,6 @@
 // Echo kite is an example to kite that just echoes the argument back.
 // Useful for debugging or testing stuff.
+
 package main
 
 import "kite"
