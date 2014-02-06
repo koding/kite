@@ -64,7 +64,8 @@ func (r *Query) Exec(args []string) error {
 	}
 
 	for i, kite := range kites {
-		fmt.Printf("\t%d.\t%+v\n", i+1, kite.Kite)
+		var k *protocol.Kite = &kite.Kite
+		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, k.URL)
 	}
 
 	return nil
