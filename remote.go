@@ -303,7 +303,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 
 // Authentication is used when connecting a RemoteKite.
 type Authentication struct {
-	// Type can be "kodingKey", "token" or "sessionID" for now.
+	// Type can be "kiteKey", "token" or "sessionID" for now.
 	Type       string     `json:"type"`
 	Key        string     `json:"key"`
 	validUntil *time.Time `json:"-"`
