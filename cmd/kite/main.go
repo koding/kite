@@ -8,6 +8,10 @@ import (
 	"kite/cmd/cli"
 )
 
+// Please use 3 digit versioning (major, minor, patch).
+// http://semver.org
+const version = "0.0.5"
+
 func main() {
 	options := &kite.Options{
 		Kitename:    "kite-command",
@@ -19,7 +23,7 @@ func main() {
 	client.KontrolEnabled = false
 
 	root := cli.NewCLI()
-	root.AddCommand("version", cmd.NewVersion())
+	root.AddCommand("version", cmd.Version(version))
 	root.AddCommand("register", cmd.NewRegister(client))
 	root.AddCommand("install", cmd.NewInstall())
 	root.AddCommand("build", build.NewBuild())
