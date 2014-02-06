@@ -2,37 +2,18 @@ package kontrol
 
 import (
 	"fmt"
-	"github.com/coreos/go-etcd/etcd"
-	"io/ioutil"
 	"kite"
 	"kite/protocol"
-	"os/user"
+	"kite/testkeys"
 	"testing"
 	"time"
+
+	"github.com/coreos/go-etcd/etcd"
 )
 
 func setupTest(t *testing.T) {
-	kodingKey := modelhelper.NewKodingKeys()
-	kodingKey.Id = bson.ObjectIdHex("528e1b36a819430000000001")
-	kodingKey.Key = "FmJpq9nof261Fa50GBb4x1naxQbB9sToQ9cSQ5RUsFgxgH0R9-DHxPwfhpXRe5PM"
-	kodingKey.Owner = "5196fcb0bc9bdb0000000011" // devrim from jAccounts collection
-	kodingKey.Hostname = "tardis.local-39612b01-b08b-4df7-49f7-641e58541459"
-
-	err := modelhelper.AddKodingKeys(kodingKey)
-	if err != nil {
-		t.Errorf("Cannot add Koding Key to MongoDB: %s", err.Error())
-		return
-	}
-
-	usr, _ := user.Current()
-	err = ioutil.WriteFile(usr.HomeDir+"/.kd/koding.key", []byte(kodingKey.Key), 0644)
-	if err != nil {
-		t.Errorf("Cannot write Koding Key to disk: %s", err.Error())
-		return
-	}
-
 	etcdClient := etcd.NewClient(nil)
-	_, err = etcdClient.Delete("/kites", true)
+	_, err := etcdClient.Delete("/kites", true)
 	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
 		t.Errorf("Cannot delete keys from etcd: %s", err)
 		return
@@ -45,13 +26,12 @@ func TestKontrol(t *testing.T) {
 	kontrolOpts := &kite.Options{
 		Kitename:    "kontrol",
 		Version:     "0.0.1",
-		Port:        "4000",
+		Port:        "3999",
 		Region:      "sj",
 		Environment: "development",
-		Username:    "devrim",
 	}
 
-	kon := New(kontrolOpts, nil)
+	kon := New(kontrolOpts, nil, testkeys.Public, testkeys.Private)
 	kon.Start()
 
 	mathKite := mathWorker()
@@ -64,7 +44,7 @@ func TestKontrol(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	query := protocol.KontrolQuery{
-		Username:    "devrim",
+		Username:    "testuser",
 		Environment: "development",
 		Name:        "mathworker",
 	}
