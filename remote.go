@@ -232,7 +232,7 @@ func (r *RemoteKite) renewToken() error {
 
 	token, err := jwt.Parse(tokenString, r.localKite.getRSAKey)
 	if err != nil {
-		return errors.New("Cannot parse token")
+		return fmt.Errorf("Cannot parse token: %s", err.Error())
 	}
 
 	exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()

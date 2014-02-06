@@ -31,7 +31,6 @@ type Kontrol struct {
 	kite       *kite.Kite
 	etcd       *etcd.Client
 	watcherHub *watcherHub
-	issuer     string
 	publicKey  string
 	privateKey string
 }
@@ -492,7 +491,7 @@ func (k *Kontrol) WatchEtcd() {
 		if strings.HasPrefix(resp.Node.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
 			kite, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
 			if err == nil {
-				k.watcherHub.Notify(kite, protocol.Deregister, k.issuer, k.privateKey)
+				k.watcherHub.Notify(kite, protocol.Deregister, k.kite.Username, k.privateKey)
 			}
 		}
 	}
@@ -528,7 +527,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kite, r.Username, k.issuer, k.privateKey)
+	return generateToken(kite, r.Username, k.kite.Username, k.privateKey)
 }
 
 // canAccess makes some access control checks and returns true
