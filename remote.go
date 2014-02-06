@@ -205,6 +205,10 @@ func (r *RemoteKite) startTokenRenewer() {
 			case <-r.signalRenewToken:
 				if err := r.renewToken(); err != nil {
 					r.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
+					// Need to sleep here litle bit because a signal is sent
+					// when an expired token is detected on incoming request.
+					// This sleep prevents the signal from coming too fast.
+					time.Sleep(1 * time.Second)
 					go time.AfterFunc(retryInterval, r.sendRenewTokenSignal)
 				} else {
 					go time.AfterFunc(renewDuration(), r.sendRenewTokenSignal)
