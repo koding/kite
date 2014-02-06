@@ -11,5 +11,6 @@ go test -v ./dnode/rpc
 go test -v ./cmd/cli
 go test -v ./systeminfo
 go test -v
-go test -v ./pool
+go test -v ./regserv
 go test -v ./kontrol
+go test -v ./pool
