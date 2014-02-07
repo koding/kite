@@ -14,3 +14,4 @@ go test -v
 go test -v ./regserv
 go test -v ./kontrol
 go test -v ./pool
+# TODO add proxy test here and make it work
