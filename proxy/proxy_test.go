@@ -1,45 +1,54 @@
-package main
+package proxy
 
 import (
 	"kite"
+	"kite/kontrol"
 	"kite/protocol"
-	"kites/kontrol"
+	"kite/testkeys"
+	"kite/testutil"
 	"net"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/op/go-logging"
 )
 
-func setupTest(t *testing.T) {
+func setupTest() {
 	// Print kite name in front of log message.
 	logging.SetFormatter(logging.MustStringFormatter("[%{module:-8s}] %{level:-8s} ▶ %{message}"))
 	stderrBackend := logging.NewLogBackend(os.Stderr, "", 0)
 	stderrBackend.Color = true
 	logging.SetBackend(stderrBackend)
 
-	// Clean etcd
-	etcdClient := etcd.NewClient(nil)
-	_, err := etcdClient.Delete("/kites", true)
-	if err != nil {
-		if err.(etcd.EtcdError).ErrorCode != 100 { // Key Not Found
-			t.Errorf("Cannot delete keys from etcd: %s", err)
-			return
-		}
-	}
+	testutil.WriteKiteKey()
+	testutil.ClearEtcd()
 }
 
 func TestTLSKite(t *testing.T) {
-	setupTest(t)
+	setupTest()
 
-	kon := kontrol.New()
+	opts := &kite.Options{
+		Kitename:    "kontrol",
+		Version:     "0.0.1",
+		Region:      "localhost",
+		Environment: "testing",
+		PublicIP:    "127.0.0.1",
+		Port:        "3999",
+		Path:        "/kontrol",
+	}
+	kon := kontrol.New(opts, nil, testkeys.Public, testkeys.Private)
 	kon.Start()
 
 	// Kontrol is ready.
 
-	k := New(8443)
+	proxyOptions := &kite.Options{
+		Kitename:    "proxy",
+		Version:     "0.0.1",
+		Environment: "testing",
+		Region:      "localhost",
+	}
+	k := New(proxyOptions, "localhost", 8443, testkeys.Cert, testkeys.Key)
 	k.Start()
 
 	// TLS Kite is ready.
@@ -50,7 +59,7 @@ func TestTLSKite(t *testing.T) {
 	opt1 := &kite.Options{
 		Kitename:    "kite1",
 		Version:     "0.0.1",
-		Environment: "development",
+		Environment: "testing",
 		Region:      "localhost",
 	}
 	kite1 := kite.New(opt1)
@@ -66,7 +75,7 @@ func TestTLSKite(t *testing.T) {
 	opt2 := &kite.Options{
 		Kitename:    "kite2",
 		Version:     "0.0.1",
-		Environment: "development",
+		Environment: "testing",
 		Region:      "localhost",
 	}
 	kite2 := kite.New(opt2)
@@ -81,8 +90,8 @@ func TestTLSKite(t *testing.T) {
 
 	// Get the list of "kite1" kites from Kontrol.
 	query := protocol.KontrolQuery{
-		Username:    "devrim",
-		Environment: "development",
+		Username:    kite2.Username,
+		Environment: "testing",
 		Name:        "kite1",
 	}
 	kites, err := kite2.Kontrol.GetKites(query)

@@ -31,21 +31,13 @@ type Proxy struct {
 	urls map[*kite.RemoteKite]protocol.KiteURL
 }
 
-func New(tlsPort int, domain, key, cert string) *Proxy {
-	options := &kite.Options{
-		Kitename:    "proxy",
-		Version:     "0.0.1",
-		Environment: "production",
-		Region:      "localhost",
-		Visibility:  protocol.Public,
-	}
-
+func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM string) *Proxy {
 	proxyKite := &Proxy{
-		kite:    kite.New(options),
+		kite:    kite.New(kiteOptions),
 		tlsPort: tlsPort,
 		domain:  domain,
-		key:     key,
-		cert:    cert,
+		cert:    certPEM,
+		key:     keyPEM,
 		urls:    make(map[*kite.RemoteKite]protocol.KiteURL),
 	}
 
@@ -71,7 +63,7 @@ func (t *Proxy) startHTTPSServer() {
 	srv := &websocket.Server{Handler: t.handleWS}
 	srv.Config.TlsConfig = &tls.Config{}
 
-	cert, err := tls.LoadX509KeyPair(config.Current.Proxy.CertFile, config.Current.Proxy.KeyFile)
+	cert, err := tls.X509KeyPair([]byte(t.cert), []byte(t.key))
 	if err != nil {
 		t.kite.Log.Fatal(err.Error())
 	}
@@ -110,7 +102,7 @@ func (t *Proxy) register(r *kite.Request) (interface{}, error) {
 
 	result := url.URL{
 		Scheme: "wss",
-		Host:   net.JoinHostPort(config.Current.Proxy.Domain, strconv.Itoa(t.tlsPort)),
+		Host:   net.JoinHostPort(t.domain, strconv.Itoa(t.tlsPort)),
 		Path:   path,
 	}
 

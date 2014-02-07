@@ -1,9 +1,14 @@
-// Package testkeys contains RSA keys for using in examples and tests.
+// Package testkeys contains RSA keys and TLS certificates for using in examples and tests.
+package testkeys
+
+///////////////////////////////////////////////////////////////
 //
-// A RSA key can be generated with the following commands:
+// RSA Key
+//
+// RSA key is generated with following commands:
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
-package testkeys
+//
 
 const Public = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxqvspbT/HInFTJfyJ14f
@@ -42,3 +47,60 @@ X57pAzpB5jNugiSLBCZ8tDyPoeHewJvU3kEEuRDZslzE70Oms65E4ahYxYZz49kA
 Bt+/AzX98FU9DGJIZTm38OzCFJnbp/awI1QnUqPTtLV3WYtdH58kQUByszdyt7aQ
 RBO19jSxMDjWlQeZbfh/goPdXvuCu8/mgrxa8xO3anx7M5WGrSKS1A==
 -----END RSA PRIVATE KEY-----`
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// TLS certificate
+//
+// Generated with following command:
+//     go run generate_cert.go -ca -duration=87600h0m0s -host="localhost,127.0.0.1"
+//
+// generate_cert.go is available at http://golang.org/src/pkg/crypto/tls/generate_cert.go
+//
+
+const Key = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpQIBAAKCAQEAoSJrA4+/gjNCCqnTq56dLrs9U3oB1iYds5HgUMTVjUtwlRr2
+eHsOUZmEHIYLu8dtpqN02x0Zdp4G9nAjhOg4kkJ55MBbYEtFJ+ovLBClK44idXlV
+6f+wvPLzqb6R2O1szByYkrwIitTYGjcuQvfIOc2msoRTtT86V3NHNB7i+19DeHzK
+jZN0E2j+d/kPZLlLNDau22EMu2MhUM6v5kgbLlb9ly9qZIq+FEWOlvP1k4sQsMBk
+9cY6JlV+tXWu2Udm4bNc4foEwhOgptMz1HrBXeq/YJmRd0oxcOsbzqqBaN5+SZat
+d/CQ1dR+ymOsSrQC02R+gO6iYL1VJwnS9vLbgQIDAQABAoIBAQCQWz5WJX0jjvpW
+hUjd0q7sw9AwLfjhOqqXSlQU6BKNkA1fd5Vh4JS2Y/sodqqiYwsIJB43gv1h+Dcy
+psobctPjrGx5lB8IyMY++R2js5HV0HNsnPRsO6bB0EKdSt5s4l/7CI9jvdNFVWP5
+MIBgfI3Dw0rZWZWIpgmFeQBMYHNnUMgrjrMsWONFy77+ce5IzeQapqjKGJj8bSPx
+QygDmXYsXL11OimZCgGYgHkDhYMBAFCTTqxjIC1et6Vt4Q9tHPq3paYZGmJGxlCM
+zW+ACqPhFqlhRBpwasNjPq2DNd5qrxrxQy9lH1k64xj+ufAVOBh2/3fyYiaQdVDf
+doLqBza1AoGBAM896ptSbnVw/Ho/V9cJJb0b3uyIWtGnPkEK1qBVm+ggjdkvdZgj
+0r2Ij3c5ivcOWyY0rw37p4JMLXMcWGhpT7UIkbyw26/hQ8Hqg1CDjja6rQqk9w+M
+fmFKNesvAg+udj5WmnBD9tZbpg3/+X75IwNV0agFGc4xFFcsD6MAmmMzAoGBAMcL
+eQk8cY6UMk3x16UvV2pSWzBKGOsPcXYUPZU2/pczFC1z5ZXXacF108KYEwErRRdF
+E237dv8wk0vzxy+osj3wPSBopdYCSpT4JsLkQjcfq3whFe1sluhI6uU+wWG+4gOg
+70Tcz9+XF6i6dgq8vBvOIf8MF590qSOP1SVXxgZ7AoGBAMFPJOZK5sPfZ3J0YXAw
+lSYnuDH0IprLILO082xNTocgzo+WyF7ok2u91OzGHQzENFuX6u3lHmPYwNBN0V1b
+VkEsRBy478LIIdbg9CoG/IGqcTyrkdTMHRqNCWxdxdNwzdTqHVa43qcmh+cpLMW2
+iGVVCKJsV5zQhQOnEtLd/iSnAoGAEctpx7SapleDY8qCL+dalkvEkT2emq0nxJms
+o8Fl41iSrjmVRd8bOktxYg08bbdTlu/6+7MmgUvzby/dF9qqDLWEkXgpk0djKYxB
+0tybOthe+Vrv3ej+WMfkEBibK0ToadCic3KWNvQIDnKVCQK0gnvcODP5jKzeTiqW
+sJ73Oi8CgYEAsQH3wJXbNr4pJBv72Mmtl0a8SKP16pgMsWznhf2Fcj6T5sUZUSif
+NHwIB/4pDzSytQh2CA/YAViy/V+M/R/DACCqc/1oAbuoD5jeSiWFokZS+WI74+/H
+Hiee/RxoZ9I9UTE8AonPfRgp9A86gwox7qhTeqNCUbWVtVDQW4ZxQ3Y=
+-----END RSA PRIVATE KEY-----`
+
+const Cert = `-----BEGIN CERTIFICATE-----
+MIIC7zCCAdmgAwIBAgIBADALBgkqhkiG9w0BAQUwEjEQMA4GA1UEChMHQWNtZSBD
+bzAeFw0xNDAyMDcwNTAxMjZaFw0yNDAyMDUwNTAxMjZaMBIxEDAOBgNVBAoTB0Fj
+bWUgQ28wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQChImsDj7+CM0IK
+qdOrnp0uuz1TegHWJh2zkeBQxNWNS3CVGvZ4ew5RmYQchgu7x22mo3TbHRl2ngb2
+cCOE6DiSQnnkwFtgS0Un6i8sEKUrjiJ1eVXp/7C88vOpvpHY7WzMHJiSvAiK1Nga
+Ny5C98g5zaayhFO1PzpXc0c0HuL7X0N4fMqNk3QTaP53+Q9kuUs0Nq7bYQy7YyFQ
+zq/mSBsuVv2XL2pkir4URY6W8/WTixCwwGT1xjomVX61da7ZR2bhs1zh+gTCE6Cm
+0zPUesFd6r9gmZF3SjFw6xvOqoFo3n5Jlq138JDV1H7KY6xKtALTZH6A7qJgvVUn
+CdL28tuBAgMBAAGjVDBSMA4GA1UdDwEB/wQEAwIApDATBgNVHSUEDDAKBggrBgEF
+BQcDATAPBgNVHRMBAf8EBTADAQH/MBoGA1UdEQQTMBGCCWxvY2FsaG9zdIcEfwAA
+ATALBgkqhkiG9w0BAQUDggEBAELOpAaNQy24GqwhJ4dXipsfIRUC8XmG0fn1Rc83
+j6QHSsq/uBuC0492ScZ7rd4KLLKvJdnQd++2eGWsIvmGYy5sUS+X1Tm1twZ1ff8L
+fiPFmLn+CymercgstHSo1fTXztunJmIs49uNvQ5E5Wjfb9bd9UK2pbQpoGRoDZrX
+JKnW7YKqIkfHKnpgz5DtNvzn+dodvFvSV2TxxNyvHZYiJ93i4+/6GIqhAfEpkuym
+3XQxGFYexX/ndHdEr5s3FTKlR20XB4sNWUyMmNIGYGQJD6SA8MNlYUH4VpDEIm88
+JtuSOO2LKgSs2/emfjWHML5Zs3sz/YqOr1qJ2PJQTmd3Z4A=
+-----END CERTIFICATE-----`
