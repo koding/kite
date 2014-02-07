@@ -4,49 +4,16 @@ import (
 	"fmt"
 	"kite"
 	"kite/protocol"
-	"kite/regserv"
 	"kite/testkeys"
+	"kite/testutil"
 	"testing"
 	"time"
-
-	"github.com/coreos/go-etcd/etcd"
 )
 
-func init() {
-	writeKiteKey()
-	clearEtcd()
-}
-
-func writeKiteKey() {
-	regserv := regserv.New(testBackend{})
-	regserv.Environment = "testing"
-	regserv.Region = "localhost"
-	regserv.PublicIP = "127.0.0.1"
-	regserv.Port = "8079"
-
-	err := regserv.RegisterSelf()
-	if err != nil {
-		panic(err)
-	}
-}
-
-type testBackend struct{}
-
-func (b testBackend) Username() string                             { return "testuser" }
-func (b testBackend) KontrolURL() string                           { return "ws://localhost:3999/kontrol" }
-func (b testBackend) PublicKey() string                            { return testkeys.Public }
-func (b testBackend) PrivateKey() string                           { return testkeys.Private }
-func (b testBackend) Authenticate(r *kite.Request) (string, error) { return "testuser", nil }
-
-func clearEtcd() {
-	etcdClient := etcd.NewClient(nil)
-	_, err := etcdClient.Delete("/kites", true)
-	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
-		panic(fmt.Errorf("Cannot delete key from etcd: %s", err))
-	}
-}
-
 func TestKontrol(t *testing.T) {
+	testutil.WriteKiteKey()
+	testutil.ClearEtcd()
+
 	opts := &kite.Options{
 		Kitename:    "kontrol",
 		Version:     "0.0.1",

@@ -4,61 +4,57 @@ package testutil
 
 import (
 	"fmt"
-	"github.com/coreos/go-etcd/etcd"
-	"kite"
-	"kite/kontrol"
-	"kite/regserv"
+	"kite/kitekey"
 	"kite/testkeys"
+	"os"
+	"time"
+
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/nu7hatch/gouuid"
 )
 
-var (
-	Kontrol *kontrol.Kontrol
-	RegServ *regserv.RegServ
-)
-
-func init() {
-	initKontrol()
-	initRegServ()
-	clearEtcd()
-}
-
-func initKontrol() {
-	kontrolOptions := &kite.Options{
-		Kitename:    "kontrol",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "testing",
-		PublicIP:    "127.0.0.1",
-		Port:        "3999",
-		Path:        "/kontrol",
+// WriteKiteKey writes a new kite key. (Copied and modified from regserv.go)
+// If the host does not have a kite.key file kite.New() panics.
+// This is a helper to put a fake key on it's location.
+func WriteKiteKey() {
+	tknID, err := uuid.NewV4()
+	if err != nil {
+		panic(err)
 	}
-	Kontrol = kontrol.New(kontrolOptions, nil, testkeys.Public, testkeys.Private)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+
+	token.Claims = map[string]interface{}{
+		"iss":        "testuser",                    // Issuer
+		"sub":        "testuser",                    // Issued to
+		"iat":        time.Now().UTC().Unix(),       // Issued At
+		"hostname":   hostname,                      // Hostname of registered machine
+		"kontrolURL": "ws://localhost:3999/kontrol", // Kontrol URL
+		"kontrolKey": testkeys.Public,               // Public key of kontrol
+		"jti":        tknID.String(),                // JWT ID
+	}
+
+	key, err := token.SignedString([]byte(testkeys.Private))
+	if err != nil {
+		panic(err)
+	}
+
+	err = kitekey.Write(key)
+	if err != nil {
+		panic(err)
+	}
 }
 
-func initRegServ() {
-	backend := &testBackend{}
-	RegServ = regserv.New(backend)
-	RegServ.Environment = "testing"
-	RegServ.Region = "localhost"
-	RegServ.PublicIP = "127.0.0.1"
-	RegServ.Port = "8079"
-}
-
-func clearEtcd() {
+func ClearEtcd() {
 	etcdClient := etcd.NewClient(nil)
 	_, err := etcdClient.Delete("/kites", true)
 	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
 		panic(fmt.Errorf("Cannot delete keys from etcd: %s", err))
 	}
-}
-
-type testBackend struct{}
-
-func (b *testBackend) Username() string   { return "testuser" }
-func (b *testBackend) KontrolURL() string { return "ws://localhost:3999/kontrol" }
-func (b *testBackend) PublicKey() string  { return testkeys.Public }
-func (b *testBackend) PrivateKey() string { return testkeys.Private }
-
-func (b *testBackend) Authenticate(r *kite.Request) (string, error) {
-	return "testuser", nil
 }

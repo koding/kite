@@ -2,6 +2,7 @@ package kite
 
 import (
 	"fmt"
+	"kite/testutil"
 	"testing"
 	"time"
 )
@@ -56,6 +57,8 @@ func add(r *Request) (interface{}, error) {
 
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
+	testutil.WriteKiteKey()
+
 	mathKite := mathWorker()
 	mathKite.Start()
 

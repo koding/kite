@@ -3,16 +3,29 @@ package pool
 import (
 	"fmt"
 	"kite"
+	"kite/kontrol"
 	"kite/protocol"
+	"kite/testkeys"
 	"kite/testutil"
 	"testing"
 	"time"
 )
 
 func TestPool(t *testing.T) {
-	testutil.RegServ.RegisterSelf()
+	testutil.WriteKiteKey()
+	testutil.ClearEtcd()
 
-	testutil.Kontrol.Start()
+	opts := &kite.Options{
+		Kitename:    "kontrol",
+		Version:     "0.0.1",
+		Region:      "localhost",
+		Environment: "testing",
+		PublicIP:    "127.0.0.1",
+		Port:        "3999",
+		Path:        "/kontrol",
+	}
+	kon := kontrol.New(opts, nil, testkeys.Public, testkeys.Private)
+	kon.Start()
 
 	optsFoo := &kite.Options{
 		Kitename:    "foo",
