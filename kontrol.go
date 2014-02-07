@@ -39,14 +39,7 @@ type Kontrol struct {
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
-	readyConnected chan bool
-
-	// used for synchronizing other methods.
-	// if kite.RegisterToKontrol is true,
-	// then we are ready after register,
-	// else we are ready after connect.
-	ready     chan bool
-	onceReady sync.Once
+	ready chan bool
 
 	// Saved in order to re-register on re-connect.
 	lastRegisteredURL *url.URL
@@ -69,9 +62,8 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 	remoteKite.client.Reconnect = true
 
 	kontrol := &Kontrol{
-		RemoteKite:     remoteKite,
-		readyConnected: make(chan bool),
-		ready:          make(chan bool),
+		RemoteKite: remoteKite,
+		ready:      make(chan bool),
 	}
 
 	var once sync.Once
@@ -86,12 +78,7 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
-		once.Do(func() {
-			close(kontrol.readyConnected)
-			if !k.RegisterToKontrol {
-				close(kontrol.ready)
-			}
-		})
+		once.Do(func() { close(kontrol.ready) })
 	})
 
 	remoteKite.OnDisconnect(func() {
@@ -104,7 +91,7 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
 func (k *Kontrol) Register() error {
-	<-k.readyConnected
+	<-k.ready
 
 	response, err := k.RemoteKite.Tell("register")
 	if err != nil {
@@ -134,9 +121,6 @@ func (k *Kontrol) Register() error {
 
 		// Save last registered URL to re-register on re-connect.
 		k.lastRegisteredURL = kite.URL.URL
-
-		// Notify waiters on ready channel.
-		k.onceReady.Do(func() { close(k.ready) })
 	case protocol.RejectKite:
 		return errors.New("Kite rejected")
 	default:

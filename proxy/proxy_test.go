@@ -63,7 +63,7 @@ func TestTLSKite(t *testing.T) {
 		Region:      "localhost",
 	}
 	kite1 := kite.New(opt1)
-	kite1.EnableProxy()
+	kite1.EnableProxy("testuser")
 	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
 		return "bar", nil
 	})
@@ -79,6 +79,7 @@ func TestTLSKite(t *testing.T) {
 		Region:      "localhost",
 	}
 	kite2 := kite.New(opt2)
+	kite2.AddRootCertificate(testkeys.Cert)
 	kite2.Start()
 	defer kite2.Close()
 

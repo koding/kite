@@ -77,6 +77,9 @@ type Kite struct {
 	// registered to Kontrol.
 	proxyEnabled bool
 
+	// will be used in query to kontrol for finding proxy kite
+	proxyUsername string
+
 	// method map for exported methods
 	handlers map[string]HandlerFunc
 
@@ -108,7 +111,7 @@ type Kite struct {
 
 	// Trusted root certificates for TLS connections (wss://).
 	// Certificate data must be PEM encoded.
-	tlsCertificates [][]byte
+	tlsCertificates []string
 
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
@@ -245,8 +248,9 @@ func (k *Kite) EnableTLS(certFile, keyFile string) {
 }
 
 // Put this kite behind a reverse-proxy. Useful under firewall or NAT.
-func (k *Kite) EnableProxy() {
+func (k *Kite) EnableProxy(username string) {
 	k.proxyEnabled = true
+	k.proxyUsername = username
 }
 
 // Trust a Kontrol key for validating tokens.
@@ -255,7 +259,7 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 }
 
 // Add new trusted root certificate for TLS.
-func (k *Kite) AddRootCertificate(cert []byte) {
+func (k *Kite) AddRootCertificate(cert string) {
 	k.tlsCertificates = append(k.tlsCertificates, cert)
 }
 
