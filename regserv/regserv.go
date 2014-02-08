@@ -4,6 +4,7 @@ package regserv
 
 import (
 	"errors"
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
 	"kite"
@@ -56,6 +57,14 @@ func (s *RegServ) Run() {
 	}
 	s.kite = kite.New(opts)
 	s.kite.HandleFunc("register", s.handleRegister)
+
+	ready := s.kite.ReadyNotify()
+	go func() {
+		<-ready
+		fmt.Println("Users can register with the following command:")
+		fmt.Printf("kite register -to '%s'\n", s.kite.URL.String())
+	}()
+
 	s.kite.Run()
 }
 
