@@ -37,6 +37,15 @@ type Kontrol struct {
 	privateKey string
 }
 
+// New creates a new kontrol.
+//
+// etcdServers can be given nil if etcd is running on the same machine.
+//
+// Public and private keys are RSA pem blocks that can be generated with the
+// following command:
+//     openssl genrsa -out testkey.pem 2048
+//     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
+//
 func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
