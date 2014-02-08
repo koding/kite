@@ -7,6 +7,7 @@ package kite
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"kite/dnode/rpc"
 	"kite/kitekey"
 	"kite/protocol"
@@ -259,9 +260,18 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 	k.trustedKontrolKeys[issuer] = key
 }
 
-// Add new trusted root certificate for TLS.
+// Add new trusted root certificate for TLS from a PEM block.
 func (k *Kite) AddRootCertificate(cert string) {
 	k.tlsCertificates = append(k.tlsCertificates, cert)
+}
+
+// Add new trusted root certificate for TLS from a file name.
+func (k *Kite) AddRootCertificateFile(certFile string) {
+	data, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		k.Log.Fatalf("Cannot add certificate: %s", err.Error())
+	}
+	k.tlsCertificates = append(k.tlsCertificates, string(data))
 }
 
 func (k *Kite) CloseNotify() chan bool {
