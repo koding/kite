@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	HeartbeatInterval = 2 * time.Second
-	HeartbeatDelay    = 4 * time.Second
+	HeartbeatInterval = 1 * time.Minute
+	HeartbeatDelay    = 2 * time.Minute
 	KitesPrefix       = "/kites"
-	TokenTTL          = 3 * time.Second
-	TokenLeeway       = 100 * time.Millisecond
+	TokenTTL          = 1 * time.Hour
+	TokenLeeway       = 1 * time.Minute
 )
 
 var log *logging.Logger
