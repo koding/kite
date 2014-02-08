@@ -22,6 +22,7 @@ func Example() {
 	adder := New(opts)
 	adder.HandleFunc("add", add)
 	adder.Start()
+	defer adder.Close()
 
 	// Start foo kite
 	opts = &Options{
@@ -34,6 +35,7 @@ func Example() {
 	}
 	foo := New(opts)
 	foo.Start()
+	defer foo.Close()
 
 	// foo kite calls the "add" method of adder kite
 	remote := foo.NewRemoteKite(adder.Kite, Authentication{})
@@ -61,9 +63,11 @@ func TestKite(t *testing.T) {
 
 	mathKite := mathWorker()
 	mathKite.Start()
+	defer mathKite.Close()
 
 	exp2Kite := exp2()
 	exp2Kite.Start()
+	defer exp2Kite.Close()
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {

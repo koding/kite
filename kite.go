@@ -116,7 +116,6 @@ type Kite struct {
 	// Used to signal if the kite is ready to start and make calls to
 	// other kites.
 	ready chan bool
-	end   chan bool
 
 	// Prints logging messages to stderr and syslog.
 	Log *logging.Logger
@@ -266,25 +265,19 @@ func (k *Kite) AddRootCertificate(cert string) {
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously.
 func (k *Kite) Run() {
-	k.Start()
-	<-k.end
-	k.Log.Notice("Kite server is closed.")
-}
-
-// Start is like Run(), but does not wait for it to complete. It's nonblocking.
-func (k *Kite) Start() {
 	if os.Getenv("KITE_VERSION") != "" {
 		fmt.Println(k.Version)
 		os.Exit(0)
 	}
 
-	go func() {
-		err := k.listenAndServe()
-		if err != nil {
-			k.Log.Fatal(err)
-		}
-	}()
+	if err := k.listenAndServe(); err != nil {
+		k.Log.Fatal(err)
+	}
+}
 
+// Start is like Run(), but does not wait for it to complete. It's nonblocking.
+func (k *Kite) Start() {
+	go k.Run()
 	<-k.ready // wait until we are ready
 }
 
@@ -355,7 +348,9 @@ func newLogger(name string) *logging.Logger {
 }
 
 // listenAndServe starts our rpc server with the given addr.
-func (k *Kite) listenAndServe() (err error) {
+func (k *Kite) listenAndServe() error {
+	var err error
+
 	k.listener, err = net.Listen("tcp4", k.Kite.URL.Host)
 	if err != nil {
 		return err
@@ -407,10 +402,9 @@ func (k *Kite) listenAndServe() (err error) {
 	err = http.Serve(k.listener, k.server)
 	if strings.Contains(err.Error(), errClosing) {
 		// The server is closed by Close() method
+		k.Log.Notice("Kite server is closed.")
 		err = nil
 	}
-
-	k.end <- true // Serving is finished.
 
 	return err
 }
