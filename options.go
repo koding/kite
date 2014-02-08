@@ -45,7 +45,7 @@ func (o *Options) validate() {
 	}
 
 	if o.PublicIP == "" {
-		o.PublicIP = "127.0.0.1"
+		o.PublicIP = "0.0.0.0"
 	}
 
 	if o.Port == "" {
