@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"kite/kitekey"
 	"kite/testkeys"
+	"log"
 	"os"
 	"time"
 
@@ -55,6 +56,6 @@ func ClearEtcd() {
 	etcdClient := etcd.NewClient(nil)
 	_, err := etcdClient.Delete("/kites", true)
 	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
-		panic(fmt.Errorf("Cannot delete keys from etcd: %s", err))
+		log.Fatalf(fmt.Errorf("Cannot clear etcd: %s", err).Error())
 	}
 }
