@@ -113,9 +113,11 @@ type Kite struct {
 	// Certificate data must be PEM encoded.
 	tlsCertificates []string
 
-	// Used to signal if the kite is ready to start and make calls to
-	// other kites.
-	ready chan bool
+	// To signal when kite is ready to accept connections
+	readyC chan bool
+
+	// To signal when kite is closed with Close()
+	closeC chan bool
 
 	// Prints logging messages to stderr and syslog.
 	Log *logging.Logger
@@ -171,8 +173,8 @@ func New(options *Options) *Kite {
 		Authenticators:      make(map[string]func(*Request) error),
 		disableAuthenticate: options.DisableAuthentication,
 		handlers:            make(map[string]HandlerFunc),
-		ready:               make(chan bool),
-		end:                 make(chan bool, 1),
+		readyC:              make(chan bool),
+		closeC:              make(chan bool),
 	}
 
 	k.Log = newLogger(k.Name)
@@ -262,6 +264,14 @@ func (k *Kite) AddRootCertificate(cert string) {
 	k.tlsCertificates = append(k.tlsCertificates, cert)
 }
 
+func (k *Kite) CloseNotify() chan bool {
+	return k.closeC
+}
+
+func (k *Kite) ReadyNotify() chan bool {
+	return k.readyC
+}
+
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously.
 func (k *Kite) Run() {
@@ -278,7 +288,7 @@ func (k *Kite) Run() {
 // Start is like Run(), but does not wait for it to complete. It's nonblocking.
 func (k *Kite) Start() {
 	go k.Run()
-	<-k.ready // wait until we are ready
+	<-k.readyC // wait until we are ready
 }
 
 // Close stops the server.
@@ -391,18 +401,20 @@ func (k *Kite) listenAndServe() error {
 		}
 	}
 
-	k.ready <- true // listener is ready, unblock Start().
+	k.Log.Notice("Serving on: %s", k.URL.URL.String())
+
+	close(k.readyC) // listener is ready, signal waiters.
 
 	// An error string equivalent to net.errClosing for using with http.Serve()
 	// during a graceful exit. Needed to declare here again because it is not
 	// exported by "net" package.
 	const errClosing = "use of closed network connection"
 
-	k.Log.Notice("Serving on: %s", k.URL.URL.String())
 	err = http.Serve(k.listener, k.server)
 	if strings.Contains(err.Error(), errClosing) {
 		// The server is closed by Close() method
 		k.Log.Notice("Kite server is closed.")
+		close(k.closeC)
 		err = nil
 	}
 
