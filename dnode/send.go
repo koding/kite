@@ -2,6 +2,7 @@ package dnode
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,7 +12,7 @@ import (
 // Call sends the method and arguments to remote.
 func (d *Dnode) Call(method string, arguments ...interface{}) (map[string]Path, error) {
 	if method == "" {
-		panic("Empty method name")
+		return nil, errors.New("Can't make a call with empty method name")
 	}
 
 	if arguments == nil {

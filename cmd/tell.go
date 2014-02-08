@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"errors"
+	"flag"
 	"fmt"
 	"kite"
 	"kite/kitekey"
@@ -25,35 +25,36 @@ func (t *Tell) Definition() string {
 }
 
 func (t *Tell) Exec(args []string) error {
-	if len(args) < 2 {
-		return errors.New("You must give a URL, method and arguments, all seperated by space")
-	}
+	var to, method string
 
-	parsed, err := url.Parse(args[0])
+	flags := flag.NewFlagSet("tell", flag.ExitOnError)
+	flags.StringVar(&to, "to", "", "URL of remote kite")
+	flags.StringVar(&method, "method", "", "method to be called")
+	flags.Parse(args)
+
+	parsed, err := url.Parse(to)
 	if err != nil {
 		return err
 	}
 
-	target := protocol.Kite{URL: protocol.KiteURL{parsed}}
-
-	kodingKey, err := kitekey.Read()
+	key, err := kitekey.Read()
 	if err != nil {
 		return err
 	}
 
 	auth := kite.Authentication{
-		Type: "kodingKey",
-		Key:  kodingKey,
+		Type: "kiteKey",
+		Key:  key,
 	}
 
-	remote := t.client.NewRemoteKite(target, auth)
+	remote := t.client.NewRemoteKite(protocol.Kite{URL: protocol.KiteURL{parsed}}, auth)
 
 	if err = remote.Dial(); err != nil {
 		return err
 	}
 
 	// Convert args to []interface{} in order to pass it to Tell() method.
-	methodArgs := args[2:]
+	methodArgs := flags.Args()
 	params := make([]interface{}, len(methodArgs))
 	for i, arg := range methodArgs {
 		if number, err := strconv.Atoi(arg); err != nil {
@@ -63,7 +64,7 @@ func (t *Tell) Exec(args []string) error {
 		}
 	}
 
-	result, err := remote.Tell(args[1], params...)
+	result, err := remote.Tell(method, params...)
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,7 @@ func (r *Query) Exec(args []string) error {
 	username, _ := token.Claims["sub"].(string)
 
 	var query protocol.KontrolQuery
-	flags := flag.NewFlagSet("query", flag.ContinueOnError)
+	flags := flag.NewFlagSet("query", flag.ExitOnError)
 	flags.StringVar(&query.Username, "username", username, "")
 	flags.StringVar(&query.Environment, "environment", "", "")
 	flags.StringVar(&query.Name, "name", "", "")
