@@ -62,7 +62,10 @@ func Write(kiteKey string) error {
 		return err
 	}
 
+	// Need to remove the previous key first because we can't write over
+	// when previos file's mode is 0400.
 	os.Remove(keyPath)
+
 	return ioutil.WriteFile(keyPath, []byte(kiteKey), 0400)
 }
 
