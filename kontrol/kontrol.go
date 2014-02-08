@@ -147,11 +147,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 
 	// send response back to the kite, also identify him with the new name
 	ip, _, _ := net.SplitHostPort(remoteAddr)
-	return &protocol.RegisterResult{
-		Result:   protocol.AllowKite,
-		Username: r.Username,
-		PublicIP: ip,
-	}, nil
+	return &protocol.RegisterResult{PublicIP: ip}, nil
 }
 
 func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {

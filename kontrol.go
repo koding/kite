@@ -2,7 +2,6 @@ package kite
 
 import (
 	"errors"
-	"fmt"
 	"kite/protocol"
 	"net"
 	"net/url"
@@ -104,28 +103,18 @@ func (k *Kontrol) Register() error {
 		return err
 	}
 
-	switch rr.Result {
-	case protocol.AllowKite:
-		kite := &k.localKite.Kite // shortcut
+	kite := &k.localKite.Kite // shortcut
 
-		// we know now which user that is after authentication
-		kite.Username = rr.Username
-
-		// Set the correct PublicIP if left empty in options.
-		ip, port, _ := net.SplitHostPort(kite.URL.Host)
-		if ip == "" {
-			kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
-		}
-
-		k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
-
-		// Save last registered URL to re-register on re-connect.
-		k.lastRegisteredURL = kite.URL.URL
-	case protocol.RejectKite:
-		return errors.New("Kite rejected")
-	default:
-		return fmt.Errorf("Invalid result: %s", rr.Result)
+	// Set the correct PublicIP if left empty in options.
+	ip, port, _ := net.SplitHostPort(kite.URL.Host)
+	if ip == "" {
+		kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
 	}
+
+	k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
+
+	// Save last registered URL to re-register on re-connect.
+	k.lastRegisteredURL = kite.URL.URL
 
 	return nil
 }

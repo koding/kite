@@ -49,22 +49,9 @@ const (
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
-	Result RegisterAction `json:"result"`
-
-	// Username is sent in response because the kite does not know
-	// it's own user's name on start.
-	Username string `json:"username"`
-
-	// PublicIP is the IP address visible to Kontrol.
+	// IP address seen by kontrol
 	PublicIP string
 }
-
-type RegisterAction string
-
-const (
-	AllowKite  RegisterAction = "ALLOW"
-	RejectKite RegisterAction = "REJECT"
-)
 
 type KiteWithToken struct {
 	Kite  Kite   `json:"kite"`
