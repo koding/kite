@@ -19,7 +19,7 @@ type Options struct {
 	// Optional fields
 	PublicIP   string              // default: 0.0.0.0
 	Port       string              // default: random
-	Path       string              // default: /kite
+	Path       string              // default: /<kitename>
 	Visibility protocol.Visibility // default: protocol.Private
 
 	// Do not authenticate incoming requests
@@ -53,7 +53,7 @@ func (o *Options) validate() {
 	}
 
 	if o.Path == "" {
-		o.Path = "/kite"
+		o.Path = "/" + o.Kitename
 	}
 
 	if o.Path[0] != '/' {
