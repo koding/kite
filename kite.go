@@ -112,7 +112,7 @@ type Kite struct {
 
 	// Trusted root certificates for TLS connections (wss://).
 	// Certificate data must be PEM encoded.
-	tlsCertificates []string
+	tlsCertificates [][]byte
 
 	// To signal when kite is ready to accept connections
 	readyC chan bool
@@ -262,7 +262,7 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 
 // Add new trusted root certificate for TLS from a PEM block.
 func (k *Kite) AddRootCertificate(cert string) {
-	k.tlsCertificates = append(k.tlsCertificates, cert)
+	k.tlsCertificates = append(k.tlsCertificates, []byte(cert))
 }
 
 // Add new trusted root certificate for TLS from a file name.
@@ -271,7 +271,7 @@ func (k *Kite) AddRootCertificateFile(certFile string) {
 	if err != nil {
 		k.Log.Fatalf("Cannot add certificate: %s", err.Error())
 	}
-	k.tlsCertificates = append(k.tlsCertificates, string(data))
+	k.tlsCertificates = append(k.tlsCertificates, data)
 }
 
 func (k *Kite) CloseNotify() chan bool {

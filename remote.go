@@ -75,7 +75,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	// Add trusted root certificates for client.
 	r.client.Config.TlsConfig = &tls.Config{RootCAs: x509.NewCertPool()}
 	for _, cert := range k.tlsCertificates {
-		r.client.Config.TlsConfig.RootCAs.AppendCertsFromPEM([]byte(cert))
+		r.client.Config.TlsConfig.RootCAs.AppendCertsFromPEM(cert)
 	}
 
 	// Parse token for setting validUntil field
