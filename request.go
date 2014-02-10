@@ -252,6 +252,10 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return err
 	}
 
+	if !token.Valid {
+		return errors.New("Invalid signature in token")
+	}
+
 	if audience, ok := token.Claims["aud"].(string); !ok || audience != k.ID {
 		return errors.New("Invalid audience in token")
 	}
@@ -279,6 +283,10 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 	token, err := jwt.Parse(r.Authentication.Key, kitekey.GetKontrolKey)
 	if err != nil {
 		return err
+	}
+
+	if !token.Valid {
+		return errors.New("Invalid signature in token")
 	}
 
 	if username, ok := token.Claims["sub"].(string); !ok {
