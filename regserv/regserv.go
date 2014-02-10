@@ -41,7 +41,8 @@ func (s *RegServ) Run() {
 
 	_, err := kitekey.Parse()
 	if err != nil {
-		s.RegisterSelf() // Need to do this before creating new kite
+		fmt.Println("!!! kite.key is not found. Generating one...") // TODO show this message in yellow color
+		s.RegisterSelf()                                            // Need to do this before creating new kite
 	}
 
 	// Create a kite and run it.
