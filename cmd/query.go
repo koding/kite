@@ -7,6 +7,7 @@ import (
 	"kite/kitekey"
 	"kite/protocol"
 	"net/url"
+	"os"
 )
 
 type Query struct {
@@ -42,7 +43,12 @@ func (r *Query) Exec(args []string) error {
 	flags.StringVar(&query.ID, "id", "", "")
 	flags.Parse(args)
 
-	parsed, err := url.Parse(token.Claims["kontrolURL"].(string))
+	kontrolURL := os.Getenv("KITE_KONTROL_URL")
+	if kontrolURL == "" {
+		kontrolURL = token.Claims["kontrolURL"].(string)
+	}
+
+	parsed, err := url.Parse(kontrolURL)
 	if err != nil {
 		return err
 	}

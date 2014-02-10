@@ -189,7 +189,12 @@ func New(options *Options) *Kite {
 		k.Username = k.kiteKey.Claims["sub"].(string)
 
 		if k.KontrolEnabled {
-			parsedURL, err := url.Parse(k.kiteKey.Claims["kontrolURL"].(string))
+			kontrolURL := os.Getenv("KITE_KONTROL_URL")
+			if kontrolURL == "" {
+				kontrolURL = k.kiteKey.Claims["kontrolURL"].(string)
+			}
+
+			parsedURL, err := url.Parse(kontrolURL)
 			if err != nil {
 				panic(err)
 			}
