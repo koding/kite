@@ -35,7 +35,7 @@ func WriteKiteKey() {
 		"iss":        "testuser",                    // Issuer
 		"sub":        "testuser",                    // Issued to
 		"iat":        time.Now().UTC().Unix(),       // Issued At
-		"hostname":   hostname,                      // Hostname of registered machine
+		"aud":        hostname,                      // Hostname of registered machine
 		"kontrolURL": "ws://localhost:3999/kontrol", // Kontrol URL
 		"kontrolKey": testkeys.Public,               // Public key of kontrol
 		"jti":        tknID.String(),                // JWT ID

@@ -40,7 +40,7 @@ func TestRegister(t *testing.T) {
 		return
 	}
 
-	if hostname := token.Claims["hostname"].(string); hostname != "bar" {
+	if hostname := token.Claims["aud"].(string); hostname != "bar" {
 		t.Errorf("invalid hostname: %s", hostname)
 		return
 	}
