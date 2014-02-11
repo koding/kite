@@ -111,7 +111,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
 	host, port, _ := net.SplitHostPort(r.RemoteKite.URL.Host)
-	if host == "" {
+	if host == "0.0.0.0" {
 		host, _, _ = net.SplitHostPort(r.RemoteAddr)
 		r.RemoteKite.URL.Host = net.JoinHostPort(host, port)
 	}
