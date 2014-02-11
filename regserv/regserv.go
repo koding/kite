@@ -118,11 +118,11 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 	token.Claims = map[string]interface{}{
 		"iss":        s.backend.Username(),    // Issuer
 		"sub":        username,                // Subject
+		"aud":        hostname,                // Hostname of registered machine
 		"iat":        time.Now().UTC().Unix(), // Issued At
-		"hostname":   hostname,                // Hostname of registered machine
+		"jti":        tknID.String(),          // JWT ID
 		"kontrolURL": s.backend.KontrolURL(),  // Kontrol URL
 		"kontrolKey": s.backend.PublicKey(),   // Public key of kontrol
-		"jti":        tknID.String(),          // JWT ID
 	}
 
 	return token.SignedString([]byte(s.backend.PrivateKey()))
