@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"kite/dnode"
 	"kite/dnode/rpc"
+	"kite/logging"
 	"kite/protocol"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/op/go-logging"
 )
 
 // Default timeout value for RemoteKite.Tell method.
@@ -30,7 +30,7 @@ type RemoteKite struct {
 	localKite *Kite
 
 	// A reference to the Kite's logger for easy access.
-	Log *logging.Logger
+	Log logging.Logger
 
 	// Credentials that we sent in each request.
 	Authentication Authentication

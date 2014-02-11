@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"kite"
 	"kite/dnode"
+	"kite/logging"
 	"kite/protocol"
 	"net"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
-	"github.com/op/go-logging"
 )
 
 const (
@@ -27,7 +27,7 @@ const (
 	TokenLeeway       = 1 * time.Minute
 )
 
-var log *logging.Logger
+var log logging.Logger
 
 type Kontrol struct {
 	kite       *kite.Kite

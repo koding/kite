@@ -7,20 +7,11 @@ import (
 	"kite/testkeys"
 	"kite/testutil"
 	"net"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/op/go-logging"
 )
 
 func setupTest() {
-	// Print kite name in front of log message.
-	logging.SetFormatter(logging.MustStringFormatter("[%{module:-8s}] %{level:-8s} ▶ %{message}"))
-	stderrBackend := logging.NewLogBackend(os.Stderr, "", 0)
-	stderrBackend.Color = true
-	logging.SetBackend(stderrBackend)
-
 	testutil.WriteKiteKey()
 	testutil.ClearEtcd()
 }

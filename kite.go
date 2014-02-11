@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"kite/dnode/rpc"
 	"kite/kitekey"
+	"kite/logging"
 	"kite/protocol"
 	"kite/systeminfo"
 	"log"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
-	"github.com/op/go-logging"
 )
 
 func init() {
@@ -122,7 +122,7 @@ type Kite struct {
 	closeC chan bool
 
 	// Prints logging messages to stderr and syslog.
-	Log *logging.Logger
+	Log logging.Logger
 }
 
 // New creates, initialize and then returns a new Kite instance. It accepts
@@ -296,7 +296,7 @@ func (k *Kite) AddRootCertificate(cert string) {
 func (k *Kite) AddRootCertificateFile(certFile string) {
 	data, err := ioutil.ReadFile(certFile)
 	if err != nil {
-		k.Log.Fatalf("Cannot add certificate: %s", err.Error())
+		k.Log.Fatal("Cannot add certificate: %s", err.Error())
 	}
 	k.tlsCertificates = append(k.tlsCertificates, data)
 }
@@ -318,7 +318,7 @@ func (k *Kite) Run() {
 	}
 
 	if err := k.listenAndServe(); err != nil {
-		k.Log.Fatal(err)
+		k.Log.Fatal(err.Error())
 	}
 }
 
@@ -332,6 +332,7 @@ func (k *Kite) Start() {
 func (k *Kite) Close() {
 	k.Log.Notice("Closing server...")
 	k.listener.Close()
+	k.Log.Close()
 }
 
 func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
@@ -358,39 +359,27 @@ func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	return nil, nil
 }
 
-func init() {
-	// These logging related stuff needs to be called once because stupid
-	// logging library uses global variables and resets the backends every time.
-	logging.SetFormatter(logging.MustStringFormatter("%{level:-8s} ▶ %{message}"))
-	stderrBackend := logging.NewLogBackend(os.Stderr, "", log.LstdFlags)
-	stderrBackend.Color = true
-	syslogBackend, _ := logging.NewSyslogBackend("")
-	logging.SetBackend(stderrBackend, syslogBackend)
-}
-
 // newLogger returns a new logger object for desired name and level.
-func newLogger(name string) *logging.Logger {
-	logger := logging.MustGetLogger(name)
+func newLogger(name string) logging.Logger {
+	logger := logging.NewLogger(name)
 
-	var level logging.Level
 	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
 	case "DEBUG":
-		level = logging.DEBUG
+		logger.SetLevel(logging.Debug)
 	case "INFO":
-		level = logging.INFO
+		logger.SetLevel(logging.Info)
 	case "NOTICE":
-		level = logging.NOTICE
+		logger.SetLevel(logging.Notice)
 	case "WARNING":
-		level = logging.WARNING
+		logger.SetLevel(logging.Warning)
 	case "ERROR":
-		level = logging.ERROR
+		logger.SetLevel(logging.Error)
 	case "CRITICAL":
-		level = logging.CRITICAL
+		logger.SetLevel(logging.Critical)
 	default:
-		level = logging.INFO
+		logger.SetLevel(logging.Info)
 	}
 
-	logging.SetLevel(level, name)
 	return logger
 }
 
