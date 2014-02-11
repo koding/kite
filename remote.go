@@ -395,7 +395,7 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 		case <-r.disconnect:
 			responseChan <- &response{nil, &Error{"disconnect", "Remote kite has disconnected"}}
 		case <-time.After(timeout):
-			responseChan <- &response{nil, &Error{"timeout", "Did not get the response in allowed time"}}
+			responseChan <- &response{nil, &Error{"timeout", fmt.Sprintf("No response to \"%s\" method in %s", method, timeout)}}
 
 			// Remove the callback function from the map so we do not
 			// consume memory for unused callbacks.
