@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -234,12 +235,22 @@ func New(options *Options) *Kite {
 	k.HandleFunc("print", func(r *Request) (interface{}, error) {
 		return fmt.Print(r.Args.One().MustString())
 	})
+
 	k.HandleFunc("prompt", func(r *Request) (interface{}, error) {
 		fmt.Print(r.Args.One().MustString())
 		var s string
 		_, err := fmt.Scanln(&s)
 		return s, err
 	})
+
+	// TODO move this outside kite package
+	if runtime.GOOS == "darwin" {
+		k.HandleFunc("notify", func(r *Request) (interface{}, error) {
+			args := r.Args.MustSliceOfLength(3)
+			cmd := exec.Command("osascript", "-e", fmt.Sprintf("display notification \"%s\" with title \"%s\" subtitle \"%s\"", args[0].MustString(), args[1].MustString(), args[2].MustString()))
+			return nil, cmd.Start()
+		})
+	}
 
 	return k
 }
