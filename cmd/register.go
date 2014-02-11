@@ -8,6 +8,7 @@ import (
 	"kite/protocol"
 	"net/url"
 	"os"
+	"time"
 )
 
 const defaultRegServ = "ws://localhost:8080/regserv"
@@ -52,7 +53,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	result, err := regserv.Tell("register", map[string]string{"hostname": hostname})
+	result, err := regserv.TellWithTimeout("register", 10*time.Minute, map[string]string{"hostname": hostname})
 	if err != nil {
 		return err
 	}

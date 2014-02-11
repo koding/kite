@@ -231,6 +231,15 @@ func New(options *Options) *Kite {
 	k.HandleFunc("systemInfo", func(r *Request) (interface{}, error) { return systeminfo.New() })
 	k.HandleFunc("heartbeat", k.handleHeartbeat)
 	k.HandleFunc("log", k.handleLog)
+	k.HandleFunc("print", func(r *Request) (interface{}, error) {
+		return fmt.Print(r.Args.One().MustString())
+	})
+	k.HandleFunc("prompt", func(r *Request) (interface{}, error) {
+		fmt.Print(r.Args.One().MustString())
+		var s string
+		_, err := fmt.Scanln(&s)
+		return s, err
+	})
 
 	return k
 }
