@@ -22,11 +22,11 @@ func TestClientServer(t *testing.T) {
 
 	// Listen HTTP
 	http.Handle("/dnode", s)
-	go http.ListenAndServe(":5000", nil)
+	go http.ListenAndServe(":5050", nil)
 	sleep()
 
 	// Connect to server
-	c, err := Dial("ws://127.0.0.1:5000/dnode", false)
+	c, err := Dial("ws://127.0.0.1:5050/dnode", false)
 	if err != nil {
 		t.Error(err)
 		return
