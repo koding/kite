@@ -182,7 +182,9 @@ func New(options *Options) *Kite {
 
 	k.kiteKey, err = kitekey.Parse()
 	if err != nil {
-		k.Log.Warning("Cannot read kite key. You must register by running \"kite register\" command.")
+		if k.Name != "kite-command" && k.Name != "regserv" {
+			k.Log.Warning("Cannot read kite key. You must register by running \"kite register\" command.")
+		}
 	} else if !k.kiteKey.Valid {
 		panic(err)
 	} else {
