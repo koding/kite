@@ -107,7 +107,7 @@ func (k *Kontrol) Register() error {
 
 	// Set the correct PublicIP if left empty in options.
 	ip, port, _ := net.SplitHostPort(kite.URL.Host)
-	if ip == "" {
+	if ip == "0.0.0.0" {
 		kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
 	}
 
