@@ -11,6 +11,7 @@ func main() {
 		Version:     "0.0.1",
 		Environment: "development",
 		Region:      "localhost",
+		Port:        "7777",
 	}
 
 	k := kite.New(options)
