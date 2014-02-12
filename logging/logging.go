@@ -16,6 +16,7 @@ type (
 	level int
 )
 
+// Colors for different log levels.
 const (
 	Black color = (iota + 30)
 	Red
@@ -27,6 +28,7 @@ const (
 	White
 )
 
+// Logging levels.
 const (
 	Critical level = iota
 	Error
@@ -36,6 +38,9 @@ const (
 	Debug
 )
 
+// Logger is the interface for outputing log messages in different levels.
+// A new Logger can be created with NewLogger() function.
+// You can changed the output backend with SetBackend() function.
 type Logger interface {
 	// SetLevel changes the level of the logger. Default is logging.Info.
 	SetLevel(level)
@@ -73,9 +78,18 @@ type Logger interface {
 
 // Backend is the main component of Logger that handles the output.
 type Backend interface {
+	// Handles one log message.
 	Log(name string, level string, color color, format string, args ...interface{})
+
+	// Close the backend.
 	Close()
 }
+
+///////////////////////////////////
+//                               //
+// Default Logger implementation //
+//                               //
+///////////////////////////////////
 
 // logger is the default Logger implementation.
 type logger struct {
