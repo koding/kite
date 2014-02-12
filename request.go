@@ -188,14 +188,6 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		k.notifyRemoteKiteConnected(remoteKite)
 	} else {
 		remoteKite = properties["remoteKite"].(*RemoteKite)
-
-		// Update Kite info but do not change the value of username.
-		username := remoteKite.Kite.Username
-		remoteKite.Kite = options.Kite
-		remoteKite.Kite.Username = username
-
-		// TODO can't set Authentication. Fix it.
-		// remoteKite.Authentication = options.Authentication
 	}
 
 	request := &Request{
