@@ -8,7 +8,6 @@ import (
 	"kite/kitekey"
 	"reflect"
 	"runtime/debug"
-	"time"
 
 	"github.com/dgrijalva/jwt-go"
 )
