@@ -260,13 +260,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return errors.New("Invalid audience in token")
 	}
 
-	if expiration, ok := token.Claims["exp"].(float64); !ok || int64(expiration) < time.Now().UTC().Unix() {
-		return errors.New("Token is expired")
-	}
-
-	if notBefore, ok := token.Claims["nbf"].(float64); !ok || int64(notBefore) > time.Now().UTC().Unix() {
-		return errors.New("Token is not valid yet")
-	}
+	// We don't check for exp and nbf claims here because jwt-go package already checks them.
 
 	if username, ok := token.Claims["sub"].(string); !ok {
 		return errors.New("Username is not present in token")
