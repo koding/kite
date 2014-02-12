@@ -18,24 +18,24 @@ type (
 
 // Colors for different log levels.
 const (
-	Black color = (iota + 30)
-	Red
-	Green
-	Yellow
-	Blue
-	Magenta
-	Cyan
-	White
+	BLACK color = (iota + 30)
+	RED
+	GREEN
+	YELLOW
+	BLUE
+	MAGENTA
+	CYAN
+	WHITE
 )
 
 // Logging levels.
 const (
-	Critical level = iota
-	Error
-	Warning
-	Notice
-	Info
-	Debug
+	CRITICAL level = iota
+	ERROR
+	WARNING
+	NOTICE
+	INFO
+	DEBUG
 )
 
 // Logger is the interface for outputing log messages in different levels.
@@ -85,11 +85,11 @@ type Backend interface {
 	Close()
 }
 
-///////////////////////////////////
-//                               //
-// Default Logger implementation //
-//                               //
-///////////////////////////////////
+///////////////////////////
+//                       //
+// Logger implementation //
+//                       //
+///////////////////////////
 
 // logger is the default Logger implementation.
 type logger struct {
@@ -102,7 +102,7 @@ type logger struct {
 func NewLogger(name string) Logger {
 	return &logger{
 		Name:    name,
-		Level:   Info,
+		Level:   INFO,
 		Backend: StderrBackend,
 	}
 }
@@ -141,39 +141,79 @@ func (l *logger) Panic(format string, args ...interface{}) {
 }
 
 func (l *logger) Critical(format string, args ...interface{}) {
-	if l.Level >= Critical {
-		l.log("CRITICAL", Magenta, format, args...)
+	if l.Level >= CRITICAL {
+		l.log("CRITICAL", MAGENTA, format, args...)
 	}
 }
 
 func (l *logger) Error(format string, args ...interface{}) {
-	if l.Level >= Error {
-		l.log("ERROR", Red, format, args...)
+	if l.Level >= ERROR {
+		l.log("ERROR", RED, format, args...)
 	}
 }
 
 func (l *logger) Warning(format string, args ...interface{}) {
-	if l.Level >= Warning {
-		l.log("WARNING", Yellow, format, args...)
+	if l.Level >= WARNING {
+		l.log("WARNING", YELLOW, format, args...)
 	}
 }
 
 func (l *logger) Notice(format string, args ...interface{}) {
-	if l.Level >= Notice {
-		l.log("NOTICE", Green, format, args...)
+	if l.Level >= NOTICE {
+		l.log("NOTICE", GREEN, format, args...)
 	}
 }
 
 func (l *logger) Info(format string, args ...interface{}) {
-	if l.Level >= Info {
-		l.log("INFO", White, format, args...)
+	if l.Level >= INFO {
+		l.log("INFO", WHITE, format, args...)
 	}
 }
 
 func (l *logger) Debug(format string, args ...interface{}) {
-	if l.Level >= Debug {
-		l.log("DEBUG", Cyan, format, args...)
+	if l.Level >= DEBUG {
+		l.log("DEBUG", CYAN, format, args...)
 	}
+}
+
+///////////////////
+//               //
+// DefaultLogger //
+//               //
+///////////////////
+
+var DefaultLogger = NewLogger("")
+
+func Fatal(format string, args ...interface{}) {
+	DefaultLogger.Fatal(format, args...)
+}
+
+func Panic(format string, args ...interface{}) {
+	DefaultLogger.Panic(format, args...)
+}
+
+func Critical(format string, args ...interface{}) {
+	DefaultLogger.Critical(format, args...)
+}
+
+func Error(format string, args ...interface{}) {
+	DefaultLogger.Error(format, args...)
+}
+
+func Warning(format string, args ...interface{}) {
+	DefaultLogger.Warning(format, args...)
+}
+
+func Notice(format string, args ...interface{}) {
+	DefaultLogger.Notice(format, args...)
+}
+
+func Info(format string, args ...interface{}) {
+	DefaultLogger.Info(format, args...)
+}
+
+func Debug(format string, args ...interface{}) {
+	DefaultLogger.Debug(format, args...)
 }
 
 ///////////////////

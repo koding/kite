@@ -365,19 +365,19 @@ func newLogger(name string) logging.Logger {
 
 	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
 	case "DEBUG":
-		logger.SetLevel(logging.Debug)
+		logger.SetLevel(logging.DEBUG)
 	case "INFO":
-		logger.SetLevel(logging.Info)
+		logger.SetLevel(logging.INFO)
 	case "NOTICE":
-		logger.SetLevel(logging.Notice)
+		logger.SetLevel(logging.NOTICE)
 	case "WARNING":
-		logger.SetLevel(logging.Warning)
+		logger.SetLevel(logging.WARNING)
 	case "ERROR":
-		logger.SetLevel(logging.Error)
+		logger.SetLevel(logging.ERROR)
 	case "CRITICAL":
-		logger.SetLevel(logging.Critical)
+		logger.SetLevel(logging.CRITICAL)
 	default:
-		logger.SetLevel(logging.Info)
+		logger.SetLevel(logging.INFO)
 	}
 
 	return logger
