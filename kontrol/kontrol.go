@@ -519,7 +519,7 @@ func (k *Kontrol) WatchEtcd() {
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	var query protocol.KontrolQuery
-	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&query)
+	err := r.Args.One().Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid Kite")
 	}
