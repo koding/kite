@@ -89,8 +89,10 @@ func (t *Proxy) register(r *kite.Request) (interface{}, error) {
 	t.urls[r.RemoteKite] = r.RemoteKite.URL
 
 	path := strings.Join([]string{
-		"proxy",
-		fmt.Sprintf("%d", unsafe.Pointer(r.RemoteKite)),
+		"proxy", // Just a prefix
+		fmt.Sprintf("%d", unsafe.Pointer(r.RemoteKite)), // Unique id for the target kite
+
+		// Rest of the path is not important. They are on path for visibility reason.
 		r.RemoteKite.Kite.Username,
 		r.RemoteKite.Kite.Environment,
 		r.RemoteKite.Kite.Name,
