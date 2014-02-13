@@ -47,7 +47,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	target := protocol.Kite{URL: protocol.KiteURL{parsed}}
+	target := protocol.Kite{URL: &protocol.KiteURL{*parsed}}
 	regserv := r.client.NewRemoteKite(target, kite.Authentication{})
 	if err = regserv.Dial(); err != nil {
 		return err

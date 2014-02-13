@@ -47,7 +47,7 @@ func (t *Tell) Exec(args []string) error {
 		Key:  key,
 	}
 
-	remote := t.client.NewRemoteKite(protocol.Kite{URL: protocol.KiteURL{parsed}}, auth)
+	remote := t.client.NewRemoteKite(protocol.Kite{URL: &protocol.KiteURL{*parsed}}, auth)
 
 	if err = remote.Dial(); err != nil {
 		return err
