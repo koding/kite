@@ -188,6 +188,10 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		k.notifyRemoteKiteConnected(remoteKite)
 	} else {
 		remoteKite = properties["remoteKite"].(*RemoteKite)
+
+		// Need to update URL in case of a change. For example, the remote kite
+		// may disconnect from a proxy kite and registers to different proxy.
+		remoteKite.URL = options.Kite.URL
 	}
 
 	request := &Request{

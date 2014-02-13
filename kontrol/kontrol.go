@@ -122,7 +122,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.RegisterResult, error) {
-	kite := &r.Kite
+	// Need a copy of protocol.Kite structure because URL field is overwritten
+	// by the heartbeat request (in request.go:parseRequest).
+	var kiteCopy protocol.Kite = r.Kite
+	kite := &kiteCopy // shorthand
 
 	if kite.Visibility != protocol.Public && kite.Visibility != protocol.Private {
 		return nil, errors.New("Invalid visibility field")
