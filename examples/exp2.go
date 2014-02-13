@@ -34,6 +34,7 @@ func main() {
 	// To demonstrate we can receive notifications matcing to our query.
 	onEvent := func(e *kite.Event) {
 		fmt.Printf("--- kite event: %#v\n", e)
+		fmt.Printf("--- e.Kite.URL.String(): %+v\n", e.Kite.URL.String())
 	}
 
 	go func() {
