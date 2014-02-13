@@ -94,8 +94,7 @@ func (k *Kontrol) init() {
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
-	URL        protocol.KiteURL
-	Visibility protocol.Visibility
+	URL protocol.KiteURL
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -127,17 +126,13 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	var kiteCopy protocol.Kite = r.Kite
 	kite := &kiteCopy // shorthand
 
-	if kite.Visibility != protocol.Public && kite.Visibility != protocol.Private {
-		return nil, errors.New("Invalid visibility field")
-	}
-
-	key, err := getKiteKey(kite)
+	kiteKey, err := getKiteKey(kite)
 	if err != nil {
 		return nil, err
 	}
 
 	// setKey sets the value of the Kite in etcd.
-	setKey := k.makeSetter(kite, key)
+	setKey := k.makeSetter(kite, kiteKey)
 
 	// Register to etcd.
 	err = setKey()
@@ -150,13 +145,13 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 		return nil, err
 	}
 
-	log.Info("Kite registered: %s", key)
+	log.Info("Kite registered: %s", kiteKey)
 	k.watcherHub.Notify(kite, protocol.Register, k.kite.Username, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.etcd.Delete(key, false)
+		k.etcd.Delete(kiteKey, false)
 	})
 
 	// send response back to the kite, also identify him with the new name
@@ -196,8 +191,7 @@ func (k *Kontrol) registerSelf() {
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 	rv := &registerValue{
-		URL:        *kite.URL,
-		Visibility: kite.Visibility,
+		URL: *kite.URL,
 	}
 
 	valueBytes, _ := json.Marshal(rv)
@@ -321,7 +315,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 
 	allowed := make([]*protocol.KiteWithToken, 0, len(kites))
 	for _, kite := range kites {
-		if canAccess(r.RemoteKite.Kite, kite.Kite) {
+		if canAccess(r.RemoteKite.Kite, query) {
 			allowed = append(allowed, kite)
 		}
 	}
@@ -524,22 +518,22 @@ func (k *Kontrol) WatchEtcd() {
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
-	var kite *protocol.Kite
-	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&kite)
+	var query protocol.KontrolQuery
+	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid Kite")
 	}
 
-	if !canAccess(r.RemoteKite.Kite, *kite) {
+	if !canAccess(r.RemoteKite.Kite, query) {
 		return nil, errors.New("Forbidden")
 	}
 
-	kiteKey, err := getKiteKey(kite)
+	kiteKey, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := k.etcd.Get(kiteKey, false, false)
+	resp, err := k.etcd.Get(KitesPrefix+kiteKey, false, false)
 	if err != nil {
 		if etcdErr, ok := err.(*etcd.EtcdError); ok && etcdErr.ErrorCode == 100 {
 			return nil, errors.New("Kite not found")
@@ -557,15 +551,10 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 }
 
 // canAccess makes some access control checks and returns true
-// if fromKite can talk with toKite.
-func canAccess(fromKite protocol.Kite, toKite protocol.Kite) bool {
-	// Do not allow other users if kite is private.
-	if fromKite.Username != toKite.Username && toKite.Visibility == protocol.Private {
-		return false
-	}
-
+// if k can access to kites matching the query.
+func canAccess(k protocol.Kite, query protocol.KontrolQuery) bool {
 	// Prevent access to development/staging kites if the requester is not owner.
-	if fromKite.Username != toKite.Username && toKite.Environment != "production" {
+	if k.Username != query.Username && query.Environment != "production" {
 		return false
 	}
 
