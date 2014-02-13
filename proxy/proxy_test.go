@@ -93,16 +93,16 @@ func TestTLSKite(t *testing.T) {
 	}
 
 	// Got kites from Kontrol.
-	remote := kites[0]
+	kite1remote := kites[0]
 
 	// Check URL has the correct port number (TLS Kite's port).
-	_, URLport, _ := net.SplitHostPort(remote.Kite.URL.Host)
+	_, URLport, _ := net.SplitHostPort(kite1remote.Kite.URL.Host)
 	if URLport != "8443" {
 		t.Errorf("Wrong port: %s", URLport)
 		return
 	}
 
-	err = remote.Dial()
+	err = kite1remote.Dial()
 	if err != nil {
 		t.Error(err.Error())
 		// time.Sleep(time.Minute)
@@ -111,7 +111,7 @@ func TestTLSKite(t *testing.T) {
 
 	// kite2 is connected to kite1 via TLS kite.
 
-	result, err := remote.Tell("foo")
+	result, err := kite1remote.Tell("foo")
 	if err != nil {
 		t.Error(err.Error())
 		return
