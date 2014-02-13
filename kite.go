@@ -152,6 +152,7 @@ func New(options *Options) *Kite {
 
 	k := &Kite{
 		Kite: protocol.Kite{
+			// Username will be set after reading the kite.key
 			Name:        options.Kitename,
 			ID:          kiteID.String(),
 			Version:     options.Version,
