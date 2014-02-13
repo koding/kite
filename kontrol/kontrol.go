@@ -521,7 +521,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	var query protocol.KontrolQuery
 	err := r.Args.One().Unmarshal(&query)
 	if err != nil {
-		return nil, errors.New("Invalid Kite")
+		return nil, errors.New("Invalid query")
 	}
 
 	if !canAccess(r.RemoteKite.Kite, query) {
