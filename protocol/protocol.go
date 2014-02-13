@@ -37,7 +37,7 @@ type Kite struct {
 	Hostname string `json:"hostname"`
 
 	// The URL that the Kite can be reached from. Marshaled as string.
-	URL KiteURL `json:"url" dnode:"-"`
+	URL *KiteURL `json:"url" dnode:"-"`
 }
 
 type Visibility string

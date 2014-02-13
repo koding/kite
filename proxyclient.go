@@ -93,7 +93,7 @@ func registerToProxyKite(r *RemoteKite) (*url.URL, error) {
 		return nil, err
 	}
 
-	r.localKite.URL = protocol.KiteURL{parsed}
+	r.localKite.URL = &protocol.KiteURL{*parsed}
 
 	return parsed, nil
 }

@@ -28,7 +28,7 @@ type Proxy struct {
 	cert   string
 
 	// Holds registered kites.
-	urls map[*kite.RemoteKite]protocol.KiteURL
+	urls map[*kite.RemoteKite]*protocol.KiteURL
 }
 
 func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM string) *Proxy {
@@ -38,7 +38,7 @@ func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM 
 		domain:  domain,
 		cert:    certPEM,
 		key:     keyPEM,
-		urls:    make(map[*kite.RemoteKite]protocol.KiteURL),
+		urls:    make(map[*kite.RemoteKite]*protocol.KiteURL),
 	}
 
 	proxyKite.kite.HandleFunc("register", proxyKite.register)

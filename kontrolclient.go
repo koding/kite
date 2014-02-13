@@ -17,7 +17,8 @@ var ErrNoKitesAvailable = errors.New("no kites availabile")
 const registerKontrolRetryDuration = time.Minute
 
 func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
-	for k.URL.URL = range urls {
+	for url := range urls {
+		k.URL = &protocol.KiteURL{*url}
 		for {
 			err := k.Kontrol.Register()
 			if err != nil {
@@ -49,7 +50,7 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 	// Only the address is required to connect Kontrol
 	kite := protocol.Kite{
 		Name: "kontrol", // for logging purposes
-		URL:  protocol.KiteURL{kontrolURL},
+		URL:  &protocol.KiteURL{*kontrolURL},
 	}
 
 	auth := Authentication{
@@ -114,7 +115,7 @@ func (k *Kontrol) Register() error {
 	k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
 
 	// Save last registered URL to re-register on re-connect.
-	k.lastRegisteredURL = kite.URL.URL
+	k.lastRegisteredURL = &kite.URL.URL
 
 	return nil
 }

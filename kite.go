@@ -160,8 +160,8 @@ func New(options *Options) *Kite {
 			Environment: options.Environment,
 			Region:      options.Region,
 			Visibility:  options.Visibility,
-			URL: protocol.KiteURL{
-				&url.URL{
+			URL: &protocol.KiteURL{
+				url.URL{
 					Scheme: "ws",
 					Host:   net.JoinHostPort(options.PublicIP, options.Port),
 					Path:   options.Path,
@@ -414,7 +414,7 @@ func (k *Kite) listenAndServe() error {
 		go k.keepRegisteredToProxyKite(registerURLs)
 	} else {
 		// If proxy is not enabled, we must populate the channel ourselves.
-		registerURLs <- k.URL.URL // Register with Kite's own URL.
+		registerURLs <- &k.URL.URL // Register with Kite's own URL.
 	}
 
 	// We must connect to Kontrol after starting to listen on port

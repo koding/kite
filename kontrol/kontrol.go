@@ -107,7 +107,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
 	}
 
-	if r.RemoteKite.URL.URL == nil {
+	if r.RemoteKite.URL == nil {
 		return nil, errors.New("Empty 'url' field")
 	}
 
@@ -196,7 +196,7 @@ func (k *Kontrol) registerSelf() {
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 	rv := &registerValue{
-		URL:        kite.URL,
+		URL:        *kite.URL,
 		Visibility: kite.Visibility,
 	}
 
@@ -472,7 +472,7 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 	rv := new(registerValue)
 	json.Unmarshal([]byte(value), rv)
 
-	kite.URL = rv.URL
+	kite.URL = &rv.URL
 
 	return kite, nil
 }

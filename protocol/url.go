@@ -6,10 +6,10 @@ import (
 )
 
 // KiteURL is extended from url.URL to marshal/unmarshal as string.
-type KiteURL struct{ *url.URL }
+type KiteURL struct{ url.URL }
 
-func (u KiteURL) MarshalJSON() ([]byte, error) {
-	if u.URL == nil {
+func (u *KiteURL) MarshalJSON() ([]byte, error) {
+	if u == nil {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(u.String())
@@ -22,6 +22,11 @@ func (u *KiteURL) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	u.URL, err = url.Parse(s)
-	return err
+	parsed, err := url.Parse(s)
+	if err != nil {
+		return err
+	}
+
+	u.URL = *parsed
+	return nil
 }
