@@ -93,8 +93,10 @@ func (h *watcherHub) Notify(kite *protocol.Kite, action protocol.KiteAction, iss
 
 		// Register events needs a token attached.
 		if action == protocol.Register {
+			queryKey, _ := getQueryKey(watch.query)
+
 			var err error
-			event.Token, err = generateToken(kite, watch.query.Username, issuer, privateKey)
+			event.Token, err = generateToken(queryKey, watch.query.Username, issuer, privateKey)
 			if err != nil {
 				log.Error("watch notify: %s", err)
 				continue

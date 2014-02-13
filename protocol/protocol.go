@@ -27,9 +27,6 @@ type Kite struct {
 	// locations.
 	Region string `json:"region"`
 
-	// Is this Kite public or private?
-	Visibility Visibility `json:"visibility"`
-
 	// 3-digit semantic version.
 	Version string `json:"version"`
 
@@ -40,12 +37,9 @@ type Kite struct {
 	URL *KiteURL `json:"url" dnode:"-"`
 }
 
-type Visibility string
-
-const (
-	Public  Visibility = "PUBLIC"
-	Private Visibility = "PRIVATE"
-)
+func (k *Kite) Key() string {
+	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+}
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {

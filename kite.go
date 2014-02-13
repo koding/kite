@@ -59,9 +59,6 @@ func init() {
 type Kite struct {
 	protocol.Kite
 
-	// Is this Kite Public or Private? Default is Private.
-	Visibility protocol.Visibility
-
 	// Points to the Kontrol instance if enabled
 	Kontrol *Kontrol
 
@@ -159,7 +156,6 @@ func New(options *Options) *Kite {
 			Hostname:    hostname,
 			Environment: options.Environment,
 			Region:      options.Region,
-			Visibility:  options.Visibility,
 			URL: &protocol.KiteURL{
 				url.URL{
 					Scheme: "ws",

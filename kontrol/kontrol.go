@@ -94,8 +94,7 @@ func (k *Kontrol) init() {
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
-	URL        protocol.KiteURL
-	Visibility protocol.Visibility
+	URL protocol.KiteURL
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -127,17 +126,13 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	var kiteCopy protocol.Kite = r.Kite
 	kite := &kiteCopy // shorthand
 
-	if kite.Visibility != protocol.Public && kite.Visibility != protocol.Private {
-		return nil, errors.New("Invalid visibility field")
-	}
-
-	key, err := getKiteKey(kite)
+	kiteKey, err := getKiteKey(kite)
 	if err != nil {
 		return nil, err
 	}
 
 	// setKey sets the value of the Kite in etcd.
-	setKey := k.makeSetter(kite, key)
+	setKey := k.makeSetter(kite, kiteKey)
 
 	// Register to etcd.
 	err = setKey()
@@ -150,13 +145,13 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 		return nil, err
 	}
 
-	log.Info("Kite registered: %s", key)
+	log.Info("Kite registered: %s", kiteKey)
 	k.watcherHub.Notify(kite, protocol.Register, k.kite.Username, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.etcd.Delete(key, false)
+		k.etcd.Delete(kiteKey, false)
 	})
 
 	// send response back to the kite, also identify him with the new name
@@ -196,8 +191,7 @@ func (k *Kontrol) registerSelf() {
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 	rv := &registerValue{
-		URL:        *kite.URL,
-		Visibility: kite.Visibility,
+		URL: *kite.URL,
 	}
 
 	valueBytes, _ := json.Marshal(rv)
@@ -294,7 +288,7 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 
 	path = strings.TrimSuffix(path, "/")
 
-	return KitesPrefix + path, nil
+	return path, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
@@ -321,7 +315,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 
 	allowed := make([]*protocol.KiteWithToken, 0, len(kites))
 	for _, kite := range kites {
-		if canAccess(r.RemoteKite.Kite, kite.Kite) {
+		if canAccess(r.RemoteKite.Kite, query) {
 			allowed = append(allowed, kite)
 		}
 	}
@@ -344,7 +338,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	// Get kites from etcd
 	resp, err := k.etcd.Get(
-		key,
+		KitesPrefix+key,
 		false, // sorting flag, we don't care about sorting for now
 		true,  // recursive, return all child directories too
 	)
@@ -360,7 +354,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, k.privateKey)
+	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, key, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +383,7 @@ func flatten(in etcd.Nodes) (out etcd.Nodes) {
 	return
 }
 
-func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*protocol.KiteWithToken, error) {
+func addTokenToKites(nodes etcd.Nodes, username, issuer, queryKey, privateKey string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
@@ -398,7 +392,7 @@ func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*
 			return nil, err
 		}
 
-		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, privateKey)
+		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, queryKey, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -407,8 +401,8 @@ func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*
 	return kitesWithToken, nil
 }
 
-func addTokenToKite(kite *protocol.Kite, username, issuer, privateKey string) (*protocol.KiteWithToken, error) {
-	tkn, err := generateToken(kite, username, issuer, privateKey)
+func addTokenToKite(kite *protocol.Kite, username, issuer, queryKey, privateKey string) (*protocol.KiteWithToken, error) {
+	tkn, err := generateToken(queryKey, username, issuer, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +415,7 @@ func addTokenToKite(kite *protocol.Kite, username, issuer, privateKey string) (*
 
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(kite *protocol.Kite, username, issuer, privateKey string) (string, error) {
+func generateToken(queryKey string, username, issuer, privateKey string) (string, error) {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
@@ -438,7 +432,7 @@ func generateToken(kite *protocol.Kite, username, issuer, privateKey string) (st
 	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
 	tkn.Claims["iss"] = issuer                                       // Issuer
 	tkn.Claims["sub"] = username                                     // Subject
-	tkn.Claims["aud"] = kite.ID                                      // Audience
+	tkn.Claims["aud"] = queryKey                                     // Audience
 	tkn.Claims["exp"] = time.Now().UTC().Add(ttl).Add(leeway).Unix() // Expiration Time
 	tkn.Claims["nbf"] = time.Now().UTC().Add(-leeway).Unix()         // Not Before
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
@@ -524,22 +518,22 @@ func (k *Kontrol) WatchEtcd() {
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
-	var kite *protocol.Kite
-	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&kite)
+	var query protocol.KontrolQuery
+	err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid Kite")
 	}
 
-	if !canAccess(r.RemoteKite.Kite, *kite) {
+	if !canAccess(r.RemoteKite.Kite, query) {
 		return nil, errors.New("Forbidden")
 	}
 
-	kiteKey, err := getKiteKey(kite)
+	kiteKey, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := k.etcd.Get(kiteKey, false, false)
+	resp, err := k.etcd.Get(KitesPrefix+kiteKey, false, false)
 	if err != nil {
 		if etcdErr, ok := err.(*etcd.EtcdError); ok && etcdErr.ErrorCode == 100 {
 			return nil, errors.New("Kite not found")
@@ -553,19 +547,14 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kite, r.Username, k.kite.Username, k.privateKey)
+	return generateToken(kiteKey, r.Username, k.kite.Username, k.privateKey)
 }
 
 // canAccess makes some access control checks and returns true
-// if fromKite can talk with toKite.
-func canAccess(fromKite protocol.Kite, toKite protocol.Kite) bool {
-	// Do not allow other users if kite is private.
-	if fromKite.Username != toKite.Username && toKite.Visibility == protocol.Private {
-		return false
-	}
-
+// if k can access to kites matching the query.
+func canAccess(k protocol.Kite, query protocol.KontrolQuery) bool {
 	// Prevent access to development/staging kites if the requester is not owner.
-	if fromKite.Username != toKite.Username && toKite.Environment != "production" {
+	if k.Username != query.Username && query.Environment != "production" {
 		return false
 	}
 

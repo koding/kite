@@ -3,7 +3,6 @@ package kite
 import (
 	"encoding/json"
 	"io/ioutil"
-	"kite/protocol"
 	"log"
 	"strings"
 )
@@ -17,10 +16,9 @@ type Options struct {
 	Region      string
 
 	// Optional fields
-	PublicIP   string              // default: 0.0.0.0
-	Port       string              // default: random
-	Path       string              // default: /<kitename>
-	Visibility protocol.Visibility // default: protocol.Private
+	PublicIP string // default: 0.0.0.0
+	Port     string // default: random
+	Path     string // default: /<kitename>
 
 	// Do not authenticate incoming requests
 	DisableAuthentication bool
@@ -58,10 +56,6 @@ func (o *Options) validate() {
 
 	if o.Path[0] != '/' {
 		o.Path = "/" + o.Path
-	}
-
-	if o.Visibility == protocol.Visibility("") {
-		o.Visibility = protocol.Private
 	}
 }
 

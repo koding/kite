@@ -8,6 +8,7 @@ import (
 	"kite/kitekey"
 	"reflect"
 	"runtime/debug"
+	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 )
@@ -251,8 +252,8 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return errors.New("Invalid signature in token")
 	}
 
-	if audience, ok := token.Claims["aud"].(string); !ok || audience != k.ID {
-		return errors.New("Invalid audience in token")
+	if audience, ok := token.Claims["aud"].(string); !ok || !strings.HasPrefix(k.Kite.Key(), audience) {
+		return fmt.Errorf("Invalid audience in token: %s", audience)
 	}
 
 	// We don't check for exp and nbf claims here because jwt-go package already checks them.
