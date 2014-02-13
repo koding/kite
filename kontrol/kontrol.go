@@ -294,7 +294,7 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 
 	path = strings.TrimSuffix(path, "/")
 
-	return KitesPrefix + path, nil
+	return path, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
@@ -344,7 +344,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	// Get kites from etcd
 	resp, err := k.etcd.Get(
-		key,
+		KitesPrefix+key,
 		false, // sorting flag, we don't care about sorting for now
 		true,  // recursive, return all child directories too
 	)
@@ -360,7 +360,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, k.privateKey)
+	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, key, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func flatten(in etcd.Nodes) (out etcd.Nodes) {
 	return
 }
 
-func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*protocol.KiteWithToken, error) {
+func addTokenToKites(nodes etcd.Nodes, username, issuer, queryKey, privateKey string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
@@ -398,7 +398,7 @@ func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*
 			return nil, err
 		}
 
-		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, privateKey)
+		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, queryKey, privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -407,8 +407,8 @@ func addTokenToKites(nodes etcd.Nodes, username, issuer, privateKey string) ([]*
 	return kitesWithToken, nil
 }
 
-func addTokenToKite(kite *protocol.Kite, username, issuer, privateKey string) (*protocol.KiteWithToken, error) {
-	tkn, err := generateToken(kite, username, issuer, privateKey)
+func addTokenToKite(kite *protocol.Kite, username, issuer, queryKey, privateKey string) (*protocol.KiteWithToken, error) {
+	tkn, err := generateToken(queryKey, username, issuer, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ func addTokenToKite(kite *protocol.Kite, username, issuer, privateKey string) (*
 
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(kite *protocol.Kite, username, issuer, privateKey string) (string, error) {
+func generateToken(queryKey string, username, issuer, privateKey string) (string, error) {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
@@ -438,7 +438,7 @@ func generateToken(kite *protocol.Kite, username, issuer, privateKey string) (st
 	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
 	tkn.Claims["iss"] = issuer                                       // Issuer
 	tkn.Claims["sub"] = username                                     // Subject
-	tkn.Claims["aud"] = kite.ID                                      // Audience
+	tkn.Claims["aud"] = queryKey                                     // Audience
 	tkn.Claims["exp"] = time.Now().UTC().Add(ttl).Add(leeway).Unix() // Expiration Time
 	tkn.Claims["nbf"] = time.Now().UTC().Add(-leeway).Unix()         // Not Before
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
@@ -553,7 +553,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kite, r.Username, k.kite.Username, k.privateKey)
+	return generateToken(kiteKey, r.Username, k.kite.Username, k.privateKey)
 }
 
 // canAccess makes some access control checks and returns true

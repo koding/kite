@@ -40,6 +40,10 @@ type Kite struct {
 	URL *KiteURL `json:"url" dnode:"-"`
 }
 
+func (k *Kite) Key() string {
+	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+}
+
 type Visibility string
 
 const (

@@ -135,7 +135,7 @@ func TestGetQueryKey(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if key != "/kites/cenk/production" {
+	if key != "/cenk/production" {
 		t.Errorf("Unexpected key: %s", key)
 	}
 
