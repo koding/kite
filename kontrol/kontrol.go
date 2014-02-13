@@ -10,6 +10,7 @@ import (
 	"kite/dnode"
 	"kite/logging"
 	"kite/protocol"
+	"math/rand"
 	"net"
 	"strings"
 	"time"
@@ -86,6 +87,7 @@ func (k *Kontrol) Start() {
 
 // init does common operations of Run() and Start().
 func (k *Kontrol) init() {
+	rand.Seed(time.Now().UnixNano())
 	go k.WatchEtcd()
 	go k.registerSelf()
 }
@@ -337,6 +339,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		k.watcherHub.RegisterWatcher(r.RemoteKite, &query, watchCallback)
 	}
 
+	// Get kites from etcd
 	resp, err := k.etcd.Get(
 		key,
 		false, // sorting flag, we don't care about sorting for now
@@ -353,7 +356,20 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 
-	return addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, k.privateKey)
+	// Attach tokens to kites
+	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, k.privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Shuffle the list
+	shuffled := make([]*protocol.KiteWithToken, len(kitesAndTokens))
+	perm := rand.Perm(len(kitesAndTokens))
+	for i, v := range perm {
+		shuffled[v] = kitesAndTokens[i]
+	}
+
+	return shuffled, nil
 }
 
 // flatten converts the recursive etcd directory structure to flat one that contains Kites.
