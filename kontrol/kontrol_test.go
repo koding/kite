@@ -12,7 +12,6 @@ import (
 
 func TestKontrol(t *testing.T) {
 	testutil.WriteKiteKey()
-	testutil.ClearEtcd()
 
 	opts := &kite.Options{
 		Kitename:    "kontrol",
@@ -25,6 +24,7 @@ func TestKontrol(t *testing.T) {
 	}
 	kon := New(opts, nil, testkeys.Public, testkeys.Private)
 	kon.Start()
+	kon.ClearKites()
 
 	mathKite := mathWorker()
 	mathKite.Start()

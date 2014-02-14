@@ -3,14 +3,11 @@
 package testutil
 
 import (
-	"fmt"
 	"kite/kitekey"
 	"kite/testkeys"
-	"log"
 	"os"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
 )
@@ -49,13 +46,5 @@ func WriteKiteKey() {
 	err = kitekey.Write(key)
 	if err != nil {
 		panic(err)
-	}
-}
-
-func ClearEtcd() {
-	etcdClient := etcd.NewClient(nil)
-	_, err := etcdClient.Delete("/kites", true)
-	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
-		log.Fatalf(fmt.Errorf("Cannot clear etcd: %s", err).Error())
 	}
 }

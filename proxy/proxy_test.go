@@ -13,7 +13,6 @@ import (
 
 func setupTest() {
 	testutil.WriteKiteKey()
-	testutil.ClearEtcd()
 }
 
 func TestTLSKite(t *testing.T) {
@@ -30,6 +29,7 @@ func TestTLSKite(t *testing.T) {
 	}
 	kon := kontrol.New(opts, nil, testkeys.Public, testkeys.Private)
 	kon.Start()
+	kon.ClearKites()
 
 	// Kontrol is ready.
 

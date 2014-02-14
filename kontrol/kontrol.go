@@ -92,6 +92,15 @@ func (k *Kontrol) init() {
 	go k.registerSelf()
 }
 
+// ClearKites removes everything under "/kites" from etcd.
+func (k *Kontrol) ClearKites() error {
+	_, err := k.etcd.Delete(KitesPrefix, true)
+	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
+		return fmt.Errorf("Cannot clear etcd: %s", err)
+	}
+	return nil
+}
+
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
 	URL protocol.KiteURL
@@ -179,7 +188,7 @@ func (k *Kontrol) registerSelf() {
 	setter := k.makeSetter(&k.kite.Kite, key)
 	for {
 		if err := setter(); err != nil {
-			log.Critical(err.Error())
+			log.Error(err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -209,7 +218,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
 		_, err = k.etcd.UpdateDir(KitesPrefix+"/"+kite.Username, ttl)
 		if err != nil {
-			log.Critical("etcd error: %s", err)
+			log.Error("etcd error: %s", err)
 			return err
 		}
 
