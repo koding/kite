@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	etcdErr "github.com/coreos/etcd/error"
-	"github.com/coreos/etcd/store"
 	"kite"
 	"kite/dnode"
 	"kite/logging"
@@ -17,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	etcdErr "github.com/coreos/etcd/error"
+	"github.com/coreos/etcd/store"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
 )
