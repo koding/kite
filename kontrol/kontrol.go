@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	HeartbeatInterval = 1 * time.Minute
-	HeartbeatDelay    = 2 * time.Minute
+	HeartbeatInterval = 5 * time.Second
+	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
 	TokenTTL          = 1 * time.Hour
 	TokenLeeway       = 1 * time.Minute
