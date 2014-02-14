@@ -37,7 +37,7 @@ import (
 )
 
 // This function is copied and modified from github.com/coreos/etcd/main.go file.
-func runEtcd(ready chan bool) {
+func (k *Kontrol) runEtcd(ready chan bool) {
 	// Load configuration.
 	var config = config.New()
 
@@ -107,8 +107,8 @@ func runEtcd(ready chan bool) {
 	}
 
 	// Create etcd key-value store and registry.
-	store := store.New()
-	registry := server.NewRegistry(store)
+	k.store = store.New()
+	registry := server.NewRegistry(k.store)
 
 	// Create stats objects
 	followersStats := server.NewRaftFollowersStats(config.Name)
@@ -130,9 +130,9 @@ func runEtcd(ready chan bool) {
 		RetryTimes:     config.MaxRetryAttempts,
 		RetryInterval:  config.RetryInterval,
 	}
-	ps := server.NewPeerServer(psConfig, registry, store, &mb, followersStats, serverStats)
+	ps := server.NewPeerServer(psConfig, registry, k.store, &mb, followersStats, serverStats)
 
-	var psListener net.Listener
+	var psListener net.Listener = k.psListener
 	if psConfig.Scheme == "https" {
 		peerServerTLSConfig, err := config.PeerTLSInfo().ServerConfig()
 		if err != nil {
@@ -159,7 +159,7 @@ func runEtcd(ready chan bool) {
 		}
 		raftTransporter.SetTLSConfig(*raftClientTLSConfig)
 	}
-	raftServer, err := raft.NewServer(config.Name, config.DataDir, raftTransporter, store, ps, "")
+	raftServer, err := raft.NewServer(config.Name, config.DataDir, raftTransporter, k.store, ps, "")
 	if err != nil {
 		elog.Fatal(err)
 	}
@@ -168,13 +168,13 @@ func runEtcd(ready chan bool) {
 	ps.SetRaftServer(raftServer)
 
 	// Create etcd server
-	s := server.New(config.Name, config.Addr, ps, registry, store, &mb)
+	s := server.New(config.Name, config.Addr, ps, registry, k.store, &mb)
 
 	if config.Trace() {
 		s.EnableTracing()
 	}
 
-	var sListener net.Listener
+	var sListener net.Listener = k.sListener
 	if config.EtcdTLSInfo().Scheme() == "https" {
 		etcdServerTLSConfig, err := config.EtcdTLSInfo().ServerConfig()
 		if err != nil {

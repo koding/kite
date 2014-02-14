@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	etcdErr "github.com/coreos/etcd/error"
+	"github.com/coreos/etcd/store"
 	"kite"
 	"kite/dnode"
 	"kite/logging"
@@ -15,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
 )
@@ -32,7 +33,9 @@ var log logging.Logger
 
 type Kontrol struct {
 	kite       *kite.Kite
-	etcd       *etcd.Client
+	store      store.Store
+	psListener net.Listener
+	sListener  net.Listener
 	watcherHub *watcherHub
 	publicKey  string
 	privateKey string
@@ -50,7 +53,6 @@ type Kontrol struct {
 func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
-		etcd:       etcd.NewClient(etcdServers),
 		watcherHub: newWatcherHub(),
 		publicKey:  publicKey,
 		privateKey: privateKey,
@@ -91,7 +93,7 @@ func (k *Kontrol) init() {
 
 	// Run etcd
 	etcdReady := make(chan bool)
-	go runEtcd(etcdReady)
+	go k.runEtcd(etcdReady)
 	<-etcdReady
 
 	go k.WatchEtcd()
@@ -100,8 +102,8 @@ func (k *Kontrol) init() {
 
 // ClearKites removes everything under "/kites" from etcd.
 func (k *Kontrol) ClearKites() error {
-	_, err := k.etcd.Delete(KitesPrefix, true)
-	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 { // Key Not Found
+	_, err := k.store.Delete(KitesPrefix, true, true)
+	if err != nil && err.(*etcdErr.Error).ErrorCode != etcdErr.EcodeKeyNotFound {
 		return fmt.Errorf("Cannot clear etcd: %s", err)
 	}
 	return nil
@@ -166,7 +168,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.etcd.Delete(kiteKey, false)
+		k.store.Delete(kiteKey, false, false)
 	})
 
 	// send response back to the kite, also identify him with the new name
@@ -211,18 +213,17 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 
 	valueBytes, _ := json.Marshal(rv)
 	value := string(valueBytes)
-
-	ttl := uint64(HeartbeatDelay / time.Second)
+	expireAt := time.Now().Add(HeartbeatDelay)
 
 	return func() error {
-		_, err := k.etcd.Set(etcdKey, value, ttl)
+		_, err := k.store.Set(etcdKey, false, value, expireAt)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
 			return err
 		}
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.etcd.UpdateDir(KitesPrefix+"/"+kite.Username, ttl)
+		_, err = k.store.Update(KitesPrefix+"/"+kite.Username, "", expireAt)
 		if err != nil {
 			log.Error("etcd error: %s", err)
 			return err
@@ -352,16 +353,14 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Get kites from etcd
-	resp, err := k.etcd.Get(
+	event, err := k.store.Get(
 		KitesPrefix+key,
-		false, // sorting flag, we don't care about sorting for now
 		true,  // recursive, return all child directories too
+		false, // sorting flag, we don't care about sorting for now
 	)
 	if err != nil {
-		if etcdErr, ok := err.(*etcd.EtcdError); ok {
-			if etcdErr.ErrorCode == 100 { // Key Not Found
-				return make([]*protocol.KiteWithToken, 0), nil
-			}
+		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
+			return make([]*protocol.KiteWithToken, 0), nil
 		}
 
 		log.Critical("etcd error: %s", err)
@@ -369,7 +368,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(resp.Node.Nodes), r.Username, k.kite.Username, key, k.privateKey)
+	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.kite.Username, key, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +384,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 }
 
 // flatten converts the recursive etcd directory structure to flat one that contains Kites.
-func flatten(in etcd.Nodes) (out etcd.Nodes) {
+func flatten(in store.NodeExterns) (out store.NodeExterns) {
 	for _, node := range in {
 		if node.Dir {
 			out = append(out, flatten(node.Nodes)...)
@@ -398,7 +397,7 @@ func flatten(in etcd.Nodes) (out etcd.Nodes) {
 	return
 }
 
-func addTokenToKites(nodes etcd.Nodes, username, issuer, queryKey, privateKey string) ([]*protocol.KiteWithToken, error) {
+func addTokenToKites(nodes store.NodeExterns, username, issuer, queryKey, privateKey string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
@@ -489,11 +488,12 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 // WatchEtcd watches all Kite changes on etcd cluster
 // and notifies registered watchers on this Kontrol instance.
 func (k *Kontrol) WatchEtcd() {
-	var resp *etcd.Response
+	var event *store.Event
 	var err error
 
+	// Get the latest index
 	for {
-		resp, err = k.etcd.Set("/_kontrol_get_index", "OK", 1)
+		event, err = k.store.Set("/_kontrol_get_index", false, "OK", time.Now().Add(1*time.Second))
 		if err == nil {
 			break
 		}
@@ -502,34 +502,29 @@ func (k *Kontrol) WatchEtcd() {
 		time.Sleep(time.Second)
 	}
 
-	index := resp.Node.ModifiedIndex
+	index := event.Node.ModifiedIndex
 	log.Info("etcd: index = %d", index)
 
-	receiver := make(chan *etcd.Response)
-
+	// Watch all changes under KitesPrefix
 	go func() {
-		for {
-			_, err := k.etcd.Watch(KitesPrefix, index+1, true, receiver, nil)
-			if err != nil {
-				log.Critical("etcd error 2: %s", err)
-				time.Sleep(time.Second)
+		watcher, err := k.store.Watch(KitesPrefix, true, true, index+1)
+		if err != nil {
+			log.Fatal("etcd error: cannot watch kite changes: %s", err.Error())
+		}
+
+		for event := range watcher.EventChan {
+			// log.Debug("etcd: change received: %#v", event)
+			index = event.Node.ModifiedIndex
+
+			// Notify deregistration events.
+			if strings.HasPrefix(event.Node.Key, KitesPrefix) && (event.Action == store.Delete || event.Action == store.Expire) {
+				kite, err := kiteFromEtcdKV(event.Node.Key, event.Node.Value)
+				if err == nil {
+					k.watcherHub.Notify(kite, protocol.Deregister, k.kite.Username, k.privateKey)
+				}
 			}
 		}
 	}()
-
-	// Channel is never closed.
-	for resp := range receiver {
-		// log.Debug("etcd: change received: %#v", resp)
-		index = resp.Node.ModifiedIndex
-
-		// Notify deregistration events.
-		if strings.HasPrefix(resp.Node.Key, KitesPrefix) && (resp.Action == "delete" || resp.Action == "expire") {
-			kite, err := kiteFromEtcdKV(resp.Node.Key, resp.Node.Value)
-			if err == nil {
-				k.watcherHub.Notify(kite, protocol.Deregister, k.kite.Username, k.privateKey)
-			}
-		}
-	}
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
@@ -548,16 +543,16 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	resp, err := k.etcd.Get(KitesPrefix+kiteKey, false, false)
+	event, err := k.store.Get(KitesPrefix+kiteKey, false, false)
 	if err != nil {
-		if etcdErr, ok := err.(*etcd.EtcdError); ok && etcdErr.ErrorCode == 100 {
+		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return nil, errors.New("Kite not found")
 		}
 		return nil, err
 	}
 
 	var kiteVal registerValue
-	err = json.Unmarshal([]byte(resp.Node.Value), &kiteVal)
+	err = json.Unmarshal([]byte(event.Node.Value), &kiteVal)
 	if err != nil {
 		return nil, err
 	}
