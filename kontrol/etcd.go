@@ -36,6 +36,7 @@ import (
 	"github.com/coreos/etcd/store"
 )
 
+// This function is copied and modified from github.com/coreos/etcd/main.go file.
 func runEtcd(ready chan bool) {
 	// Load configuration.
 	var config = config.New()
