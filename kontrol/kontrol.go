@@ -88,6 +88,12 @@ func (k *Kontrol) Start() {
 // init does common operations of Run() and Start().
 func (k *Kontrol) init() {
 	rand.Seed(time.Now().UnixNano())
+
+	// Run etcd
+	etcdReady := make(chan bool)
+	go runEtcd(etcdReady)
+	<-etcdReady
+
 	go k.WatchEtcd()
 	go k.registerSelf()
 }
