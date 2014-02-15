@@ -488,35 +488,19 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 // WatchEtcd watches all Kite changes on etcd cluster
 // and notifies registered watchers on this Kontrol instance.
 func (k *Kontrol) WatchEtcd() {
-	var event *store.Event
-	var err error
-
-	// Get the latest index
+	var index uint64 = 0
 	for {
-		event, err = k.store.Set("/_kontrol_get_index", false, "OK", time.Now().Add(1*time.Second))
-		if err == nil {
-			break
-		}
-
-		log.Critical("etcd error 1: %s", err.Error())
-		time.Sleep(time.Second)
-	}
-
-	index := event.Node.ModifiedIndex
-	log.Info("etcd: index = %d", index)
-
-	// Watch all changes under KitesPrefix
-	go func() {
-		watcher, err := k.store.Watch(KitesPrefix, true, true, index+1)
+		// Watch all changes under KitesPrefix
+		watcher, err := k.store.Watch(KitesPrefix, true, true, index)
 		if err != nil {
+			// This may happen when the log position is behind leader too much.
+			// TODO Test this case and handle it properly.
 			log.Fatal("etcd error: cannot watch kite changes: %s", err.Error())
 		}
 
+		// Notify deregistration events.
 		for event := range watcher.EventChan {
-			// log.Debug("etcd: change received: %#v", event)
 			index = event.Node.ModifiedIndex
-
-			// Notify deregistration events.
 			if strings.HasPrefix(event.Node.Key, KitesPrefix) && (event.Action == store.Delete || event.Action == store.Expire) {
 				kite, err := kiteFromEtcdKV(event.Node.Key, event.Node.Value)
 				if err == nil {
@@ -524,7 +508,7 @@ func (k *Kontrol) WatchEtcd() {
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
