@@ -213,9 +213,11 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 
 	valueBytes, _ := json.Marshal(rv)
 	value := string(valueBytes)
-	expireAt := time.Now().Add(HeartbeatDelay)
 
 	return func() error {
+		expireAt := time.Now().Add(HeartbeatDelay)
+
+		// Set the kite
 		_, err := k.store.Set(etcdKey, false, value, expireAt)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
