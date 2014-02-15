@@ -36,7 +36,6 @@ type Kontrol struct {
 	store      store.Store
 	psListener net.Listener
 	sListener  net.Listener
-	watcherHub *watcherHub
 	publicKey  string
 	privateKey string
 }
@@ -53,7 +52,6 @@ type Kontrol struct {
 func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
-		watcherHub: newWatcherHub(),
 		publicKey:  publicKey,
 		privateKey: privateKey,
 	}
@@ -96,7 +94,6 @@ func (k *Kontrol) init() {
 	go k.runEtcd(etcdReady)
 	<-etcdReady
 
-	go k.WatchEtcd()
 	go k.registerSelf()
 }
 
@@ -163,7 +160,6 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	}
 
 	log.Info("Kite registered: %s", kiteKey)
-	k.watcherHub.Notify(kite, protocol.Register, k.kite.Username, k.privateKey)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -349,9 +345,21 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	// Register callbacks to our watcher hub.
 	// It will call them when a Kite registered/unregistered matching the query.
+	// Regsitering watcher should be done before making etcd.Get().
 	if watchCallback != nil {
-		// Regsitering watcher should be done before making etcd.Get().
-		k.watcherHub.RegisterWatcher(r.RemoteKite, &query, watchCallback)
+		watcher, err := k.store.Watch(KitesPrefix+key, true, true, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Stop watching on disconnect.
+		disconnect := make(chan bool)
+		r.RemoteKite.OnDisconnect(func() {
+			close(disconnect)
+			watcher.Remove()
+		})
+
+		go k.watchAndSendKiteEvents(watcher, disconnect, &query, watchCallback)
 	}
 
 	// Get kites from etcd
@@ -383,6 +391,78 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	return shuffled, nil
+}
+
+func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan bool, query *protocol.KontrolQuery, callback dnode.Function) {
+	var index uint64 = 0
+	for {
+		var kiteEvent kite.Event
+
+		select {
+		case <-disconnect:
+			return
+		case etcdEvent, ok := <-watcher.EventChan:
+			index = etcdEvent.Node.ModifiedIndex
+
+			// If EventChan is closed then eiter we couldn't consume
+			// messages on time or the remote kite is disconnected
+			// and the watcher is removed.
+			if !ok {
+				// Do not burn CPU until OnDisconnect handler is called
+				// if the reason of cancel is disconnect.
+				time.Sleep(time.Second)
+
+				// If the watcher is cancelled because we don't consume at
+				// enough rate, then we are going to try to re-watch the same key.
+				key, _ := getQueryKey(query) // can't fail
+				var err error
+				watcher, err = k.store.Watch(KitesPrefix+key, true, true, index)
+				if err != nil {
+					log.Warning("Cannot re-watch query: %s", err.Error())
+					return // TODO find a way to tell the error to the kite
+				}
+
+				continue
+			}
+
+			switch etcdEvent.Action {
+			case store.Set:
+				// Do not send Register events for heartbeat messages.
+				// PrevNode must be empty if the kite has registered for the first time.
+				if etcdEvent.PrevNode != nil {
+					continue
+				}
+
+				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key, etcdEvent.Node.Value)
+				if err != nil {
+					continue
+				}
+
+				kiteEvent.Action = protocol.Register
+				kiteEvent.Kite = *otherKite
+
+				kiteEvent.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.kite.Username, k.privateKey)
+				if err != nil {
+					log.Error("watch notify: %s", err)
+					return
+				}
+			case store.Delete: // Delete happens when we detect that otherKite is disconnected.
+				fallthrough
+			case store.Expire: // Expire happens when we don't get heartbeat from otherKite.
+				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key, etcdEvent.Node.Value)
+				if err != nil {
+					continue
+				}
+
+				kiteEvent.Action = protocol.Deregister
+				kiteEvent.Kite = *otherKite
+			default:
+				continue // We don't care other events
+			}
+
+			callback(kiteEvent)
+		}
+	}
 }
 
 // flatten converts the recursive etcd directory structure to flat one that contains Kites.
@@ -485,32 +565,6 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 	kite.URL = &rv.URL
 
 	return kite, nil
-}
-
-// WatchEtcd watches all Kite changes on etcd cluster
-// and notifies registered watchers on this Kontrol instance.
-func (k *Kontrol) WatchEtcd() {
-	var index uint64 = 0
-	for {
-		// Watch all changes under KitesPrefix
-		watcher, err := k.store.Watch(KitesPrefix, true, true, index)
-		if err != nil {
-			// This may happen when the log position is behind leader too much.
-			// TODO Test this case and handle it properly.
-			log.Fatal("etcd error: cannot watch kite changes: %s", err.Error())
-		}
-
-		// Notify deregistration events.
-		for event := range watcher.EventChan {
-			index = event.Node.ModifiedIndex
-			if strings.HasPrefix(event.Node.Key, KitesPrefix) && (event.Action == store.Delete || event.Action == store.Expire) {
-				kite, err := kiteFromEtcdKV(event.Node.Key, event.Node.Value)
-				if err == nil {
-					k.watcherHub.Notify(kite, protocol.Deregister, k.kite.Username, k.privateKey)
-				}
-			}
-		}
-	}
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
