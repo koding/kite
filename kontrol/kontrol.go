@@ -603,10 +603,5 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 // canAccess makes some access control checks and returns true
 // if k can access to kites matching the query.
 func canAccess(k protocol.Kite, query protocol.KontrolQuery) bool {
-	// Prevent access to development/staging kites if the requester is not owner.
-	if k.Username != query.Username && query.Environment != "production" {
-		return false
-	}
-
 	return true
 }
