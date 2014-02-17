@@ -409,22 +409,27 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 }
 
 // sendCallbackID send the callback number to be deleted after response is received.
-func sendCallbackID(callbacks map[string]dnode.Path, ch chan uint64) {
-	// TODO now, it is not the max id that is response callback.
-	if len(callbacks) > 0 {
-		// Find max callback ID.
-		max := uint64(0)
-		for id, _ := range callbacks {
-			i, _ := strconv.ParseUint(id, 10, 64)
-			if i > max {
-				max = i
-			}
+func sendCallbackID(callbacks map[string]dnode.Path, ch chan<- uint64) {
+	for id, path := range callbacks {
+		if len(path) != 2 {
+			continue
 		}
-
-		ch <- max
-	} else {
-		close(ch)
+		p0, ok := path[0].(string)
+		if !ok {
+			continue
+		}
+		p1, ok := path[1].(string)
+		if !ok {
+			continue
+		}
+		if p0 != "0" || p1 != "responseCallback" {
+			continue
+		}
+		i, _ := strconv.ParseUint(id, 10, 64)
+		ch <- i
+		return
 	}
+	close(ch)
 }
 
 // makeResponseCallback prepares and returns a callback function sent to the server.
