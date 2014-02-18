@@ -38,7 +38,7 @@ func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM 
 		urls:    make(map[string]*kite.RemoteKite),
 	}
 
-	proxyKite.kite.HandleFunc("register", proxyKite.register)
+	proxyKite.kite.HandleFunc("register", proxyKite.handleRegister)
 
 	// Remove URL from the map when Kite disconnects.
 	proxyKite.kite.OnDisconnect(func(r *kite.RemoteKite) { delete(proxyKite.urls, r.Kite.ID) })
@@ -82,7 +82,7 @@ func (t *Proxy) startHTTPSServer() {
 	}()
 }
 
-func (t *Proxy) register(r *kite.Request) (interface{}, error) {
+func (t *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	t.urls[r.RemoteKite.Kite.ID] = r.RemoteKite
 
 	proxyURL := url.URL{
