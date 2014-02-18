@@ -26,7 +26,6 @@ import (
 
 	"github.com/coreos/etcd/config"
 	ehttp "github.com/coreos/etcd/http"
-	elog "github.com/coreos/etcd/log"
 	"github.com/coreos/etcd/metrics"
 	"github.com/coreos/etcd/server"
 	"github.com/coreos/etcd/store"
@@ -58,18 +57,18 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+3001)
 
 	if config.DataDir == "" {
-		elog.Fatal("The data dir was not set and could not be guessed from machine name")
+		log.Fatal("The data dir was not set and could not be guessed from machine name")
 	}
 
 	// Create data directory if it doesn't already exist.
 	if err := os.MkdirAll(config.DataDir, 0744); err != nil {
-		elog.Fatalf("Unable to create path: %s", err)
+		log.Fatal("Unable to create path: %s", err)
 	}
 
 	// Warn people if they have an info file
 	info := filepath.Join(config.DataDir, "info")
 	if _, err := os.Stat(info); err == nil {
-		elog.Warnf("All cached configuration is now ignored. The file %s can be removed.", info)
+		log.Warning("All cached configuration is now ignored. The file %s can be removed.", info)
 	}
 
 	var mbName string
@@ -79,7 +78,7 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	// Retrieve CORS configuration
 	corsInfo, err := ehttp.NewCORSInfo(config.CorsOrigins)
 	if err != nil {
-		elog.Fatal("CORS:", err)
+		log.Fatal("CORS:", err)
 	}
 
 	// Create etcd key-value store and registry.
@@ -112,17 +111,17 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	if psConfig.Scheme == "https" {
 		peerServerTLSConfig, err := config.PeerTLSInfo().ServerConfig()
 		if err != nil {
-			elog.Fatal("peer server TLS error: ", err)
+			log.Fatal("peer server TLS error: ", err)
 		}
 
 		psListener, err = server.NewTLSListener(config.Peer.BindAddr, peerServerTLSConfig)
 		if err != nil {
-			elog.Fatal("Failed to create peer listener: ", err)
+			log.Fatal("Failed to create peer listener: ", err)
 		}
 	} else {
 		psListener, err = server.NewListener(config.Peer.BindAddr)
 		if err != nil {
-			elog.Fatal("Failed to create peer listener: ", err)
+			log.Fatal("Failed to create peer listener: ", err)
 		}
 	}
 
@@ -131,13 +130,13 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	if psConfig.Scheme == "https" {
 		raftClientTLSConfig, err := config.PeerTLSInfo().ClientConfig()
 		if err != nil {
-			elog.Fatal("raft client TLS error: ", err)
+			log.Fatal("raft client TLS error: ", err)
 		}
 		raftTransporter.SetTLSConfig(*raftClientTLSConfig)
 	}
 	raftServer, err := raft.NewServer(config.Name, config.DataDir, raftTransporter, k.store, ps, "")
 	if err != nil {
-		elog.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	raftServer.SetElectionTimeout(electionTimeout)
 	raftServer.SetHeartbeatInterval(heartbeatTimeout)
@@ -150,17 +149,17 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	if config.EtcdTLSInfo().Scheme() == "https" {
 		etcdServerTLSConfig, err := config.EtcdTLSInfo().ServerConfig()
 		if err != nil {
-			elog.Fatal("etcd TLS error: ", err)
+			log.Fatal("etcd TLS error: ", err)
 		}
 
 		sListener, err = server.NewTLSListener(config.BindAddr, etcdServerTLSConfig)
 		if err != nil {
-			elog.Fatal("Failed to create TLS etcd listener: ", err)
+			log.Fatal("Failed to create TLS etcd listener: ", err)
 		}
 	} else {
 		sListener, err = server.NewListener(config.BindAddr)
 		if err != nil {
-			elog.Fatal("Failed to create etcd listener: ", err)
+			log.Fatal("Failed to create etcd listener: ", err)
 		}
 	}
 
@@ -168,14 +167,20 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	ps.Start(config.Snapshot, config.Peers)
 
 	go func() {
-		elog.Infof("peer server [name %s, listen on %s, advertised url %s]", ps.Config.Name, psListener.Addr(), ps.Config.URL)
+		log.Info("peer server [name %s, listen on %s, advertised url %s]", ps.Config.Name, psListener.Addr(), ps.Config.URL)
 		sHTTP := &ehttp.CORSHandler{ps.HTTPHandler(), corsInfo}
-		elog.Fatal(http.Serve(psListener, sHTTP))
+		if err := http.Serve(psListener, sHTTP); err != nil {
+			log.Fatal(err.Error())
+		}
 	}()
 
-	elog.Infof("etcd server [name %s, listen on %s, advertised url %s]", s.Name, sListener.Addr(), s.URL())
+	log.Info("etcd server [name %s, listen on %s, advertised url %s]", s.Name, sListener.Addr(), s.URL())
 	sHTTP := &ehttp.CORSHandler{s.HTTPHandler(), corsInfo}
-	go func() { elog.Fatal(http.Serve(sListener, sHTTP)) }()
+	go func() {
+		if err := http.Serve(sListener, sHTTP); err != nil {
+			log.Fatal(err.Error())
+		}
+	}()
 
 	close(ready)
 }
