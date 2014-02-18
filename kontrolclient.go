@@ -122,24 +122,44 @@ func (k *Kontrol) Register() error {
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
-func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event)) error {
+func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event, error)) (watcherID string, err error) {
 	<-k.ready
 
 	queueEvents := func(r *Request) {
-		event := Event{localKite: k.localKite}
-		err := r.Args.MustSliceOfLength(1)[0].Unmarshal(&event)
-		if err != nil {
-			k.Log.Error(err.Error())
-			return
+		args := r.Args.MustSliceOfLength(2)
+
+		var returnEvent *Event
+		var returnError error
+
+		// Unmarshal event argument
+		if args[0] != nil {
+			var event = Event{localKite: k.localKite}
+			err := args[0].Unmarshal(&event)
+			if err != nil {
+				k.Log.Error(err.Error())
+				return
+			}
+			returnEvent = &event
 		}
 
-		onEvent(&event)
+		// Unmarshal error argument
+		if args[1] != nil {
+			var kiteErr Error
+			err = args[1].Unmarshal(&kiteErr)
+			if err != nil {
+				k.Log.Error(err.Error())
+				return
+			}
+			returnError = &kiteErr
+		}
+
+		onEvent(returnEvent, returnError)
 	}
 
 	args := []interface{}{query, Callback(queueEvents)}
-	remoteKites, err := k.getKites(args...)
+	remoteKites, watcherID, err := k.getKites(args...)
 	if err != nil && err != ErrNoKitesAvailable {
-		return err // return only when something really happened
+		return "", err // return only when something really happened
 	}
 
 	// also put the current kites to the eventChan.
@@ -153,10 +173,16 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event)) 
 			localKite: k.localKite,
 		}
 
-		onEvent(&event)
+		onEvent(&event, nil)
 	}
 
-	return nil
+	return watcherID, nil
+}
+
+func (k *Kontrol) CancelWatch(id string) error {
+	<-k.ready
+	_, err := k.RemoteKite.Tell("cancelWatcher", id)
+	return err
 }
 
 // GetKites returns the list of Kites matching the query. The returned list
@@ -164,33 +190,38 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event)) 
 // with RemoteKite.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
-	return k.getKites(query)
+	remoteKites, _, err := k.getKites(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(remoteKites) == 0 {
+		return nil, ErrNoKitesAvailable
+	}
+
+	return remoteKites, nil
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
+func (k *Kontrol) getKites(args ...interface{}) (kites []*RemoteKite, watcherID string, err error) {
 	<-k.ready
 
 	response, err := k.RemoteKite.Tell("getKites", args...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	var kites []protocol.KiteWithToken
-	err = response.Unmarshal(&kites)
+	var result = new(protocol.GetKitesResult)
+	err = response.Unmarshal(&result)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	if len(kites) == 0 {
-		return nil, ErrNoKitesAvailable
-	}
-
-	remoteKites := make([]*RemoteKite, len(kites))
-	for i, kite := range kites {
+	remoteKites := make([]*RemoteKite, len(result.Kites))
+	for i, kite := range result.Kites {
 		token, err := jwt.Parse(kite.Token, k.localKite.getRSAKey)
 		if err != nil {
-			return nil, err
+			return nil, result.WatcherID, err
 		}
 
 		exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
@@ -203,7 +234,7 @@ func (k *Kontrol) getKites(args ...interface{}) ([]*RemoteKite, error) {
 		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
 	}
 
-	return remoteKites, nil
+	return remoteKites, result.WatcherID, nil
 }
 
 // GetToken is used to get a new token for a single Kite.

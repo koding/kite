@@ -191,6 +191,7 @@ func (c *Client) sleep() {
 
 // Close closes the underlying websocket connection.
 func (c *Client) Close() {
+	c.Reconnect = false
 	c.Conn.Close()
 }
 

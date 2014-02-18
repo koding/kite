@@ -31,7 +31,7 @@ func (p *Pool) Start() chan error {
 
 // Run the pool (blocking).
 func (p *Pool) Run() error {
-	return p.kontrol.WatchKites(p.query, func(event *kite.Event) {
+	_, err := p.kontrol.WatchKites(p.query, func(event *kite.Event, err error) {
 		switch event.Action {
 		case protocol.Register:
 			p.Kites[event.Kite.ID] = event.RemoteKite()
@@ -40,4 +40,5 @@ func (p *Pool) Run() error {
 			delete(p.Kites, event.Kite.ID)
 		}
 	})
+	return err
 }

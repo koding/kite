@@ -53,22 +53,23 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
-	mathWorker := kites[0]
-	err = mathWorker.Dial()
+	remoteMathWorker := kites[0]
+	err = remoteMathWorker.Dial()
 	if err != nil {
 		t.Errorf("Cannot connect to remote mathworker")
 		return
 	}
 
 	// Test Kontrol.GetToken
-	fmt.Printf("oldToken: %#v\n", mathWorker.Authentication.Key)
-	newToken, err := exp2Kite.Kontrol.GetToken(&mathWorker.Kite)
+	fmt.Printf("oldToken: %#v\n", remoteMathWorker.Authentication.Key)
+	newToken, err := exp2Kite.Kontrol.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
 	fmt.Printf("newToken: %#v\n", newToken)
 
-	response, err := mathWorker.Tell("square", 2)
+	// Run "square" method
+	response, err := remoteMathWorker.Tell("square", 2)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -81,9 +82,83 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
+	// Result must be "4"
 	if result != 4 {
 		t.Errorf("Invalid result: %d", result)
 		return
+	}
+
+	events := make(chan *kite.Event, 3)
+
+	// Test WatchKites
+	watcherID, err := exp2Kite.Kontrol.WatchKites(query, func(e *kite.Event, err error) {
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		t.Logf("Event.Action: %s Event.Kite.ID: %s", e.Action, e.Kite.ID)
+		events <- e
+	})
+	if err != nil {
+		t.Errorf("Cannot watch: %s", err.Error())
+		return
+	}
+
+	// First event must be register event because math worker is already running
+	select {
+	case e := <-events:
+		if e.Action != protocol.Register {
+			t.Errorf("unexpected action: %s", e.Action)
+			return
+		}
+	case <-time.After(time.Second):
+		t.Error("timeout")
+		return
+	}
+
+	mathKite.Kontrol.Close() // TODO Close all RemoteKites when kite is closed.
+	mathKite.Close()
+
+	// We must get Deregister event
+	select {
+	case e := <-events:
+		if e.Action != protocol.Deregister {
+			t.Errorf("unexpected action: %s", e.Action)
+			return
+		}
+	case <-time.After(time.Second):
+		t.Error("timeout")
+		return
+	}
+
+	// Start a new mathworker kite
+	mathKite = mathWorker()
+	mathKite.Start()
+
+	// We must get Register event
+	select {
+	case e := <-events:
+		if e.Action != protocol.Register {
+			t.Errorf("unexpected action: %s", e.Action)
+			return
+		}
+	case <-time.After(time.Second):
+		t.Error("timeout")
+		return
+	}
+
+	err = exp2Kite.Kontrol.CancelWatch(watcherID)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	// We must not get any event after cancelling the watcher
+	select {
+	case e := <-events:
+		t.Errorf("unexpected event: %s", e)
+		return
+	case <-time.After(time.Second):
 	}
 }
 

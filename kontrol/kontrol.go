@@ -14,6 +14,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	etcdErr "github.com/coreos/etcd/error"
@@ -44,6 +45,10 @@ type Kontrol struct {
 	sListener  net.Listener // etcd http server listener (default port: 4001)
 	publicKey  string       // RSA key for validation of tokens
 	privateKey string       // RSA key for signing tokens
+
+	// To cancel running watchers, we must store the references
+	watchers      map[string]*store.Watcher
+	watchersMutex sync.Mutex
 }
 
 // New creates a new kontrol.
@@ -70,6 +75,7 @@ func New(kiteOptions *kite.Options, name, dataDir string, peers []string, public
 		peers:      peers,
 		publicKey:  publicKey,
 		privateKey: privateKey,
+		watchers:   make(map[string]*store.Watcher),
 	}
 
 	log = kontrol.kite.Log
@@ -79,6 +85,7 @@ func New(kiteOptions *kite.Options, name, dataDir string, peers []string, public
 	kontrol.kite.HandleFunc("register", kontrol.handleRegister)
 	kontrol.kite.HandleFunc("getKites", kontrol.handleGetKites)
 	kontrol.kite.HandleFunc("getToken", kontrol.handleGetToken)
+	kontrol.kite.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
 
 	return kontrol
 }
@@ -356,26 +363,16 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		watchCallback = r.Args[1].MustFunction()
 	}
 
-	kites, err := k.getKites(r, query, watchCallback)
-	if err != nil {
-		return nil, err
-	}
-
-	allowed := make([]*protocol.KiteWithToken, 0, len(kites))
-	for _, kite := range kites {
-		if canAccess(r.RemoteKite.Kite, query) {
-			allowed = append(allowed, kite)
-		}
-	}
-
-	return allowed, nil
+	return k.getKites(r, query, watchCallback)
 }
 
-func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) ([]*protocol.KiteWithToken, error) {
+func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) (*protocol.GetKitesResult, error) {
 	key, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
+
+	var result = new(protocol.GetKitesResult)
 
 	// Create e watcher on query.
 	// The callback is going to be called when a Kite registered/unregistered
@@ -393,14 +390,31 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 			return nil, err
 		}
 
+		watcherID, err := uuid.NewV4()
+		if err != nil {
+			return nil, err
+		}
+		result.WatcherID = watcherID.String()
+
+		// Put watcher into map in order to cancel from cancelWatcher() method.
+		k.watchersMutex.Lock()
+		k.watchers[result.WatcherID] = watcher
+
 		// Stop watching on disconnect.
 		disconnect := make(chan bool)
 		r.RemoteKite.OnDisconnect(func() {
+			// Remove watcher from the map
+			k.watchersMutex.Lock()
+			defer k.watchersMutex.Unlock()
+			delete(k.watchers, watcherID.String())
+
+			// Notify disconnection and stop watching.
 			close(disconnect)
 			watcher.Remove()
 		})
+		k.watchersMutex.Unlock()
 
-		go k.watchAndSendKiteEvents(watcher, disconnect, &query, watchCallback)
+		go k.watchAndSendKiteEvents(watcher, result.WatcherID, disconnect, &query, watchCallback)
 	}
 
 	// Get kites from etcd
@@ -411,7 +425,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
-			return make([]*protocol.KiteWithToken, 0), nil
+			return result, nil
 		}
 
 		log.Critical("etcd error: %s", err)
@@ -431,10 +445,28 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		shuffled[v] = kitesAndTokens[i]
 	}
 
-	return shuffled, nil
+	result.Kites = shuffled
+	return result, nil
 }
 
-func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan bool, query *protocol.KontrolQuery, callback dnode.Function) {
+func (k *Kontrol) handleCancelWatcher(r *kite.Request) (interface{}, error) {
+	id := r.Args.One().MustString()
+	return nil, k.cancelWatcher(id)
+}
+
+func (k *Kontrol) cancelWatcher(watcherID string) error {
+	k.watchersMutex.Lock()
+	defer k.watchersMutex.Unlock()
+	watcher, ok := k.watchers[watcherID]
+	if !ok {
+		return errors.New("Watcher not found")
+	}
+	watcher.Remove()
+	delete(k.watchers, watcherID)
+	return nil
+}
+
+func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID string, disconnect chan bool, query *protocol.KontrolQuery, callback dnode.Function) {
 	var index uint64 = 0
 	for {
 		var kiteEvent kite.Event
@@ -443,14 +475,29 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 		case <-disconnect:
 			return
 		case etcdEvent, ok := <-watcher.EventChan:
-			index = etcdEvent.Node.ModifiedIndex
-
-			// If EventChan is closed then eiter we couldn't consume
-			// messages on time or the remote kite is disconnected
-			// and the watcher is removed.
+			// Channel is closed. This happens in 3 cases:
+			//   1. Remote kite called "cancelWatcher" method and removed the watcher.
+			//   2. Remote kite has disconnected and the watcher is removed.
+			//   3. Remote kite couldn't consume messages fast enough, buffer has filled up and etcd cancelled the watcher.
 			if !ok {
-				// If the watcher is cancelled because we don't consume at
-				// enough rate, then we are going to try to re-watch the same key.
+				// Do not try again if watcher is cancelled.
+				k.watchersMutex.Lock()
+				if _, ok := k.watchers[watcherID]; !ok {
+					k.watchersMutex.Unlock()
+					return
+				}
+
+				// Do not try again if disconnected.
+				select {
+				case <-disconnect:
+					k.watchersMutex.Unlock()
+					return
+				default:
+				}
+				k.watchersMutex.Unlock()
+
+				// If we are here that means we did not consume fast enough and etcd
+				// has canceled our watcher. We need to create a new watcher with the same key.
 				key, _ := getQueryKey(query) // can't fail
 				var err error
 				watcher, err = k.store.Watch(
@@ -460,17 +507,15 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 					index,           // since index
 				)
 				if err != nil {
-					log.Warning("Cannot re-watch query: %s", err.Error())
-
-					// Do not burn CPU until OnDisconnect handler is called
-					// if the reason of cancel is disconnect.
-					time.Sleep(time.Second)
-
-					return // TODO find a way to tell the error to the kite
+					log.Error("Cannot re-watch query: %s", err.Error())
+					callback(nil, &kite.Error{"watchError", err.Error()})
+					return
 				}
 
 				continue
 			}
+
+			index = etcdEvent.Node.ModifiedIndex
 
 			switch etcdEvent.Action {
 			case store.Set:
@@ -507,7 +552,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 				continue // We don't care other events
 			}
 
-			callback(kiteEvent)
+			callback(kiteEvent, nil)
 		}
 	}
 }
@@ -621,10 +666,6 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Invalid query")
 	}
 
-	if !canAccess(r.RemoteKite.Kite, query) {
-		return nil, errors.New("Forbidden")
-	}
-
 	kiteKey, err := getQueryKey(&query)
 	if err != nil {
 		return nil, err
@@ -649,10 +690,4 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	}
 
 	return generateToken(kiteKey, r.Username, k.kite.Username, k.privateKey)
-}
-
-// canAccess makes some access control checks and returns true
-// if k can access to kites matching the query.
-func canAccess(k protocol.Kite, query protocol.KontrolQuery) bool {
-	return true
 }

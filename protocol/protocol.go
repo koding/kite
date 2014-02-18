@@ -47,6 +47,11 @@ type RegisterResult struct {
 	PublicIP string
 }
 
+type GetKitesResult struct {
+	Kites     []*KiteWithToken `json:"kites"`
+	WatcherID string           `json:"watcherID"`
+}
+
 type KiteWithToken struct {
 	Kite  Kite   `json:"kite"`
 	Token string `json:"token"`
