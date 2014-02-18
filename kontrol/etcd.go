@@ -34,14 +34,14 @@ import (
 
 // This function is copied and modified from github.com/coreos/etcd/main.go file.
 func (k *Kontrol) runEtcd(ready chan bool) {
-	// Load default configuration.
-	var config = config.New()
-	config.Load(nil)
-
 	// Load config values from kontrol.
+	var config = config.New()
 	config.Name = k.name       // name of the etcd instance
 	config.DataDir = k.dataDir // directory to store etcd log
 	config.Peers = k.peers     // comma seperated values of other peers
+
+	// Load other defaults.
+	config.Load(nil)
 
 	// By default etcd uses ports 4001 and 7001.
 	// In Kontrol these ports depend on the kontrol's port.
