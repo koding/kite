@@ -20,10 +20,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"runtime"
-	"runtime/pprof"
 	"strconv"
 	"time"
 
@@ -59,20 +56,6 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 
 	config.Peers = k.peers
 
-	// Enable options.
-	if config.VeryVeryVerbose {
-		elog.Verbose = true
-		raft.SetLogLevel(raft.Trace)
-	} else if config.VeryVerbose {
-		elog.Verbose = true
-		raft.SetLogLevel(raft.Debug)
-	} else if config.Verbose {
-		elog.Verbose = true
-	}
-	if config.CPUProfileFile != "" {
-		profile(config.CPUProfileFile)
-	}
-
 	if config.DataDir == "" {
 		elog.Fatal("The data dir was not set and could not be guessed from machine name")
 	}
@@ -89,19 +72,8 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	}
 
 	var mbName string
-	if config.Trace() {
-		mbName = config.MetricsBucketName()
-		runtime.SetBlockProfileRate(1)
-	}
 
 	mb := metrics.NewBucket(mbName)
-
-	if config.GraphiteHost != "" {
-		err := mb.Publish(config.GraphiteHost)
-		if err != nil {
-			panic(err)
-		}
-	}
 
 	// Retrieve CORS configuration
 	corsInfo, err := ehttp.NewCORSInfo(config.CorsOrigins)
@@ -173,10 +145,6 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	// Create etcd server
 	s := server.New(config.Name, config.Addr, ps, registry, k.store, &mb)
 
-	if config.Trace() {
-		s.EnableTracing()
-	}
-
 	var sListener net.Listener = k.sListener
 	if config.EtcdTLSInfo().Scheme() == "https" {
 		etcdServerTLSConfig, err := config.EtcdTLSInfo().ServerConfig()
@@ -209,22 +177,4 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	go func() { elog.Fatal(http.Serve(sListener, sHTTP)) }()
 
 	close(ready)
-}
-
-// profile starts CPU profiling.
-func profile(path string) {
-	f, err := os.Create(path)
-	if err != nil {
-		elog.Fatal(err)
-	}
-	pprof.StartCPUProfile(f)
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		sig := <-c
-		elog.Infof("captured %v, stopping profiler and exiting..", sig)
-		pprof.StopCPUProfile()
-		os.Exit(1)
-	}()
 }
