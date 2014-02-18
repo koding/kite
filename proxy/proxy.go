@@ -3,16 +3,13 @@ package proxy
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io"
 	"kite"
-	"kite/protocol"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"code.google.com/p/go.net/websocket"
 )
@@ -28,7 +25,7 @@ type Proxy struct {
 	cert   string
 
 	// Holds registered kites.
-	urls map[*kite.RemoteKite]*protocol.KiteURL
+	urls map[string]*kite.RemoteKite
 }
 
 func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM string) *Proxy {
@@ -38,13 +35,13 @@ func New(kiteOptions *kite.Options, domain string, tlsPort int, certPEM, keyPEM 
 		domain:  domain,
 		cert:    certPEM,
 		key:     keyPEM,
-		urls:    make(map[*kite.RemoteKite]*protocol.KiteURL),
+		urls:    make(map[string]*kite.RemoteKite),
 	}
 
 	proxyKite.kite.HandleFunc("register", proxyKite.register)
 
 	// Remove URL from the map when Kite disconnects.
-	proxyKite.kite.OnDisconnect(func(r *kite.RemoteKite) { delete(proxyKite.urls, r) })
+	proxyKite.kite.OnDisconnect(func(r *kite.RemoteKite) { delete(proxyKite.urls, r.Kite.ID) })
 
 	return proxyKite
 }
@@ -86,55 +83,38 @@ func (t *Proxy) startHTTPSServer() {
 }
 
 func (t *Proxy) register(r *kite.Request) (interface{}, error) {
-	t.urls[r.RemoteKite] = r.RemoteKite.URL
+	t.urls[r.RemoteKite.Kite.ID] = r.RemoteKite
 
-	path := strings.Join([]string{
-		"proxy", // Just a prefix
-		fmt.Sprintf("%d", unsafe.Pointer(r.RemoteKite)), // Unique id for the target kite
-
-		// Rest of the path is not important. They are on path for visibility reason.
-		r.RemoteKite.Kite.Username,
-		r.RemoteKite.Kite.Environment,
-		r.RemoteKite.Kite.Name,
-		r.RemoteKite.Kite.Version,
-		r.RemoteKite.Kite.Region,
-		r.RemoteKite.Kite.Hostname,
-		r.RemoteKite.Kite.ID,
-	}, "/")
-
-	result := url.URL{
+	proxyURL := url.URL{
 		Scheme: "wss",
 		Host:   net.JoinHostPort(t.domain, strconv.Itoa(t.tlsPort)),
-		Path:   path,
+		Path:   "proxy" + r.RemoteKite.Kite.Key(),
 	}
 
-	return result.String(), nil
+	return proxyURL.String(), nil
 }
 
 func (t *Proxy) handleWS(ws *websocket.Conn) {
-	path := ws.Request().URL.Path[1:] // strip leading '/'
+	path := ws.Request().URL.Path[1:] // strip leading "/"
 
 	parts := strings.Split(path, "/")
-	if len(parts) < 2 {
+
+	if len(parts) != 8 {
 		return
 	}
 
-	if parts[0] != "proxy" {
+	if parts[0] != "proxy" { // path must start with "proxy"
 		return
 	}
 
-	i, err := strconv.ParseUint(parts[1], 10, 64)
-	if err != nil {
-		return
-	}
+	kiteID := parts[7]
 
-	r := (*kite.RemoteKite)(unsafe.Pointer(uintptr(i)))
-	kiteURL, ok := t.urls[r]
+	remoteKite, ok := t.urls[kiteID]
 	if !ok {
 		return
 	}
 
-	conn, err := websocket.Dial(kiteURL.String(), "kite", "http://localhost")
+	conn, err := websocket.Dial(remoteKite.Kite.URL.String(), "kite", "http://localhost")
 	if err != nil {
 		return
 	}
