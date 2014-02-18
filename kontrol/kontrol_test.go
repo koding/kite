@@ -22,7 +22,7 @@ func TestKontrol(t *testing.T) {
 		Port:        "3999",
 		Path:        "/kontrol",
 	}
-	kon := New(opts, nil, testkeys.Public, testkeys.Private)
+	kon := New(opts, "kontrol", "/tmp/test_kontrol_data_dir", nil, testkeys.Public, testkeys.Private)
 	kon.Start()
 	kon.ClearKites()
 

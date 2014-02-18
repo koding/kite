@@ -7,6 +7,7 @@ import (
 	"kite/testkeys"
 	"kite/testutil"
 	"net"
+	"os"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ func TestTLSKite(t *testing.T) {
 		Port:        "3999",
 		Path:        "/kontrol",
 	}
-	kon := kontrol.New(opts, nil, testkeys.Public, testkeys.Private)
+	kon := kontrol.New(opts, "kontrol", os.TempDir(), nil, testkeys.Public, testkeys.Private)
 	kon.Start()
 	kon.ClearKites()
 

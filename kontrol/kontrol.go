@@ -12,6 +12,7 @@ import (
 	"kite/protocol"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,11 @@ var log logging.Logger
 
 type Kontrol struct {
 	kite       *kite.Kite
+	ip         string
+	port       int
+	name       string
+	dataDir    string
+	peers      []string
 	store      store.Store
 	psListener net.Listener
 	sListener  net.Listener
@@ -42,16 +48,26 @@ type Kontrol struct {
 
 // New creates a new kontrol.
 //
-// etcdServers can be given nil if etcd is running on the same machine.
+// peers can be given nil if not running on cluster.
 //
 // Public and private keys are RSA pem blocks that can be generated with the
 // following command:
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
-func New(kiteOptions *kite.Options, etcdServers []string, publicKey, privateKey string) *Kontrol {
+func New(kiteOptions *kite.Options, name, dataDir string, peers []string, publicKey, privateKey string) *Kontrol {
+	port, err := strconv.Atoi(kiteOptions.Port)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	kontrol := &Kontrol{
 		kite:       kite.New(kiteOptions),
+		ip:         kiteOptions.PublicIP,
+		port:       port,
+		name:       name,
+		dataDir:    dataDir,
+		peers:      peers,
 		publicKey:  publicKey,
 		privateKey: privateKey,
 	}

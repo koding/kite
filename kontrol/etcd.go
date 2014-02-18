@@ -24,9 +24,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"time"
-
-	"github.com/coreos/etcd/third_party/github.com/coreos/raft"
 
 	"github.com/coreos/etcd/config"
 	ehttp "github.com/coreos/etcd/http"
@@ -34,27 +33,31 @@ import (
 	"github.com/coreos/etcd/metrics"
 	"github.com/coreos/etcd/server"
 	"github.com/coreos/etcd/store"
+	"github.com/coreos/etcd/third_party/github.com/coreos/raft"
 )
 
 // This function is copied and modified from github.com/coreos/etcd/main.go file.
 func (k *Kontrol) runEtcd(ready chan bool) {
 	// Load configuration.
 	var config = config.New()
+	config.Load(nil)
 
-	// Disable command line argument parsing for etcd
-	//
-	// if err := config.Load(os.Args[1:]); err != nil {
-	// 	fmt.Println(server.Usage() + "\n")
-	// 	fmt.Println(err.Error() + "\n")
-	// 	os.Exit(1)
-	// } else if config.ShowVersion {
-	// 	fmt.Println(server.ReleaseVersion)
-	// 	os.Exit(0)
-	// } else if config.ShowHelp {
-	// 	fmt.Println(server.Usage() + "\n")
-	// 	os.Exit(0)
-	// }
-	config.Load([]string{})
+	advertiseIP := k.ip
+	if advertiseIP == "0.0.0.0" {
+		advertiseIP = "127.0.0.1"
+	}
+
+	// Load config values from kontrol
+	config.Name = k.name
+	config.DataDir = k.dataDir
+
+	config.BindAddr = k.ip + ":" + strconv.Itoa(k.port+1)
+	config.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+1)
+
+	config.Peer.BindAddr = k.ip + ":" + strconv.Itoa(k.port+3001)
+	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+3001)
+
+	config.Peers = k.peers
 
 	// Enable options.
 	if config.VeryVeryVerbose {
