@@ -449,10 +449,6 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 			// messages on time or the remote kite is disconnected
 			// and the watcher is removed.
 			if !ok {
-				// Do not burn CPU until OnDisconnect handler is called
-				// if the reason of cancel is disconnect.
-				time.Sleep(time.Second)
-
 				// If the watcher is cancelled because we don't consume at
 				// enough rate, then we are going to try to re-watch the same key.
 				key, _ := getQueryKey(query) // can't fail
@@ -465,6 +461,11 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 				)
 				if err != nil {
 					log.Warning("Cannot re-watch query: %s", err.Error())
+
+					// Do not burn CPU until OnDisconnect handler is called
+					// if the reason of cancel is disconnect.
+					time.Sleep(time.Second)
+
 					return // TODO find a way to tell the error to the kite
 				}
 
