@@ -12,18 +12,15 @@ import (
 	"kite/kitekey"
 	"kite/logging"
 	"kite/protocol"
-	"kite/systeminfo"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/nu7hatch/gouuid"
@@ -225,28 +222,14 @@ func New(options *Options) *Kite {
 	// A kite accepts requests from Kontrol.
 	k.Authenticators["kiteKey"] = k.AuthenticateFromKiteKey
 
-	// Register our internal methods
-	k.HandleFunc("systemInfo", func(r *Request) (interface{}, error) { return systeminfo.New() })
+	// Register default methods.
+	k.HandleFunc("systemInfo", systemInfo)
 	k.HandleFunc("heartbeat", k.handleHeartbeat)
 	k.HandleFunc("log", k.handleLog)
-	k.HandleFunc("print", func(r *Request) (interface{}, error) {
-		return fmt.Print(r.Args.One().MustString())
-	})
-
-	k.HandleFunc("prompt", func(r *Request) (interface{}, error) {
-		fmt.Print(r.Args.One().MustString())
-		var s string
-		_, err := fmt.Scanln(&s)
-		return s, err
-	})
-
-	// TODO move this outside kite package
+	k.HandleFunc("print", handlePrint)
+	k.HandleFunc("prompt", handlePrompt)
 	if runtime.GOOS == "darwin" {
-		k.HandleFunc("notify", func(r *Request) (interface{}, error) {
-			args := r.Args.MustSliceOfLength(3)
-			cmd := exec.Command("osascript", "-e", fmt.Sprintf("display notification \"%s\" with title \"%s\" subtitle \"%s\"", args[0].MustString(), args[1].MustString(), args[2].MustString()))
-			return nil, cmd.Start()
-		})
+		k.HandleFunc("notify", handleNotifyDarwin)
 	}
 
 	return k
@@ -330,30 +313,6 @@ func (k *Kite) Close() {
 	k.Log.Notice("Closing server...")
 	k.listener.Close()
 	k.Log.Close()
-}
-
-func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	args := r.Args.MustSliceOfLength(2)
-	seconds := args[0].MustFloat64()
-	ping := args[1].MustFunction()
-
-	go func() {
-		for {
-			time.Sleep(time.Duration(seconds) * time.Second)
-			if ping() != nil {
-				return
-			}
-		}
-	}()
-
-	return nil, nil
-}
-
-// handleLog prints a log message to stdout.
-func (k *Kite) handleLog(r *Request) (interface{}, error) {
-	msg := r.Args.One().MustString()
-	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, msg))
-	return nil, nil
 }
 
 // newLogger returns a new logger object for desired name and level.
