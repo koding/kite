@@ -32,13 +32,13 @@ func main() {
 	}
 
 	// To demonstrate we can receive notifications matcing to our query.
-	onEvent := func(e *kite.Event) {
+	onEvent := func(e *kite.Event, err error) {
 		fmt.Printf("--- kite event: %#v\n", e)
 		fmt.Printf("--- e.Kite.URL.String(): %+v\n", e.Kite.URL.String())
 	}
 
 	go func() {
-		err := k.Kontrol.WatchKites(query, onEvent)
+		_, err := k.Kontrol.WatchKites(query, onEvent)
 		if err != nil {
 			fmt.Println(err)
 		}

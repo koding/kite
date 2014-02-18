@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"container/list"
 	"errors"
 	"kite/protocol"
 	"net"
@@ -43,6 +44,10 @@ type Kontrol struct {
 
 	// Saved in order to re-register on re-connect.
 	lastRegisteredURL *url.URL
+
+	// Watchers are saved here to re-watch on reconnect.
+	watchers      *list.List
+	watchersMutex sync.RWMutex
 }
 
 // NewKontrol returns a pointer to new Kontrol instance.
@@ -64,6 +69,7 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 	kontrol := &Kontrol{
 		RemoteKite: remoteKite,
 		ready:      make(chan bool),
+		watchers:   list.New(),
 	}
 
 	var once sync.Once
@@ -79,6 +85,16 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
 		once.Do(func() { close(kontrol.ready) })
+
+		// Re-register existing watchers.
+		kontrol.watchersMutex.RLock()
+		for e := kontrol.watchers.Front(); e != nil; e = e.Next() {
+			watcher := e.Value.(*Watcher)
+			if err := watcher.rewatch(); err != nil {
+				kontrol.Log.Error("Cannot rewatch query: %+v", watcher)
+			}
+		}
+		kontrol.watchersMutex.RUnlock()
 	})
 
 	remoteKite.OnDisconnect(func() {
@@ -125,11 +141,20 @@ func (k *Kontrol) Register() error {
 func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
 	<-k.ready
 
-	queueEvents := func(r *Request) {
-		args := r.Args.MustSliceOfLength(2)
+	watcherID, err := k.watchKites(query, onEvent)
+	if err != nil {
+		return nil, err
+	}
 
+	return k.newWatcher(watcherID, &query, onEvent), nil
+}
+
+func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) Callback {
+	return func(r *Request) {
 		var returnEvent *Event
 		var returnError error
+
+		args := r.Args.MustSliceOfLength(2)
 
 		// Unmarshal event argument
 		if args[0] != nil {
@@ -155,11 +180,12 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 
 		onEvent(returnEvent, returnError)
 	}
+}
 
-	args := []interface{}{query, Callback(queueEvents)}
-	remoteKites, watcherID, err := k.getKites(args...)
+func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
+	remoteKites, watcherID, err := k.getKites(query, k.eventCallbackHandler(onEvent))
 	if err != nil && err != ErrNoKitesAvailable {
-		return nil, err // return only when something really happened
+		return "", err // return only when something really happened
 	}
 
 	// also put the current kites to the eventChan.
@@ -176,7 +202,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 		onEvent(&event, nil)
 	}
 
-	return k.newWatcher(watcherID, &query, onEvent), nil
+	return watcherID, nil
 }
 
 // GetKites returns the list of Kites matching the query. The returned list
@@ -250,24 +276,62 @@ func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
 }
 
 type Watcher struct {
-	id      string
-	query   *protocol.KontrolQuery
-	handler EventHandler
-	kontrol *Kontrol
+	id       string
+	query    *protocol.KontrolQuery
+	handler  EventHandler
+	kontrol  *Kontrol
+	canceled bool
+	mutex    sync.Mutex
+	elem     *list.Element
 }
 
+type EventHandler func(*Event, error)
+
 func (k *Kontrol) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
-	return &Watcher{
+	watcher := &Watcher{
 		id:      id,
 		query:   query,
 		handler: handler,
 		kontrol: k,
 	}
+
+	// Add to the kontrol's watchers list.
+	k.watchersMutex.Lock()
+	watcher.elem = k.watchers.PushBack(watcher)
+	k.watchersMutex.Unlock()
+
+	return watcher
 }
 
 func (w *Watcher) Cancel() error {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	if w.canceled {
+		return nil
+	}
+
 	_, err := w.kontrol.Tell("cancelWatcher", w.id)
+	if err == nil {
+		w.canceled = true
+
+		// Remove from kontrol's watcher list.
+		w.kontrol.watchersMutex.Lock()
+		w.kontrol.watchers.Remove(w.elem)
+		w.kontrol.watchersMutex.Unlock()
+	}
+
 	return err
 }
 
-type EventHandler func(*Event, error)
+func (w *Watcher) rewatch() error {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	id, err := w.kontrol.watchKites(*w.query, w.handler)
+	if err != nil {
+		return err
+	}
+	w.id = id
+	return nil
+}
