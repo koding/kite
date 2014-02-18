@@ -35,26 +35,27 @@ import (
 
 // This function is copied and modified from github.com/coreos/etcd/main.go file.
 func (k *Kontrol) runEtcd(ready chan bool) {
-	// Load configuration.
+	// Load default configuration.
 	var config = config.New()
 	config.Load(nil)
 
+	// Load config values from kontrol.
+	config.Name = k.name       // name of the etcd instance
+	config.DataDir = k.dataDir // directory to store etcd log
+	config.Peers = k.peers     // comma seperated values of other peers
+
+	// By default etcd uses ports 4001 and 7001.
+	// In Kontrol these ports depend on the kontrol's port.
+	// Etcd http server port will be: kontrolPort + 1
+	// Etcd peer server port will be: kontrolPort + 3001
 	advertiseIP := k.ip
 	if advertiseIP == "0.0.0.0" {
 		advertiseIP = "127.0.0.1"
 	}
-
-	// Load config values from kontrol
-	config.Name = k.name
-	config.DataDir = k.dataDir
-
 	config.BindAddr = k.ip + ":" + strconv.Itoa(k.port+1)
 	config.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+1)
-
 	config.Peer.BindAddr = k.ip + ":" + strconv.Itoa(k.port+3001)
 	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+3001)
-
-	config.Peers = k.peers
 
 	if config.DataDir == "" {
 		elog.Fatal("The data dir was not set and could not be guessed from machine name")
