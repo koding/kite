@@ -115,7 +115,11 @@ func (k *Kontrol) init() {
 
 // ClearKites removes everything under "/kites" from etcd.
 func (k *Kontrol) ClearKites() error {
-	_, err := k.store.Delete(KitesPrefix, true, true)
+	_, err := k.store.Delete(
+		KitesPrefix, // path
+		true,        // recursive
+		true,        // dir
+	)
 	if err != nil && err.(*etcdErr.Error).ErrorCode != etcdErr.EcodeKeyNotFound {
 		return fmt.Errorf("Cannot clear etcd: %s", err)
 	}
@@ -180,7 +184,11 @@ func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.Reg
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.store.Delete(kiteKey, false, false)
+		k.store.Delete(
+			kiteKey, // path
+			false,   // recursive
+			false,   // dir
+		)
 	})
 
 	// send response back to the kite, also identify him with the new name
@@ -229,15 +237,25 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 	return func() error {
 		expireAt := time.Now().Add(HeartbeatDelay)
 
-		// Set the kite
-		_, err := k.store.Set(etcdKey, false, value, expireAt)
+		// Set the kite key.
+		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
+		_, err := k.store.Set(
+			etcdKey,  // path
+			false,    // dir
+			value,    // value
+			expireAt, // expire time
+		)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
 			return err
 		}
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.store.Update(KitesPrefix+"/"+kite.Username, "", expireAt)
+		_, err = k.store.Update(
+			KitesPrefix+"/"+kite.Username, // path
+			"",       // new value
+			expireAt, // expire time
+		)
 		if err != nil {
 			log.Error("etcd error: %s", err)
 			return err
@@ -359,11 +377,18 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
-	// Register callbacks to our watcher hub.
-	// It will call them when a Kite registered/unregistered matching the query.
-	// Regsitering watcher should be done before making etcd.Get().
+	// Create e watcher on query.
+	// The callback is going to be called when a Kite registered/unregistered
+	// matching the query.
+	// Registering watcher should be done before making etcd.Get() because
+	// Get() may return an empty result.
 	if watchCallback != nil {
-		watcher, err := k.store.Watch(KitesPrefix+key, true, true, 0)
+		watcher, err := k.store.Watch(
+			KitesPrefix+key, // prefix
+			true,            // recursive
+			true,            // stream
+			0,               // since index
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -380,9 +405,9 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	// Get kites from etcd
 	event, err := k.store.Get(
-		KitesPrefix+key,
-		true,  // recursive, return all child directories too
-		false, // sorting flag, we don't care about sorting for now
+		KitesPrefix+key, // path
+		true,            // recursive, return all child directories too
+		false,           // sorting flag, we don't care about sorting for now
 	)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
@@ -432,7 +457,12 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, disconnect chan
 				// enough rate, then we are going to try to re-watch the same key.
 				key, _ := getQueryKey(query) // can't fail
 				var err error
-				watcher, err = k.store.Watch(KitesPrefix+key, true, true, index)
+				watcher, err = k.store.Watch(
+					KitesPrefix+key, // prefix
+					true,            // recursive
+					true,            // stream
+					index,           // since index
+				)
 				if err != nil {
 					log.Warning("Cannot re-watch query: %s", err.Error())
 					return // TODO find a way to tell the error to the kite
@@ -599,7 +629,11 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	event, err := k.store.Get(KitesPrefix+kiteKey, false, false)
+	event, err := k.store.Get(
+		KitesPrefix+kiteKey, // path
+		false, // recursive
+		false, // sorted
+	)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return nil, errors.New("Kite not found")
