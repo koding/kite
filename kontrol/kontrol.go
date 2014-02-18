@@ -34,16 +34,16 @@ var log logging.Logger
 
 type Kontrol struct {
 	kite       *kite.Kite
-	ip         string
-	port       int
-	name       string
-	dataDir    string
-	peers      []string
-	store      store.Store
-	psListener net.Listener
-	sListener  net.Listener
-	publicKey  string
-	privateKey string
+	ip         string       // Bind IP address
+	port       int          // Bind kite port (default: 4000)
+	name       string       // Name of the etcd instance
+	dataDir    string       // etcd data dir
+	peers      []string     // other peers in cluster (must be peer address of other instances)
+	store      store.Store  // etcd data store
+	psListener net.Listener // etcd peer server listener (default port: 7001)
+	sListener  net.Listener // etcd http server listener (default port: 4001)
+	publicKey  string       // RSA key for validation of tokens
+	privateKey string       // RSA key for signing tokens
 }
 
 // New creates a new kontrol.
