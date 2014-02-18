@@ -6,6 +6,7 @@ import (
 	"kite/protocol"
 	"kite/testkeys"
 	"kite/testutil"
+	"os"
 	"testing"
 	"time"
 )
@@ -22,7 +23,7 @@ func TestKontrol(t *testing.T) {
 		Port:        "3999",
 		Path:        "/kontrol",
 	}
-	kon := New(opts, "kontrol", "/tmp/test_kontrol_data_dir", nil, testkeys.Public, testkeys.Private)
+	kon := New(opts, "kontrol", os.TempDir(), nil, testkeys.Public, testkeys.Private)
 	kon.Start()
 	kon.ClearKites()
 
