@@ -91,7 +91,7 @@ func TestKontrol(t *testing.T) {
 	events := make(chan *kite.Event, 3)
 
 	// Test WatchKites
-	watcherID, err := exp2Kite.Kontrol.WatchKites(query, func(e *kite.Event, err error) {
+	watcher, err := exp2Kite.Kontrol.WatchKites(query, func(e *kite.Event, err error) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -147,7 +147,7 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
-	err = exp2Kite.Kontrol.CancelWatch(watcherID)
+	err = watcher.Cancel()
 	if err != nil {
 		t.Errorf(err.Error())
 		return

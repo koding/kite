@@ -122,7 +122,7 @@ func (k *Kontrol) Register() error {
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
-func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event, error)) (watcherID string, err error) {
+func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
 	<-k.ready
 
 	queueEvents := func(r *Request) {
@@ -145,7 +145,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event, e
 		// Unmarshal error argument
 		if args[1] != nil {
 			var kiteErr Error
-			err = args[1].Unmarshal(&kiteErr)
+			err := args[1].Unmarshal(&kiteErr)
 			if err != nil {
 				k.Log.Error(err.Error())
 				return
@@ -159,7 +159,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event, e
 	args := []interface{}{query, Callback(queueEvents)}
 	remoteKites, watcherID, err := k.getKites(args...)
 	if err != nil && err != ErrNoKitesAvailable {
-		return "", err // return only when something really happened
+		return nil, err // return only when something really happened
 	}
 
 	// also put the current kites to the eventChan.
@@ -176,13 +176,7 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent func(*Event, e
 		onEvent(&event, nil)
 	}
 
-	return watcherID, nil
-}
-
-func (k *Kontrol) CancelWatch(id string) error {
-	<-k.ready
-	_, err := k.RemoteKite.Tell("cancelWatcher", id)
-	return err
+	return k.newWatcher(watcherID, &query, onEvent), nil
 }
 
 // GetKites returns the list of Kites matching the query. The returned list
@@ -254,3 +248,26 @@ func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
 
 	return tkn, nil
 }
+
+type Watcher struct {
+	id      string
+	query   *protocol.KontrolQuery
+	handler EventHandler
+	kontrol *Kontrol
+}
+
+func (k *Kontrol) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
+	return &Watcher{
+		id:      id,
+		query:   query,
+		handler: handler,
+		kontrol: k,
+	}
+}
+
+func (w *Watcher) Cancel() error {
+	_, err := w.kontrol.Tell("cancelWatcher", w.id)
+	return err
+}
+
+type EventHandler func(*Event, error)
