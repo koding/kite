@@ -289,6 +289,12 @@ func (k *Kite) ReadyNotify() chan bool {
 	return k.readyC
 }
 
+// Start is like Run(), but does not wait for it to complete. It's nonblocking.
+func (k *Kite) Start() {
+	go k.Run()
+	<-k.readyC // wait until we are ready
+}
+
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously.
 func (k *Kite) Run() {
@@ -297,15 +303,20 @@ func (k *Kite) Run() {
 		os.Exit(0)
 	}
 
-	if err := k.listenAndServe(); err != nil {
+	// An error string equivalent to net.errClosing for using with http.Serve()
+	// during a graceful exit. Needed to declare here again because it is not
+	// exported by "net" package.
+	const errClosing = "use of closed network connection"
+
+	err := k.ListenAndServe()
+	if err != nil {
+		if strings.Contains(err.Error(), errClosing) {
+			// The server is closed by Close() method
+			k.Log.Notice("Kite server is closed.")
+			return
+		}
 		k.Log.Fatal(err.Error())
 	}
-}
-
-// Start is like Run(), but does not wait for it to complete. It's nonblocking.
-func (k *Kite) Start() {
-	go k.Run()
-	<-k.readyC // wait until we are ready
 }
 
 // Close stops the server.
@@ -313,6 +324,103 @@ func (k *Kite) Close() {
 	k.Log.Notice("Closing server...")
 	k.listener.Close()
 	k.Log.Close()
+}
+
+// ListenAndServe listens on the TCP network address k.URL.Host and then
+// calls Serve to handle requests on incoming connections.
+func (k *Kite) ListenAndServe() error {
+	var err error
+
+	k.listener, err = net.Listen("tcp4", k.Kite.URL.Host)
+	if err != nil {
+		return err
+	}
+
+	k.Log.Notice("Listening: %s", k.listener.Addr().String())
+
+	// Enable TLS
+	if k.server.TlsConfig != nil {
+		k.listener = tls.NewListener(k.listener, k.server.TlsConfig)
+	}
+
+	return k.Serve(k.listener)
+}
+
+func (k *Kite) Serve(l net.Listener) error {
+	// Must register to proxy and/or kontrol before start serving.
+	// Otherwise, no one can find us.
+	k.Register(l.Addr())
+
+	k.Log.Notice("Serving on: %s", k.URL.URL.String())
+
+	close(k.readyC)       // listener is ready, notify waiters.
+	defer close(k.closeC) // serving is finished, notify waiters.
+
+	return http.Serve(l, k)
+}
+
+// Register to proxy and/or kontrol, then update the URL.
+func (k *Kite) Register(addr net.Addr) {
+	// Port is known here if "0" is used as port number
+	host, _, _ := net.SplitHostPort(k.Kite.URL.Host)
+	_, port, _ := net.SplitHostPort(addr.String())
+	k.Kite.URL.Host = net.JoinHostPort(host, port)
+
+	// Kontrol will register to the URLs sent to this channel.
+	registerURLs := make(chan *url.URL, 1)
+
+	if k.proxyEnabled {
+		// Register to Proxy Kite and stay connected.
+		// Fill the channel with registered Proxy URLs.
+		go k.keepRegisteredToProxyKite(registerURLs)
+	} else {
+		// If proxy is not enabled, we must populate the channel ourselves.
+		registerURLs <- &k.URL.URL // Register with Kite's own URL.
+	}
+
+	// We must connect to Kontrol after starting to listen on port
+	if k.KontrolEnabled && k.Kontrol != nil {
+		if err := k.Kontrol.DialForever(); err != nil {
+			k.Log.Critical(err.Error())
+		}
+
+		if k.RegisterToKontrol {
+			go k.keepRegisteredToKontrol(registerURLs)
+		}
+	}
+}
+
+func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	k.server.ServeHTTP(w, req)
+}
+
+// OnConnect registers a function to run when a Kite connects to this Kite.
+func (k *Kite) OnConnect(handler func(*RemoteKite)) {
+	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+}
+
+// OnDisconnect registers a function to run when a connected Kite is disconnected.
+func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
+	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
+}
+
+// notifyRemoteKiteConnected runs the registered handlers with OnConnect().
+func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
+	k.Log.Info("Client '%s' is identified as '%s'",
+		r.client.Conn.Request().RemoteAddr, r.Name)
+
+	for _, handler := range k.onConnectHandlers {
+		go handler(r)
+	}
+}
+
+// notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
+func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
+	k.Log.Info("Client has disconnected: %s", r.Name)
+
+	for _, handler := range k.onDisconnectHandlers {
+		go handler(r)
+	}
 }
 
 // newLogger returns a new logger object for desired name and level.
@@ -337,96 +445,4 @@ func newLogger(name string) logging.Logger {
 	}
 
 	return logger
-}
-
-// listenAndServe starts our rpc server with the given addr.
-func (k *Kite) listenAndServe() error {
-	var err error
-
-	k.listener, err = net.Listen("tcp4", k.Kite.URL.Host)
-	if err != nil {
-		return err
-	}
-
-	k.Log.Notice("Listening: %s", k.listener.Addr().String())
-
-	// Enable TLS
-	if k.server.TlsConfig != nil {
-		k.listener = tls.NewListener(k.listener, k.server.TlsConfig)
-	}
-
-	// Port is known here if "0" is used as port number
-	host, _, _ := net.SplitHostPort(k.Kite.URL.Host)
-	_, port, _ := net.SplitHostPort(k.listener.Addr().String())
-	k.Kite.URL.Host = net.JoinHostPort(host, port)
-
-	// Kontrol will register to the URLs sent to this channel.
-	registerURLs := make(chan *url.URL, 1)
-
-	if k.proxyEnabled {
-		// Register to Proxy Kite and stay connected.
-		// Fill the channel with registered Proxy URLs.
-		go k.keepRegisteredToProxyKite(registerURLs)
-	} else {
-		// If proxy is not enabled, we must populate the channel ourselves.
-		registerURLs <- &k.URL.URL // Register with Kite's own URL.
-	}
-
-	// We must connect to Kontrol after starting to listen on port
-	if k.KontrolEnabled && k.Kontrol != nil {
-		if err = k.Kontrol.DialForever(); err != nil {
-			k.Log.Critical(err.Error())
-		}
-
-		if k.RegisterToKontrol {
-			go k.keepRegisteredToKontrol(registerURLs)
-		}
-	}
-
-	k.Log.Notice("Serving on: %s", k.URL.URL.String())
-
-	close(k.readyC) // listener is ready, signal waiters.
-
-	// An error string equivalent to net.errClosing for using with http.Serve()
-	// during a graceful exit. Needed to declare here again because it is not
-	// exported by "net" package.
-	const errClosing = "use of closed network connection"
-
-	err = http.Serve(k.listener, k.server)
-	if strings.Contains(err.Error(), errClosing) {
-		// The server is closed by Close() method
-		k.Log.Notice("Kite server is closed.")
-		close(k.closeC)
-		err = nil
-	}
-
-	return err
-}
-
-// OnConnect registers a function to run when a Kite connects to this Kite.
-func (k *Kite) OnConnect(handler func(*RemoteKite)) {
-	k.onConnectHandlers = append(k.onConnectHandlers, handler)
-}
-
-// OnDisconnect registers a function to run when a connected Kite is disconnected.
-func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
-	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
-}
-
-// notifyRemoteKiteConnected runs the registered handlers with OnConnect().
-func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-	k.Log.Info("Client '%s' is identified as '%s'",
-		r.client.Conn.Request().RemoteAddr, r.Name)
-
-	for _, handler := range k.onConnectHandlers {
-		go handler(r)
-	}
-}
-
-func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-	k.Log.Info("Client has disconnected: %s", r.Name)
-
-	for _, handler := range k.onDisconnectHandlers {
-		go handler(r)
-	}
 }
