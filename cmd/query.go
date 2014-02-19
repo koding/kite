@@ -63,13 +63,13 @@ func (r *Query) Exec(args []string) error {
 		return err
 	}
 
-	var kites []protocol.KiteWithToken
-	err = response.Unmarshal(&kites)
+	var result protocol.GetKitesResult
+	err = response.Unmarshal(&result)
 	if err != nil {
 		return err
 	}
 
-	for i, kite := range kites {
+	for i, kite := range result.Kites {
 		var k *protocol.Kite = &kite.Kite
 		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, k.URL)
 	}
