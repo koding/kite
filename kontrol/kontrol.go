@@ -425,6 +425,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
+			result.Kites = make([]*protocol.KiteWithToken, 0) // do not send null
 			return result, nil
 		}
 
