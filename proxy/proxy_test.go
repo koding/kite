@@ -6,8 +6,8 @@ import (
 	"kite/protocol"
 	"kite/testkeys"
 	"kite/testutil"
-	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -40,8 +40,8 @@ func TestTLSKite(t *testing.T) {
 		Environment: "testing",
 		Region:      "localhost",
 	}
-	k := New(proxyOptions, "localhost", 8443, testkeys.Cert, testkeys.Key)
-	k.Start()
+	k := New(proxyOptions, "localhost", testkeys.Cert, testkeys.Key, testkeys.Public, testkeys.Private)
+	go k.ListenAndServe()
 
 	// TLS Kite is ready.
 
@@ -56,6 +56,7 @@ func TestTLSKite(t *testing.T) {
 	}
 	kite1 := kite.New(opt1)
 	kite1.EnableProxy("testuser")
+	kite1.AddRootCertificate(testkeys.Cert)
 	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
 		return "bar", nil
 	})
@@ -97,16 +98,14 @@ func TestTLSKite(t *testing.T) {
 	kite1remote := kites[0]
 
 	// Check URL has the correct port number (TLS Kite's port).
-	_, URLport, _ := net.SplitHostPort(kite1remote.Kite.URL.Host)
-	if URLport != "8443" {
-		t.Errorf("Wrong port: %s", URLport)
+	if !strings.HasPrefix(kite1remote.Kite.URL.Path, "/proxy") {
+		t.Errorf("Invalid proxy URL: %s", kite1remote.Kite.URL.String())
 		return
 	}
 
 	err = kite1remote.Dial()
 	if err != nil {
 		t.Error(err.Error())
-		// time.Sleep(time.Minute)
 		return
 	}
 

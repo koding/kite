@@ -117,6 +117,9 @@ type Kite struct {
 
 	// Prints logging messages to stderr and syslog.
 	Log logging.Logger
+
+	// Original URL that the kite server is serving on.
+	ServingURL *url.URL
 }
 
 // New creates, initialize and then returns a new Kite instance. It accepts
@@ -172,6 +175,8 @@ func New(options *Options) *Kite {
 		readyC:              make(chan bool),
 		closeC:              make(chan bool),
 	}
+	tempURL := k.Kite.URL.URL
+	k.ServingURL = &tempURL
 
 	k.Log = newLogger(k.Name)
 
@@ -225,6 +230,7 @@ func New(options *Options) *Kite {
 	// Register default methods.
 	k.HandleFunc("systemInfo", systemInfo)
 	k.HandleFunc("heartbeat", k.handleHeartbeat)
+	k.HandleFunc("tunnel", handleTunnel)
 	k.HandleFunc("log", k.handleLog)
 	k.HandleFunc("print", handlePrint)
 	k.HandleFunc("prompt", handlePrompt)
@@ -254,6 +260,7 @@ func (k *Kite) EnableTLS(certFile, keyFile string) {
 	}
 
 	k.Kite.URL.Scheme = "wss"
+	k.ServingURL.Scheme = "wss"
 }
 
 // Put this kite behind a reverse-proxy. Useful under firewall or NAT.
@@ -365,6 +372,7 @@ func (k *Kite) Register(addr net.Addr) {
 	host, _, _ := net.SplitHostPort(k.Kite.URL.Host)
 	_, port, _ := net.SplitHostPort(addr.String())
 	k.Kite.URL.Host = net.JoinHostPort(host, port)
+	k.ServingURL.Host = k.Kite.URL.Host
 
 	// Kontrol will register to the URLs sent to this channel.
 	registerURLs := make(chan *url.URL, 1)
