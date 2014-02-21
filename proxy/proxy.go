@@ -120,6 +120,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	}
 
 	tunnel := remoteKite.newTunnel(ws)
+	defer tunnel.Close()
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
@@ -147,7 +148,6 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	_, err = remoteKite.Tell("tunnel", map[string]string{"url": tunnelURL.String()})
 	if err != nil {
 		p.kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Key())
-		tunnel.Close()
 		return
 	}
 
@@ -156,7 +156,6 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 		<-tunnel.CloseNotify()
 	case <-time.After(1 * time.Minute):
 		p.kite.Log.Error("timeout")
-		tunnel.Close()
 	}
 }
 
