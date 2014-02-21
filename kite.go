@@ -8,10 +8,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
-	"github.com/koding/kite/dnode/rpc"
-	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/logging"
-	"github.com/koding/kite/protocol"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +19,10 @@ import (
 	"syscall"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/dnode/rpc"
+	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/logging"
+	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"
 )
 

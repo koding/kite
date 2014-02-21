@@ -5,15 +5,15 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/dnode/rpc"
-	"github.com/koding/kite/logging"
-	"github.com/koding/kite/protocol"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/dnode/rpc"
+	"github.com/koding/kite/logging"
+	"github.com/koding/kite/protocol"
 )
 
 // Default timeout value for RemoteKite.Tell method.

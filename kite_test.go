@@ -2,9 +2,10 @@ package kite
 
 import (
 	"fmt"
-	"github.com/koding/kite/testutil"
 	"testing"
 	"time"
+
+	"github.com/koding/kite/testutil"
 )
 
 // This example shows a simple method call between two kites.

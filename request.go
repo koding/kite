@@ -3,14 +3,14 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/dnode/rpc"
-	"github.com/koding/kite/kitekey"
 	"reflect"
 	"runtime/debug"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/dnode/rpc"
+	"github.com/koding/kite/kitekey"
 )
 
 // runMethod is called when a method is received from remote Kite.

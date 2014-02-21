@@ -3,13 +3,13 @@ package kite
 import (
 	"container/list"
 	"errors"
-	"github.com/koding/kite/protocol"
 	"net"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/protocol"
 )
 
 // Returned from GetKites when query matches no kites.

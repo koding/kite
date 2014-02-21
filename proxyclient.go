@@ -1,10 +1,11 @@
 package kite
 
 import (
-	"github.com/koding/kite/protocol"
 	"math/rand"
 	"net/url"
 	"time"
+
+	"github.com/koding/kite/protocol"
 )
 
 const proxyRetryDuration = 10 * time.Second

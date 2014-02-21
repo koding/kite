@@ -2,13 +2,13 @@ package kite
 
 import (
 	"fmt"
-	"github.com/koding/kite/systeminfo"
-	"github.com/koding/kite/util"
 	"net/url"
 	"os/exec"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
+	"github.com/koding/kite/systeminfo"
+	"github.com/koding/kite/util"
 )
 
 // systemInfo returns info about the system (CPU, memory, disk...).
