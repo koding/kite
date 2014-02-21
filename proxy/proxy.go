@@ -55,14 +55,14 @@ func New(kiteOptions *kite.Options, domain string, certPEM, keyPEM string, pubKe
 	return proxyKite
 }
 
-func (t *Proxy) Close() {
-	t.listener.Close()
+func (p *Proxy) Close() {
+	p.listener.Close()
 }
 
-func (t *Proxy) ListenAndServe() error {
-	cert, err := tls.X509KeyPair([]byte(t.cert), []byte(t.key))
+func (p *Proxy) ListenAndServe() error {
+	cert, err := tls.X509KeyPair([]byte(p.cert), []byte(p.key))
 	if err != nil {
-		t.kite.Log.Fatal(err.Error())
+		p.kite.Log.Fatal(err.Error())
 	}
 
 	tlsConfig := &tls.Config{
@@ -70,36 +70,36 @@ func (t *Proxy) ListenAndServe() error {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle(t.kite.URL.Path, t.kite)
-	mux.Handle("/proxy", websocket.Server{Handler: t.handleProxy})   // Handler for clients outside
-	mux.Handle("/tunnel", websocket.Server{Handler: t.handleTunnel}) // Handler for kites behind
+	mux.Handle(p.kite.URL.Path, p.kite)
+	mux.Handle("/proxy", websocket.Server{Handler: p.handleProxy})   // Handler for clients outside
+	mux.Handle("/tunnel", websocket.Server{Handler: p.handleTunnel}) // Handler for kites behind
 
-	t.listener, err = net.Listen("tcp", t.kite.URL.Host)
+	p.listener, err = net.Listen("tcp", p.kite.URL.Host)
 	if err != nil {
-		t.kite.Log.Fatal(err.Error())
+		p.kite.Log.Fatal(err.Error())
 	}
-	t.listener = tls.NewListener(t.listener, tlsConfig)
+	p.listener = tls.NewListener(p.listener, tlsConfig)
 
 	// Need to update these manually. TODO FIX
-	t.kite.URL.Scheme = "wss"
-	t.kite.ServingURL.Scheme = "wss"
+	p.kite.URL.Scheme = "wss"
+	p.kite.ServingURL.Scheme = "wss"
 
-	t.kite.Register(t.listener.Addr())
+	p.kite.Register(p.listener.Addr())
 
 	server := &http.Server{
 		Handler:   mux,
 		TLSConfig: tlsConfig,
 	}
 
-	return server.Serve(t.listener)
+	return server.Serve(p.listener)
 }
 
-func (t *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
-	t.kites[r.RemoteKite.Kite.ID] = newKite(r.RemoteKite)
+func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
+	p.kites[r.RemoteKite.Kite.ID] = newKite(r.RemoteKite)
 
 	proxyURL := url.URL{
-		Scheme:   t.kite.URL.Scheme,
-		Host:     t.kite.URL.Host,
+		Scheme:   p.kite.URL.Scheme,
+		Host:     p.kite.URL.Host,
 		Path:     "proxy",
 		RawQuery: "kiteID=" + r.RemoteKite.Kite.ID,
 	}
@@ -108,14 +108,14 @@ func (t *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 }
 
 // handleProxy is the client side of the Tunnel (on public network).
-func (t *Proxy) handleProxy(ws *websocket.Conn) {
+func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	req := ws.Request()
 
 	kiteID := req.URL.Query().Get("kiteID")
 
-	remoteKite, ok := t.kites[kiteID]
+	remoteKite, ok := p.kites[kiteID]
 	if !ok {
-		t.kite.Log.Error("Remote kite is not found: %s", req.URL.String())
+		p.kite.Log.Error("Remote kite is not found: %s", req.URL.String())
 		return
 	}
 
@@ -134,19 +134,19 @@ func (t *Proxy) handleProxy(ws *websocket.Conn) {
 		"nbf": time.Now().UTC().Add(-leeway).Unix(),         // Not Before
 	}
 
-	signed, err := token.SignedString([]byte(t.privKey))
+	signed, err := token.SignedString([]byte(p.privKey))
 	if err != nil {
-		t.kite.Log.Critical("Cannot sign token: %s", err.Error())
+		p.kite.Log.Critical("Cannot sign token: %s", err.Error())
 		return
 	}
 
-	tunnelURL := *t.kite.URL
+	tunnelURL := *p.kite.URL
 	tunnelURL.Path = "/tunnel"
 	tunnelURL.RawQuery = "token=" + signed
 
 	_, err = remoteKite.Tell("tunnel", map[string]string{"url": tunnelURL.String()})
 	if err != nil {
-		t.kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Kite.Key())
+		p.kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Kite.Key())
 		tunnel.Close()
 		return
 	}
@@ -155,37 +155,37 @@ func (t *Proxy) handleProxy(ws *websocket.Conn) {
 	case <-tunnel.StartNotify():
 		<-tunnel.CloseNotify()
 	case <-time.After(1 * time.Minute):
-		t.kite.Log.Error("timeout")
+		p.kite.Log.Error("timeout")
 		tunnel.Close()
 	}
 }
 
 // handleTunnel is the Kite side of the Tunnel (on private network).
-func (t *Proxy) handleTunnel(ws *websocket.Conn) {
+func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	tokenString := ws.Request().URL.Query().Get("token")
 
 	getPublicKey := func(token *jwt.Token) ([]byte, error) {
-		return []byte(t.pubKey), nil
+		return []byte(p.pubKey), nil
 	}
 
 	token, err := jwt.Parse(tokenString, getPublicKey)
 	if err != nil {
-		t.kite.Log.Error("Invalid token: \"%s\"", tokenString)
+		p.kite.Log.Error("Invalid token: \"%s\"", tokenString)
 		return
 	}
 
 	kiteID := token.Claims["sub"].(string)
 	seq := uint64(token.Claims["seq"].(float64))
 
-	remoteKite, ok := t.kites[kiteID]
+	remoteKite, ok := p.kites[kiteID]
 	if !ok {
-		t.kite.Log.Error("Remote kite is not found: %s", kiteID)
+		p.kite.Log.Error("Remote kite is not found: %s", kiteID)
 		return
 	}
 
 	tunnel, ok := remoteKite.tunnels[seq]
 	if !ok {
-		t.kite.Log.Error("Tunnel not found: %d", seq)
+		p.kite.Log.Error("Tunnel not found: %d", seq)
 	}
 
 	go tunnel.Run(ws)
