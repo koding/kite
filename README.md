@@ -120,16 +120,18 @@ This is a message for geting the list of kites from *Kontrol*:
 }
 ```
 
-Implementation of sending a message: [go/src/koding/newkite/kite/remote.go](https://git.sj.koding.com/koding/koding/blob/master/go/src/koding/newkite/kite/remote.go)
+Implementation of sending a message: [remote.go](https://github.com/koding/koding/blob/master/kite/remote.go)
 
-Implementation of processing incoming message: [go/src/koding/newkite/kite/request.go](https://git.sj.koding.com/koding/koding/blob/master/go/src/koding/newkite/kite/request.go)
+Implementation of processing incoming message: [request.go](https://github.com/koding/koding/blob/master/request.go)
 
 What is *Kontrol*?
 ------------------
 
-Kontrol is a special Kite that is run by Koding. It is both a dynamic name service (like DNS) and an authentication service (like OAuth2). We are thinking about seperating these services into 2 different Kites in future.
+Kontrol is a special Kite that is run by Koding. It is both a dynamic name
+service (like DNS) and an authentication service (like OAuth2). We are thinking
+about seperating these services into 2 different Kites in future.
 
-Kontrol code is here: [go/src/koding/newkite/kontrol/main.go](https://git.sj.koding.com/koding/koding/blob/master/go/src/koding/newkite/kontrol/main.go)
+Kontrol code is here: [kite/kontrol](https://github.com/koding/kite/tree/master/kontrol)
 
 How a Kite can find other Kites?
 --------------------------------
@@ -188,11 +190,9 @@ What about the browser?
 
 Browser is also acts like a Kite. It has it's own methods ("log" for logging a
 message to the console, "alert" for displaying alert to the user, etc.). A
-connected Kite can call methods of the browser. See how it's implemented in [c
-lient/Main/kite/newkite.coffee](https://git.sj.koding.com/koding
-/koding/blob/master/client/Main/kite/newkite.coffee).
+connected Kite can call methods of the browser. 
 
-Kontrol client can be inspected to see how `NewKite` class can be used in [client/Main/kite/kontrol.coffee](https://git.sj.koding.com/koding/koding/blob/master/client/Main/kite/kontrol.coffee).
+See [kite.js](https://github.com/koding/kite.js) for more information.
 
 
 How can I write a new Kite?
@@ -203,7 +203,5 @@ How can I write a new Kite?
 * Add your method handlers with `k.HandleFunc()`.
 * Call `k.Run()`
 
-See [mathworker example](http://git.sj.koding.com/koding/kite/blob/master/examples/mathworker.go)
+See [mathworker example](https://github.com/koding/kite/blob/master/examples/mathworker.go)
 for an example Kite code.
-
-Or read some real Kite code in [koding repository](http://git.sj.koding.com/koding/koding/tree/master/go/src/koding/kites).
