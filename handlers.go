@@ -3,8 +3,12 @@ package kite
 import (
 	"fmt"
 	"kite/systeminfo"
+	"kite/util"
+	"net/url"
 	"os/exec"
 	"time"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 // systemInfo returns info about the system (CPU, memory, disk...).
@@ -56,4 +60,40 @@ func handleNotifyDarwin(r *Request) (interface{}, error) {
 	cmd := exec.Command("osascript", "-e", fmt.Sprintf("display notification \"%s\" with title \"%s\" subtitle \"%s\"",
 		args[1].MustString(), args[2].MustString(), args[0].MustString()))
 	return nil, cmd.Start()
+}
+
+// handleTunnel opens two websockets, one to proxy kite and one to itself,
+// then it copies the message between them.
+func handleTunnel(r *Request) (interface{}, error) {
+	var args struct {
+		URL string
+	}
+	r.Args.One().MustUnmarshal(&args)
+
+	parsed, err := url.Parse(args.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	conf := &websocket.Config{
+		Location:  parsed,
+		Version:   websocket.ProtocolVersionHybi13,
+		Origin:    &url.URL{Scheme: "http", Host: "localhost"},
+		TlsConfig: r.LocalKite.tlsConfig(),
+	}
+
+	remoteConn, err := websocket.DialConfig(conf)
+	if err != nil {
+		return nil, err
+	}
+
+	conf.Location = r.LocalKite.ServingURL
+
+	localConn, err := websocket.DialConfig(conf)
+	if err != nil {
+		return nil, err
+	}
+
+	util.JoinStreams(localConn, remoteConn)
+	return nil, nil
 }

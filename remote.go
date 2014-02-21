@@ -73,10 +73,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	r.client.Properties()["remoteKite"] = r
 
 	// Add trusted root certificates for client.
-	r.client.Config.TlsConfig = &tls.Config{RootCAs: x509.NewCertPool()}
-	for _, cert := range k.tlsCertificates {
-		r.client.Config.TlsConfig.RootCAs.AppendCertsFromPEM(cert)
-	}
+	r.client.Config.TlsConfig = k.tlsConfig()
 
 	// Parse token for setting validUntil field
 	if auth.Type == "token" && auth.validUntil == nil {
@@ -108,6 +105,14 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	})
 
 	return r
+}
+
+func (k *Kite) tlsConfig() *tls.Config {
+	c := &tls.Config{RootCAs: x509.NewCertPool()}
+	for _, cert := range k.tlsCertificates {
+		c.RootCAs.AppendCertsFromPEM(cert)
+	}
+	return c
 }
 
 func onError(err error) {
