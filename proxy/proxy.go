@@ -33,7 +33,7 @@ type Proxy struct {
 	privKey string
 
 	// Holds registered kites. Keys are kite IDs.
-	kites map[string]*Kite
+	kites map[string]*PrivateKite
 }
 
 func New(kiteOptions *kite.Options, domain string, certPEM, keyPEM string, pubKey, privKey string) *Proxy {
@@ -44,12 +44,12 @@ func New(kiteOptions *kite.Options, domain string, certPEM, keyPEM string, pubKe
 		key:     keyPEM,
 		pubKey:  pubKey,
 		privKey: privKey,
-		kites:   make(map[string]*Kite),
+		kites:   make(map[string]*PrivateKite),
 	}
 
 	proxyKite.kite.HandleFunc("register", proxyKite.handleRegister)
 
-	// Remove URL from the map when Kite disconnects.
+	// Remove URL from the map when PrivateKite disconnects.
 	proxyKite.kite.OnDisconnect(func(r *kite.RemoteKite) { delete(proxyKite.kites, r.Kite.ID) })
 
 	return proxyKite
@@ -95,13 +95,13 @@ func (p *Proxy) ListenAndServe() error {
 }
 
 func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
-	p.kites[r.RemoteKite.Kite.ID] = newKite(r.RemoteKite)
+	p.kites[r.RemoteKite.ID] = newPrivateKite(r.RemoteKite)
 
 	proxyURL := url.URL{
 		Scheme:   p.kite.URL.Scheme,
 		Host:     p.kite.URL.Host,
 		Path:     "proxy",
-		RawQuery: "kiteID=" + r.RemoteKite.Kite.ID,
+		RawQuery: "kiteID=" + r.RemoteKite.ID,
 	}
 
 	return proxyURL.String(), nil
@@ -127,7 +127,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	const leeway = time.Duration(1 * time.Minute)
 
 	token.Claims = map[string]interface{}{
-		"sub": remoteKite.Kite.ID,                           // kite ID
+		"sub": remoteKite.ID,                                // kite ID
 		"seq": tunnel.id,                                    // tunnel number
 		"iat": time.Now().UTC().Unix(),                      // Issued At
 		"exp": time.Now().UTC().Add(ttl).Add(leeway).Unix(), // Expiration Time
@@ -146,7 +146,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 
 	_, err = remoteKite.Tell("tunnel", map[string]string{"url": tunnelURL.String()})
 	if err != nil {
-		p.kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Kite.Key())
+		p.kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Key())
 		tunnel.Close()
 		return
 	}
@@ -160,7 +160,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	}
 }
 
-// handleTunnel is the Kite side of the Tunnel (on private network).
+// handleTunnel is the PrivateKite side of the Tunnel (on private network).
 func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	tokenString := ws.Request().URL.Query().Get("token")
 
@@ -194,10 +194,10 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 }
 
 //
-// Kite
+// PrivateKite
 //
 
-type Kite struct {
+type PrivateKite struct {
 	*kite.RemoteKite
 
 	// Connections to kites behind the proxy. Keys are kite IDs.
@@ -207,14 +207,14 @@ type Kite struct {
 	seq uint64
 }
 
-func newKite(r *kite.RemoteKite) *Kite {
-	return &Kite{
+func newPrivateKite(r *kite.RemoteKite) *PrivateKite {
+	return &PrivateKite{
 		RemoteKite: r,
 		tunnels:    make(map[uint64]*Tunnel),
 	}
 }
 
-func (k *Kite) newTunnel(local *websocket.Conn) *Tunnel {
+func (k *PrivateKite) newTunnel(local *websocket.Conn) *Tunnel {
 	t := &Tunnel{
 		id:        atomic.AddUint64(&k.seq, 1),
 		localConn: local,
