@@ -6,6 +6,8 @@ This document tries to describe Kites and their internals.
 What is a Kite?
 ---------------
 
+![Kite](http://i.imgur.com/iNcltPN.png)
+
 A Kite is a **micro-service** communicating with other parties with *Kite Protocol*.
 Installed browser apps on koding.com talks with these Kites. For example, file tree in
 *Develop* tab talks with *fs* Kite.
