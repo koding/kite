@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"kite/kitekey"
+	"github.com/koding/kite/kitekey"
 	"os"
 	"path/filepath"
 	"strings"

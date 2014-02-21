@@ -2,8 +2,8 @@ package kite
 
 import (
 	"fmt"
-	"kite/systeminfo"
-	"kite/util"
+	"github.com/koding/kite/systeminfo"
+	"github.com/koding/kite/util"
 	"net/url"
 	"os/exec"
 	"time"

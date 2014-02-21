@@ -3,9 +3,9 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"kite/dnode"
-	"kite/dnode/rpc"
-	"kite/kitekey"
+	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/dnode/rpc"
+	"github.com/koding/kite/kitekey"
 	"reflect"
 	"runtime/debug"
 	"strings"

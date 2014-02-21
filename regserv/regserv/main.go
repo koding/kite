@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"kite"
-	"kite/regserv"
-	"kite/testkeys"
+	"github.com/koding/kite"
+	"github.com/koding/kite/regserv"
+	"github.com/koding/kite/testkeys"
 	"time"
 )
 

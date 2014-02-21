@@ -3,8 +3,8 @@
 package pool
 
 import (
-	"kite"
-	"kite/protocol"
+	"github.com/koding/kite"
+	"github.com/koding/kite/protocol"
 )
 
 // Pool is helper for staying connected to every kite in a query.

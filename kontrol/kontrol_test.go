@@ -2,10 +2,10 @@ package kontrol
 
 import (
 	"fmt"
-	"kite"
-	"kite/protocol"
-	"kite/testkeys"
-	"kite/testutil"
+	"github.com/koding/kite"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 	"os"
 	"testing"
 	"time"

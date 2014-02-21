@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"kite/kitekey"
+	"github.com/koding/kite/kitekey"
 	"os"
 	"path/filepath"
 	"syscall"

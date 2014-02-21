@@ -2,9 +2,9 @@ package regserv
 
 import (
 	"github.com/dgrijalva/jwt-go"
-	"kite"
-	"kite/kitekey"
-	"kite/testkeys"
+	"github.com/koding/kite"
+	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/testkeys"
 	"testing"
 )
 

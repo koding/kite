@@ -2,7 +2,7 @@ package kite
 
 import (
 	"fmt"
-	"kite/testutil"
+	"github.com/koding/kite/testutil"
 	"testing"
 	"time"
 )

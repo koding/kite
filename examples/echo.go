@@ -3,7 +3,7 @@
 
 package main
 
-import "kite"
+import "github.com/koding/kite"
 
 func main() {
 	options := &kite.Options{

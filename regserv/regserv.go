@@ -5,8 +5,8 @@ package regserv
 import (
 	"errors"
 	"fmt"
-	"kite"
-	"kite/kitekey"
+	"github.com/koding/kite"
+	"github.com/koding/kite/kitekey"
 	"os"
 	"time"
 

@@ -3,8 +3,8 @@ package proxy
 
 import (
 	"crypto/tls"
-	"kite"
-	"kite/util"
+	"github.com/koding/kite"
+	"github.com/koding/kite/util"
 	"net"
 	"net/http"
 	"net/url"

@@ -3,7 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"kite/kitekey"
+	"github.com/koding/kite/kitekey"
 	"os"
 	"path/filepath"
 )

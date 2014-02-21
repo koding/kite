@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"kite"
+	"github.com/koding/kite"
 )
 
 var port = flag.String("port", "", "port to bind itself")

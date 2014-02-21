@@ -3,8 +3,8 @@
 package testutil
 
 import (
-	"kite/kitekey"
-	"kite/testkeys"
+	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/testkeys"
 	"os"
 	"time"
 

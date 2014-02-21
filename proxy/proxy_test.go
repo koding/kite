@@ -1,11 +1,11 @@
 package proxy
 
 import (
-	"kite"
-	"kite/kontrol"
-	"kite/protocol"
-	"kite/testkeys"
-	"kite/testutil"
+	"github.com/koding/kite"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 	"os"
 	"strings"
 	"testing"

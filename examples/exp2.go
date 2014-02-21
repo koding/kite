@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"kite"
-	"kite/protocol"
+	"github.com/koding/kite"
+	"github.com/koding/kite/protocol"
 	"math/rand"
 	"time"
 )

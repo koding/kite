@@ -1,7 +1,7 @@
 package kite
 
 import (
-	"kite/protocol"
+	"github.com/koding/kite/protocol"
 )
 
 // Event is the struct that is emitted from Kontrol.WatchKites method.

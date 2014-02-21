@@ -2,10 +2,10 @@
 package main
 
 import (
-	"kite"
-	"kite/cmd"
-	"kite/cmd/build"
-	"kite/cmd/cli"
+	"github.com/koding/kite"
+	"github.com/koding/kite/cmd"
+	"github.com/koding/kite/cmd/build"
+	"github.com/koding/kite/cmd/cli"
 )
 
 // Please use 3 digit versioning (major, minor, patch).

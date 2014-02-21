@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"kite"
-	"kite/kontrol"
-	"kite/testkeys"
+	"github.com/koding/kite"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/testkeys"
 	"log"
 	"os"
 	"strings"
