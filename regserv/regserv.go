@@ -5,12 +5,13 @@ package regserv
 import (
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/nu7hatch/gouuid"
 	"kite"
 	"kite/kitekey"
 	"os"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/nu7hatch/gouuid"
 )
 
 const version = "0.0.1"
