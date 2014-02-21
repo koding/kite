@@ -51,7 +51,7 @@ func (o *Options) validate() {
 	}
 
 	if o.Path == "" {
-		o.Path = "/" + o.Kitename
+		o.Path = "/kite/" + o.Kitename
 	}
 
 	if o.Path[0] != '/' {
