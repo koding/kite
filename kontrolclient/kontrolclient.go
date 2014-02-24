@@ -1,42 +1,25 @@
-package kite
+package kontrolclient
 
 import (
 	"container/list"
 	"errors"
-	"net"
 	"net/url"
 	"sync"
-	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/protocol"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite/protocol"
 )
 
 // Returned from GetKites when query matches no kites.
 var ErrNoKitesAvailable = errors.New("no kites availabile")
 
-const registerKontrolRetryDuration = time.Minute
-
-func (k *Kite) keepRegisteredToKontrol(urls chan *url.URL) {
-	for url := range urls {
-		k.URL = &protocol.KiteURL{*url}
-		for {
-			err := k.Kontrol.Register()
-			if err != nil {
-				// do not exit, because existing applications might import the kite package
-				k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
-				time.Sleep(registerKontrolRetryDuration)
-			}
-
-			// Registered to Kontrol.
-			break
-		}
-	}
-}
-
 // Kontrol is a client for registering and querying Kontrol Kite.
 type Kontrol struct {
-	*RemoteKite
+	*kite.RemoteKite
+
+	LocalKite *kite.Kite
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
@@ -51,36 +34,29 @@ type Kontrol struct {
 }
 
 // NewKontrol returns a pointer to new Kontrol instance.
-func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
+func New(k *kite.Kite) *Kontrol {
 	// Only the address is required to connect Kontrol
-	kite := protocol.Kite{
-		Name: "kontrol", // for logging purposes
-		URL:  &protocol.KiteURL{*kontrolURL},
-	}
-
-	auth := Authentication{
+	auth := &kite.Authentication{
 		Type: "kiteKey",
-		Key:  k.kiteKey.Raw,
+		Key:  k.Config.KiteKey,
 	}
 
-	remoteKite := k.NewRemoteKite(kite, auth)
-	remoteKite.client.Reconnect = true
+	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
+	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
+	remoteKite.Authentication = auth
+	// remoteKite.client.Reconnect = true
 
 	kontrol := &Kontrol{
 		RemoteKite: remoteKite,
+		LocalKite:  k,
 		ready:      make(chan bool),
 		watchers:   list.New(),
 	}
 
 	var once sync.Once
 
-	remoteKite.OnConnect(func() {
+	kontrol.OnConnect(func() {
 		k.Log.Info("Connected to Kontrol ")
-
-		// We need to re-register the last registered URL on re-connect.
-		if kontrol.lastRegisteredURL != nil {
-			go kontrol.Register()
-		}
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
@@ -97,16 +73,12 @@ func (k *Kite) NewKontrol(kontrolURL *url.URL) *Kontrol {
 		kontrol.watchersMutex.RUnlock()
 	})
 
-	remoteKite.OnDisconnect(func() {
-		k.Log.Warning("Disconnected from Kontrol. I will retry in background...")
-	})
-
 	return kontrol
 }
 
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
-func (k *Kontrol) Register() error {
+func (k *Kontrol) Register(kiteURL *url.URL) error {
 	<-k.ready
 
 	response, err := k.RemoteKite.Tell("register")
@@ -120,18 +92,13 @@ func (k *Kontrol) Register() error {
 		return err
 	}
 
-	kite := &k.localKite.Kite // shortcut
-
-	// Set the correct PublicIP if left empty in options.
-	ip, port, _ := net.SplitHostPort(kite.URL.Host)
-	if ip == "0.0.0.0" {
-		kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
-	}
-
-	k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
-
-	// Save last registered URL to re-register on re-connect.
-	k.lastRegisteredURL = &kite.URL.URL
+	// kite := &k.localKite.Kite // shortcut
+	//
+	// // Set the correct PublicIP if left empty in options.
+	// ip, port, _ := net.SplitHostPort(kiteURL.Host)
+	// if ip == "0.0.0.0" {
+	// 	kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
+	// }
 
 	return nil
 }
@@ -149,8 +116,8 @@ func (k *Kontrol) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 	return k.newWatcher(watcherID, &query, onEvent), nil
 }
 
-func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) Callback {
-	return func(r *Request) {
+func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) kite.Callback {
+	return func(r *kite.Request) {
 		var returnEvent *Event
 		var returnError error
 
@@ -158,7 +125,7 @@ func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) Callback {
 
 		// Unmarshal event argument
 		if args[0] != nil {
-			var event = Event{localKite: k.localKite}
+			var event = Event{localKite: k.LocalKite}
 			err := args[0].Unmarshal(&event)
 			if err != nil {
 				k.Log.Error(err.Error())
@@ -169,7 +136,7 @@ func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) Callback {
 
 		// Unmarshal error argument
 		if args[1] != nil {
-			var kiteErr Error
+			var kiteErr kite.Error
 			err := args[1].Unmarshal(&kiteErr)
 			if err != nil {
 				k.Log.Error(err.Error())
@@ -196,7 +163,7 @@ func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 				Kite:   remoteKite.Kite,
 				Token:  remoteKite.Authentication.Key,
 			},
-			localKite: k.localKite,
+			localKite: k.LocalKite,
 		}
 
 		onEvent(&event, nil)
@@ -209,7 +176,7 @@ func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 // contains ready to connect RemoteKite instances. The caller must connect
 // with RemoteKite.Dial() before using each Kite. An error is returned when no
 // kites are available.
-func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
+func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*kite.RemoteKite, error) {
 	remoteKites, _, err := k.getKites(query)
 	if err != nil {
 		return nil, err
@@ -223,7 +190,7 @@ func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*RemoteKite, error) {
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *Kontrol) getKites(args ...interface{}) (kites []*RemoteKite, watcherID string, err error) {
+func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watcherID string, err error) {
 	<-k.ready
 
 	response, err := k.RemoteKite.Tell("getKites", args...)
@@ -237,21 +204,23 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*RemoteKite, watcherID 
 		return nil, "", err
 	}
 
-	remoteKites := make([]*RemoteKite, len(result.Kites))
-	for i, kite := range result.Kites {
-		token, err := jwt.Parse(kite.Token, k.localKite.getRSAKey)
+	remoteKites := make([]*kite.RemoteKite, len(result.Kites))
+	for i, currentKite := range result.Kites {
+		_, err := jwt.Parse(currentKite.Token, k.LocalKite.RSAKey)
 		if err != nil {
 			return nil, result.WatcherID, err
 		}
 
-		exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-		auth := Authentication{
-			Type:       "token",
-			Key:        kite.Token,
-			validUntil: &exp,
+		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
+		auth := &kite.Authentication{
+			Type: "token",
+			Key:  currentKite.Token,
+			// validUntil: &exp,
 		}
 
-		remoteKites[i] = k.localKite.NewRemoteKite(kite.Kite, auth)
+		remoteKites[i] = k.LocalKite.NewRemoteKiteString(currentKite.URL)
+		remoteKites[i].Kite = currentKite.Kite
+		remoteKites[i].Authentication = auth
 	}
 
 	return remoteKites, result.WatcherID, nil
@@ -273,65 +242,4 @@ func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
 	}
 
 	return tkn, nil
-}
-
-type Watcher struct {
-	id       string
-	query    *protocol.KontrolQuery
-	handler  EventHandler
-	kontrol  *Kontrol
-	canceled bool
-	mutex    sync.Mutex
-	elem     *list.Element
-}
-
-type EventHandler func(*Event, error)
-
-func (k *Kontrol) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
-	watcher := &Watcher{
-		id:      id,
-		query:   query,
-		handler: handler,
-		kontrol: k,
-	}
-
-	// Add to the kontrol's watchers list.
-	k.watchersMutex.Lock()
-	watcher.elem = k.watchers.PushBack(watcher)
-	k.watchersMutex.Unlock()
-
-	return watcher
-}
-
-func (w *Watcher) Cancel() error {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
-	if w.canceled {
-		return nil
-	}
-
-	_, err := w.kontrol.Tell("cancelWatcher", w.id)
-	if err == nil {
-		w.canceled = true
-
-		// Remove from kontrol's watcher list.
-		w.kontrol.watchersMutex.Lock()
-		w.kontrol.watchers.Remove(w.elem)
-		w.kontrol.watchersMutex.Unlock()
-	}
-
-	return err
-}
-
-func (w *Watcher) rewatch() error {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
-	id, err := w.kontrol.watchKites(*w.query, w.handler)
-	if err != nil {
-		return err
-	}
-	w.id = id
-	return nil
 }

@@ -4,12 +4,26 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/koding/kite/systeminfo"
 	"github.com/koding/kite/util"
 )
+
+func (k *Kite) addDefaultHandlers() {
+	// TODO prefix these methods with "kite."
+	k.HandleFunc("systemInfo", systemInfo)
+	k.HandleFunc("heartbeat", k.handleHeartbeat)
+	k.HandleFunc("tunnel", handleTunnel)
+	k.HandleFunc("log", k.handleLog)
+	k.HandleFunc("print", handlePrint)
+	k.HandleFunc("prompt", handlePrompt)
+	if runtime.GOOS == "darwin" {
+		k.HandleFunc("notify", handleNotifyDarwin)
+	}
+}
 
 // systemInfo returns info about the system (CPU, memory, disk...).
 func systemInfo(r *Request) (interface{}, error) {
@@ -79,7 +93,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		Location:  parsed,
 		Version:   websocket.ProtocolVersionHybi13,
 		Origin:    &url.URL{Scheme: "http", Host: "localhost"},
-		TlsConfig: r.LocalKite.tlsConfig(),
+		TlsConfig: r.RemoteKite.TLSConfig,
 	}
 
 	remoteConn, err := websocket.DialConfig(conf)
@@ -87,7 +101,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	conf.Location = r.LocalKite.ServingURL
+	// conf.Location = r.LocalKite.ServingURL
 
 	localConn, err := websocket.DialConfig(conf)
 	if err != nil {

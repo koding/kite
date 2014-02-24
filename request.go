@@ -58,7 +58,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 
 	request, callback = kite.parseRequest(method, args, tr)
 
-	if !kite.disableAuthenticate {
+	if !kite.Config.DisableAuthentication {
 		kiteErr = request.authenticate()
 		if kiteErr != nil {
 			return
@@ -140,7 +140,7 @@ type Request struct {
 	LocalKite      *Kite
 	RemoteKite     *RemoteKite
 	Username       string
-	Authentication Authentication
+	Authentication *Authentication
 	RemoteAddr     string
 }
 
@@ -182,17 +182,17 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		// Do not create a new RemoteKite on every request,
 		// cache it in Transport.Properties().
 		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
-		remoteKite = k.newRemoteKiteWithClient(options.Kite, options.Authentication, client)
+		remoteKite = k.newRemoteKiteWithClient(nil, client)
 		properties["remoteKite"] = remoteKite
 
-		// Notify Kite.OnConnect handlers.
-		k.notifyRemoteKiteConnected(remoteKite)
+		// // Notify Kite.OnConnect handlers.
+		// k.notifyRemoteKiteConnected(remoteKite)
 	} else {
 		remoteKite = properties["remoteKite"].(*RemoteKite)
 
-		// Need to update URL in case of a change. For example, the remote kite
-		// may disconnect from a proxy kite and registers to different proxy.
-		remoteKite.URL = options.Kite.URL
+		// // Need to update URL in case of a change. For example, the remote kite
+		// // may disconnect from a proxy kite and registers to different proxy.
+		// remoteKite.URL = options.Kite.URL
 	}
 
 	request := &Request{
@@ -214,6 +214,13 @@ func (r *Request) authenticate() *Error {
 	// RemoteAddr() returns "" if this is an outgoing connection.
 	if r.RemoteAddr == "" {
 		return nil
+	}
+
+	if r.Authentication == nil {
+		return &Error{
+			Type:    "authenticationError",
+			Message: "No authentication information is provided",
+		}
 	}
 
 	// Select authenticator function.
@@ -243,7 +250,7 @@ func (r *Request) authenticate() *Error {
 
 // AuthenticateFromToken is the default Authenticator for Kite.
 func (k *Kite) AuthenticateFromToken(r *Request) error {
-	token, err := jwt.Parse(r.Authentication.Key, r.LocalKite.getRSAKey)
+	token, err := jwt.Parse(r.Authentication.Key, r.LocalKite.RSAKey)
 	if err != nil {
 		return err
 	}
@@ -252,7 +259,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return errors.New("Invalid signature in token")
 	}
 
-	if audience, ok := token.Claims["aud"].(string); !ok || !strings.HasPrefix(k.Kite.Key(), audience) {
+	if audience, ok := token.Claims["aud"].(string); !ok || !strings.HasPrefix(k.Kite().Key(), audience) {
 		return fmt.Errorf("Invalid audience in token: %s", audience)
 	}
 

@@ -2,9 +2,9 @@ package kite
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -26,6 +26,8 @@ type RemoteKite struct {
 	// The information about the kite that we are connecting to.
 	protocol.Kite
 
+	URL *url.URL
+
 	// A reference to the current Kite running.
 	localKite *Kite
 
@@ -33,7 +35,7 @@ type RemoteKite struct {
 	Log logging.Logger
 
 	// Credentials that we sent in each request.
-	Authentication Authentication
+	Authentication *Authentication
 
 	// dnode RPC client that processes messages.
 	client *rpc.Client
@@ -46,17 +48,18 @@ type RemoteKite struct {
 
 	// For forcing token to renew.
 	signalRenewToken chan struct{}
+
+	TLSConfig *tls.Config
 }
 
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
-func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKite {
+func (k *Kite) NewRemoteKite(kiteURL *url.URL) *RemoteKite {
 	r := &RemoteKite{
-		Kite:             kite,
+		URL:              kiteURL,
 		localKite:        k,
 		Log:              k.Log,
-		Authentication:   auth,
 		client:           k.server.NewClientWithHandlers(),
 		disconnect:       make(chan struct{}),
 		signalRenewToken: make(chan struct{}, 1),
@@ -73,28 +76,7 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	r.client.Properties()["remoteKite"] = r
 
 	// Add trusted root certificates for client.
-	r.client.Config.TlsConfig = k.tlsConfig()
-
-	// Parse token for setting validUntil field
-	if auth.Type == "token" && auth.validUntil == nil {
-		var exp time.Time
-		token, err := jwt.Parse(auth.Key, k.getRSAKey)
-		if err != nil {
-			exp = time.Now().UTC()
-		} else {
-			exp = time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-		}
-		r.Authentication.validUntil = &exp
-	}
-
-	r.OnConnect(func() {
-		if r.Authentication.Type != "token" {
-			return
-		}
-
-		// Start a goroutine that will renew the token before it expires.
-		r.startTokenRenewer()
-	})
+	r.client.Config.TlsConfig = r.TLSConfig
 
 	var m sync.Mutex
 	r.OnDisconnect(func() {
@@ -107,12 +89,12 @@ func (k *Kite) NewRemoteKite(kite protocol.Kite, auth Authentication) *RemoteKit
 	return r
 }
 
-func (k *Kite) tlsConfig() *tls.Config {
-	c := &tls.Config{RootCAs: x509.NewCertPool()}
-	for _, cert := range k.tlsCertificates {
-		c.RootCAs.AppendCertsFromPEM(cert)
+func (k *Kite) NewRemoteKiteString(kiteURL string) *RemoteKite {
+	parsed, err := url.Parse(kiteURL)
+	if err != nil {
+		panic(err)
 	}
-	return c
+	return k.NewRemoteKite(parsed)
 }
 
 func onError(err error) {
@@ -139,19 +121,19 @@ func onError(err error) {
 
 func wrapCallbackArgs(args []interface{}, tr dnode.Transport) []interface{} {
 	return []interface{}{&callOptionsOut{
-		WithArgs: args,
+		WithArgs:    args,
 		callOptions: callOptions{
-			Kite: tr.Properties()["localKite"].(*Kite).Kite,
+		// Kite: tr.Properties()["localKite"].(*Kite).Kite,
 		},
 	}}
 }
 
 // newRemoteKiteWithClient returns a pointer to new RemoteKite instance.
 // The client will be replaced with the given client.
-// Used to give the Kite method handler a working RemoteKite to call methods
+// Used to give the Kite method handler a working RemoteKite for calling methods
 // on other side.
-func (k *Kite) newRemoteKiteWithClient(kite protocol.Kite, auth Authentication, client *rpc.Client) *RemoteKite {
-	r := k.NewRemoteKite(kite, auth)
+func (k *Kite) newRemoteKiteWithClient(kiteURL *url.URL, client *rpc.Client) *RemoteKite {
+	r := k.NewRemoteKite(kiteURL)
 	r.client = client
 	r.client.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback, onError)
 	r.client.Properties()["localKite"] = k
@@ -164,14 +146,14 @@ func (r *RemoteKite) SetTellTimeout(d time.Duration) { r.tellTimeout = d }
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (r *RemoteKite) Dial() (err error) {
-	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.Kite.URL.String())
-	return r.client.Dial(r.Kite.URL.String())
+	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.URL.String())
+	return r.client.Dial(r.URL.String())
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
 func (r *RemoteKite) DialForever() error {
-	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.Kite.URL.String())
-	return r.client.DialForever(r.Kite.URL.String())
+	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.URL.String())
+	return r.client.DialForever(r.URL.String())
 }
 
 func (r *RemoteKite) Close() {
@@ -188,43 +170,6 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
-func (r *RemoteKite) startTokenRenewer() {
-	const (
-		renewBefore   = 30 * time.Second
-		retryInterval = 10 * time.Second
-	)
-
-	// The duration from now to the time token needs to be renewed.
-	// Needs to be calculated after renewing the token.
-	renewDuration := func() time.Duration {
-		return r.Authentication.validUntil.Add(-renewBefore).Sub(time.Now().UTC())
-	}
-
-	// renews token before it expires (sends the first signal to the goroutine below)
-	go time.AfterFunc(renewDuration(), r.sendRenewTokenSignal)
-
-	// renews token on signal
-	go func() {
-		for {
-			select {
-			case <-r.signalRenewToken:
-				if err := r.renewToken(); err != nil {
-					r.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), r.Kite.ID, retryInterval/time.Second)
-					// Need to sleep here litle bit because a signal is sent
-					// when an expired token is detected on incoming request.
-					// This sleep prevents the signal from coming too fast.
-					time.Sleep(1 * time.Second)
-					go time.AfterFunc(retryInterval, r.sendRenewTokenSignal)
-				} else {
-					go time.AfterFunc(renewDuration(), r.sendRenewTokenSignal)
-				}
-			case <-r.disconnect:
-				return
-			}
-		}
-	}()
-}
-
 func (r *RemoteKite) sendRenewTokenSignal() {
 	// Needs to be non-blocking because tokenRenewer may be stopped.
 	select {
@@ -233,36 +178,17 @@ func (r *RemoteKite) sendRenewTokenSignal() {
 	}
 }
 
-func (r *RemoteKite) renewToken() error {
-	tokenString, err := r.localKite.Kontrol.GetToken(&r.Kite)
-	if err != nil {
-		return err
-	}
-
-	token, err := jwt.Parse(tokenString, r.localKite.getRSAKey)
-	if err != nil {
-		return fmt.Errorf("Cannot parse token: %s", err.Error())
-	}
-
-	exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-
-	r.Authentication.Key = tokenString
-	r.Authentication.validUntil = &exp
-
-	return nil
-}
-
-// getRSAKey returns the corresponding public key for the issuer of the token.
+// RSAKey returns the corresponding public key for the issuer of the token.
 // It is called by jwt-go package when validating the signature in the token.
-func (k *Kite) getRSAKey(token *jwt.Token) ([]byte, error) {
+func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 	issuer, ok := token.Claims["iss"].(string)
 	if !ok {
-		return nil, errors.New("Token does not contain a valid issuer claim")
+		return nil, errors.New("token does not contain a valid issuer claim")
 	}
 
 	key, ok := k.trustedKontrolKeys[issuer]
 	if !ok {
-		return nil, fmt.Errorf("Issuer is not trusted: %s", issuer)
+		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
 	}
 
 	return []byte(key), nil
@@ -274,7 +200,7 @@ func (k *Kite) getRSAKey(token *jwt.Token) ([]byte, error) {
 type callOptions struct {
 	// Arguments to the method
 	Kite             protocol.Kite   `json:"kite"`
-	Authentication   Authentication  `json:"authentication"`
+	Authentication   *Authentication `json:"authentication"`
 	WithArgs         dnode.Arguments `json:"withArgs" dnode:"-"`
 	ResponseCallback dnode.Function  `json:"responseCallback" dnode:"-"`
 }
@@ -302,7 +228,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 		WithArgs:         args,
 		ResponseCallback: responseCallback,
 		callOptions: callOptions{
-			Kite:           r.localKite.Kite,
+			// Kite:           r.localKite.Kite,
 			Authentication: r.Authentication,
 		},
 	}

@@ -2,73 +2,24 @@ package kite
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
-
-	"github.com/koding/kite/testutil"
 )
-
-// This example shows a simple method call between two kites.
-func Example() {
-	// Start adder kite
-	opts := &Options{
-		Kitename:    "adder",
-		Version:     "0.0.1",
-		Environment: "development",
-		Region:      "localhost",
-		PublicIP:    "127.0.0.1",
-		Port:        "10001",
-		DisableAuthentication: true, // open to anyone
-	}
-	adder := New(opts)
-	adder.HandleFunc("add", add)
-	adder.Start()
-	defer adder.Close()
-
-	// Start foo kite
-	opts = &Options{
-		Kitename:    "foo",
-		Version:     "0.0.1",
-		Environment: "development",
-		Region:      "localhost",
-		PublicIP:    "127.0.0.1",
-		Port:        "10002",
-	}
-	foo := New(opts)
-	foo.Start()
-	defer foo.Close()
-
-	// foo kite calls the "add" method of adder kite
-	remote := foo.NewRemoteKite(adder.Kite, Authentication{})
-	err := remote.Dial()
-	if err != nil {
-		panic(err)
-	}
-	result, err := remote.Tell("add", 2, 3)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Result is %d\n", int(result.MustFloat64()))
-	// Output: Result is 5
-}
-
-func add(r *Request) (interface{}, error) {
-	args := r.Args.MustSliceOfLength(2)
-	return args[0].MustFloat64() + args[1].MustFloat64(), nil
-}
 
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
-	testutil.WriteKiteKey()
+	mathKite := New("mathworker", "0.0.1")
+	mathKite.HandleFunc("square", Square)
+	mathKite.HandleFunc("squareCB", SquareCB)
+	mathKite.Config.DisableAuthentication = true
+	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
-	mathKite := mathWorker()
-	mathKite.Start()
-	defer mathKite.Close()
+	exp2Kite := New("exp2", "0.0.1")
+	go http.ListenAndServe("127.0.0.1:3637", exp2Kite)
 
-	exp2Kite := exp2()
-	exp2Kite.Start()
-	defer exp2Kite.Close()
+	// Wait until they start serving
+	time.Sleep(time.Second)
 
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
@@ -80,13 +31,8 @@ func TestKite(t *testing.T) {
 
 	exp2Kite.HandleFunc("foo", handleFoo)
 
-	// Use the kodingKey auth type since they are on same host.
-	auth := Authentication{
-		Type: "kiteKey",
-		Key:  exp2Kite.kiteKey.Raw,
-	}
-	remote := exp2Kite.NewRemoteKite(mathKite.Kite, auth)
-
+	// exp2 connects to mathworker
+	remote := exp2Kite.NewRemoteKiteString("ws://127.0.0.1:3636")
 	err := remote.Dial()
 	if err != nil {
 		t.Errorf(err.Error())
@@ -125,7 +71,7 @@ func TestKite(t *testing.T) {
 		resultChan <- n
 	}
 
-	result, err = remote.Tell("square2", 3, Callback(resultCallback))
+	result, err = remote.Tell("squareCB", 3, Callback(resultCallback))
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -142,36 +88,6 @@ func TestKite(t *testing.T) {
 	}
 }
 
-func exp2() *Kite {
-	options := &Options{
-		Kitename:    "exp2",
-		Version:     "0.0.1",
-		Port:        "3637",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	k := New(options)
-	k.KontrolEnabled = false
-	return k
-}
-
-func mathWorker() *Kite {
-	options := &Options{
-		Kitename:    "mathworker",
-		Version:     "0.0.1",
-		Port:        "3636",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	k := New(options)
-	k.KontrolEnabled = false
-	k.HandleFunc("square", Square)
-	k.HandleFunc("square2", Square2)
-	return k
-}
-
 // Returns the result. Also tests reverse call.
 func Square(r *Request) (interface{}, error) {
 	a := r.Args[0].MustFloat64()
@@ -185,8 +101,8 @@ func Square(r *Request) (interface{}, error) {
 	return result, nil
 }
 
-// Calls the callback with the result. For testing requests from Callback.
-func Square2(r *Request) (interface{}, error) {
+// Calls the callback with the result. For testing requests with Callback.
+func SquareCB(r *Request) (interface{}, error) {
 	args := r.Args.MustSliceOfLength(2)
 	a := args[0].MustFloat64()
 	cb := args[1].MustFunction()

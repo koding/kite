@@ -2,36 +2,35 @@ package kontrol
 
 import (
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/testkeys"
-	"github.com/koding/kite/testutil"
+	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/simple"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 )
 
 func TestKontrol(t *testing.T) {
 	testutil.WriteKiteKey()
 
-	opts := &kite.Options{
-		Kitename:    "kontrol",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "testing",
-		PublicIP:    "127.0.0.1",
-		Port:        "3999",
-		Path:        "/kontrol",
-	}
-	kon := New(opts, "kontrol", os.TempDir(), nil, testkeys.Public, testkeys.Private)
+	kon := New(testkeys.Public, testkeys.Private)
+	kon.DataDir = os.TempDir()
+	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 	kon.ClearKites()
 
-	mathKite := mathWorker()
-	mathKite.Start()
+	mathKite := simple.New("mathworker", "0.0.1")
+	mathKite.HandleFunc("square", Square)
+	mathKite.Run()
+	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
-	exp2Kite := exp2()
-	exp2Kite.Start()
+	exp2Kite := kite.New("exp2", "0.0.1")
+	go http.ListenAndServe("127.0.0.1:3637", exp2Kite)
 
 	// Wait for kites to register themselves on Kontrol.
 	time.Sleep(500 * time.Millisecond)
@@ -42,7 +41,8 @@ func TestKontrol(t *testing.T) {
 		Name:        "mathworker",
 	}
 
-	kites, err := exp2Kite.Kontrol.GetKites(query)
+	konClient := kontrolclient.New(exp2Kite)
+	kites, err := konClient.GetKites(query)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -62,7 +62,7 @@ func TestKontrol(t *testing.T) {
 
 	// Test Kontrol.GetToken
 	fmt.Printf("oldToken: %#v\n", remoteMathWorker.Authentication.Key)
-	newToken, err := exp2Kite.Kontrol.GetToken(&remoteMathWorker.Kite)
+	newToken, err := konClient.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -88,10 +88,10 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
-	events := make(chan *kite.Event, 3)
+	events := make(chan *kontrolclient.Event, 3)
 
 	// Test WatchKites
-	watcher, err := exp2Kite.Kontrol.WatchKites(query, func(e *kite.Event, err error) {
+	watcher, err := konClient.WatchKites(query, func(e *kontrolclient.Event, err error) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -116,7 +116,6 @@ func TestKontrol(t *testing.T) {
 		return
 	}
 
-	mathKite.Kontrol.Close() // TODO Close all RemoteKites when kite is closed.
 	mathKite.Close()
 
 	// We must get Deregister event
@@ -162,20 +161,6 @@ func TestKontrol(t *testing.T) {
 	}
 }
 
-func mathWorker() *kite.Kite {
-	options := &kite.Options{
-		Kitename:    "mathworker",
-		Version:     "0.0.1",
-		Port:        "3636",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	k := kite.New(options)
-	k.HandleFunc("square", Square)
-	return k
-}
-
 func Square(r *kite.Request) (interface{}, error) {
 	a, err := r.Args[0].Float64()
 	if err != nil {
@@ -187,18 +172,6 @@ func Square(r *kite.Request) (interface{}, error) {
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
 
 	return result, nil
-}
-
-func exp2() *kite.Kite {
-	options := &kite.Options{
-		Kitename:    "exp2",
-		Version:     "0.0.1",
-		Port:        "3637",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	return kite.New(options)
 }
 
 func TestGetQueryKey(t *testing.T) {

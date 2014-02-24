@@ -6,13 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/logging"
-	"github.com/koding/kite/protocol"
 	"math/rand"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +15,12 @@ import (
 	etcdErr "github.com/coreos/etcd/error"
 	"github.com/coreos/etcd/store"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite"
+	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/logging"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/server"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -34,12 +35,10 @@ const (
 var log logging.Logger
 
 type Kontrol struct {
-	kite       *kite.Kite
-	ip         string       // Bind IP address
-	port       int          // Bind kite port (default: 4000)
-	name       string       // Name of the etcd instance
-	dataDir    string       // etcd data dir
-	peers      []string     // other peers in cluster (must be peer address of other instances)
+	Server     *server.Server
+	Name       string       // Name of the etcd instance
+	DataDir    string       // etcd data dir
+	Peers      []string     // other peers in cluster (must be peer address of other instances)
 	store      store.Store  // etcd data store
 	psListener net.Listener // etcd peer server listener (default port: 7001)
 	sListener  net.Listener // etcd http server listener (default port: 4001)
@@ -60,52 +59,52 @@ type Kontrol struct {
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
-func New(kiteOptions *kite.Options, name, dataDir string, peers []string, publicKey, privateKey string) *Kontrol {
-	port, err := strconv.Atoi(kiteOptions.Port)
-	if err != nil {
-		panic(err.Error())
+func New(publicKey, privateKey string) *Kontrol {
+	k := kite.New("kontrol", "0.0.2")
+
+	// Listen on 4000 by default
+	if k.Config.Port == 0 {
+		k.Config.Port = 4000
 	}
 
+	hostname := k.Kite().Hostname
+
 	kontrol := &Kontrol{
-		kite:       kite.New(kiteOptions),
-		ip:         kiteOptions.PublicIP,
-		port:       port,
-		name:       name,
-		dataDir:    dataDir,
-		peers:      peers,
+		Server:     server.New(k),
+		Name:       hostname,
+		DataDir:    "kontrol-data." + hostname,
+		Peers:      nil,
 		publicKey:  publicKey,
 		privateKey: privateKey,
 		watchers:   make(map[string]*store.Watcher),
 	}
 
-	log = kontrol.kite.Log
+	log = k.Log
 
-	kontrol.kite.KontrolEnabled = false // Because we are Kontrol!
-
-	kontrol.kite.HandleFunc("register", kontrol.handleRegister)
-	kontrol.kite.HandleFunc("getKites", kontrol.handleGetKites)
-	kontrol.kite.HandleFunc("getToken", kontrol.handleGetToken)
-	kontrol.kite.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
+	k.HandleFunc("register", kontrol.handleRegister)
+	k.HandleFunc("getKites", kontrol.handleGetKites)
+	k.HandleFunc("getToken", kontrol.handleGetToken)
+	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
 
 	return kontrol
 }
 
 func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error) {
-	k.kite.Authenticators[keyType] = fn
+	k.Server.Kite.Authenticators[keyType] = fn
 }
 
-func (k *Kontrol) EnableTLS(certFile, keyFile string) {
-	k.kite.EnableTLS(certFile, keyFile)
-}
+// func (k *Kontrol) EnableTLS(certFile, keyFile string) {
+// 	k.Server.Kite.EnableTLS(certFile, keyFile)
+// }
 
 func (k *Kontrol) Run() {
 	k.init()
-	k.kite.Run()
+	k.Server.Run()
 }
 
 func (k *Kontrol) Start() {
 	k.init()
-	k.kite.Start()
+	k.Server.Start()
 }
 
 // init does common operations of Run() and Start().
@@ -135,20 +134,24 @@ func (k *Kontrol) ClearKites() error {
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
-	URL protocol.KiteURL
+	URL *protocol.KiteURL `json:"url"`
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	log.Info("Register request from: %#v", r.RemoteKite.Kite)
 
+	var args struct {
+		URL *protocol.KiteURL `json:"url"`
+	}
+	r.Args.MustUnmarshal(&args)
+	if args.URL == nil {
+		return nil, errors.New("empty url")
+	}
+
 	// Only accept requests with kiteKey because we need this info
 	// for generating tokens for this kite.
 	if r.Authentication.Type != "kiteKey" {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
-	}
-
-	if r.RemoteKite.URL == nil {
-		return nil, errors.New("Empty 'url' field")
 	}
 
 	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
@@ -158,49 +161,53 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		r.RemoteKite.URL.Host = net.JoinHostPort(host, port)
 	}
 
-	return k.register(r.RemoteKite, r.RemoteAddr)
-}
-
-func (k *Kontrol) register(r *kite.RemoteKite, remoteAddr string) (*protocol.RegisterResult, error) {
-	// Need a copy of protocol.Kite structure because URL field is overwritten
-	// by the heartbeat request (in request.go:parseRequest).
-	var kiteCopy protocol.Kite = r.Kite
-	kite := &kiteCopy // shorthand
-
-	kiteKey, err := getKiteKey(kite)
+	err := k.register(r.RemoteKite, args.URL)
 	if err != nil {
 		return nil, err
 	}
 
+	// send response back to the kite, also identify him with the new name
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return &protocol.RegisterResult{PublicIP: ip}, nil
+}
+
+func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error {
+	err := validateKiteKey(&r.Kite)
+	if err != nil {
+		return err
+	}
+
+	value := &registerValue{
+		URL: kiteURL,
+	}
+
 	// setKey sets the value of the Kite in etcd.
-	setKey := k.makeSetter(kite, kiteKey)
+	setKey, etcdKey := k.makeSetter(&r.Kite, value)
 
 	// Register to etcd.
 	err = setKey()
 	if err != nil {
 		log.Critical("etcd setKey error: %s", err)
-		return nil, errors.New("internal error - register")
+		return errors.New("internal error - register")
 	}
 
 	if err := requestHeartbeat(r, setKey); err != nil {
-		return nil, err
+		return err
 	}
 
-	log.Info("Kite registered: %s", kiteKey)
+	log.Info("Kite registered: %s", r.Kite.Key())
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
 		k.store.Delete(
-			kiteKey, // path
+			etcdKey, // path
 			false,   // recursive
 			false,   // dir
 		)
 	})
 
-	// send response back to the kite, also identify him with the new name
-	ip, _, _ := net.SplitHostPort(remoteAddr)
-	return &protocol.RegisterResult{PublicIP: ip}, nil
+	return nil
 }
 
 func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
@@ -213,14 +220,9 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
 	return err
 }
 
-// registerSelf adds Kontrol itself to etcd.
+// registerSelf adds Kontrol itself to etcd. TODO review and fix
 func (k *Kontrol) registerSelf() {
-	key, err := getKiteKey(&k.kite.Kite)
-	if err != nil {
-		panic(err)
-	}
-
-	setter := k.makeSetter(&k.kite.Kite, key)
+	setter, _ := k.makeSetter(k.Server.Kite.Kite(), &registerValue{})
 	for {
 		if err := setter(); err != nil {
 			log.Error(err.Error())
@@ -233,24 +235,22 @@ func (k *Kontrol) registerSelf() {
 }
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
-	rv := &registerValue{
-		URL: *kite.URL,
-	}
+func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter func() error, etcdKey string) {
+	etcdKey = KitesPrefix + kite.Key()
 
-	valueBytes, _ := json.Marshal(rv)
-	value := string(valueBytes)
+	valueBytes, _ := json.Marshal(value)
+	valueString := string(valueBytes)
 
-	return func() error {
+	setter = func() error {
 		expireAt := time.Now().Add(HeartbeatDelay)
 
 		// Set the kite key.
 		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 		_, err := k.store.Set(
-			etcdKey,  // path
-			false,    // dir
-			value,    // value
-			expireAt, // expire time
+			etcdKey,     // path
+			false,       // dir
+			valueString, // value
+			expireAt,    // expire time
 		)
 		if err != nil {
 			log.Critical("etcd error: %s", err)
@@ -270,11 +270,13 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, etcdKey string) func() error {
 
 		return nil
 	}
+
+	return
 }
 
-// getKiteKey returns a string representing the kite uniquely
+// validateKiteKey returns a string representing the kite uniquely
 // that is suitable to use as a key for etcd.
-func getKiteKey(k *protocol.Kite) (string, error) {
+func validateKiteKey(k *protocol.Kite) error {
 	// Order is important.
 	fields := map[string]string{
 		"username":    k.Username,
@@ -289,21 +291,14 @@ func getKiteKey(k *protocol.Kite) (string, error) {
 	// Validate fields.
 	for k, v := range fields {
 		if v == "" {
-			return "", fmt.Errorf("Empty Kite field: %s", k)
+			return fmt.Errorf("Empty Kite field: %s", k)
 		}
 		if strings.ContainsRune(v, '/') {
-			return "", fmt.Errorf("Field \"%s\" must not contain '/'", k)
+			return fmt.Errorf("Field \"%s\" must not contain '/'", k)
 		}
 	}
 
-	// Build key.
-	key := "/"
-	for _, v := range fields {
-		key = key + v + "/"
-	}
-	key = strings.TrimSuffix(key, "/")
-
-	return KitesPrefix + key, nil
+	return nil
 }
 
 // getQueryKey returns the etcd key for the query.
@@ -434,7 +429,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.kite.Username, key, k.privateKey)
+	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.Server.Kite.Kite().Username, key, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +465,7 @@ func (k *Kontrol) cancelWatcher(watcherID string) error {
 func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID string, disconnect chan bool, query *protocol.KontrolQuery, callback dnode.Function) {
 	var index uint64 = 0
 	for {
-		var kiteEvent kite.Event
+		var kiteEvent kontrolclient.Event
 
 		select {
 		case <-disconnect:
@@ -534,7 +529,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				kiteEvent.Action = protocol.Register
 				kiteEvent.Kite = *otherKite
 
-				kiteEvent.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.kite.Username, k.privateKey)
+				kiteEvent.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.Server.Kite.Kite().Username, k.privateKey)
 				if err != nil {
 					log.Error("watch notify: %s", err)
 					return
@@ -655,7 +650,7 @@ func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
 	rv := new(registerValue)
 	json.Unmarshal([]byte(value), rv)
 
-	kite.URL = &rv.URL
+	// kite.URL = &rv.URL
 
 	return kite, nil
 }
@@ -690,5 +685,5 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kiteKey, r.Username, k.kite.Username, k.privateKey)
+	return generateToken(kiteKey, r.Username, k.Server.Kite.Kite().Username, k.privateKey)
 }

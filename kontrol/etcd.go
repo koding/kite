@@ -36,9 +36,9 @@ import (
 func (k *Kontrol) runEtcd(ready chan bool) {
 	// Load config values from kontrol.
 	var config = config.New()
-	config.Name = k.name       // name of the etcd instance
-	config.DataDir = k.dataDir // directory to store etcd log
-	config.Peers = k.peers     // comma seperated values of other peers
+	config.Name = k.Name       // name of the etcd instance
+	config.DataDir = k.DataDir // directory to store etcd log
+	config.Peers = k.Peers     // comma seperated values of other peers
 
 	// Load other defaults.
 	config.Load(nil)
@@ -47,14 +47,16 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	// In Kontrol these ports depend on the kontrol's port.
 	// Etcd http server port will be: kontrolPort + 1
 	// Etcd peer server port will be: kontrolPort + 3001
-	advertiseIP := k.ip
+	ip, port, _ := net.SplitHostPort(k.Server.Addr())
+	portInt, _ := strconv.Atoi(port)
+	advertiseIP := ip
 	if advertiseIP == "0.0.0.0" {
 		advertiseIP = "127.0.0.1"
 	}
-	config.BindAddr = k.ip + ":" + strconv.Itoa(k.port+1)
-	config.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+1)
-	config.Peer.BindAddr = k.ip + ":" + strconv.Itoa(k.port+3001)
-	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(k.port+3001)
+	config.BindAddr = ip + ":" + strconv.Itoa(portInt+1)
+	config.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(portInt+1)
+	config.Peer.BindAddr = ip + ":" + strconv.Itoa(portInt+3001)
+	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(portInt+3001)
 
 	if config.DataDir == "" {
 		log.Fatal("The data dir was not set and could not be guessed from machine name")

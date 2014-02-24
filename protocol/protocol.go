@@ -32,13 +32,14 @@ type Kite struct {
 
 	// os.Hostname() of the Kite.
 	Hostname string `json:"hostname"`
-
-	// The URL that the Kite can be reached from. Marshaled as string.
-	URL *KiteURL `json:"url" dnode:"-"`
 }
 
 func (k *Kite) Key() string {
 	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+}
+
+type RegsiterArgs struct {
+	URL string `json:"url"`
 }
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
@@ -54,6 +55,7 @@ type GetKitesResult struct {
 
 type KiteWithToken struct {
 	Kite  Kite   `json:"kite"`
+	URL   string `json:"url"`
 	Token string `json:"token"`
 }
 
@@ -63,7 +65,8 @@ type KiteEvent struct {
 	Action KiteAction `json:"action"`
 	Kite   Kite       `json:"kite"`
 
-	// Required when Action == Register
+	// Required to connect when Action == Register
+	URL   string `json:"url,omitempty"`
 	Token string `json:"token,omitempty"`
 }
 
