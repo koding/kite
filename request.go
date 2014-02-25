@@ -183,6 +183,7 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		// cache it in Transport.Properties().
 		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
 		remoteKite = k.newRemoteKiteWithClient(nil, client)
+		remoteKite.Kite = options.Kite
 		properties["remoteKite"] = remoteKite
 
 		// // Notify Kite.OnConnect handlers.

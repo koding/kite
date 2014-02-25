@@ -3,20 +3,19 @@ package proxy
 
 import (
 	"crypto/tls"
-	"github.com/koding/kite/kontrolclient"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
+	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
-	"github.com/koding/kite/util"
 )
 
 type Proxy struct {
@@ -45,16 +44,13 @@ type Proxy struct {
 	mux *http.ServeMux
 
 	RegisterToKontrol bool
-	registration      *registration.Registration
-
-	kontrol *kontrolclient.Kontrol
 
 	url *url.URL
 }
 
 func New(pubKey, privKey string) *Proxy {
 	k := kite.New("proxy", "0.0.2")
-	kon := kontrolclient.New(k)
+
 	p := &Proxy{
 		Kite:              k,
 		pubKey:            pubKey,
@@ -64,8 +60,6 @@ func New(pubKey, privKey string) *Proxy {
 		Port:              3999,
 		mux:               http.NewServeMux(),
 		RegisterToKontrol: true,
-		registration:      registration.New(kon),
-		kontrol:           kon,
 	}
 
 	p.Kite.HandleFunc("register", p.handleRegister)
@@ -85,21 +79,29 @@ func (p *Proxy) Close() {
 }
 
 func (p *Proxy) ListenAndServe() error {
+	fmt.Println("--- ListenAndServe")
 	var err error
 	p.listener, err = net.Listen("tcp", net.JoinHostPort(p.IP, strconv.Itoa(p.Port)))
 	if err != nil {
 		return err
 	}
 
+	p.Kite.Log.Notice("Listening on: %s", p.listener.Addr().String())
+
+	kon := kontrolclient.New(p.Kite)
+
 	if p.RegisterToKontrol {
+		reg := registration.New(kon)
 		p.url = &url.URL{
 			Scheme: "ws",
 			Host:   net.JoinHostPort(p.Domain, strconv.Itoa(p.Port)),
 			Path:   "/kite",
 		}
-		p.registration.RegisterToKontrol(p.url)
+		kon.DialForever()
+		go reg.RegisterToKontrol(p.url)
 	}
 
+	fmt.Println("--- serve")
 	return http.Serve(p.listener, p.mux)
 }
 
@@ -270,43 +272,4 @@ func (k *PrivateKite) newTunnel(local *websocket.Conn) *Tunnel {
 	}()
 
 	return t
-}
-
-//
-// Tunnel
-//
-
-type Tunnel struct {
-	id          uint64          // key in kites's tunnels map
-	localConn   *websocket.Conn // conn to local kite
-	startChan   chan bool       // to signal started state
-	closeChan   chan bool       // to signal closed state
-	closed      bool            // to prevent closing closeChan again
-	closedMutex sync.Mutex      // for protection of closed field
-}
-
-func (t *Tunnel) Close() {
-	t.closedMutex.Lock()
-	defer t.closedMutex.Unlock()
-
-	if t.closed {
-		return
-	}
-
-	close(t.closeChan)
-	t.closed = true
-}
-
-func (t *Tunnel) CloseNotify() chan bool {
-	return t.closeChan
-}
-
-func (t *Tunnel) StartNotify() chan bool {
-	return t.startChan
-}
-
-func (t *Tunnel) Run(remoteConn *websocket.Conn) {
-	close(t.startChan)
-	<-util.JoinStreams(t.localConn, remoteConn)
-	t.Close()
 }

@@ -19,7 +19,6 @@ type Config struct {
 	// Options for Server
 	IP                 string
 	Port               int
-	Path               string
 	DisableConcurrency bool
 
 	KontrolURL  *url.URL
@@ -44,11 +43,11 @@ func New() *Config {
 }
 
 func (c *Config) ReadEnvironmentVariables() {
-	if environment := os.Getenv("KITE_ENVIRONMENT"); environment == "" {
+	if environment := os.Getenv("KITE_ENVIRONMENT"); environment != "" {
 		c.Environment = environment
 	}
 
-	if region := os.Getenv("KITE_REGION"); region == "" {
+	if region := os.Getenv("KITE_REGION"); region != "" {
 		c.Region = region
 	}
 }
@@ -82,6 +81,16 @@ func (c *Config) ReadKiteKey() error {
 	}
 
 	return nil
+}
+
+func MustGet() *Config {
+	c := New()
+	err := c.ReadKiteKey()
+	if err != nil {
+		panic(err)
+	}
+	c.ReadEnvironmentVariables()
+	return c
 }
 
 // validate fields of the options struct. It exits if an error is occured.

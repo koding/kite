@@ -3,6 +3,7 @@ package kontrolclient
 import (
 	"container/list"
 	"errors"
+	"fmt"
 	"net/url"
 	"sync"
 
@@ -35,11 +36,17 @@ type Kontrol struct {
 
 // NewKontrol returns a pointer to new Kontrol instance.
 func New(k *kite.Kite) *Kontrol {
+	if k.Config.KontrolURL == nil {
+		panic("no kontrol URL given in config")
+	}
+
 	// Only the address is required to connect Kontrol
 	auth := &kite.Authentication{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
+
+	fmt.Println("--- creating new kontrl client with url:", k.Config.KontrolURL.String())
 
 	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
 	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
@@ -81,7 +88,11 @@ func New(k *kite.Kite) *Kontrol {
 func (k *Kontrol) Register(kiteURL *url.URL) error {
 	<-k.ready
 
-	response, err := k.RemoteKite.Tell("register")
+	args := protocol.RegsiterArgs{
+		URL: kiteURL.String(),
+	}
+
+	response, err := k.RemoteKite.Tell("register", args)
 	if err != nil {
 		return err
 	}
@@ -92,14 +103,7 @@ func (k *Kontrol) Register(kiteURL *url.URL) error {
 		return err
 	}
 
-	// kite := &k.localKite.Kite // shortcut
-	//
-	// // Set the correct PublicIP if left empty in options.
-	// ip, port, _ := net.SplitHostPort(kiteURL.Host)
-	// if ip == "0.0.0.0" {
-	// 	kite.URL.Host = net.JoinHostPort(rr.PublicIP, port)
-	// }
-
+	k.Log.Info("Registered to kontrol with URL: %s", rr.URL)
 	return nil
 }
 

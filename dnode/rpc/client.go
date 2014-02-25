@@ -3,13 +3,13 @@ package rpc
 import (
 	"errors"
 	"fmt"
-	"github.com/koding/kite/dnode"
 	"net/url"
 	"os"
 	"sync"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
+	"github.com/koding/kite/dnode"
 )
 
 const redialDurationStart = 1 * time.Second
@@ -132,19 +132,21 @@ func (c *Client) dial() error {
 
 // DialForever connects to the server in background.
 // If the connection drops, it reconnects again.
-func (c *Client) DialForever(serverURL string) (err error) {
+func (c *Client) DialForever(serverURL string) (connected chan bool, err error) {
 	c.Reconnect = true
+
+	connected = make(chan bool, 1)
 
 	if c.Config.Location, err = url.Parse(serverURL); err != nil {
 		return
 	}
 
-	go c.dialForever()
+	go c.dialForever(connected)
 
 	return
 }
 
-func (c *Client) dialForever() {
+func (c *Client) dialForever(connectNotifyChan chan bool) {
 	for c.dial() != nil {
 		if !c.Reconnect {
 			return
@@ -152,6 +154,9 @@ func (c *Client) dialForever() {
 
 		c.sleep()
 	}
+
+	close(connectNotifyChan) // This is executed only once.
+
 	go c.run()
 }
 

@@ -143,7 +143,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	var args struct {
 		URL *protocol.KiteURL `json:"url"`
 	}
-	r.Args.MustUnmarshal(&args)
+	r.Args.One().MustUnmarshal(&args)
 	if args.URL == nil {
 		return nil, errors.New("empty url")
 	}
@@ -155,10 +155,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
-	host, port, _ := net.SplitHostPort(r.RemoteKite.URL.Host)
-	if host == "0.0.0.0" {
+	host, port, _ := net.SplitHostPort(args.URL.Host)
+	if host == "0.0.0.0" || host == "" {
 		host, _, _ = net.SplitHostPort(r.RemoteAddr)
-		r.RemoteKite.URL.Host = net.JoinHostPort(host, port)
+		args.URL.Host = net.JoinHostPort(host, port)
 	}
 
 	err := k.register(r.RemoteKite, args.URL)
@@ -167,8 +167,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	// send response back to the kite, also identify him with the new name
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return &protocol.RegisterResult{PublicIP: ip}, nil
+	return &protocol.RegisterResult{URL: args.URL.String()}, nil
 }
 
 func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error {

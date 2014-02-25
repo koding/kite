@@ -55,9 +55,9 @@ type RemoteKite struct {
 // NewRemoteKite returns a pointer to a new RemoteKite. The returned instance
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
-func (k *Kite) NewRemoteKite(kiteURL *url.URL) *RemoteKite {
+func (k *Kite) NewRemoteKite(remoteURL *url.URL) *RemoteKite {
 	r := &RemoteKite{
-		URL:              kiteURL,
+		URL:              remoteURL,
 		localKite:        k,
 		Log:              k.Log,
 		client:           k.server.NewClientWithHandlers(),
@@ -89,8 +89,8 @@ func (k *Kite) NewRemoteKite(kiteURL *url.URL) *RemoteKite {
 	return r
 }
 
-func (k *Kite) NewRemoteKiteString(kiteURL string) *RemoteKite {
-	parsed, err := url.Parse(kiteURL)
+func (k *Kite) NewRemoteKiteString(remoteURL string) *RemoteKite {
+	parsed, err := url.Parse(remoteURL)
 	if err != nil {
 		panic(err)
 	}
@@ -121,9 +121,9 @@ func onError(err error) {
 
 func wrapCallbackArgs(args []interface{}, tr dnode.Transport) []interface{} {
 	return []interface{}{&callOptionsOut{
-		WithArgs:    args,
+		WithArgs: args,
 		callOptions: callOptions{
-		// Kite: tr.Properties()["localKite"].(*Kite).Kite,
+			Kite: *tr.Properties()["localKite"].(*Kite).Kite(),
 		},
 	}}
 }
@@ -151,7 +151,7 @@ func (r *RemoteKite) Dial() (err error) {
 }
 
 // Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
-func (r *RemoteKite) DialForever() error {
+func (r *RemoteKite) DialForever() (connected chan bool, err error) {
 	r.Log.Info("Dialing remote kite: [%s %s]", r.Kite.Name, r.URL.String())
 	return r.client.DialForever(r.URL.String())
 }
@@ -228,7 +228,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 		WithArgs:         args,
 		ResponseCallback: responseCallback,
 		callOptions: callOptions{
-			// Kite:           r.localKite.Kite,
+			Kite:           *r.localKite.Kite(),
 			Authentication: r.Authentication,
 		},
 	}

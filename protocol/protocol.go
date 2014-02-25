@@ -44,8 +44,7 @@ type RegsiterArgs struct {
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
-	// IP address seen by kontrol
-	PublicIP string
+	URL string `json:"url"`
 }
 
 type GetKitesResult struct {
