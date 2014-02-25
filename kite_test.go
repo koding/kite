@@ -35,14 +35,12 @@ func TestKite(t *testing.T) {
 	remote := exp2Kite.NewRemoteKiteString("ws://127.0.0.1:3636")
 	err := remote.Dial()
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
 	}
 
 	result, err := remote.Tell("square", 2)
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
 	}
 
 	number := result.MustFloat64()
@@ -50,18 +48,16 @@ func TestKite(t *testing.T) {
 	fmt.Printf("rpc result: %f\n", number)
 
 	if number != 4 {
-		t.Errorf("Invalid result: %f", number)
+		t.Fatalf("Invalid result: %f", number)
 	}
 
 	select {
 	case s := <-fooChan:
 		if s != "bar" {
-			t.Errorf("Invalid message: %s", s)
-			return
+			t.Fatalf("Invalid message: %s", s)
 		}
 	case <-time.After(100 * time.Millisecond):
-		t.Errorf("Did not get the message")
-		return
+		t.Fatal("Did not get the message")
 	}
 
 	resultChan := make(chan float64, 1)
@@ -73,18 +69,16 @@ func TestKite(t *testing.T) {
 
 	result, err = remote.Tell("squareCB", 3, Callback(resultCallback))
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatal(err)
 	}
 
 	select {
 	case n := <-resultChan:
 		if n != 9.0 {
-			t.Errorf("Unexpected result: %f", n)
-			return
+			t.Fatalf("Unexpected result: %f", n)
 		}
 	case <-time.After(100 * time.Millisecond):
-		t.Errorf("Did not get the message")
-		return
+		t.Fatal("Did not get the message")
 	}
 }
 
