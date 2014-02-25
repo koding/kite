@@ -83,9 +83,13 @@ func New(k *kite.Kite) *Kontrol {
 	return kontrol
 }
 
+type registerResult struct {
+	URL *url.URL
+}
+
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
-func (k *Kontrol) Register(kiteURL *url.URL) error {
+func (k *Kontrol) Register(kiteURL *url.URL) (*registerResult, error) {
 	<-k.ready
 
 	args := protocol.RegsiterArgs{
@@ -94,17 +98,23 @@ func (k *Kontrol) Register(kiteURL *url.URL) error {
 
 	response, err := k.RemoteKite.Tell("register", args)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var rr protocol.RegisterResult
 	err = response.Unmarshal(&rr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	k.Log.Info("Registered to kontrol with URL: %s", rr.URL)
-	return nil
+
+	parsed, err := url.Parse(rr.URL)
+	if err != nil {
+		k.Log.Error("Cannot parse registered URL: %s", err.Error())
+	}
+
+	return &registerResult{parsed}, nil
 }
 
 // WatchKites watches for Kites that matches the query. The onEvent functions

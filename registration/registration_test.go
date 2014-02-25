@@ -1,41 +1,60 @@
 package registration
 
-// import (
-// 	"testing"
+import (
+	"net/url"
+	"os"
+	"testing"
+	"time"
 
-// 	"github.com/koding/kite/kontrol"
-// )
+	"github.com/koding/kite"
+	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
+)
 
-// func init() {
-// 	kon := kontrol.New(kiteOptions, name, dataDir, peers, publicKey, privateKey)
-// 	kon.Start()
-// }
+var kon *kontrol.Kontrol
 
-// func TestRegistration(t *testing.T) {
-// 	c := NewConfig()
+func init() {
+	kon := kontrol.New(testkeys.Public, testkeys.Private)
+	kon.DataDir = os.TempDir()
+	kon.Start()
+}
 
-// 	kon := NewKontrol()
-// 	err := kon.Dial()
-// 	if err != nil {
-// 		t.Error(err)
-// 		return
-// 	}
+func TestRegisterToKontrol(t *testing.T) {
+	c := config.New()
+	c.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	c.KontrolKey = testkeys.Public
+	c.KontrolUser = "testuser"
+	c.KiteKey = testutil.NewKiteKey().Raw
 
-// 	k := New("test", "1.0.0", c)
-// 	k.HandleFunc("hello", hello)
+	k := kite.New("test", "1.0.0")
+	k.Config = c
+	k.HandleFunc("hello", hello)
 
-// 	s := NewKiteServer(k)
-// 	s.Start()
-// 	defer s.Close()
+	konclient := kontrolclient.New(k)
+	err := konclient.Dial()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	r := NewRegistration(k, kon)
-// 	r.RegisterToKontrol()
-// 	r.RegisterToProxy()
-// 	r.RegisterToProxyAndKontrol()
+	reg := New(konclient)
+	kiteURL := &url.URL{Scheme: "ws", Host: "zubuzaretta:16500"}
 
-// 	<-s.CloseNotify()
-// }
+	select {
+	case registeredURL := <-reg.RegisterToKontrol(kiteURL):
+		if *registeredURL != *kiteURL {
+			t.Fatal("invalid url")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
+}
 
-// func hello(r *Request) (interface{}, error) {
-// 	return "hello", nil
-// }
+func TestRegisterToProxy(t *testing.T)           {}
+func TestRegisterToProxyAndKontrol(t *testing.T) {}
+
+func hello(r *kite.Request) (interface{}, error) {
+	return "hello", nil
+}
