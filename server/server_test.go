@@ -14,7 +14,8 @@ func TestServerStart(t *testing.T) {
 	})
 
 	server := New(k)
-	server.Config.ListenAddr = "127.0.0.1:3636"
+	server.Config.IP = "127.0.0.1"
+	server.Config.Port = 3636
 	server.Config.DisableAuthentication = true
 	server.Start()
 
