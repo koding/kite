@@ -1,13 +1,14 @@
 package registration
 
 import (
-	"github.com/koding/kite"
-	"github.com/koding/kite/protocol"
 	"math/rand"
 	"net/url"
+	"sync"
 	"time"
 
+	"github.com/koding/kite"
 	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/protocol"
 )
 
 const (
@@ -17,58 +18,55 @@ const (
 
 type Registration struct {
 	kontrol *kontrolclient.Kontrol
+
+	// To signal waiters when registration is successfull.
+	ready     chan bool
+	onceReady sync.Once
 }
 
 func New(kon *kontrolclient.Kontrol) *Registration {
-	return &Registration{kontrol: kon}
+	return &Registration{
+		kontrol: kon,
+		ready:   make(chan bool),
+	}
 }
 
-// Register to Kontrol in background.
-func (r *Registration) RegisterToKontrol(kiteURL *url.URL) (registeredURL chan *url.URL) {
-	registeredURL = make(chan *url.URL, 1)
-	go func() {
-		for {
-			result, err := r.kontrol.Register(kiteURL)
-			if err != nil {
-				// do not exit, because existing applications might import the kite package
-				r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
-				time.Sleep(registerKontrolRetryDuration)
-				continue
-			}
-			registeredURL <- result.URL
-			break
+func (r *Registration) ReadyNotify() chan bool {
+	return r.ready
+}
+
+func (r *Registration) signalReady() {
+	r.onceReady.Do(func() { close(r.ready) })
+}
+
+// Register to Kontrol in background. If registration fails, it
+func (r *Registration) RegisterToKontrol(kiteURL *url.URL) {
+	for {
+		_, err := r.kontrol.Register(kiteURL)
+		if err != nil {
+			// do not exit, because existing applications might import the kite package
+			r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
+			time.Sleep(registerKontrolRetryDuration)
+			continue
 		}
-	}()
-	return registeredURL
+		r.signalReady()
+		break
+	}
 }
 
 // Register to Proxy in background.
 func (r *Registration) RegisterToProxy() {
-	go r.keepRegisteredToProxyKite(nil)
+	r.keepRegisteredToProxyKite(nil)
 }
 
 // Register to Proxy, then Kontrol in background.
 func (r *Registration) RegisterToProxyAndKontrol() {
 	urls := make(chan *url.URL)
-	go r.keepRegisteredToProxyKite(urls)
-	// go r.keepRegisteredToKontrol(urls)
-}
 
-func (r *Registration) keepRegisteredToKontrol(urls <-chan *url.URL, registeredURLs chan<- *url.URL) {
+	go r.keepRegisteredToProxyKite(urls)
+
 	for url := range urls {
-		for {
-			result, err := r.kontrol.Register(url)
-			if err != nil {
-				// do not exit, because existing applications might import the kite package
-				r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
-				time.Sleep(registerKontrolRetryDuration)
-				continue
-			}
-			select {
-			case registeredURLs <- result.URL:
-			case <-time.After(time.Second):
-			}
-		}
+		r.RegisterToKontrol(url)
 	}
 }
 
@@ -80,7 +78,7 @@ func (r *Registration) keepRegisteredToKontrol(urls <-chan *url.URL, registeredU
 func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 	query := protocol.KontrolQuery{
 		Username:    r.kontrol.LocalKite.Config.KontrolUser,
-		Environment: r.kontrol.LocalKite.Kite().Environment,
+		Environment: r.kontrol.LocalKite.Config.Environment,
 		Name:        "proxy",
 	}
 
@@ -113,6 +111,8 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 
 		if urls != nil {
 			urls <- proxyURL
+		} else {
+			r.signalReady()
 		}
 
 		// Block until disconnect from Proxy Kite.
@@ -183,14 +183,6 @@ func (reg *Registration) registerToProxyKite(r *kite.RemoteKite) (*url.URL, erro
 // // Register to proxy and/or kontrol, then update the URL.
 // func (k *Kite) Register(kiteURL *url.URL) {
 
-// }
-
-// func (k *Kite) RegisterString(kiteURL string) {
-//  parsed, err := url.Parse(kiteURL)
-//  if err != nil {
-//      panic(err)
-//  }
-//  k.Register(parsed)
 // }
 
 // remoteKite.OnConnect(func() {

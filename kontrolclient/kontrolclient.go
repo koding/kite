@@ -3,14 +3,12 @@ package kontrolclient
 import (
 	"container/list"
 	"errors"
-	"fmt"
 	"net/url"
 	"sync"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/protocol"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 // Returned from GetKites when query matches no kites.
@@ -45,8 +43,6 @@ func New(k *kite.Kite) *Kontrol {
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
-
-	fmt.Println("--- creating new kontrl client with url:", k.Config.KontrolURL.String())
 
 	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
 	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
@@ -232,8 +228,14 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 			// validUntil: &exp,
 		}
 
+		parsed, err := url.Parse(currentKite.URL)
+		if err != nil {
+			k.Log.Error("invalid url came from kontrol", currentKite.URL)
+		}
+
 		remoteKites[i] = k.LocalKite.NewRemoteKiteString(currentKite.URL)
 		remoteKites[i].Kite = currentKite.Kite
+		remoteKites[i].URL = parsed
 		remoteKites[i].Authentication = auth
 	}
 

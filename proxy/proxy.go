@@ -105,6 +105,12 @@ func (p *Proxy) ListenAndServe() error {
 	return http.Serve(p.listener, p.mux)
 }
 
+func (p *Proxy) Start() {
+	go p.ListenAndServe()
+	time.Sleep(1e9)
+	select {}
+}
+
 func (p *Proxy) ListenAndServeTLS(certFile, keyfile string) error {
 	cert, err := tls.X509KeyPair([]byte(p.cert), []byte(p.key))
 	if err != nil {

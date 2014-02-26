@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/koding/kite/config"
 	"math/rand"
 	"net"
 	"strings"
@@ -59,8 +60,9 @@ type Kontrol struct {
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
-func New(publicKey, privateKey string) *Kontrol {
+func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 	k := kite.New("kontrol", "0.0.2")
+	k.Config = conf
 
 	// Listen on 4000 by default
 	if k.Config.Port == 0 {
@@ -138,7 +140,7 @@ type registerValue struct {
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
-	log.Info("Register request from: %#v", r.RemoteKite.Kite)
+	log.Info("Register request from: %s", r.RemoteKite.Kite.Key())
 
 	var args struct {
 		URL *protocol.KiteURL `json:"url"`
@@ -579,6 +581,11 @@ func addTokenToKites(nodes store.NodeExterns, username, issuer, queryKey, privat
 		if err != nil {
 			return nil, err
 		}
+
+		rv := new(registerValue)
+		json.Unmarshal([]byte(node.Value), rv)
+
+		kitesWithToken[i].URL = rv.URL.String()
 	}
 
 	return kitesWithToken, nil
@@ -632,26 +639,21 @@ func generateToken(queryKey string, username, issuer, privateKey string) (string
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
 // etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
 func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
+	// TODO replace "kites" with KitesPrefix constant
 	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
 		return nil, fmt.Errorf("Invalid Kite: %s", key)
 	}
 
-	kite := new(protocol.Kite)
-	kite.Username = fields[1]
-	kite.Environment = fields[2]
-	kite.Name = fields[3]
-	kite.Version = fields[4]
-	kite.Region = fields[5]
-	kite.Hostname = fields[6]
-	kite.ID = fields[7]
-
-	rv := new(registerValue)
-	json.Unmarshal([]byte(value), rv)
-
-	// kite.URL = &rv.URL
-
-	return kite, nil
+	return &protocol.Kite{
+		Username:    fields[1],
+		Environment: fields[2],
+		Name:        fields[3],
+		Version:     fields[4],
+		Region:      fields[5],
+		Hostname:    fields[6],
+		ID:          fields[7],
+	}, nil
 }
 
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {

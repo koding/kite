@@ -186,12 +186,15 @@ func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 		return nil, errors.New("token does not contain a valid issuer claim")
 	}
 
-	key, ok := k.trustedKontrolKeys[issuer]
-	if !ok {
+	if issuer != k.Config.KontrolUser {
 		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
 	}
 
-	return []byte(key), nil
+	if k.Config.KontrolKey == "" {
+		panic("kontrol key is not set in config")
+	}
+
+	return []byte(k.Config.KontrolKey), nil
 }
 
 // callOptions is the type of first argument in the dnode message.
