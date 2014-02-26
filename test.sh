@@ -11,7 +11,10 @@ go test -v ./dnode/rpc
 go test -v ./cmd/cli
 go test -v ./systeminfo
 go test -v
+go test -v ./server
+go test -v ./registration/test
 go test -v ./regserv
 go test -v ./kontrol
-go test -v ./pool
 go test -v ./proxy
+go test -v ./simple
+go test -v ./pool

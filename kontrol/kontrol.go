@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	Version           = "0.0.2"
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
@@ -61,7 +62,7 @@ type Kontrol struct {
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
 func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
-	k := kite.New("kontrol", "0.0.2")
+	k := kite.New("kontrol", Version)
 	k.Config = conf
 
 	// Listen on 4000 by default

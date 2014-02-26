@@ -19,6 +19,8 @@ import (
 	"github.com/koding/kite/registration"
 )
 
+const Version = "0.0.2"
+
 type Proxy struct {
 	Kite *kite.Kite
 
@@ -50,7 +52,7 @@ type Proxy struct {
 }
 
 func New(conf *config.Config, pubKey, privKey string) *Proxy {
-	k := kite.New("proxy", "0.0.2")
+	k := kite.New("proxy", Version)
 	k.Config = conf
 
 	p := &Proxy{

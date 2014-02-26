@@ -29,14 +29,3 @@ func (b *exampleBackend) Username() string   { return "testuser" }
 func (b *exampleBackend) KontrolURL() string { return "ws://localhost:4000/kontrol" }
 func (b *exampleBackend) PublicKey() string  { return testkeys.Public }
 func (b *exampleBackend) PrivateKey() string { return testkeys.Private }
-
-func (b *exampleBackend) Authenticate(r *kite.Request) (string, error) {
-	result, err := r.RemoteKite.TellWithTimeout("prompt", 10*time.Minute, "Enter username: ")
-	if err != nil {
-		return "", err
-	}
-
-	// WARNING: You should probably ask for password here ;)
-
-	return result.MustString(), nil
-}
