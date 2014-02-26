@@ -3,6 +3,7 @@ package registration_test
 import (
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
-	// "github.com/koding/kite/proxy"
+	"github.com/koding/kite/proxy"
 	"github.com/koding/kite/registration"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
@@ -20,7 +21,7 @@ import (
 var (
 	conf *config.Config
 	kon  *kontrol.Kontrol
-	// prx *proxy.Proxy
+	prx  *proxy.Proxy
 )
 
 func init() {
@@ -35,8 +36,8 @@ func init() {
 	kon.DataDir = os.TempDir()
 	kon.Start()
 
-	// prx := proxy.New(testkeys.Public, testkeys.Private)
-	// prx.Start()
+	prx := proxy.New(conf, testkeys.Public, testkeys.Private)
+	prx.Start()
 }
 
 func TestRegisterToKontrol(t *testing.T) {
@@ -73,20 +74,48 @@ func TestRegisterToKontrol(t *testing.T) {
 }
 
 func TestRegisterToProxy(t *testing.T) {
-	// _, clt, reg := setup()
-	// defer clt.Close()
+	_, clt, reg := setup()
+	defer clt.Close()
 
-	// select {
-	// case proxyURL := <-reg.RegisterToProxy():
-	// 	// if *proxyURL != *kiteURL {
-	// 	// t.Fatal("invalid url")
-	// 	// }
-	// case <-time.After(time.Second):
-	// 	t.Fatal("timeout")
-	// }
+	go reg.RegisterToProxy()
+
+	select {
+	case <-reg.ReadyNotify():
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
 }
 
-func TestRegisterToProxyAndKontrol(t *testing.T) {}
+func TestRegisterToProxyAndKontrol(t *testing.T) {
+	k, clt, reg := setup()
+	defer clt.Close()
+
+	go reg.RegisterToProxyAndKontrol()
+
+	select {
+	case <-reg.ReadyNotify():
+		kites, err := clt.GetKites(protocol.KontrolQuery{
+			Username:    k.Kite().Username,
+			Environment: k.Kite().Environment,
+			Name:        k.Kite().Name,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(kites) != 1 {
+			t.Fatalf("unexpected result: %+v", kites)
+		}
+		first := kites[0]
+		if first.Kite != *k.Kite() {
+			t.Errorf("unexpected kite key: %s", first.Kite)
+		}
+		if !strings.Contains(first.URL.String(), "/proxy") {
+			t.Errorf("unexpected url: %s", first.URL.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
+}
 
 func setup() (*kite.Kite, *kontrolclient.Kontrol, *registration.Registration) {
 

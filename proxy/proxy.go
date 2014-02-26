@@ -14,6 +14,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
 )
@@ -48,8 +49,9 @@ type Proxy struct {
 	url *url.URL
 }
 
-func New(pubKey, privKey string) *Proxy {
+func New(conf *config.Config, pubKey, privKey string) *Proxy {
 	k := kite.New("proxy", "0.0.2")
+	k.Config = conf
 
 	p := &Proxy{
 		Kite:              k,
@@ -108,7 +110,6 @@ func (p *Proxy) ListenAndServe() error {
 func (p *Proxy) Start() {
 	go p.ListenAndServe()
 	time.Sleep(1e9)
-	select {}
 }
 
 func (p *Proxy) ListenAndServeTLS(certFile, keyfile string) error {
