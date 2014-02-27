@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/testkeys"
