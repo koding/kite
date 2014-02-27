@@ -2,9 +2,10 @@
 set -e
 
 # Do not owerwrite the user's key when running tests
-# KITE_HOME=/tmp/kite_home
-# rm -rf $KITE_HOME
-# export KITE_HOME=$KITE_HOME
+KITE_HOME=/tmp/test_kite_home
+rm -rf $KITE_HOME
+export KITE_HOME=$KITE_HOME
+go run ./testutil/writekey/main.go
 
 go test -v ./dnode
 go test -v ./dnode/rpc

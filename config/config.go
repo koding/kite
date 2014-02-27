@@ -91,13 +91,21 @@ func (c *Config) Clone() *Config {
 	return cloned
 }
 
-func MustGet() *Config {
+func Get() (*Config, error) {
 	c := New()
 	err := c.ReadKiteKey()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	c.ReadEnvironmentVariables()
+	return c, nil
+}
+
+func MustGet() *Config {
+	c, err := Get()
+	if err != nil {
+		panic(err)
+	}
 	return c
 }
 

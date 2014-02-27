@@ -4,11 +4,13 @@ package regserv
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/server"
 	"github.com/nu7hatch/gouuid"
 )
@@ -42,18 +44,18 @@ func (s *RegServ) Run() {
 	// fmt.Printf("kite register -to '%s'\n", s.kite.URL.String())
 }
 
-// // RegisterSelf registers this host and writes a key to ~/.kite/kite.key
-// func (s *RegServ) RegisterSelf() error {
-// 	hostname, err := os.Hostname()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	key, err := s.register(s.backend.Username(), hostname)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return kitekey.Write(key)
-// }
+// RegisterSelf registers this host and writes a key to ~/.kite/kite.key
+func (s *RegServ) RegisterSelf() error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	key, err := s.register(s.Server.Config.Username, hostname)
+	if err != nil {
+		return err
+	}
+	return kitekey.Write(key)
+}
 
 func (s *RegServ) handleRegister(r *kite.Request) (interface{}, error) {
 	var args struct {

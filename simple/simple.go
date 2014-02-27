@@ -16,16 +16,14 @@ type Simple struct {
 }
 
 func New(name, version string) *Simple {
-	config := config.New()
-
-	err := config.ReadKiteKey()
-	if err != nil {
-		panic(err)
-	}
-	config.ReadEnvironmentVariables()
-
 	k := kite.New(name, version)
-	k.Config = config
+
+	conf, err := config.Get()
+	if err != nil {
+		k.Log.Fatal("Cannot get config: %s", err.Error())
+	}
+
+	k.Config = conf
 
 	server := server.New(k)
 
