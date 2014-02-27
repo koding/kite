@@ -36,7 +36,6 @@ func TestKontrol(t *testing.T) {
 	kon.DataDir = os.TempDir()
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
-	kon.ClearKites()
 
 	prx := proxy.New(conf.Clone(), testkeys.Public, testkeys.Private)
 	prx.Start()

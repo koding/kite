@@ -3,10 +3,12 @@
 package testutil
 
 import (
+	"net/url"
 	"os"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/testkeys"
 	"github.com/nu7hatch/gouuid"
 )
@@ -44,4 +46,14 @@ func NewKiteKey() *jwt.Token {
 
 	token.Valid = true
 	return token
+}
+
+func NewConfig() *config.Config {
+	conf := config.New()
+	conf.Username = "testuser"
+	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolKey = testkeys.Public
+	conf.KontrolUser = "testuser"
+	conf.KiteKey = NewKiteKey().Raw
+	return conf
 }
