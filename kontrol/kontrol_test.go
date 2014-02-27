@@ -2,6 +2,7 @@ package kontrol
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"testing"
@@ -33,7 +34,7 @@ func init() {
 
 func TestKontrol(t *testing.T) {
 	kon := New(conf.Clone(), testkeys.Public, testkeys.Private)
-	kon.DataDir = os.TempDir()
+	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 

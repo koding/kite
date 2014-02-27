@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"io/ioutil"
 	"net/url"
 	"os"
 	"testing"
@@ -22,7 +23,7 @@ func TestSimple(t *testing.T) {
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
 	kon := kontrol.New(conf.Clone(), testkeys.Public, testkeys.Private)
-	kon.DataDir = os.TempDir()
+	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 	kon.ClearKites()

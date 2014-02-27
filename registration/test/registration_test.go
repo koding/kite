@@ -1,6 +1,7 @@
 package registration_test
 
 import (
+	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
@@ -33,7 +34,8 @@ func init() {
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
 	kon := kontrol.New(conf, testkeys.Public, testkeys.Private)
-	kon.DataDir = os.TempDir()
+	kon.DataDir, _ = ioutil.TempDir("", "")
+	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 
 	prx := proxy.New(conf, testkeys.Public, testkeys.Private)
