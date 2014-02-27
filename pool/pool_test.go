@@ -2,19 +2,18 @@ package pool
 
 import (
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/koding/kite"
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestPool(t *testing.T) {
-	testutil.WriteKiteKey()
-
 	opts := &kite.Options{
 		Kitename:    "kontrol",
 		Version:     "0.0.1",
