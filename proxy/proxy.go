@@ -3,7 +3,6 @@ package proxy
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -77,7 +76,6 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 
 	// Remove URL from the map when PrivateKite disconnects.
 	k.OnDisconnect(func(r *kite.RemoteKite) {
-		fmt.Println("--- removing kite", r.Kite.ID)
 		delete(p.kites, r.Kite.ID)
 	})
 
@@ -95,7 +93,6 @@ func (p *Proxy) Close() {
 }
 
 func (p *Proxy) ListenAndServe() error {
-	fmt.Println("--- ListenAndServe")
 	var err error
 	p.listener, err = net.Listen("tcp", net.JoinHostPort(p.IP, strconv.Itoa(p.Port)))
 	if err != nil {
@@ -117,7 +114,6 @@ func (p *Proxy) ListenAndServe() error {
 		go reg.RegisterToKontrol(p.url)
 	}
 
-	fmt.Println("--- serve")
 	return http.Serve(p.listener, p.mux)
 }
 
@@ -174,7 +170,6 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	req := ws.Request()
 
 	kiteID := req.URL.Query().Get("kiteID")
-	fmt.Println("--- handleProxy", kiteID)
 
 	remoteKite, ok := p.kites[kiteID]
 	if !ok {
@@ -237,16 +232,13 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	}
 
 	kiteID := token.Claims["sub"].(string)
-	fmt.Println("--- handleTunnel", kiteID)
 	seq := uint64(token.Claims["seq"].(float64))
-	fmt.Println("--- handleTunnel", seq)
 
 	remoteKite, ok := p.kites[kiteID]
 	if !ok {
 		p.Kite.Log.Error("Remote kite is not found: %s", kiteID)
 		return
 	}
-	fmt.Printf("--- var: %+v\n", remoteKite.Kite.Name)
 
 	tunnel, ok := remoteKite.tunnels[seq]
 	if !ok {
@@ -257,7 +249,6 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 
 	<-tunnel.CloseNotify()
 
-	fmt.Println("--- XXX end of tunnel connection")
 }
 
 //

@@ -201,7 +201,6 @@ func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error 
 	log.Info("Kite registered: %s", r.Kite.Key())
 
 	r.OnDisconnect(func() {
-		fmt.Println("--- kontrol: kite is disconnected:", r.Key())
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
 		k.store.Delete(
