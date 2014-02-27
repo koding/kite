@@ -10,8 +10,6 @@ import (
 	"github.com/koding/kite/testkeys"
 )
 
-func Authenticate(r *kite.Request) (string, error) { return "testuser", nil }
-
 func TestRegister(t *testing.T) {
 	conf := config.New()
 	regserv := New(conf, testkeys.Public, testkeys.Private)

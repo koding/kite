@@ -24,6 +24,7 @@ func (t *Tunnel) Close() {
 		return
 	}
 
+	t.localConn.Close()
 	close(t.closeChan)
 	t.closed = true
 }

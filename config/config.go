@@ -83,6 +83,14 @@ func (c *Config) ReadKiteKey() error {
 	return nil
 }
 
+// Clone returns a new copy of the config object.
+func (c *Config) Clone() *Config {
+	cloned := new(Config)
+	*cloned = *c
+	*cloned.KontrolURL = *c.KontrolURL
+	return cloned
+}
+
 func MustGet() *Config {
 	c := New()
 	err := c.ReadKiteKey()

@@ -23,12 +23,6 @@ type Server struct {
 	readyC chan bool // To signal when kite is ready to accept connections
 	closeC chan bool // To signal when kite is closed with Close()
 
-	// Handlers to call when a Kite opens a connection to this Kite.
-	onConnectHandlers []func(*kite.RemoteKite)
-
-	// Handlers to call when a client has disconnected.
-	onDisconnectHandlers []func(*kite.RemoteKite)
-
 	// Should handlers run concurrently? Default is true.
 	concurrent bool
 }
@@ -46,46 +40,6 @@ func New(k *kite.Kite) *Server {
 // func (k *Kite) DisableConcurrency() {
 // 	k.server.SetConcurrent(false)
 // }
-
-// // OnConnect registers a function to run when a Kite connects to this Kite.
-// func (k *Kite) OnConnect(handler func(*RemoteKite)) {
-// 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
-// }
-
-// // OnDisconnect registers a function to run when a connected Kite is disconnected.
-// func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
-// 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
-// }
-
-// // notifyRemoteKiteConnected runs the registered handlers with OnConnect().
-// func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
-// 	k.Log.Info("Client '%s' is identified as '%s'",
-// 		r.client.Conn.Request().RemoteAddr, r.Name)
-
-// 	for _, handler := range k.onConnectHandlers {
-// 		go handler(r)
-// 	}
-// }
-
-// // notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
-// func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-// 	k.Log.Info("Client has disconnected: %s", r.Name)
-
-// 	for _, handler := range k.onDisconnectHandlers {
-// 		go handler(r)
-// 	}
-// }
-
-// k.server.OnConnect(func(c *rpc.Client) {
-// 	k.Log.Info("New connection from: %s", c.Conn.Request().RemoteAddr)
-// })
-
-// // Run OnDisconnect handlers when a client has disconnected.
-// k.server.OnDisconnect(func(c *rpc.Client) {
-// 	if r, ok := c.Properties()["remoteKite"]; ok {
-// 		k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
-// 	}
-// })
 
 // // // Add new trusted root certificate for TLS from a PEM block.
 // // func (k *Server) AddRootCertificate(cert string) {

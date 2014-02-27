@@ -45,6 +45,12 @@ func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
 	s.Server.Kite.HandleFunc(method, handler)
 }
 
+func (s *Simple) Start() {
+	s.Kontrol.DialForever()
+	s.Server.Start()
+	go s.Registration.RegisterToProxyAndKontrol()
+}
+
 func (s *Simple) Run() {
 	s.Kontrol.DialForever()
 	s.Server.Start()
@@ -53,5 +59,6 @@ func (s *Simple) Run() {
 }
 
 func (s *Simple) Close() {
+	s.Kontrol.Close()
 	s.Server.Close()
 }

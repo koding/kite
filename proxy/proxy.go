@@ -19,7 +19,10 @@ import (
 	"github.com/koding/kite/registration"
 )
 
-const Version = "0.0.2"
+const (
+	Version     = "0.0.2"
+	DefaultPort = 3999
+)
 
 type Proxy struct {
 	Kite *kite.Kite
@@ -61,7 +64,7 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 		privKey:           privKey,
 		kites:             make(map[string]*PrivateKite),
 		IP:                "0.0.0.0",
-		Port:              3999,
+		Port:              DefaultPort,
 		mux:               http.NewServeMux(),
 		RegisterToKontrol: true,
 	}
@@ -73,13 +76,22 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 	p.mux.Handle("/tunnel", websocket.Server{Handler: p.handleTunnel}) // Handler for kites behind
 
 	// Remove URL from the map when PrivateKite disconnects.
-	// k.OnDisconnect(func(r *kite.RemoteKite) { delete(p.Kites, r.Kite.ID) })
+	k.OnDisconnect(func(r *kite.RemoteKite) {
+		fmt.Println("--- removing kite", r.Kite.ID)
+		delete(p.kites, r.Kite.ID)
+	})
 
 	return p
 }
 
 func (p *Proxy) Close() {
 	p.listener.Close()
+	for _, k := range p.kites {
+		k.Close()
+		for _, t := range k.tunnels {
+			t.Close()
+		}
+	}
 }
 
 func (p *Proxy) ListenAndServe() error {
@@ -162,6 +174,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	req := ws.Request()
 
 	kiteID := req.URL.Query().Get("kiteID")
+	fmt.Println("--- handleProxy", kiteID)
 
 	remoteKite, ok := p.kites[kiteID]
 	if !ok {
@@ -224,13 +237,16 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	}
 
 	kiteID := token.Claims["sub"].(string)
+	fmt.Println("--- handleTunnel", kiteID)
 	seq := uint64(token.Claims["seq"].(float64))
+	fmt.Println("--- handleTunnel", seq)
 
 	remoteKite, ok := p.kites[kiteID]
 	if !ok {
 		p.Kite.Log.Error("Remote kite is not found: %s", kiteID)
 		return
 	}
+	fmt.Printf("--- var: %+v\n", remoteKite.Kite.Name)
 
 	tunnel, ok := remoteKite.tunnels[seq]
 	if !ok {
@@ -240,6 +256,8 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	go tunnel.Run(ws)
 
 	<-tunnel.CloseNotify()
+
+	fmt.Println("--- XXX end of tunnel connection")
 }
 
 //

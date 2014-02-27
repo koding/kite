@@ -27,6 +27,7 @@ import (
 
 const (
 	Version           = "0.0.2"
+	DefaultPort       = 4000
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
@@ -67,7 +68,7 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 
 	// Listen on 4000 by default
 	if k.Config.Port == 0 {
-		k.Config.Port = 4000
+		k.Config.Port = DefaultPort
 	}
 
 	hostname := k.Kite().Hostname
@@ -200,6 +201,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error 
 	log.Info("Kite registered: %s", r.Kite.Key())
 
 	r.OnDisconnect(func() {
+		fmt.Println("--- kontrol: kite is disconnected:", r.Key())
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
 		k.store.Delete(

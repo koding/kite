@@ -73,6 +73,12 @@ type Kite struct {
 	handlers map[string]HandlerFunc // method map for exported methods
 	server   *rpc.Server            // Dnode rpc server
 
+	// Handlers to call when a Kite opens a connection to this Kite.
+	onConnectHandlers []func(*RemoteKite)
+
+	// Handlers to call when a client has disconnected.
+	onDisconnectHandlers []func(*RemoteKite)
+
 	name    string
 	version string
 	id      string // Unique kite instance id
@@ -169,4 +175,33 @@ func newLogger(name string) logging.Logger {
 	}
 
 	return logger
+}
+
+// OnConnect registers a function to run when a Kite connects to this Kite.
+func (k *Kite) OnConnect(handler func(*RemoteKite)) {
+	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+}
+
+// OnDisconnect registers a function to run when a connected Kite is disconnected.
+func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
+	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
+}
+
+// notifyRemoteKiteConnected runs the registered handlers with OnConnect().
+func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
+	k.Log.Info("Client '%s' is identified as '%s'",
+		r.client.Conn.Request().RemoteAddr, r.Name)
+
+	for _, handler := range k.onConnectHandlers {
+		handler(r)
+	}
+}
+
+// notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
+func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
+	k.Log.Info("Client has disconnected: %s", r.Name)
+
+	for _, handler := range k.onDisconnectHandlers {
+		handler(r)
+	}
 }

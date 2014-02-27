@@ -9,7 +9,6 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/koding/kite/systeminfo"
-	"github.com/koding/kite/util"
 )
 
 func (k *Kite) addDefaultHandlers() {
@@ -101,13 +100,6 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	// conf.Location = r.LocalKite.ServingURL
-
-	localConn, err := websocket.DialConfig(conf)
-	if err != nil {
-		return nil, err
-	}
-
-	util.JoinStreams(localConn, remoteConn)
+	go r.LocalKite.server.Handler(remoteConn)
 	return nil, nil
 }
