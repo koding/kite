@@ -24,9 +24,6 @@ type Kontrol struct {
 	// successful connection.
 	ready chan bool
 
-	// Saved in order to re-register on re-connect.
-	lastRegisteredURL *url.URL
-
 	// Watchers are saved here to re-watch on reconnect.
 	watchers      *list.List
 	watchersMutex sync.RWMutex
