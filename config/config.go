@@ -33,7 +33,6 @@ var defaultConfig = &Config{
 	Region:      "unknown",
 	IP:          "0.0.0.0",
 	Port:        0,
-	// KontrolURL:  &url.URL{Scheme: "ws", Host: "localhost:4000"},
 }
 
 // New returns a new Config initialized with defaults.
