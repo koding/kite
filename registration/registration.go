@@ -72,8 +72,6 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 
 	var lastRegisteredURL *url.URL
 
-	retryURLs := make(chan *url.URL, 1)
-
 	for {
 		select {
 		case e := <-events:
@@ -94,23 +92,13 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 				r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
 				time.AfterFunc(kontrolRetryDuration, func() {
 					select {
-					case retryURLs <- u:
+					case urls <- u:
 					default:
 					}
 				})
 			} else {
 				lastRegisteredURL = u
 				r.signalReady()
-				// drain retry urls
-				select {
-				case <-retryURLs:
-				default:
-				}
-			}
-		case u := <-retryURLs:
-			select {
-			case urls <- u:
-			default:
 			}
 		}
 	}
