@@ -35,15 +35,12 @@ func New(k *kite.Kite) *Kontrol {
 		panic("no kontrol URL given in config")
 	}
 
-	// Only the address is required to connect Kontrol
-	auth := &kite.Authentication{
+	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
+	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
+	remoteKite.Authentication = &kite.Authentication{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
-
-	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
-	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
-	remoteKite.Authentication = auth
 
 	kontrol := &Kontrol{
 		RemoteKite: remoteKite,
