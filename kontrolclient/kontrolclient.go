@@ -78,6 +78,9 @@ type registerResult struct {
 
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() method.
+//
+// This method does not handle the reconnection case. If you want to keep
+// registered to kontrol, use kite/registration package.
 func (k *Kontrol) Register(kiteURL *url.URL) (*registerResult, error) {
 	<-k.ready
 
