@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 )
 
 func TestRegister(t *testing.T) {
-	conf := config.New()
-	regserv := New(conf, testkeys.Public, testkeys.Private)
+	regserv := New(testutil.NewConfig(), testkeys.Public, testkeys.Private)
 
 	key, err := regserv.register("foo", "bar")
 	if err != nil {

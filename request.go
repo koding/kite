@@ -186,14 +186,10 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 		remoteKite.Kite = options.Kite
 		properties["remoteKite"] = remoteKite
 
-		// // Notify Kite.OnConnect handlers.
-		// k.notifyRemoteKiteConnected(remoteKite)
+		// Notify Kite.OnFirstRequest handlers.
+		k.notifyFirstRequest(remoteKite)
 	} else {
 		remoteKite = properties["remoteKite"].(*RemoteKite)
-
-		// // Need to update URL in case of a change. For example, the remote kite
-		// // may disconnect from a proxy kite and registers to different proxy.
-		// remoteKite.URL = options.Kite.URL
 	}
 
 	request := &Request{

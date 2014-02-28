@@ -119,6 +119,18 @@ func New(name, version string) *Kite {
 	// Server needs a reference to local kite
 	k.server.Properties()["localKite"] = k
 
+	k.server.OnConnect(func(c *rpc.Client) {
+		k.Log.Info("New connection from: %s", c.RemoteAddr())
+	})
+
+	// Call registered handlers when a client has disconnected.
+	k.server.OnDisconnect(func(c *rpc.Client) {
+		if r, ok := c.Properties()["remoteKite"]; ok {
+			// Run OnDisconnect handlers.
+			k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
+		}
+	})
+
 	// Every kite should be able to authenticate the user from token.
 	// Tokens are granted by Kontrol Kite.
 	k.Authenticators["token"] = k.AuthenticateFromToken
@@ -132,6 +144,7 @@ func New(name, version string) *Kite {
 	return k
 }
 
+// Kite returns the definition of the kite.
 func (k *Kite) Kite() *protocol.Kite {
 	return &protocol.Kite{
 		Username:    k.Config.Username,
@@ -177,8 +190,8 @@ func newLogger(name string) logging.Logger {
 	return logger
 }
 
-// OnConnect registers a function to run when a Kite connects to this Kite.
-func (k *Kite) OnConnect(handler func(*RemoteKite)) {
+// OnFirstRequest registers a function to run when a Kite connects to this Kite.
+func (k *Kite) OnFirstRequest(handler func(*RemoteKite)) {
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
 }
 
@@ -187,10 +200,10 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
 }
 
-// notifyRemoteKiteConnected runs the registered handlers with OnConnect().
-func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
+// notifyFirstRequest runs the registered handlers with OnFirstRequest().
+func (k *Kite) notifyFirstRequest(r *RemoteKite) {
 	k.Log.Info("Client '%s' is identified as '%s'",
-		r.client.Conn.Request().RemoteAddr, r.Name)
+		r.client.RemoteAddr(), r.Key())
 
 	for _, handler := range k.onConnectHandlers {
 		handler(r)
@@ -199,7 +212,7 @@ func (k *Kite) notifyRemoteKiteConnected(r *RemoteKite) {
 
 // notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
 func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-	k.Log.Info("Client has disconnected: %s", r.Name)
+	k.Log.Info("Client has disconnected: %s", r.Key())
 
 	for _, handler := range k.onDisconnectHandlers {
 		handler(r)
