@@ -22,7 +22,7 @@ func main() {
 
 	// Registration options
 	var (
-		registerSelf   = flag.Bool("register-self", false, "create a new kite.key")
+		init           = flag.Bool("init", false, "create a new kite.key")
 		username       = flag.String("username", "", "")
 		kontrolURL     = flag.String("kontrol-url", "", "")
 		publicKeyFile  = flag.String("public-key", "", "")
@@ -31,7 +31,7 @@ func main() {
 
 	flag.Parse()
 
-	if *registerSelf {
+	if *init {
 		conf := config.New()
 
 		if *username == "" {
@@ -87,7 +87,7 @@ func main() {
 }
 
 const noKeyMessage = `kite.key not found in ~/.kite/kite.key. Please register yourself with:
-	regserv -register-self -username=<username> -kontrol-url=<url> -public-key=<filename> -private-key=<filename>
+	regserv -init -username=<username> -kontrol-url=<url> -public-key=<filename> -private-key=<filename>
 A new pair of keys can be created with:
 	openssl genrsa -out privateKey.pem 2048
 	openssl rsa -in privateKey.pem -pubout > publicKey.pem`
