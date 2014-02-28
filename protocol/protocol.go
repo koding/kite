@@ -3,6 +3,11 @@
 // designed to be sent between those components.
 package protocol
 
+import (
+	"errors"
+	"strings"
+)
+
 // Kite is the base struct containing the public fields. It is usually embeded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
@@ -36,6 +41,17 @@ type Kite struct {
 
 func (k Kite) String() string {
 	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+}
+
+func (k *Kite) Validate() error {
+	s := k.String()
+	if strings.Contains(s, "//") {
+		return errors.New("empty field")
+	}
+	if strings.Count(s, "/") != 7 {
+		return errors.New(`fields cannot contain "/"`)
+	}
+	return nil
 }
 
 type RegsiterArgs struct {
