@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/koding/kite/kontrolclient"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -100,7 +101,7 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 		"iat":        time.Now().UTC().Unix(),             // Issued At
 		"jti":        tknID.String(),                      // JWT ID
 		"kontrolURL": s.Server.Config.KontrolURL.String(), // Kontrol URL
-		"kontrolKey": s.publicKey,                         // Public key of kontrol
+		"kontrolKey": strings.TrimSpace(s.publicKey),      // Public key of kontrol
 	}
 
 	return token.SignedString([]byte(s.privateKey))
