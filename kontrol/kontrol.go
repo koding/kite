@@ -219,7 +219,7 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
 		kite.Callback(func(r *kite.Request) { setterFunc() }),
 	}
 
-	_, err := r.Tell("heartbeat", heartbeatArgs...)
+	_, err := r.Tell("kite.heartbeat", heartbeatArgs...)
 	return err
 }
 

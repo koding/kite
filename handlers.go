@@ -12,15 +12,14 @@ import (
 )
 
 func (k *Kite) addDefaultHandlers() {
-	// TODO prefix these methods with "kite."
-	k.HandleFunc("systemInfo", systemInfo)
-	k.HandleFunc("heartbeat", k.handleHeartbeat)
-	k.HandleFunc("tunnel", handleTunnel)
-	k.HandleFunc("log", k.handleLog)
-	k.HandleFunc("print", handlePrint)
-	k.HandleFunc("prompt", handlePrompt)
+	k.HandleFunc("kite.systemInfo", systemInfo)
+	k.HandleFunc("kite.heartbeat", k.handleHeartbeat)
+	k.HandleFunc("kite.tunnel", handleTunnel)
+	k.HandleFunc("kite.log", k.handleLog)
+	k.HandleFunc("kite.print", handlePrint)
+	k.HandleFunc("kite.prompt", handlePrompt)
 	if runtime.GOOS == "darwin" {
-		k.HandleFunc("notify", handleNotifyDarwin)
+		k.HandleFunc("kite.notify", handleNotifyDarwin)
 	}
 }
 

@@ -4,7 +4,6 @@ package regserv
 
 import (
 	"errors"
-	"github.com/koding/kite/kontrolclient"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
 	"github.com/koding/kite/server"
 	"github.com/nu7hatch/gouuid"
@@ -111,7 +111,7 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 // username. You should probably not use this and authenticate users be
 // asking a password or something different.
 func AskUsernameOnly(r *kite.Request) (string, error) {
-	result, err := r.RemoteKite.TellWithTimeout("prompt", 10*time.Minute, "Enter username: ")
+	result, err := r.RemoteKite.TellWithTimeout("kite.prompt", 10*time.Minute, "Enter username: ")
 	if err != nil {
 		return "", err
 	}

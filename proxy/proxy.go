@@ -207,7 +207,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	tunnelURL.Path = "/tunnel"
 	tunnelURL.RawQuery = "token=" + signed
 
-	_, err = remoteKite.Tell("tunnel", map[string]string{"url": tunnelURL.String()})
+	_, err = remoteKite.Tell("kite.tunnel", map[string]string{"url": tunnelURL.String()})
 	if err != nil {
 		p.Kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Key())
 		return

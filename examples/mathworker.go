@@ -33,7 +33,7 @@ func Square(r *kite.Request) (interface{}, error) {
 
 	// Print a log on remote Kite.
 	// This message will be printed on client's console.
-	r.RemoteKite.Go("log", fmt.Sprintf("Message from %s: \"You have requested square of %.0f\"", r.LocalKite.Kite().Name, a))
+	r.RemoteKite.Go("kite.log", fmt.Sprintf("Message from %s: \"You have requested square of %.0f\"", r.LocalKite.Kite().Name, a))
 
 	// You can return anything as result, as long as it is JSON marshalable.
 	return result, nil
