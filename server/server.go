@@ -35,12 +35,6 @@ func New(k *kite.Kite) *Server {
 	}
 }
 
-// // Normally, each incoming request is processed in a new goroutine.
-// // If you disable concurrency, requests will be processed synchronously.
-// func (k *Kite) DisableConcurrency() {
-// 	k.server.SetConcurrent(false)
-// }
-
 // // // Add new trusted root certificate for TLS from a PEM block.
 // // func (k *Server) AddRootCertificate(cert string) {
 // //  k.tlsCertificates = append(k.tlsCertificates, []byte(cert))

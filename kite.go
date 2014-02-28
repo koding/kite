@@ -239,3 +239,9 @@ func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 
 	return []byte(k.Config.KontrolKey), nil
 }
+
+// Normally, each incoming request is processed in a new goroutine.
+// If you disable concurrency, requests will be processed synchronously.
+func (k *Kite) DisableConcurrency() {
+	k.server.SetConcurrent(false)
+}
