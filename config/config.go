@@ -109,26 +109,3 @@ func MustGet() *Config {
 	}
 	return c
 }
-
-// validate fields of the options struct. It exits if an error is occured.
-func (o *Config) validate() {
-	// if o.PublicIP == "" {
-	// 	o.PublicIP = "0.0.0.0"
-	// }
-
-	// if o.Port == "" {
-	// 	o.Port = "0" // OS binds to an automatic port
-	// }
-
-	// if o.Path == "" {
-	// 	o.Path = "/kite/" + o.Kitename
-	// }
-
-	// if o.Path[0] != '/' {
-	// 	o.Path = "/" + o.Path
-	// }
-}
-
-// 		// 	k.TrustKontrolKey(k.kiteKey.Claims["iss"].(string), k.kiteKey.Claims["kontrolKey"].(string))
-// 		// }
-// 	}
