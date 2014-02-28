@@ -44,7 +44,6 @@ func New(k *kite.Kite) *Kontrol {
 	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
 	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
 	remoteKite.Authentication = auth
-	// remoteKite.client.Reconnect = true
 
 	kontrol := &Kontrol{
 		RemoteKite: remoteKite,
