@@ -256,7 +256,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return errors.New("Invalid signature in token")
 	}
 
-	if audience, ok := token.Claims["aud"].(string); !ok || !strings.HasPrefix(k.Kite().Key(), audience) {
+	if audience, ok := token.Claims["aud"].(string); !ok || !strings.HasPrefix(k.Kite().String(), audience) {
 		return fmt.Errorf("Invalid audience in token: %s", audience)
 	}
 

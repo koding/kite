@@ -205,7 +205,7 @@ func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
 // notifyFirstRequest runs the registered handlers with OnFirstRequest().
 func (k *Kite) notifyFirstRequest(r *RemoteKite) {
 	k.Log.Info("Client '%s' is identified as '%s'",
-		r.client.RemoteAddr(), r.Key())
+		r.client.RemoteAddr(), r.Kite)
 
 	for _, handler := range k.onConnectHandlers {
 		handler(r)
@@ -214,7 +214,7 @@ func (k *Kite) notifyFirstRequest(r *RemoteKite) {
 
 // notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
 func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
-	k.Log.Info("Client has disconnected: %s", r.Key())
+	k.Log.Info("Client has disconnected: %s", r.Kite)
 
 	for _, handler := range k.onDisconnectHandlers {
 		handler(r)

@@ -142,7 +142,7 @@ type registerValue struct {
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
-	log.Info("Register request from: %s", r.RemoteKite.Kite.Key())
+	log.Info("Register request from: %s", r.RemoteKite.Kite)
 
 	var args struct {
 		URL *protocol.KiteURL `json:"url"`
@@ -198,7 +198,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error 
 		return err
 	}
 
-	log.Info("Kite registered: %s", r.Kite.Key())
+	log.Info("Kite registered: %s", r.Kite)
 
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
@@ -242,7 +242,7 @@ func (k *Kontrol) registerSelf() {
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter func() error, etcdKey string) {
-	etcdKey = KitesPrefix + kite.Key()
+	etcdKey = KitesPrefix + kite.String()
 
 	valueBytes, _ := json.Marshal(value)
 	valueString := string(valueBytes)

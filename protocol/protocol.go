@@ -34,7 +34,7 @@ type Kite struct {
 	Hostname string `json:"hostname"`
 }
 
-func (k *Kite) Key() string {
+func (k Kite) String() string {
 	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
 }
 
