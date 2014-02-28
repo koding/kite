@@ -221,7 +221,6 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 		auth := &kite.Authentication{
 			Type: "token",
 			Key:  currentKite.Token,
-			// validUntil: &exp,
 		}
 
 		parsed, err := url.Parse(currentKite.URL)
@@ -233,6 +232,16 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 		remoteKites[i].Kite = currentKite.Kite
 		remoteKites[i].URL = parsed
 		remoteKites[i].Authentication = auth
+	}
+
+	// Renew tokens
+	for _, r := range remoteKites {
+		token, err := NewTokenRenewer(r, k)
+		if err != nil {
+			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
+			continue
+		}
+		token.RenewWhenExpires()
 	}
 
 	return remoteKites, result.WatcherID, nil

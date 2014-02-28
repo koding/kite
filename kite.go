@@ -5,6 +5,7 @@
 package kite
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode/rpc"
 	"github.com/koding/kite/logging"
@@ -217,4 +219,23 @@ func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
 	for _, handler := range k.onDisconnectHandlers {
 		handler(r)
 	}
+}
+
+// RSAKey returns the corresponding public key for the issuer of the token.
+// It is called by jwt-go package when validating the signature in the token.
+func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
+	if k.Config.KontrolKey == "" {
+		panic("kontrol key is not set in config")
+	}
+
+	issuer, ok := token.Claims["iss"].(string)
+	if !ok {
+		return nil, errors.New("token does not contain a valid issuer claim")
+	}
+
+	if issuer != k.Config.KontrolUser {
+		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
+	}
+
+	return []byte(k.Config.KontrolKey), nil
 }

@@ -2,14 +2,12 @@ package kite
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/dnode/rpc"
 	"github.com/koding/kite/logging"
@@ -29,7 +27,7 @@ type RemoteKite struct {
 	URL *url.URL
 
 	// A reference to the current Kite running.
-	localKite *Kite
+	LocalKite *Kite
 
 	// A reference to the Kite's logger for easy access.
 	Log logging.Logger
@@ -46,9 +44,6 @@ type RemoteKite struct {
 	// Duration to wait reply from remote when making a request with Tell().
 	tellTimeout time.Duration
 
-	// For forcing token to renew.
-	signalRenewToken chan struct{}
-
 	TLSConfig *tls.Config
 }
 
@@ -57,12 +52,11 @@ type RemoteKite struct {
 // Tell() and Go() methods.
 func (k *Kite) NewRemoteKite(remoteURL *url.URL) *RemoteKite {
 	r := &RemoteKite{
-		URL:              remoteURL,
-		localKite:        k,
-		Log:              k.Log,
-		client:           k.server.NewClientWithHandlers(),
-		disconnect:       make(chan struct{}),
-		signalRenewToken: make(chan struct{}, 1),
+		URL:        remoteURL,
+		LocalKite:  k,
+		Log:        k.Log,
+		client:     k.server.NewClientWithHandlers(),
+		disconnect: make(chan struct{}),
 	}
 	r.SetTellTimeout(DefaultTellTimeout)
 
@@ -170,33 +164,6 @@ func (r *RemoteKite) OnDisconnect(handler func()) {
 	r.client.OnDisconnect(handler)
 }
 
-func (r *RemoteKite) sendRenewTokenSignal() {
-	// Needs to be non-blocking because tokenRenewer may be stopped.
-	select {
-	case r.signalRenewToken <- struct{}{}:
-	default:
-	}
-}
-
-// RSAKey returns the corresponding public key for the issuer of the token.
-// It is called by jwt-go package when validating the signature in the token.
-func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
-	issuer, ok := token.Claims["iss"].(string)
-	if !ok {
-		return nil, errors.New("token does not contain a valid issuer claim")
-	}
-
-	if issuer != k.Config.KontrolUser {
-		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
-	}
-
-	if k.Config.KontrolKey == "" {
-		panic("kontrol key is not set in config")
-	}
-
-	return []byte(k.Config.KontrolKey), nil
-}
-
 // callOptions is the type of first argument in the dnode message.
 // Second argument is a callback function.
 // It is used when unmarshalling a dnode message.
@@ -231,7 +198,7 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 		WithArgs:         args,
 		ResponseCallback: responseCallback,
 		callOptions: callOptions{
-			Kite:           *r.localKite.Kite(),
+			Kite:           *r.LocalKite.Kite(),
 			Authentication: r.Authentication,
 		},
 	}
@@ -242,9 +209,8 @@ func wrapMethodArgs(args []interface{}, tr dnode.Transport) []interface{} {
 // Authentication is used when connecting a RemoteKite.
 type Authentication struct {
 	// Type can be "kiteKey", "token" or "sessionID" for now.
-	Type       string     `json:"type"`
-	Key        string     `json:"key"`
-	validUntil *time.Time `json:"-"`
+	Type string `json:"type"`
+	Key  string `json:"key"`
 }
 
 // response is the type of the return value of Tell() and Go() methods.
@@ -322,9 +288,6 @@ func (r *RemoteKite) send(method string, args []interface{}, timeout time.Durati
 	go func() {
 		select {
 		case resp := <-doneChan:
-			if kiteErr, ok := resp.Err.(*Error); ok && kiteErr.Type == "authenticationError" {
-				r.sendRenewTokenSignal()
-			}
 			responseChan <- resp
 		case <-r.disconnect:
 			responseChan <- &response{nil, &Error{"disconnect", "Remote kite has disconnected"}}
