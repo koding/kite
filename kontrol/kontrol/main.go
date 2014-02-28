@@ -1,56 +1,61 @@
 package main
 
 import (
-	// "flag"
-	// "log"
-	// "os"
-	// "strings"
+	"flag"
+	"io/ioutil"
+	"log"
+	"strings"
 
-	// "github.com/koding/kite"
-	// "github.com/koding/kite/config"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
-	"github.com/koding/kite/testkeys"
 )
 
 func main() {
-	// var name, dataDir, peersString string
-	// var peers []string
+	var (
+		publicKeyFile  = flag.String("public-key", "", "")
+		privateKeyFile = flag.String("private-key", "", "")
+		ip             = flag.String("ip", "0.0.0.0", "")
+		port           = flag.Int("port", 4000, "")
+		name           = flag.String("name", "", "name of the instance")
+		dataDir        = flag.String("data-dir", "", "directory to store data")
+		peers          = flag.String("peers", "", "comma seperated peer addresses")
+	)
 
-	// options := &kite.Options{
-	// 	Kitename: "kontrol",
-	// 	Version:  "0.0.1",
-	// 	Path:     "/kontrol",
-	// }
+	flag.Parse()
 
-	// flag.StringVar(&options.Environment, "environment", "development", "")
-	// flag.StringVar(&options.Region, "region", "localhost", "")
-	// flag.StringVar(&options.PublicIP, "ip", "0.0.0.0", "")
-	// flag.StringVar(&options.Port, "port", "4000", "")
+	if *publicKeyFile == "" {
+		log.Fatalln("no -public-key given")
+	}
 
-	// flag.StringVar(&name, "name", "", "name of the instance")
-	// flag.StringVar(&dataDir, "data-dir", "", "directory to store data")
-	// flag.StringVar(&peersString, "peers", "", "comma seperated peer addresses")
+	if *privateKeyFile == "" {
+		log.Fatalln("no -private-key given")
+	}
 
-	// flag.Parse()
+	publicKey, err := ioutil.ReadFile(*publicKeyFile)
+	if err != nil {
+		log.Fatalln("cannot read public key file")
+	}
 
-	// if name == "" {
-	// 	var err error
-	// 	name, err = os.Hostname()
-	// 	if err != nil {
-	// 		log.Fatal(err.Error())
-	// 	}
-	// }
+	privateKey, err := ioutil.ReadFile(*privateKeyFile)
+	if err != nil {
+		log.Fatalln("cannot read private key file")
+	}
 
-	// if dataDir == "" {
-	// 	log.Fatal("data-dir flag is not set")
-	// }
+	conf := config.MustGet()
+	conf.IP = *ip
+	conf.Port = *port
 
-	// if peersString != "" {
-	// 	peers = strings.Split(peersString, ",")
-	// }
+	k := kontrol.New(conf, string(publicKey), string(privateKey))
 
-	// k := kontrol.New(options, name, dataDir, peers, testkeys.Public, testkeys.Private)
+	if *name != "" {
+		k.Name = *name
+	}
+	if *dataDir != "" {
+		k.DataDir = *dataDir
+	}
+	if *peers != "" {
+		k.Peers = strings.Split(*peers, ",")
+	}
 
-	k := kontrol.New(testkeys.Public, testkeys.Private)
 	k.Run()
 }

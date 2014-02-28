@@ -122,6 +122,10 @@ func (p *Proxy) Start() {
 	time.Sleep(1e9)
 }
 
+func (p *Proxy) Run() {
+	p.ListenAndServe()
+}
+
 func (p *Proxy) ListenAndServeTLS(certFile, keyfile string) error {
 	cert, err := tls.X509KeyPair([]byte(p.cert), []byte(p.key))
 	if err != nil {

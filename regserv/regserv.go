@@ -4,6 +4,7 @@ package regserv
 
 import (
 	"errors"
+	"github.com/koding/kite/kontrolclient"
 	"os"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/registration"
 	"github.com/koding/kite/server"
 	"github.com/nu7hatch/gouuid"
 )
@@ -28,6 +30,7 @@ type RegServ struct {
 
 func New(conf *config.Config, pubKey, privKey string) *RegServ {
 	k := kite.New("regserv", Version)
+	k.Config = conf
 	r := &RegServ{
 		Server:       server.New(k),
 		Authenticate: AskUsernameOnly,
@@ -39,7 +42,18 @@ func New(conf *config.Config, pubKey, privKey string) *RegServ {
 }
 
 func (s *RegServ) Run() {
+	kon := kontrolclient.New(s.Server.Kite)
+	reg := registration.New(kon)
+
+	connected, _ := kon.DialForever()
+	go func() {
+		<-connected
+		reg.RegisterToProxyAndKontrol()
+	}()
+
 	s.Server.Run()
+	<-s.Server.CloseNotify()
+
 	// fmt.Println("Users can register with the following command:")
 	// fmt.Printf("kite register -to '%s'\n", s.kite.URL.String())
 }
@@ -80,13 +94,13 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
-		"iss":        s.Server.Kite.Kite().Username, // Issuer
-		"sub":        username,                      // Subject
-		"aud":        hostname,                      // Hostname of registered machine
-		"iat":        time.Now().UTC().Unix(),       // Issued At
-		"jti":        tknID.String(),                // JWT ID
-		"kontrolURL": s.Server.Config.Username,      // Kontrol URL
-		"kontrolKey": s.publicKey,                   // Public key of kontrol
+		"iss":        s.Server.Kite.Kite().Username,       // Issuer
+		"sub":        username,                            // Subject
+		"aud":        hostname,                            // Hostname of registered machine
+		"iat":        time.Now().UTC().Unix(),             // Issued At
+		"jti":        tknID.String(),                      // JWT ID
+		"kontrolURL": s.Server.Config.KontrolURL.String(), // Kontrol URL
+		"kontrolKey": s.publicKey,                         // Public key of kontrol
 	}
 
 	return token.SignedString([]byte(s.privateKey))

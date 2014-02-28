@@ -225,7 +225,10 @@ func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
 
 // registerSelf adds Kontrol itself to etcd. TODO review and fix
 func (k *Kontrol) registerSelf() {
-	setter, _ := k.makeSetter(k.Server.Kite.Kite(), &registerValue{})
+	value := &registerValue{
+		URL: &protocol.KiteURL{*k.Server.Config.KontrolURL},
+	}
+	setter, _ := k.makeSetter(k.Server.Kite.Kite(), value)
 	for {
 		if err := setter(); err != nil {
 			log.Error(err.Error())

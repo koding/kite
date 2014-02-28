@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 
@@ -104,7 +105,8 @@ func Get() (*Config, error) {
 func MustGet() *Config {
 	c, err := Get()
 	if err != nil {
-		panic(err)
+		fmt.Printf("Cannot read kite.key: %s\n", err.Error())
+		os.Exit(1)
 	}
 	return c
 }

@@ -2,10 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
-	"strconv"
+	"os"
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/regserv"
@@ -15,10 +16,8 @@ import (
 func main() {
 	// Server options
 	var (
-		environment = flag.String("environment", "unknown", "")
-		region      = flag.String("region", "unknown", "")
-		ip          = flag.String("ip", "0.0.0.0", "")
-		portStr     = flag.String("port", "3998", "")
+		ip   = flag.String("ip", "0.0.0.0", "")
+		port = flag.Int("port", 3998, "")
 	)
 
 	// Registration options
@@ -46,6 +45,14 @@ func main() {
 		}
 		conf.KontrolURL = parsed
 
+		if *publicKeyFile == "" {
+			log.Fatalln("no -public-key given")
+		}
+
+		if *privateKeyFile == "" {
+			log.Fatalln("no -private-key given")
+		}
+
 		publicKey, err := ioutil.ReadFile(*publicKeyFile)
 		if err != nil {
 			log.Fatalln("cannot read public key file")
@@ -61,21 +68,26 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		fmt.Println("kite.key is written to ~/.kite/kite.key. You can see it with:\n\tkite showkey")
+		os.Exit(0)
 	}
 
 	conf, err := config.Get()
 	if err != nil {
-		log.Fatalf("kite.key not found. Please register yourself with:\n\tregserv -register-self -username=<username> -kontrol-url=<url> -public-key=<filename> -private-key=<filename>\n")
+		fmt.Println(noKeyMessage)
+		os.Exit(1)
 	}
 
-	conf.Environment = *environment
-	conf.Region = *region
 	conf.IP = *ip
-	conf.Port, err = strconv.Atoi(*portStr)
-	if err != nil {
-		log.Fatalln("invalid port number")
-	}
+	conf.Port = *port
 
 	s := regserv.New(conf, testkeys.Public, testkeys.Private)
 	s.Run()
 }
+
+const noKeyMessage = `kite.key not found in ~/.kite/kite.key. Please register yourself with:
+	regserv -register-self -username=<username> -kontrol-url=<url> -public-key=<filename> -private-key=<filename>
+A new pair of keys can be created with:
+	openssl genrsa -out privateKey.pem 2048
+	openssl rsa -in privateKey.pem -pubout > publicKey.pem`
