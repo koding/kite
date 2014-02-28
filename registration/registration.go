@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	registerKontrolRetryDuration = time.Minute
-	proxyRetryDuration           = 10 * time.Second
+	kontrolRetryDuration = 10 * time.Second
+	proxyRetryDuration   = 10 * time.Second
 )
 
 type Registration struct {
@@ -39,34 +39,80 @@ func (r *Registration) signalReady() {
 	r.onceReady.Do(func() { close(r.ready) })
 }
 
-// Register to Kontrol in background. If registration fails, it
+// Register to Kontrol. This method is blocking.
 func (r *Registration) RegisterToKontrol(kiteURL *url.URL) {
-	for {
-		_, err := r.kontrol.Register(kiteURL)
-		if err != nil {
-			// do not exit, because existing applications might import the kite package
-			r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, registerKontrolRetryDuration/time.Second)
-			time.Sleep(registerKontrolRetryDuration)
-			continue
-		}
-		r.signalReady()
-		break
-	}
+	urls := make(chan *url.URL, 1)
+	urls <- kiteURL
+	r.mainLoop(urls)
 }
 
-// Register to Proxy in background.
+// Register to Proxy. This method is blocking.
 func (r *Registration) RegisterToProxy() {
 	r.keepRegisteredToProxyKite(nil)
 }
 
-// Register to Proxy, then Kontrol in background.
+// Register to Proxy, then Kontrol. This method is blocking.
 func (r *Registration) RegisterToProxyAndKontrol() {
-	urls := make(chan *url.URL)
+	urls := make(chan *url.URL, 1)
 
 	go r.keepRegisteredToProxyKite(urls)
+	r.mainLoop(urls)
+}
 
-	for url := range urls {
-		r.RegisterToKontrol(url)
+func (r *Registration) mainLoop(urls chan *url.URL) {
+	const (
+		Connect = iota
+		Disconnect
+	)
+
+	events := make(chan int)
+
+	r.kontrol.OnConnect(func() { events <- Connect })
+	r.kontrol.OnDisconnect(func() { events <- Disconnect })
+
+	var lastRegisteredURL *url.URL
+
+	retryURLs := make(chan *url.URL, 1)
+
+	for {
+		select {
+		case e := <-events:
+			switch e {
+			case Connect:
+				r.kontrol.Log.Notice("Connected to Kontrol.")
+				if lastRegisteredURL != nil {
+					select {
+					case urls <- lastRegisteredURL:
+					default:
+					}
+				}
+			case Disconnect:
+				r.kontrol.Log.Warning("Disconnected from Kontrol.")
+			}
+		case u := <-urls:
+			if _, err := r.kontrol.Register(u); err != nil {
+				r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
+				time.AfterFunc(kontrolRetryDuration, func() {
+					select {
+					case retryURLs <- u:
+					default:
+					}
+				})
+			} else {
+				lastRegisteredURL = u
+				r.signalReady()
+				// drain retry urls
+				select {
+				case <-retryURLs:
+				default:
+				}
+			}
+		case u := <-retryURLs:
+			select {
+			case urls <- u:
+			default:
+			}
+		}
 	}
 }
 
@@ -156,47 +202,5 @@ func (reg *Registration) registerToProxyKite(r *kite.RemoteKite) (*url.URL, erro
 		return nil, err
 	}
 
-	// reg.localKite.URL = &protocol.KiteURL{*parsed}
-
 	return parsed, nil
 }
-
-// // func (r *Registerer) Start() {
-// //   // Port is known here if "0" is used as port number
-// //   host, _, _ := net.SplitHostPort(k.Kite.URL.Host)
-// //   _, port, _ := net.SplitHostPort(addr.String())
-// //   k.Kite.URL.Host = net.JoinHostPort(host, port)
-// //   k.ServingURL.Host = k.Kite.URL.Host
-
-// //   // We must connect to Kontrol after starting to listen on port
-// //   if k.KontrolEnabled && k.Kontrol != nil {
-// //       if err := k.Kontrol.DialForever(); err != nil {
-// //           k.Log.Critical(err.Error())
-// //       }
-
-// //       if k.RegisterToKontrol {
-// //           go k.keepRegisteredToKontrol(registerURLs)
-// //       }
-// //   }
-// // }
-
-// // Register to proxy and/or kontrol, then update the URL.
-// func (k *Kite) Register(kiteURL *url.URL) {
-
-// }
-
-// remoteKite.OnConnect(func() {
-//         // We need to re-register the last registered URL on re-connect.
-//         if kontrol.lastRegisteredURL != nil {
-//                 go kontrol.Register()
-//         }
-// })
-
-// remoteKite.OnDisconnect(func() {
-//         k.Log.Warning("Disconnected from Kontrol. I will retry in background...")
-// })
-
-// k.Log.Info("Registered to Kontrol with URL: %s ID: %s", kite.URL.String(), kite.ID)
-
-// // Save last registered URL to re-register on re-connect.
-// k.lastRegisteredURL = &kite.URL.URL
