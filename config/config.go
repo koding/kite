@@ -87,7 +87,9 @@ func (c *Config) ReadKiteKey() error {
 func (c *Config) Clone() *Config {
 	cloned := new(Config)
 	*cloned = *c
-	*cloned.KontrolURL = *c.KontrolURL
+	if c.KontrolURL != nil {
+		*cloned.KontrolURL = *c.KontrolURL
+	}
 	return cloned
 }
 
