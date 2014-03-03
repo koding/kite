@@ -197,7 +197,9 @@ func (c *Client) sleep() {
 // Close closes the underlying websocket connection.
 func (c *Client) Close() {
 	c.Reconnect = false
-	c.Conn.Close()
+	if c.Conn != nil {
+		c.Conn.Close()
+	}
 }
 
 func (c *Client) Send(msg []byte) error {
@@ -206,14 +208,17 @@ func (c *Client) Send(msg []byte) error {
 	}
 
 	if c.Conn == nil {
-		return errors.New("Not connected")
+		return errors.New("not connected")
 	}
 
 	return websocket.Message.Send(c.Conn, string(msg))
 }
 
 func (c *Client) Receive() ([]byte, error) {
-	// println("Receiving...")
+	if c.Conn == nil {
+		return nil, errors.New("not connected")
+	}
+
 	var msg []byte
 	err := websocket.Message.Receive(c.Conn, &msg)
 
