@@ -32,7 +32,7 @@ func TestKite(t *testing.T) {
 	exp2Kite.HandleFunc("foo", handleFoo)
 
 	// exp2 connects to mathworker
-	remote := exp2Kite.NewRemoteKiteString("ws://127.0.0.1:3636")
+	remote := exp2Kite.NewClientString("ws://127.0.0.1:3636")
 	err := remote.Dial()
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func Square(r *Request) (interface{}, error) {
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
 
 	// Reverse method call
-	r.RemoteKite.Go("foo", "bar")
+	r.Client.Go("foo", "bar")
 
 	return result, nil
 }

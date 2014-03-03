@@ -138,13 +138,13 @@ type Request struct {
 	Method         string
 	Args           dnode.Arguments
 	LocalKite      *Kite
-	RemoteKite     *RemoteKite
+	Client         *Client
 	Username       string
 	Authentication *Authentication
 	RemoteAddr     string
 }
 
-// Wrap your function with Callback to send it as an argument to a RemoteKite.
+// Wrap your function with Callback to send it as an argument to a Client.
 type Callback func(r *Request)
 
 func (c Callback) MarshalJSON() ([]byte, error) {
@@ -175,28 +175,28 @@ func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.T
 	// Properties about the client...
 	properties := tr.Properties()
 
-	// Create a new RemoteKite instance to pass it to the handler, so
+	// Create a new Client instance to pass it to the handler, so
 	// the handler can call methods on the other site on the same connection.
-	var remoteKite *RemoteKite
-	if properties["remoteKite"] == nil {
-		// Do not create a new RemoteKite on every request,
+	var client *Client
+	if properties["client"] == nil {
+		// Do not create a new Client on every request,
 		// cache it in Transport.Properties().
-		client := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
-		remoteKite = k.newRemoteKiteWithClient(nil, client)
-		remoteKite.Kite = options.Kite
-		properties["remoteKite"] = remoteKite
+		rpcClient := tr.(*rpc.Client) // We only have a dnode/rpc.Client for now.
+		client = k.newClientWithClient(nil, rpcClient)
+		client.Kite = options.Kite
+		properties["client"] = client
 
 		// Notify Kite.OnFirstRequest handlers.
-		k.notifyFirstRequest(remoteKite)
+		k.notifyFirstRequest(client)
 	} else {
-		remoteKite = properties["remoteKite"].(*RemoteKite)
+		client = properties["client"].(*Client)
 	}
 
 	request := &Request{
 		Method:         method,
 		Args:           options.WithArgs,
 		LocalKite:      k,
-		RemoteKite:     remoteKite,
+		Client:         client,
 		RemoteAddr:     tr.RemoteAddr(),
 		Authentication: options.Authentication,
 	}
@@ -240,7 +240,7 @@ func (r *Request) authenticate() *Error {
 
 	// Fix username of the remote Kite if it is invalid.
 	// This prevents a Kite to impersonate someone else's Kite.
-	r.RemoteKite.Kite.Username = r.Username
+	r.Client.Kite.Username = r.Username
 
 	return nil
 }

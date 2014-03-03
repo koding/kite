@@ -14,18 +14,18 @@ const (
 	retryInterval = 10 * time.Second
 )
 
-// TokenRenewer renews the token of a RemoteKite just before it expires.
+// TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
-	remoteKite       *kite.RemoteKite
+	client       *kite.Client
 	kontrol          *Kontrol
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
 }
 
-func NewTokenRenewer(r *kite.RemoteKite, kon *Kontrol) (*TokenRenewer, error) {
+func NewTokenRenewer(r *kite.Client, kon *Kontrol) (*TokenRenewer, error) {
 	t := &TokenRenewer{
-		remoteKite:       r,
+		client:       r,
 		kontrol:          kon,
 		signalRenewToken: make(chan struct{}, 1),
 		disconnect:       make(chan struct{}),
@@ -35,7 +35,7 @@ func NewTokenRenewer(r *kite.RemoteKite, kon *Kontrol) (*TokenRenewer, error) {
 
 // parse the token string and set
 func (t *TokenRenewer) parse(tokenString string) error {
-	token, err := jwt.Parse(tokenString, t.remoteKite.LocalKite.RSAKey)
+	token, err := jwt.Parse(tokenString, t.client.LocalKite.RSAKey)
 	if err != nil {
 		return fmt.Errorf("Cannot parse token: %s", err.Error())
 	}
@@ -51,8 +51,8 @@ func (t *TokenRenewer) parse(tokenString string) error {
 
 // RenewWhenExpires renews the token before it expires.
 func (t *TokenRenewer) RenewWhenExpires() {
-	t.remoteKite.OnConnect(func() { go t.renewLoop() })
-	t.remoteKite.OnDisconnect(func() { close(t.disconnect) })
+	t.client.OnConnect(func() { go t.renewLoop() })
+	t.client.OnDisconnect(func() { close(t.disconnect) })
 }
 
 func (t *TokenRenewer) renewLoop() {
@@ -64,7 +64,7 @@ func (t *TokenRenewer) renewLoop() {
 		select {
 		case <-t.signalRenewToken:
 			if err := t.renewToken(); err != nil {
-				t.kontrol.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.remoteKite.ID, retryInterval/time.Second)
+				t.kontrol.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
 				// Need to sleep here litle bit because a signal is sent
 				// when an expired token is detected on incoming request.
 				// This sleep prevents the signal from coming too fast.
@@ -95,7 +95,7 @@ func (t *TokenRenewer) sendRenewTokenSignal() {
 
 // renewToken gets a new token from a kontrol, parses it and sets it as the token.
 func (t *TokenRenewer) renewToken() error {
-	tokenString, err := t.kontrol.GetToken(&t.remoteKite.Kite)
+	tokenString, err := t.kontrol.GetToken(&t.client.Kite)
 	if err != nil {
 		return err
 	}
@@ -104,6 +104,6 @@ func (t *TokenRenewer) renewToken() error {
 		return err
 	}
 
-	t.remoteKite.Authentication.Key = tokenString
+	t.client.Authentication.Key = tokenString
 	return nil
 }

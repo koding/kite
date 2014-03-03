@@ -12,14 +12,14 @@ import (
 type Pool struct {
 	kontrol *kontrolclient.Kontrol
 	query   protocol.KontrolQuery
-	Kites   map[string]*kite.RemoteKite
+	Kites   map[string]*kite.Client
 }
 
 func New(kontrol *kontrolclient.Kontrol, query protocol.KontrolQuery) *Pool {
 	return &Pool{
 		kontrol: kontrol,
 		query:   query,
-		Kites:   make(map[string]*kite.RemoteKite),
+		Kites:   make(map[string]*kite.Client),
 	}
 }
 
@@ -35,7 +35,7 @@ func (p *Pool) Run() error {
 	_, err := p.kontrol.WatchKites(p.query, func(event *kontrolclient.Event, err error) {
 		switch event.Action {
 		case protocol.Register:
-			p.Kites[event.Kite.ID] = event.RemoteKite()
+			p.Kites[event.Kite.ID] = event.Client()
 			go p.Kites[event.Kite.ID].DialForever()
 		case protocol.Deregister:
 			delete(p.Kites, event.Kite.ID)

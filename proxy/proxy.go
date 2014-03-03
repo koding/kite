@@ -75,7 +75,7 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 	p.mux.Handle("/tunnel", websocket.Server{Handler: p.handleTunnel}) // Handler for kites behind
 
 	// Remove URL from the map when PrivateKite disconnects.
-	k.OnDisconnect(func(r *kite.RemoteKite) {
+	k.OnDisconnect(func(r *kite.Client) {
 		delete(p.kites, r.Kite.ID)
 	})
 
@@ -157,13 +157,13 @@ func (p *Proxy) ListenAndServeTLS(certFile, keyfile string) error {
 }
 
 func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
-	p.kites[r.RemoteKite.ID] = newPrivateKite(r.RemoteKite)
+	p.kites[r.Client.ID] = newPrivateKite(r.Client)
 
 	proxyURL := url.URL{
 		Scheme:   p.url.Scheme,
 		Host:     p.url.Host,
 		Path:     "proxy",
-		RawQuery: "kiteID=" + r.RemoteKite.ID,
+		RawQuery: "kiteID=" + r.Client.ID,
 	}
 
 	return proxyURL.String(), nil
@@ -175,13 +175,13 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 
 	kiteID := req.URL.Query().Get("kiteID")
 
-	remoteKite, ok := p.kites[kiteID]
+	client, ok := p.kites[kiteID]
 	if !ok {
 		p.Kite.Log.Error("Remote kite is not found: %s", req.URL.String())
 		return
 	}
 
-	tunnel := remoteKite.newTunnel(ws)
+	tunnel := client.newTunnel(ws)
 	defer tunnel.Close()
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
@@ -190,7 +190,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	const leeway = time.Duration(1 * time.Minute)
 
 	token.Claims = map[string]interface{}{
-		"sub": remoteKite.ID,                                // kite ID
+		"sub": client.ID,                                // kite ID
 		"seq": tunnel.id,                                    // tunnel number
 		"iat": time.Now().UTC().Unix(),                      // Issued At
 		"exp": time.Now().UTC().Add(ttl).Add(leeway).Unix(), // Expiration Time
@@ -207,9 +207,9 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	tunnelURL.Path = "/tunnel"
 	tunnelURL.RawQuery = "token=" + signed
 
-	_, err = remoteKite.Tell("kite.tunnel", map[string]string{"url": tunnelURL.String()})
+	_, err = client.Tell("kite.tunnel", map[string]string{"url": tunnelURL.String()})
 	if err != nil {
-		p.Kite.Log.Error("Cannot open tunnel to the kite: %s", remoteKite.Kite)
+		p.Kite.Log.Error("Cannot open tunnel to the kite: %s", client.Kite)
 		return
 	}
 
@@ -238,13 +238,13 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 	kiteID := token.Claims["sub"].(string)
 	seq := uint64(token.Claims["seq"].(float64))
 
-	remoteKite, ok := p.kites[kiteID]
+	client, ok := p.kites[kiteID]
 	if !ok {
 		p.Kite.Log.Error("Remote kite is not found: %s", kiteID)
 		return
 	}
 
-	tunnel, ok := remoteKite.tunnels[seq]
+	tunnel, ok := client.tunnels[seq]
 	if !ok {
 		p.Kite.Log.Error("Tunnel not found: %d", seq)
 	}
@@ -260,7 +260,7 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 //
 
 type PrivateKite struct {
-	*kite.RemoteKite
+	*kite.Client
 
 	// Connections to kites behind the proxy. Keys are kite IDs.
 	tunnels map[uint64]*Tunnel
@@ -269,9 +269,9 @@ type PrivateKite struct {
 	seq uint64
 }
 
-func newPrivateKite(r *kite.RemoteKite) *PrivateKite {
+func newPrivateKite(r *kite.Client) *PrivateKite {
 	return &PrivateKite{
-		RemoteKite: r,
+		Client: r,
 		tunnels:    make(map[uint64]*Tunnel),
 	}
 }

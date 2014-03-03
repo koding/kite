@@ -49,7 +49,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 // handleLog prints a log message to stderr.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	msg := r.Args.One().MustString()
-	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, msg))
+	k.Log.Info(fmt.Sprintf("%s: %s", r.Client.Name, msg))
 	return nil, nil
 }
 
@@ -91,7 +91,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		Location:  parsed,
 		Version:   websocket.ProtocolVersionHybi13,
 		Origin:    &url.URL{Scheme: "http", Host: "localhost"},
-		TlsConfig: r.RemoteKite.TLSConfig,
+		TlsConfig: r.Client.TLSConfig,
 	}
 
 	remoteConn, err := websocket.DialConfig(conf)

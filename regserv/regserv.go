@@ -111,7 +111,7 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 // username. You should probably not use this and authenticate users be
 // asking a password or something different.
 func AskUsernameOnly(r *kite.Request) (string, error) {
-	result, err := r.RemoteKite.TellWithTimeout("kite.prompt", 10*time.Minute, "Enter username: ")
+	result, err := r.Client.TellWithTimeout("kite.prompt", 10*time.Minute, "Enter username: ")
 	if err != nil {
 		return "", err
 	}

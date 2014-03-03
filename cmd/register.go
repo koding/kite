@@ -50,7 +50,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	regserv := r.client.NewRemoteKite(parsed)
+	regserv := r.client.NewClient(parsed)
 	if err = regserv.Dial(); err != nil {
 		return err
 	}

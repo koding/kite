@@ -16,7 +16,7 @@ var ErrNoKitesAvailable = errors.New("no kites availabile")
 
 // Kontrol is a client for registering and querying Kontrol Kite.
 type Kontrol struct {
-	*kite.RemoteKite
+	*kite.Client
 
 	LocalKite *kite.Kite
 
@@ -35,15 +35,15 @@ func New(k *kite.Kite) *Kontrol {
 		panic("no kontrol URL given in config")
 	}
 
-	remoteKite := k.NewRemoteKite(k.Config.KontrolURL)
-	remoteKite.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
-	remoteKite.Authentication = &kite.Authentication{
+	client := k.NewClient(k.Config.KontrolURL)
+	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
+	client.Authentication = &kite.Authentication{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
 
 	kontrol := &Kontrol{
-		RemoteKite: remoteKite,
+		Client: client,
 		LocalKite:  k,
 		ready:      make(chan bool),
 		watchers:   list.New(),
@@ -88,7 +88,7 @@ func (k *Kontrol) Register(kiteURL *url.URL) (*registerResult, error) {
 		URL: kiteURL.String(),
 	}
 
-	response, err := k.RemoteKite.Tell("register", args)
+	response, err := k.Client.Tell("register", args)
 	if err != nil {
 		return nil, err
 	}
@@ -156,18 +156,18 @@ func (k *Kontrol) eventCallbackHandler(onEvent EventHandler) kite.Callback {
 }
 
 func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
-	remoteKites, watcherID, err := k.getKites(query, k.eventCallbackHandler(onEvent))
+	clients, watcherID, err := k.getKites(query, k.eventCallbackHandler(onEvent))
 	if err != nil && err != ErrNoKitesAvailable {
 		return "", err // return only when something really happened
 	}
 
 	// also put the current kites to the eventChan.
-	for _, remoteKite := range remoteKites {
+	for _, client := range clients {
 		event := Event{
 			KiteEvent: protocol.KiteEvent{
 				Action: protocol.Register,
-				Kite:   remoteKite.Kite,
-				Token:  remoteKite.Authentication.Key,
+				Kite:   client.Kite,
+				Token:  client.Authentication.Key,
 			},
 			localKite: k.LocalKite,
 		}
@@ -179,27 +179,27 @@ func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 }
 
 // GetKites returns the list of Kites matching the query. The returned list
-// contains ready to connect RemoteKite instances. The caller must connect
-// with RemoteKite.Dial() before using each Kite. An error is returned when no
+// contains ready to connect Client instances. The caller must connect
+// with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
-func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*kite.RemoteKite, error) {
-	remoteKites, _, err := k.getKites(query)
+func (k *Kontrol) GetKites(query protocol.KontrolQuery) ([]*kite.Client, error) {
+	clients, _, err := k.getKites(query)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(remoteKites) == 0 {
+	if len(clients) == 0 {
 		return nil, ErrNoKitesAvailable
 	}
 
-	return remoteKites, nil
+	return clients, nil
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watcherID string, err error) {
+func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.Client, watcherID string, err error) {
 	<-k.ready
 
-	response, err := k.RemoteKite.Tell("getKites", args...)
+	response, err := k.Client.Tell("getKites", args...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -210,7 +210,7 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 		return nil, "", err
 	}
 
-	remoteKites := make([]*kite.RemoteKite, len(result.Kites))
+	clients := make([]*kite.Client, len(result.Kites))
 	for i, currentKite := range result.Kites {
 		_, err := jwt.Parse(currentKite.Token, k.LocalKite.RSAKey)
 		if err != nil {
@@ -228,14 +228,14 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 			k.Log.Error("invalid url came from kontrol", currentKite.URL)
 		}
 
-		remoteKites[i] = k.LocalKite.NewRemoteKiteString(currentKite.URL)
-		remoteKites[i].Kite = currentKite.Kite
-		remoteKites[i].URL = parsed
-		remoteKites[i].Authentication = auth
+		clients[i] = k.LocalKite.NewClientString(currentKite.URL)
+		clients[i].Kite = currentKite.Kite
+		clients[i].URL = parsed
+		clients[i].Authentication = auth
 	}
 
 	// Renew tokens
-	for _, r := range remoteKites {
+	for _, r := range clients {
 		token, err := NewTokenRenewer(r, k)
 		if err != nil {
 			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
@@ -244,14 +244,14 @@ func (k *Kontrol) getKites(args ...interface{}) (kites []*kite.RemoteKite, watch
 		token.RenewWhenExpires()
 	}
 
-	return remoteKites, result.WatcherID, nil
+	return clients, result.WatcherID, nil
 }
 
 // GetToken is used to get a new token for a single Kite.
 func (k *Kontrol) GetToken(kite *protocol.Kite) (string, error) {
 	<-k.ready
 
-	result, err := k.RemoteKite.Tell("getToken", kite)
+	result, err := k.Client.Tell("getToken", kite)
 	if err != nil {
 		return "", err
 	}

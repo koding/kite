@@ -20,7 +20,7 @@ func TestServerStart(t *testing.T) {
 	server.Start()
 
 	client := kite.New("testclient", "1.0.0")
-	remote := client.NewRemoteKiteString("ws://localhost:3636")
+	remote := client.NewClientString("ws://localhost:3636")
 
 	err := remote.Dial()
 	if err != nil {

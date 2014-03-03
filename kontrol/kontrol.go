@@ -142,7 +142,7 @@ type registerValue struct {
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
-	log.Info("Register request from: %s", r.RemoteKite.Kite)
+	log.Info("Register request from: %s", r.Client.Kite)
 
 	var args struct {
 		URL *protocol.KiteURL `json:"url"`
@@ -165,7 +165,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		args.URL.Host = net.JoinHostPort(host, port)
 	}
 
-	err := k.register(r.RemoteKite, args.URL)
+	err := k.register(r.Client, args.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	return &protocol.RegisterResult{URL: args.URL.String()}, nil
 }
 
-func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error {
+func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 	err := validateKiteKey(&r.Kite)
 	if err != nil {
 		return err
@@ -213,7 +213,7 @@ func (k *Kontrol) register(r *kite.RemoteKite, kiteURL *protocol.KiteURL) error 
 	return nil
 }
 
-func requestHeartbeat(r *kite.RemoteKite, setterFunc func() error) error {
+func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		kite.Callback(func(r *kite.Request) { setterFunc() }),
@@ -403,7 +403,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 		// Stop watching on disconnect.
 		disconnect := make(chan bool)
-		r.RemoteKite.OnDisconnect(func() {
+		r.Client.OnDisconnect(func() {
 			// Remove watcher from the map
 			k.watchersMutex.Lock()
 			defer k.watchersMutex.Unlock()

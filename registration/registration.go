@@ -156,7 +156,7 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 
 // registerToProxyKite dials the proxy kite and calls register method then
 // returns the reverse-proxy URL.
-func (reg *Registration) registerToProxyKite(r *kite.RemoteKite) (*url.URL, error) {
+func (reg *Registration) registerToProxyKite(r *kite.Client) (*url.URL, error) {
 	Log := reg.kontrol.Log
 
 	err := r.Dial()

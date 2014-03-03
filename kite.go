@@ -1,7 +1,7 @@
 // Package kite is a library for creating small micro-services.
 // Two main types implemented by this package are
 // Kite for creating a micro-service server called "Kite" and
-// RemoteKite for communicating with another kites.
+// Client for communicating with another kites.
 package kite
 
 import (
@@ -76,10 +76,10 @@ type Kite struct {
 	server   *rpc.Server            // Dnode rpc server
 
 	// Handlers to call when a Kite opens a connection to this Kite.
-	onConnectHandlers []func(*RemoteKite)
+	onConnectHandlers []func(*Client)
 
 	// Handlers to call when a client has disconnected.
-	onDisconnectHandlers []func(*RemoteKite)
+	onDisconnectHandlers []func(*Client)
 
 	name    string
 	version string
@@ -127,9 +127,9 @@ func New(name, version string) *Kite {
 
 	// Call registered handlers when a client has disconnected.
 	k.server.OnDisconnect(func(c *rpc.Client) {
-		if r, ok := c.Properties()["remoteKite"]; ok {
+		if r, ok := c.Properties()["client"]; ok {
 			// Run OnDisconnect handlers.
-			k.notifyRemoteKiteDisconnected(r.(*RemoteKite))
+			k.notifyClientDisconnected(r.(*Client))
 		}
 	})
 
@@ -191,17 +191,17 @@ func newLogger(name string) logging.Logger {
 }
 
 // OnFirstRequest registers a function to run when a Kite connects to this Kite.
-func (k *Kite) OnFirstRequest(handler func(*RemoteKite)) {
+func (k *Kite) OnFirstRequest(handler func(*Client)) {
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
 }
 
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
-func (k *Kite) OnDisconnect(handler func(*RemoteKite)) {
+func (k *Kite) OnDisconnect(handler func(*Client)) {
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
 }
 
 // notifyFirstRequest runs the registered handlers with OnFirstRequest().
-func (k *Kite) notifyFirstRequest(r *RemoteKite) {
+func (k *Kite) notifyFirstRequest(r *Client) {
 	k.Log.Info("Client '%s' is identified as '%s'",
 		r.client.RemoteAddr(), r.Kite)
 
@@ -210,8 +210,8 @@ func (k *Kite) notifyFirstRequest(r *RemoteKite) {
 	}
 }
 
-// notifyRemoteKiteDisconnected runs the registered handlers with OnDisconnect().
-func (k *Kite) notifyRemoteKiteDisconnected(r *RemoteKite) {
+// notifyClientDisconnected runs the registered handlers with OnDisconnect().
+func (k *Kite) notifyClientDisconnected(r *Client) {
 	k.Log.Info("Client has disconnected: %s", r.Kite)
 
 	for _, handler := range k.onDisconnectHandlers {
