@@ -19,14 +19,14 @@ func TestProxy(t *testing.T) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	prx := New(conf.Clone(), testkeys.Public, testkeys.Private)
+	prx := New(conf.Copy(), testkeys.Public, testkeys.Private)
 	prx.Kite.Config.DisableAuthentication = true // no kontrol running in test
 	prx.Start()
 
 	// Proxy kite is ready.
 
 	kite1 := kite.New("kite1", "1.0.0")
-	kite1.Config = conf.Clone()
+	kite1.Config = conf.Copy()
 	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
 		return "bar", nil
 	})
@@ -53,7 +53,7 @@ func TestProxy(t *testing.T) {
 	}
 
 	kite2 := kite.New("kite2", "1.0.0")
-	kite2.Config = conf.Clone()
+	kite2.Config = conf.Copy()
 
 	kite1remote := kite2.NewClientString(proxyURL)
 

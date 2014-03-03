@@ -33,25 +33,25 @@ func init() {
 }
 
 func TestKontrol(t *testing.T) {
-	kon := New(conf.Clone(), testkeys.Public, testkeys.Private)
+	kon := New(conf.Copy(), testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 
-	prx := proxy.New(conf.Clone(), testkeys.Public, testkeys.Private)
+	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	time.Sleep(1e9)
 
 	mathKite := simple.New("mathworker", "0.0.1")
-	mathKite.Config = conf.Clone()
+	mathKite.Config = conf.Copy()
 	mathKite.HandleFunc("square", Square)
 	mathKite.Start()
 
 	<-mathKite.Registration.ReadyNotify()
 
 	exp2Kite := kite.New("exp2", "0.0.1")
-	exp2Kite.Config = conf.Clone()
+	exp2Kite.Config = conf.Copy()
 
 	query := protocol.KontrolQuery{
 		Username:    exp2Kite.Kite().Username,
@@ -146,7 +146,7 @@ func TestKontrol(t *testing.T) {
 
 	// Start a new mathworker kite
 	mathKite2 := simple.New("mathworker", "0.0.1")
-	mathKite2.Config = conf.Clone()
+	mathKite2.Config = conf.Copy()
 	mathKite2.Start()
 
 	// We must get Register event

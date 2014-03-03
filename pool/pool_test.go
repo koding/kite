@@ -26,18 +26,18 @@ func TestPool(t *testing.T) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	kon := kontrol.New(conf.Clone(), testkeys.Public, testkeys.Private)
+	kon := kontrol.New(conf.Copy(), testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 	// defer kon.Close()
 
-	prx := proxy.New(conf.Clone(), testkeys.Public, testkeys.Private)
+	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
 	prx.Start()
 	// defer prx.Close()
 
 	foo := kite.New("foo", "1.0.0")
-	foo.Config = conf.Clone()
+	foo.Config = conf.Copy()
 	konClient := kontrolclient.New(foo)
 	connected, err := konClient.DialForever()
 	if err != nil {
@@ -57,7 +57,7 @@ func TestPool(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		bar := simple.New("bar", "1.0.0")
-		bar.Config = conf.Clone()
+		bar.Config = conf.Copy()
 		bar.Start()
 		defer bar.Close()
 		<-bar.Registration.ReadyNotify()
