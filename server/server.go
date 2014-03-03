@@ -17,13 +17,8 @@ type Server struct {
 	*kite.Kite
 	listener  net.Listener
 	TLSConfig *tls.Config
-
-	// Trusted root certificates for TLS connections (wss://).
-	// Certificate data must be PEM encoded.
-	//tlsCertificates [][]byte
-
-	readyC chan bool // To signal when kite is ready to accept connections
-	closeC chan bool // To signal when kite is closed with Close()
+	readyC    chan bool // To signal when kite is ready to accept connections
+	closeC    chan bool // To signal when kite is closed with Close()
 }
 
 func New(k *kite.Kite) *Server {
