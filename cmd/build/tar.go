@@ -2,9 +2,9 @@ package build
 
 import (
 	"errors"
-	"io/ioutil"
 	"github.com/koding/kite/cmd/util"
 	"github.com/koding/kite/cmd/util/deps"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"

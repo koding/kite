@@ -43,10 +43,10 @@ func New(k *kite.Kite) *Kontrol {
 	}
 
 	kontrol := &Kontrol{
-		Client: client,
-		LocalKite:  k,
-		ready:      make(chan bool),
-		watchers:   list.New(),
+		Client:    client,
+		LocalKite: k,
+		ready:     make(chan bool),
+		watchers:  list.New(),
 	}
 
 	var once sync.Once

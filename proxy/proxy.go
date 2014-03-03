@@ -190,7 +190,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	const leeway = time.Duration(1 * time.Minute)
 
 	token.Claims = map[string]interface{}{
-		"sub": client.ID,                                // kite ID
+		"sub": client.ID,                                    // kite ID
 		"seq": tunnel.id,                                    // tunnel number
 		"iat": time.Now().UTC().Unix(),                      // Issued At
 		"exp": time.Now().UTC().Add(ttl).Add(leeway).Unix(), // Expiration Time
@@ -271,8 +271,8 @@ type PrivateKite struct {
 
 func newPrivateKite(r *kite.Client) *PrivateKite {
 	return &PrivateKite{
-		Client: r,
-		tunnels:    make(map[uint64]*Tunnel),
+		Client:  r,
+		tunnels: make(map[uint64]*Tunnel),
 	}
 }
 

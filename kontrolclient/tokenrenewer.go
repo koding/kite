@@ -16,7 +16,7 @@ const (
 
 // TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
-	client       *kite.Client
+	client           *kite.Client
 	kontrol          *Kontrol
 	validUntil       time.Time
 	signalRenewToken chan struct{}
@@ -25,7 +25,7 @@ type TokenRenewer struct {
 
 func NewTokenRenewer(r *kite.Client, kon *Kontrol) (*TokenRenewer, error) {
 	t := &TokenRenewer{
-		client:       r,
+		client:           r,
 		kontrol:          kon,
 		signalRenewToken: make(chan struct{}, 1),
 		disconnect:       make(chan struct{}),

@@ -2,8 +2,8 @@ package build
 
 import (
 	"fmt"
-	"io/ioutil"
 	"github.com/koding/kite/cmd/util"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
