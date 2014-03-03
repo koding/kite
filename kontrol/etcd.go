@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/coreos/etcd/config"
@@ -43,20 +42,10 @@ func (k *Kontrol) runEtcd(ready chan bool) {
 	// Load other defaults.
 	config.Load(nil)
 
-	// By default etcd uses ports 4001 and 7001.
-	// In Kontrol these ports depend on the kontrol's port.
-	// Etcd http server port will be: kontrolPort + 1
-	// Etcd peer server port will be: kontrolPort + 3001
-	ip, port, _ := net.SplitHostPort(k.Server.Addr())
-	portInt, _ := strconv.Atoi(port)
-	advertiseIP := ip
-	if advertiseIP == "0.0.0.0" {
-		advertiseIP = "127.0.0.1"
-	}
-	config.BindAddr = ip + ":" + strconv.Itoa(portInt+1)
-	config.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(portInt+1)
-	config.Peer.BindAddr = ip + ":" + strconv.Itoa(portInt+3001)
-	config.Peer.Addr = "http://" + advertiseIP + ":" + strconv.Itoa(portInt+3001)
+	config.BindAddr = k.EtcdBindAddr
+	config.Addr = k.EtcdAddr
+	config.Peer.BindAddr = k.PeerBindAddr
+	config.Peer.Addr = k.PeerAddr
 
 	if config.DataDir == "" {
 		log.Fatal("The data dir was not set and could not be guessed from machine name")

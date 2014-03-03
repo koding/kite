@@ -3,8 +3,6 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"net/url"
-	"os"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
@@ -40,15 +38,6 @@ func (r *Query) Exec(args []string) error {
 	flags.StringVar(&query.Hostname, "hostname", "", "")
 	flags.StringVar(&query.ID, "id", "", "")
 	flags.Parse(args)
-
-	kontrolURL := os.Getenv("KITE_KONTROL_URL")
-	if kontrolURL != "" {
-		parsed, err := url.Parse(kontrolURL)
-		if err != nil {
-			return err
-		}
-		r.client.Config.KontrolURL = parsed
-	}
 
 	kontrol := kontrolclient.New(r.client)
 	if err := kontrol.Dial(); err != nil {

@@ -54,9 +54,6 @@ func (s *RegServ) Run() {
 
 	s.Server.Run()
 	<-s.Server.CloseNotify()
-
-	// fmt.Println("Users can register with the following command:")
-	// fmt.Printf("kite register -to '%s'\n", s.kite.URL.String())
 }
 
 // RegisterSelf registers this host and writes a key to ~/.kite/kite.key
@@ -103,6 +100,8 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 		"kontrolURL": s.Server.Config.KontrolURL.String(), // Kontrol URL
 		"kontrolKey": strings.TrimSpace(s.publicKey),      // Public key of kontrol
 	}
+
+	s.Server.Log.Info("Registered user: %s", username)
 
 	return token.SignedString([]byte(s.privateKey))
 }

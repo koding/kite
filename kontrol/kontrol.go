@@ -38,15 +38,19 @@ const (
 var log logging.Logger
 
 type Kontrol struct {
-	Server     *server.Server
-	Name       string       // Name of the etcd instance
-	DataDir    string       // etcd data dir
-	Peers      []string     // other peers in cluster (must be peer address of other instances)
-	store      store.Store  // etcd data store
-	psListener net.Listener // etcd peer server listener (default port: 7001)
-	sListener  net.Listener // etcd http server listener (default port: 4001)
-	publicKey  string       // RSA key for validation of tokens
-	privateKey string       // RSA key for signing tokens
+	Server       *server.Server
+	Name         string       // Name of the etcd instance
+	DataDir      string       // etcd data dir
+	EtcdAddr     string       // The public host:port used for etcd server.
+	EtcdBindAddr string       // The listening host:port used for etcd server.
+	PeerAddr     string       // The public host:port used for peer communication.
+	PeerBindAddr string       // The listening host:port used for peer communication.
+	Peers        []string     // other peers in cluster (must be peer address of other instances)
+	store        store.Store  // etcd data store
+	psListener   net.Listener // etcd peer server listener (default port: 7001)
+	sListener    net.Listener // etcd http server listener (default port: 4001)
+	publicKey    string       // RSA key for validation of tokens
+	privateKey   string       // RSA key for signing tokens
 
 	// To cancel running watchers, we must store the references
 	watchers      map[string]*store.Watcher
@@ -74,13 +78,17 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 	hostname := k.Kite().Hostname
 
 	kontrol := &Kontrol{
-		Server:     server.New(k),
-		Name:       hostname,
-		DataDir:    "kontrol-data." + hostname,
-		Peers:      nil,
-		publicKey:  publicKey,
-		privateKey: privateKey,
-		watchers:   make(map[string]*store.Watcher),
+		Server:       server.New(k),
+		Name:         hostname,
+		DataDir:      "kontrol-data." + hostname,
+		EtcdAddr:     "http://localhost:4001",
+		EtcdBindAddr: ":4001",
+		PeerAddr:     "http://localhost:7001",
+		PeerBindAddr: ":7001",
+		Peers:        nil,
+		publicKey:    publicKey,
+		privateKey:   privateKey,
+		watchers:     make(map[string]*store.Watcher),
 	}
 
 	log = k.Log

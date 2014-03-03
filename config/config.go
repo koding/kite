@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -69,11 +70,17 @@ func (c *Config) ReadKiteKey() error {
 		c.KontrolUser = kontrolUser
 	}
 
-	if kontrolURL, ok := key.Claims["kontrolURL"].(string); ok {
-		c.KontrolURL, err = url.Parse(kontrolURL)
-		if err != nil {
-			return err
+	kontrolURL := os.Getenv("KITE_KONTROL_URL")
+	if kontrolURL == "" {
+		var ok bool
+		if kontrolURL, ok = key.Claims["kontrolURL"].(string); !ok {
+			return errors.New("kontrolURL not found in kite.key")
 		}
+	}
+
+	c.KontrolURL, err = url.Parse(kontrolURL)
+	if err != nil {
+		return err
 	}
 
 	if kontrolKey, ok := key.Claims["kontrolKey"].(string); ok {
