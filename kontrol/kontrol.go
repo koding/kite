@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/koding/kite/config"
 	"math/rand"
 	"net"
 	"strings"
@@ -17,11 +16,12 @@ import (
 	"github.com/coreos/etcd/store"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/kontrolclient"
-	"github.com/koding/kite/logging"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/server"
+	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
 )
 

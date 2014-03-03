@@ -17,8 +17,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode/rpc"
-	"github.com/koding/kite/logging"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
 )
 

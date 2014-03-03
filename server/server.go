@@ -71,7 +71,6 @@ func (s *Server) Run() {
 func (s *Server) Close() {
 	s.Kite.Log.Notice("Closing server...")
 	s.listener.Close()
-	s.Kite.Log.Close()
 }
 
 func (s *Server) Addr() string {

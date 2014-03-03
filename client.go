@@ -10,8 +10,8 @@ import (
 
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/dnode/rpc"
-	"github.com/koding/kite/logging"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/logging"
 )
 
 // Default timeout value for Client.Tell method.
