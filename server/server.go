@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -33,44 +34,6 @@ func New(k *kite.Kite) *Server {
 	}
 }
 
-// // // Add new trusted root certificate for TLS from a PEM block.
-// // func (k *Server) AddRootCertificate(cert string) {
-// //  k.tlsCertificates = append(k.tlsCertificates, []byte(cert))
-// // }
-
-// // // Add new trusted root certificate for TLS from a file name.
-// // func (k *Server) AddRootCertificateFile(certFile string) {
-// //  data, err := ioutil.ReadFile(certFile)
-// //  if err != nil {
-// //      k.Log.Fatal("Cannot add certificate: %s", err.Error())
-// //  }
-// //  k.tlsCertificates = append(k.tlsCertificates, data)
-// // }
-
-// // // EnableTLS enables "wss://" protocol".
-// // // It uses the same port and disables "ws://".
-// // func (k *Kite) EnableTLS(certFile, keyFile string) {
-// //  cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-// //  if err != nil {
-// //      k.Log.Fatal(err.Error())
-// //  }
-
-// //  k.server.TlsConfig = &tls.Config{
-// //      Certificates: []tls.Certificate{cert},
-// //  }
-
-// //  k.Kite.URL.Scheme = "wss"
-// //  k.ServingURL.Scheme = "wss"
-// // }
-
-// // func (k *Kite) tlsConfig() *tls.Config {
-// //         c := &tls.Config{RootCAs: x509.NewCertPool()}
-// //         for _, cert := range k.tlsCertificates {
-// //                 c.RootCAs.AppendCertsFromPEM(cert)
-// //         }
-// //         return c
-// // }
-
 func (s *Server) CloseNotify() chan bool {
 	return s.closeC
 }
@@ -98,7 +61,7 @@ func (s *Server) Run() {
 	// exported by "net" package.
 	const errClosing = "use of closed network connection"
 
-	err := s.ListenAndServe()
+	err := s.listenAndServe()
 	if err != nil {
 		if strings.Contains(err.Error(), errClosing) {
 			// The server is closed by Close() method
@@ -120,7 +83,9 @@ func (s *Server) Addr() string {
 	return net.JoinHostPort(s.Kite.Config.IP, strconv.Itoa(s.Kite.Config.Port))
 }
 
-func (s *Server) listen() error {
+// listenAndServe listens on the TCP network address k.URL.Host and then
+// calls Serve to handle requests on incoming connections.
+func (s *Server) listenAndServe() error {
 	var err error
 	s.listener, err = net.Listen("tcp4", s.Addr())
 	if err != nil {
@@ -128,48 +93,42 @@ func (s *Server) listen() error {
 	}
 
 	s.Kite.Log.Notice("Listening: %s", s.listener.Addr().String())
-	return nil
-}
 
-// ListenAndServe listens on the TCP network address k.URL.Host and then
-// calls Serve to handle requests on incoming connections.
-func (s *Server) ListenAndServe() error {
-	err := s.listen()
-	if err != nil {
-		return err
-	}
-	close(s.readyC) // listener is ready, notify waiters.
-	return s.Serve(s.listener)
-}
-
-func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
-	config := &tls.Config{}
 	if s.TLSConfig != nil {
-		*config = *s.TLSConfig
-	}
-	if config.NextProtos == nil {
-		config.NextProtos = []string{"http/1.1"}
-	}
-
-	var err error
-	config.Certificates = make([]tls.Certificate, 1)
-	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return err
+		if s.TLSConfig.NextProtos == nil {
+			s.TLSConfig.NextProtos = []string{"http/1.1"}
+		}
+		s.listener = tls.NewListener(s.listener, s.TLSConfig)
 	}
 
-	err = s.listen()
-	if err != nil {
-		return err
-	}
-
-	s.listener = tls.NewListener(s.listener, config)
-	return s.Serve(s.listener)
-}
-
-func (s *Server) Serve(l net.Listener) error {
-	s.listener = l
+	close(s.readyC) // listener is ready, notify waiters.
 	s.Kite.Log.Info("Serving...")
 	defer close(s.closeC) // serving is finished, notify waiters.
-	return http.Serve(l, s.Kite)
+	return http.Serve(s.listener, s.Kite)
+}
+
+func (k *Server) UseTLS(certPEM, keyPEM string) {
+	config := &tls.Config{}
+	if k.TLSConfig != nil {
+		k.TLSConfig = config
+	}
+
+	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
+	if err != nil {
+		panic(err)
+	}
+
+	config.Certificates = append(config.Certificates, cert)
+}
+
+func (k *Server) UseTLSFile(certFile, keyFile string) {
+	certData, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
+	}
+	keyData, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
+	}
+	k.UseTLS(string(certData), string(keyData))
 }
