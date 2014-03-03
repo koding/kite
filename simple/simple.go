@@ -44,15 +44,19 @@ func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
 }
 
 func (s *Simple) Start() {
-	s.Kontrol.DialForever()
+	connected, err := s.Kontrol.DialForever()
+	if err != nil {
+		s.Server.Log.Fatal("Cannot dial kontrol: %s", err.Error())
+	}
 	s.Server.Start()
-	go s.Registration.RegisterToProxyAndKontrol()
+	go func() {
+		<-connected
+		s.Registration.RegisterToProxyAndKontrol()
+	}()
 }
 
 func (s *Simple) Run() {
-	s.Kontrol.DialForever()
-	s.Server.Start()
-	s.Registration.RegisterToProxyAndKontrol()
+	s.Start()
 	<-s.Server.CloseNotify()
 }
 

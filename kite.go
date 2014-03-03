@@ -175,8 +175,6 @@ func newLogger(name string) logging.Logger {
 	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
 	case "DEBUG":
 		logger.SetLevel(logging.DEBUG)
-	case "INFO":
-		logger.SetLevel(logging.INFO)
 	case "NOTICE":
 		logger.SetLevel(logging.NOTICE)
 	case "WARNING":

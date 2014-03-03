@@ -83,7 +83,7 @@ func (c *Config) ReadKiteKey() error {
 	return nil
 }
 
-// Clone returns a new copy of the config object.
+// Clone returns a new deep copy of the config object.
 func (c *Config) Clone() *Config {
 	cloned := new(Config)
 	*cloned = *c

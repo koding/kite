@@ -3,12 +3,13 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/koding/kite"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/koding/kite"
 )
 
 type Server struct {
@@ -22,9 +23,6 @@ type Server struct {
 
 	readyC chan bool // To signal when kite is ready to accept connections
 	closeC chan bool // To signal when kite is closed with Close()
-
-	// Should handlers run concurrently? Default is true.
-	concurrent bool
 }
 
 func New(k *kite.Kite) *Server {
