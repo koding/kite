@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"github.com/koding/kite/kitekey"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"

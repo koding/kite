@@ -4,10 +4,9 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
-	"strings"
 
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/proxy"
 )
 
 func main() {
@@ -16,9 +15,6 @@ func main() {
 		privateKeyFile = flag.String("private-key", "", "")
 		ip             = flag.String("ip", "0.0.0.0", "")
 		port           = flag.Int("port", 4000, "")
-		name           = flag.String("name", "", "name of the instance")
-		dataDir        = flag.String("data-dir", "", "directory to store data")
-		peers          = flag.String("peers", "", "comma seperated peer addresses")
 	)
 
 	flag.Parse()
@@ -45,17 +41,7 @@ func main() {
 	conf.IP = *ip
 	conf.Port = *port
 
-	k := kontrol.New(conf, string(publicKey), string(privateKey))
+	p := proxy.New(conf, string(publicKey), string(privateKey))
 
-	if *name != "" {
-		k.Name = *name
-	}
-	if *dataDir != "" {
-		k.DataDir = *dataDir
-	}
-	if *peers != "" {
-		k.Peers = strings.Split(*peers, ",")
-	}
-
-	k.Run()
+	p.Run()
 }

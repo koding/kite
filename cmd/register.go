@@ -3,15 +3,15 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/protocol"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/kitekey"
 )
 
-const defaultRegServ = "ws://localhost:8080/regserv"
+const defaultRegServ = "ws://localhost:3998/regserv"
 
 type Register struct {
 	client *kite.Kite
@@ -28,12 +28,20 @@ func (r *Register) Definition() string {
 }
 
 func (r *Register) Exec(args []string) error {
-	flags := flag.NewFlagSet("register", flag.ContinueOnError)
-	to := flags.String("to", defaultRegServ, "target registration server")
+	flags := flag.NewFlagSet("register", flag.ExitOnError)
+	to := flags.String("to", "", "target registration server")
 	flags.Parse(args)
 
-	_, err := kitekey.Read()
-	if err == nil {
+	if *to == "" {
+		r.client.Log.Fatal("no URL given in -to flag")
+	}
+
+	parsed, err := url.Parse(*to)
+	if err != nil {
+		return err
+	}
+
+	if _, err = kitekey.Read(); err == nil {
 		r.client.Log.Warning("Already registered. Registering again...")
 	}
 
@@ -42,13 +50,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	parsed, err := url.Parse(*to)
-	if err != nil {
-		return err
-	}
-
-	target := protocol.Kite{URL: &protocol.KiteURL{*parsed}}
-	regserv := r.client.NewRemoteKite(target, kite.Authentication{})
+	regserv := r.client.NewClient(parsed)
 	if err = regserv.Dial(); err != nil {
 		return err
 	}

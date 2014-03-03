@@ -3,6 +3,11 @@
 // designed to be sent between those components.
 package protocol
 
+import (
+	"errors"
+	"strings"
+)
+
 // Kite is the base struct containing the public fields. It is usually embeded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
@@ -32,19 +37,30 @@ type Kite struct {
 
 	// os.Hostname() of the Kite.
 	Hostname string `json:"hostname"`
-
-	// The URL that the Kite can be reached from. Marshaled as string.
-	URL *KiteURL `json:"url" dnode:"-"`
 }
 
-func (k *Kite) Key() string {
+func (k Kite) String() string {
 	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+}
+
+func (k *Kite) Validate() error {
+	s := k.String()
+	if strings.Contains(s, "//") {
+		return errors.New("empty field")
+	}
+	if strings.Count(s, "/") != 7 {
+		return errors.New(`fields cannot contain "/"`)
+	}
+	return nil
+}
+
+type RegsiterArgs struct {
+	URL string `json:"url"`
 }
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
-	// IP address seen by kontrol
-	PublicIP string
+	URL string `json:"url"`
 }
 
 type GetKitesResult struct {
@@ -54,6 +70,7 @@ type GetKitesResult struct {
 
 type KiteWithToken struct {
 	Kite  Kite   `json:"kite"`
+	URL   string `json:"url"`
 	Token string `json:"token"`
 }
 
@@ -63,7 +80,8 @@ type KiteEvent struct {
 	Action KiteAction `json:"action"`
 	Kite   Kite       `json:"kite"`
 
-	// Required when Action == Register
+	// Required to connect when Action == Register
+	URL   string `json:"url,omitempty"`
 	Token string `json:"token,omitempty"`
 }
 

@@ -1,78 +1,72 @@
 package pool
 
 import (
-	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/kontrol"
-	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/testkeys"
-	"github.com/koding/kite/testutil"
+	"io/ioutil"
+	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/proxy"
+	"github.com/koding/kite/simple"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 )
 
 func TestPool(t *testing.T) {
-	testutil.WriteKiteKey()
+	conf := config.New()
+	conf.Username = "testuser"
+	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolKey = testkeys.Public
+	conf.KontrolUser = "testuser"
+	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	opts := &kite.Options{
-		Kitename:    "kontrol",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "testing",
-		PublicIP:    "127.0.0.1",
-		Port:        "3999",
-		Path:        "/kontrol",
-	}
-	kon := kontrol.New(opts, "kontrol", os.TempDir(), nil, testkeys.Public, testkeys.Private)
+	kon := kontrol.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	kon.DataDir, _ = ioutil.TempDir("", "")
+	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
-	kon.ClearKites()
+	// defer kon.Close()
 
-	optsFoo := &kite.Options{
-		Kitename:    "foo",
-		Version:     "0.0.1",
-		Environment: "testing",
-		Region:      "localhost",
+	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	prx.Start()
+	// defer prx.Close()
+
+	foo := kite.New("foo", "1.0.0")
+	foo.Config = conf.Copy()
+	konClient := kontrolclient.New(foo)
+	connected, err := konClient.DialForever()
+	if err != nil {
+		t.Fatal(err)
 	}
-	foo := kite.New(optsFoo)
-	foo.Start()
-	defer foo.Close()
-	time.Sleep(1e9)
+	<-connected
 
-	fmt.Println("--- starting pool")
 	query := protocol.KontrolQuery{
-		Username:    foo.Username,
-		Environment: "testing",
+		Username:    conf.Username,
+		Environment: conf.Environment,
 		Name:        "bar",
 	}
-	p := New(foo.Kontrol, query)
-	errChan := p.Start()
-	go func() {
-		err := <-errChan
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-	}()
-	time.Sleep(1e9)
 
-	if len(p.Kites) != 0 {
-		t.Errorf("no kite expected")
-		return
+	p := New(konClient, query)
+	p.Start()
+	// defer p.Close()
+
+	for i := 0; i < 2; i++ {
+		bar := simple.New("bar", "1.0.0")
+		bar.Config = conf.Copy()
+		bar.Start()
+		defer bar.Close()
+		<-bar.Registration.ReadyNotify()
 	}
 
-	optsBar := &kite.Options{
-		Kitename:    "bar",
-		Version:     "0.0.1",
-		Environment: "testing",
-		Region:      "localhost",
-	}
-	bar := kite.New(optsBar)
-	bar.Start()
-	defer bar.Close()
-	time.Sleep(1e9)
+	// We must wait for a until the pool receives events from kontrol.
+	time.Sleep(time.Second)
 
-	if len(p.Kites) != 1 {
-		t.Errorf("1 kite expected")
-		return
+	if len(p.Kites) != 2 {
+		t.Fatalf("expected 2 kited, found: %d", len(p.Kites))
 	}
 }

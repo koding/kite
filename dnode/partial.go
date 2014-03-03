@@ -214,7 +214,7 @@ func (a Arguments) Unmarshal(v interface{}) error {
 
 	kind := value.Elem().Kind()
 	if kind != reflect.Slice {
-		return errors.New("Argument must be a slice")
+		return fmt.Errorf("dnode: argument must be a slice: %s", value.Elem().Interface())
 	}
 
 	switch value.Elem().Type() {

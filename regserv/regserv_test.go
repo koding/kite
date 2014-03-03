@@ -1,27 +1,16 @@
 package regserv
 
 import (
+	"testing"
+
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/testkeys"
-	"testing"
+	"github.com/koding/kite/testutil"
 )
 
-type testBackend struct{}
-
-func (b testBackend) Username() string                             { return "testuser" }
-func (b testBackend) KontrolURL() string                           { return "ws://localhost:3999/kontrol" }
-func (b testBackend) PublicKey() string                            { return testkeys.Public }
-func (b testBackend) PrivateKey() string                           { return testkeys.Private }
-func (b testBackend) Authenticate(r *kite.Request) (string, error) { return "testuser", nil }
-
 func TestRegister(t *testing.T) {
-	regserv := New(testBackend{})
-	regserv.Environment = "testing"
-	regserv.Region = "localhost"
-	regserv.PublicIP = "127.0.0.1"
-	regserv.Port = "8079"
+	regserv := New(testutil.NewConfig(), testkeys.Public, testkeys.Private)
 
 	key, err := regserv.register("foo", "bar")
 	if err != nil {

@@ -3,11 +3,11 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/protocol"
 	"net/url"
 	"strconv"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/kitekey"
 )
 
 type Tell struct {
@@ -42,12 +42,11 @@ func (t *Tell) Exec(args []string) error {
 		return err
 	}
 
-	auth := kite.Authentication{
+	remote := t.client.NewClient(parsed)
+	remote.Authentication = &kite.Authentication{
 		Type: "kiteKey",
 		Key:  key,
 	}
-
-	remote := t.client.NewRemoteKite(protocol.Kite{URL: &protocol.KiteURL{*parsed}}, auth)
 
 	if err = remote.Dial(); err != nil {
 		return err

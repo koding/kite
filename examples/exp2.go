@@ -1,76 +1,46 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/protocol"
 	"math/rand"
 	"time"
+
+	"github.com/koding/kite"
 )
 
-var port = flag.String("port", "", "port to bind itself")
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func main() {
-	flag.Parse()
+	// Create a kite
+	k := kite.New("exp2", "1.0.0")
 
-	options := &kite.Options{
-		Kitename:    "application",
-		Version:     "0.0.1",
-		Port:        *port,
-		Region:      "localhost",
-		Environment: "development",
-	}
+	// Create mathworker client
+	mathWorker := k.NewClientString("ws://localhost:3636")
 
-	k := kite.New(options)
-	k.Start()
-
-	query := protocol.KontrolQuery{
-		Username:    k.Username,
-		Environment: "development",
-		Name:        "mathworker",
-	}
-
-	// To demonstrate we can receive notifications matcing to our query.
-	onEvent := func(e *kite.Event, err error) {
-		fmt.Printf("--- kite event: %#v\n", e)
-		fmt.Printf("--- e.Kite.URL.String(): %+v\n", e.Kite.URL.String())
-	}
-
-	go func() {
-		_, err := k.Kontrol.WatchKites(query, onEvent)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
-
-	// .. or just get the current kites and dial for one
-	kites, err := k.Kontrol.GetKites(query)
+	// Connect to remote kite
+	connected, err := mathWorker.DialForever()
 	if err != nil {
-		fmt.Println(err)
-		return
+		k.Log.Fatal(err.Error())
 	}
 
-	mathWorker := kites[0]
-	err = mathWorker.Dial()
-	if err != nil {
-		fmt.Println("Cannot connect to remote mathworker")
-		return
-	}
+	// Wait until connected
+	<-connected
 
-	squareOf := func(i int) {
+	// Call square method every second
+	for _ = range time.Tick(time.Second) {
+		i := rand.Intn(10)
+
+		// Call a method of mathworker kite
 		response, err := mathWorker.Tell("square", i)
 		if err != nil {
-			fmt.Println(err)
-			return
+			k.Log.Error(err.Error())
+			continue
 		}
 
+		// Print the result
 		result := response.MustFloat64()
-		fmt.Printf("input: %d  rpc result: %f\n", i, result)
-	}
-
-	for {
-		squareOf(rand.Intn(10))
-		time.Sleep(time.Second)
+		fmt.Printf("input: %d  result: %.0f\n", i, result)
 	}
 }

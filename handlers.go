@@ -4,12 +4,24 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/koding/kite/systeminfo"
-	"github.com/koding/kite/util"
 )
+
+func (k *Kite) addDefaultHandlers() {
+	k.HandleFunc("kite.systemInfo", systemInfo)
+	k.HandleFunc("kite.heartbeat", k.handleHeartbeat)
+	k.HandleFunc("kite.tunnel", handleTunnel)
+	k.HandleFunc("kite.log", k.handleLog)
+	k.HandleFunc("kite.print", handlePrint)
+	k.HandleFunc("kite.prompt", handlePrompt)
+	if runtime.GOOS == "darwin" {
+		k.HandleFunc("kite.notify", handleNotifyDarwin)
+	}
+}
 
 // systemInfo returns info about the system (CPU, memory, disk...).
 func systemInfo(r *Request) (interface{}, error) {
@@ -37,7 +49,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 // handleLog prints a log message to stderr.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	msg := r.Args.One().MustString()
-	k.Log.Info(fmt.Sprintf("%s: %s", r.RemoteKite.Name, msg))
+	k.Log.Info(fmt.Sprintf("%s: %s", r.Client.Name, msg))
 	return nil, nil
 }
 
@@ -79,7 +91,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		Location:  parsed,
 		Version:   websocket.ProtocolVersionHybi13,
 		Origin:    &url.URL{Scheme: "http", Host: "localhost"},
-		TlsConfig: r.LocalKite.tlsConfig(),
+		TlsConfig: r.Client.TLSConfig,
 	}
 
 	remoteConn, err := websocket.DialConfig(conf)
@@ -87,13 +99,6 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	conf.Location = r.LocalKite.ServingURL
-
-	localConn, err := websocket.DialConfig(conf)
-	if err != nil {
-		return nil, err
-	}
-
-	util.JoinStreams(localConn, remoteConn)
+	go r.LocalKite.server.Handler(remoteConn)
 	return nil, nil
 }

@@ -3,9 +3,9 @@ package build
 import (
 	"errors"
 	"fmt"
-	"go/build"
 	"github.com/koding/kite/cmd/util"
 	"github.com/koding/kite/cmd/util/deps"
+	"go/build"
 	"log"
 	"os"
 	"os/exec"

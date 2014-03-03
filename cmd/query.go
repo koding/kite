@@ -3,11 +3,13 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/protocol"
 	"net/url"
 	"os"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/protocol"
 )
 
 type Query struct {
@@ -25,16 +27,12 @@ func (r *Query) Definition() string {
 }
 
 func (r *Query) Exec(args []string) error {
-	token, err := kitekey.Parse()
-	if err != nil {
-		return err
-	}
-
-	username, _ := token.Claims["sub"].(string)
+	r.client.Config = config.MustGet()
 
 	var query protocol.KontrolQuery
+
 	flags := flag.NewFlagSet("query", flag.ExitOnError)
-	flags.StringVar(&query.Username, "username", username, "")
+	flags.StringVar(&query.Username, "username", r.client.Kite().Username, "")
 	flags.StringVar(&query.Environment, "environment", "", "")
 	flags.StringVar(&query.Name, "name", "", "")
 	flags.StringVar(&query.Version, "version", "", "")
@@ -44,34 +42,27 @@ func (r *Query) Exec(args []string) error {
 	flags.Parse(args)
 
 	kontrolURL := os.Getenv("KITE_KONTROL_URL")
-	if kontrolURL == "" {
-		kontrolURL = token.Claims["kontrolURL"].(string)
+	if kontrolURL != "" {
+		parsed, err := url.Parse(kontrolURL)
+		if err != nil {
+			return err
+		}
+		r.client.Config.KontrolURL = parsed
 	}
 
-	parsed, err := url.Parse(kontrolURL)
+	kontrol := kontrolclient.New(r.client)
+	if err := kontrol.Dial(); err != nil {
+		return err
+	}
+
+	result, err := kontrol.GetKites(query)
 	if err != nil {
 		return err
 	}
 
-	kontrol := r.client.NewKontrol(parsed)
-	if err = kontrol.Dial(); err != nil {
-		return err
-	}
-
-	response, err := kontrol.Tell("getKites", query)
-	if err != nil {
-		return err
-	}
-
-	var result protocol.GetKitesResult
-	err = response.Unmarshal(&result)
-	if err != nil {
-		return err
-	}
-
-	for i, kite := range result.Kites {
-		var k *protocol.Kite = &kite.Kite
-		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, k.URL)
+	for i, client := range result {
+		var k *protocol.Kite = &client.Kite
+		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, client.URL)
 	}
 
 	return nil

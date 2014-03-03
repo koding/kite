@@ -2,178 +2,174 @@ package kontrol
 
 import (
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/testkeys"
-	"github.com/koding/kite/testutil"
+	"io/ioutil"
+	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrolclient"
+	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/proxy"
+	"github.com/koding/kite/simple"
+	"github.com/koding/kite/testkeys"
+	"github.com/koding/kite/testutil"
 )
 
+var (
+	conf *config.Config
+	kon  *Kontrol
+)
+
+func init() {
+	conf = config.New()
+	conf.Username = "testuser"
+	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolKey = testkeys.Public
+	conf.KontrolUser = "testuser"
+	conf.KiteKey = testutil.NewKiteKey().Raw
+}
+
 func TestKontrol(t *testing.T) {
-	testutil.WriteKiteKey()
-
-	opts := &kite.Options{
-		Kitename:    "kontrol",
-		Version:     "0.0.1",
-		Region:      "localhost",
-		Environment: "testing",
-		PublicIP:    "127.0.0.1",
-		Port:        "3999",
-		Path:        "/kontrol",
-	}
-	kon := New(opts, "kontrol", os.TempDir(), nil, testkeys.Public, testkeys.Private)
+	kon := New(conf.Copy(), testkeys.Public, testkeys.Private)
+	kon.DataDir, _ = ioutil.TempDir("", "")
+	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
-	kon.ClearKites()
 
-	mathKite := mathWorker()
+	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	prx.Start()
+
+	time.Sleep(1e9)
+
+	mathKite := simple.New("mathworker", "0.0.1")
+	mathKite.Config = conf.Copy()
+	mathKite.HandleFunc("square", Square)
 	mathKite.Start()
 
-	exp2Kite := exp2()
-	exp2Kite.Start()
+	<-mathKite.Registration.ReadyNotify()
 
-	// Wait for kites to register themselves on Kontrol.
-	time.Sleep(500 * time.Millisecond)
+	exp2Kite := kite.New("exp2", "0.0.1")
+	exp2Kite.Config = conf.Copy()
 
 	query := protocol.KontrolQuery{
-		Username:    "testuser",
-		Environment: "development",
+		Username:    exp2Kite.Kite().Username,
+		Environment: exp2Kite.Kite().Environment,
 		Name:        "mathworker",
 	}
 
-	kites, err := exp2Kite.Kontrol.GetKites(query)
+	konClient := kontrolclient.New(exp2Kite)
+	connected, err := konClient.DialForever()
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
+	}
+
+	<-connected
+
+	kites, err := konClient.GetKites(query)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if len(kites) == 0 {
-		t.Errorf("No mathworker available")
-		return
+		t.Fatal("No mathworker available")
 	}
 
 	remoteMathWorker := kites[0]
 	err = remoteMathWorker.Dial()
 	if err != nil {
-		t.Errorf("Cannot connect to remote mathworker")
-		return
+		t.Fatal("Cannot connect to remote mathworker")
 	}
 
 	// Test Kontrol.GetToken
-	fmt.Printf("oldToken: %#v\n", remoteMathWorker.Authentication.Key)
-	newToken, err := exp2Kite.Kontrol.GetToken(&remoteMathWorker.Kite)
+	t.Logf("oldToken: %s", remoteMathWorker.Authentication.Key)
+	newToken, err := konClient.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 	}
-	fmt.Printf("newToken: %#v\n", newToken)
+	t.Logf("newToken: %s", newToken)
 
 	// Run "square" method
 	response, err := remoteMathWorker.Tell("square", 2)
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
 	}
 
 	var result int
 	err = response.Unmarshal(&result)
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
 	}
 
 	// Result must be "4"
 	if result != 4 {
-		t.Errorf("Invalid result: %d", result)
-		return
+		t.Fatalf("Invalid result: %d", result)
 	}
 
-	events := make(chan *kite.Event, 3)
+	events := make(chan *kontrolclient.Event, 3)
 
 	// Test WatchKites
-	watcher, err := exp2Kite.Kontrol.WatchKites(query, func(e *kite.Event, err error) {
+	watcher, err := konClient.WatchKites(query, func(e *kontrolclient.Event, err error) {
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err)
 		}
 
 		t.Logf("Event.Action: %s Event.Kite.ID: %s", e.Action, e.Kite.ID)
 		events <- e
 	})
 	if err != nil {
-		t.Errorf("Cannot watch: %s", err.Error())
-		return
+		t.Fatalf("Cannot watch: %s", err.Error())
 	}
 
 	// First event must be register event because math worker is already running
 	select {
 	case e := <-events:
 		if e.Action != protocol.Register {
-			t.Errorf("unexpected action: %s", e.Action)
-			return
+			t.Fatalf("unexpected action: %s", e.Action)
 		}
 	case <-time.After(time.Second):
-		t.Error("timeout")
-		return
+		t.Fatal("timeout")
 	}
 
-	mathKite.Kontrol.Close() // TODO Close all RemoteKites when kite is closed.
 	mathKite.Close()
 
 	// We must get Deregister event
 	select {
 	case e := <-events:
 		if e.Action != protocol.Deregister {
-			t.Errorf("unexpected action: %s", e.Action)
-			return
+			t.Fatalf("unexpected action: %s", e.Action)
 		}
 	case <-time.After(time.Second):
-		t.Error("timeout")
-		return
+		t.Fatal("timeout")
 	}
 
 	// Start a new mathworker kite
-	mathKite = mathWorker()
-	mathKite.Start()
+	mathKite2 := simple.New("mathworker", "0.0.1")
+	mathKite2.Config = conf.Copy()
+	mathKite2.Start()
 
 	// We must get Register event
 	select {
 	case e := <-events:
 		if e.Action != protocol.Register {
-			t.Errorf("unexpected action: %s", e.Action)
-			return
+			t.Fatalf("unexpected action: %s", e.Action)
 		}
 	case <-time.After(time.Second):
-		t.Error("timeout")
-		return
+		t.Fatal("timeout")
 	}
 
 	err = watcher.Cancel()
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatal(err)
 	}
 
 	// We must not get any event after cancelling the watcher
 	select {
 	case e := <-events:
-		t.Errorf("unexpected event: %s", e)
-		return
+		t.Fatalf("unexpected event: %s", e)
 	case <-time.After(time.Second):
 	}
-}
-
-func mathWorker() *kite.Kite {
-	options := &kite.Options{
-		Kitename:    "mathworker",
-		Version:     "0.0.1",
-		Port:        "3636",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	k := kite.New(options)
-	k.HandleFunc("square", Square)
-	return k
 }
 
 func Square(r *kite.Request) (interface{}, error) {
@@ -187,18 +183,6 @@ func Square(r *kite.Request) (interface{}, error) {
 	fmt.Printf("Kite call, sending result '%f' back\n", result)
 
 	return result, nil
-}
-
-func exp2() *kite.Kite {
-	options := &kite.Options{
-		Kitename:    "exp2",
-		Version:     "0.0.1",
-		Port:        "3637",
-		Region:      "localhost",
-		Environment: "development",
-	}
-
-	return kite.New(options)
 }
 
 func TestGetQueryKey(t *testing.T) {

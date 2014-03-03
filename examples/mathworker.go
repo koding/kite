@@ -1,40 +1,40 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+
 	"github.com/koding/kite"
+	"github.com/koding/kite/server"
 )
 
-var port = flag.String("port", "", "port to bind itself")
-
 func main() {
-	flag.Parse()
+	// Create a kite
+	k := kite.New("mathworker", "1.0.0")
 
-	options := &kite.Options{
-		Kitename:    "mathworker",
-		Version:     "0.0.1",
-		Port:        *port,
-		Region:      "localhost",
-		Environment: "development",
-	}
+	// Authentication is disabled for this example
+	k.Config.DisableAuthentication = true
 
-	k := kite.New(options)
-
+	// Add our handler method
 	k.HandleFunc("square", Square)
 
-	k.Run()
+	// Attach to a server and run it
+	s := server.New(k)
+	s.Config.Port = 3636
+	s.Run()
 }
 
 func Square(r *kite.Request) (interface{}, error) {
+	// Unmarshal method arguments
 	a := r.Args.One().MustFloat64()
 
 	result := a * a
 
-	fmt.Printf("Kite call, sending result %.0f back\n", result)
+	fmt.Printf("Call received, sending result %.0f back\n", result)
 
 	// Print a log on remote Kite.
-	r.RemoteKite.Go("log", fmt.Sprintf("You have requested square of: %f", a))
+	// This message will be printed on client's console.
+	r.Client.Go("kite.log", fmt.Sprintf("Message from %s: \"You have requested square of %.0f\"", r.LocalKite.Kite().Name, a))
 
+	// You can return anything as result, as long as it is JSON marshalable.
 	return result, nil
 }

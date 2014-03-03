@@ -2,9 +2,8 @@
 package rpc
 
 import (
-	"github.com/koding/kite/dnode"
-
 	"code.google.com/p/go.net/websocket"
+	"github.com/koding/kite/dnode"
 )
 
 // Server is a websocket server serving each dnode messages with registered handlers.
@@ -93,12 +92,12 @@ func (s *Server) OnDisconnect(handler func(*Client)) {
 
 func (s *Server) callOnConnectHandlers(c *Client) {
 	for _, handler := range s.onConnectHandlers {
-		go handler(c)
+		handler(c)
 	}
 }
 
 func (s *Server) callOnDisconnectHandlers(c *Client) {
 	for _, handler := range s.onDisconnectHandlers {
-		go handler(c)
+		handler(c)
 	}
 }
