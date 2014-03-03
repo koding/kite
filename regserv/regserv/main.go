@@ -10,7 +10,6 @@ import (
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/regserv"
-	"github.com/koding/kite/testkeys"
 )
 
 func main() {
@@ -31,6 +30,24 @@ func main() {
 
 	flag.Parse()
 
+	if *publicKeyFile == "" {
+		log.Fatalln("no -public-key given")
+	}
+
+	if *privateKeyFile == "" {
+		log.Fatalln("no -private-key given")
+	}
+
+	publicKey, err := ioutil.ReadFile(*publicKeyFile)
+	if err != nil {
+		log.Fatalln("cannot read public key file")
+	}
+
+	privateKey, err := ioutil.ReadFile(*privateKeyFile)
+	if err != nil {
+		log.Fatalln("cannot read private key file")
+	}
+
 	if *init {
 		conf := config.New()
 
@@ -45,24 +62,6 @@ func main() {
 		}
 		conf.KontrolURL = parsed
 
-		if *publicKeyFile == "" {
-			log.Fatalln("no -public-key given")
-		}
-
-		if *privateKeyFile == "" {
-			log.Fatalln("no -private-key given")
-		}
-
-		publicKey, err := ioutil.ReadFile(*publicKeyFile)
-		if err != nil {
-			log.Fatalln("cannot read public key file")
-		}
-
-		privateKey, err := ioutil.ReadFile(*privateKeyFile)
-		if err != nil {
-			log.Fatalln("cannot read private key file")
-		}
-
 		s := regserv.New(conf, string(publicKey), string(privateKey))
 		err = s.RegisterSelf()
 		if err != nil {
@@ -75,6 +74,7 @@ func main() {
 
 	conf, err := config.Get()
 	if err != nil {
+		fmt.Println(err)
 		fmt.Println(noKeyMessage)
 		os.Exit(1)
 	}
@@ -82,7 +82,13 @@ func main() {
 	conf.IP = *ip
 	conf.Port = *port
 
-	s := regserv.New(conf, testkeys.Public, testkeys.Private)
+	s := regserv.New(conf, string(publicKey), string(privateKey))
+
+	// Request must not be authenticated because clients do not have a
+	// kite.key before they register. We will authenticate them in
+	// "register" method handler.
+	s.Server.Config.DisableAuthentication = true
+
 	s.Run()
 }
 
