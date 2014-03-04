@@ -660,7 +660,7 @@ func generateToken(queryKey string, username, issuer, privateKey string) (string
 	return signed, nil
 }
 
-// kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
+// kiteFromEtcdKV returns a *protocol.Kite from an etcd key.
 // etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
 func kiteFromEtcdKV(key string) (*protocol.Kite, error) {
 	// TODO replace "kites" with KitesPrefix constant

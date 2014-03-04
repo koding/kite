@@ -271,8 +271,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	return nil
 }
 
-// AuthenticateFromKiteKey authenticates user from Koding Key.
-// Kontrol makes requests with a Koding Key.
+// AuthenticateFromKiteKey authenticates user from kite key.
 func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 	token, err := jwt.Parse(r.Authentication.Key, kitekey.GetKontrolKey)
 	if err != nil {
