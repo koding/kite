@@ -539,13 +539,20 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key, etcdEvent.Node.Value)
+				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key)
+				if err != nil {
+					continue
+				}
+
+				var val registerValue
+				err = json.Unmarshal([]byte(etcdEvent.Node.Value), &val)
 				if err != nil {
 					continue
 				}
 
 				kiteEvent.Action = protocol.Register
 				kiteEvent.Kite = *otherKite
+				kiteEvent.URL = val.URL.String()
 
 				kiteEvent.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.Server.Kite.Kite().Username, k.privateKey)
 				if err != nil {
@@ -555,7 +562,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 			case store.Delete: // Delete happens when we detect that otherKite is disconnected.
 				fallthrough
 			case store.Expire: // Expire happens when we don't get heartbeat from otherKite.
-				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key, etcdEvent.Node.Value)
+				otherKite, err := kiteFromEtcdKV(etcdEvent.Node.Key)
 				if err != nil {
 					continue
 				}
@@ -589,7 +596,7 @@ func addTokenToKites(nodes store.NodeExterns, username, issuer, queryKey, privat
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
-		kite, err := kiteFromEtcdKV(node.Key, node.Value)
+		kite, err := kiteFromEtcdKV(node.Key)
 		if err != nil {
 			return nil, err
 		}
@@ -655,7 +662,7 @@ func generateToken(queryKey string, username, issuer, privateKey string) (string
 
 // kiteFromEtcdKV returns a *protocol.Kite and Koding Key string from an etcd key.
 // etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
-func kiteFromEtcdKV(key, value string) (*protocol.Kite, error) {
+func kiteFromEtcdKV(key string) (*protocol.Kite, error) {
 	// TODO replace "kites" with KitesPrefix constant
 	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {

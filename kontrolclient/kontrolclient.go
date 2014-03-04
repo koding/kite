@@ -167,6 +167,7 @@ func (k *Kontrol) watchKites(query protocol.KontrolQuery, onEvent EventHandler) 
 			KiteEvent: protocol.KiteEvent{
 				Action: protocol.Register,
 				Kite:   client.Kite,
+				URL:    client.URL.String(),
 				Token:  client.Authentication.Key,
 			},
 			localKite: k.LocalKite,
