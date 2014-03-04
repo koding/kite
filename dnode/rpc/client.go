@@ -3,8 +3,10 @@ package rpc
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +114,25 @@ func (c *Client) Dial(serverURL string) error {
 
 // dial makes a single Dial() and run onConnectHandlers if connects.
 func (c *Client) dial() error {
+	// If no port number in host, append 80 or 443 depending on the scheme
+	_, _, err := net.SplitHostPort(c.Config.Location.Host)
+	if err != nil {
+		if err2, ok := err.(*net.AddrError); ok && err2.Err == "missing port in address" {
+			var port string
+			switch c.Config.Location.Scheme {
+			case "ws":
+				port = "80"
+			case "wss":
+				port = "443"
+			default:
+				panic("unexpected scheme: " + c.Config.Location.Scheme)
+			}
+			c.Config.Location.Host = net.JoinHostPort(strings.TrimRight(err2.Addr, ":"), port)
+		} else {
+			return err // Other kind of error
+		}
+	}
+
 	ws, err := websocket.DialConfig(c.Config)
 	if err != nil {
 		return err
