@@ -46,13 +46,16 @@ func (s *RegServ) Run() {
 	kon := kontrolclient.New(s.Server.Kite)
 	reg := registration.New(kon)
 
-	connected, _ := kon.DialForever()
+	connected, err := kon.DialForever()
+	if err != nil {
+		s.Server.Log.Fatal(err.Error())
+	}
+	s.Server.Start()
 	go func() {
 		<-connected
 		reg.RegisterToProxyAndKontrol()
 	}()
 
-	s.Server.Run()
 	<-s.Server.CloseNotify()
 }
 

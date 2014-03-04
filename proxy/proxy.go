@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	Version     = "0.0.2"
-	DefaultPort = 3999
+	Version           = "0.0.2"
+	DefaultPort       = 3999
+	DefaultPublicHost = "localhost:3999"
 )
 
 type Proxy struct {
@@ -29,15 +30,11 @@ type Proxy struct {
 	listener  net.Listener
 	TLSConfig *tls.Config
 
-	IP   string
-	Port int
+	readyC chan bool // To signal when kite is ready to accept connections
+	closeC chan bool // To signal when kite is closed with Close()
 
-	// TLS certificate
-	key  string
-	cert string
-
-	// Must match the name in certificate.
-	Domain string
+	// If givent it must match the domain in certificate.
+	PublicHost string
 
 	// For generating token tokens for tunnels.
 	pubKey  string
@@ -57,15 +54,21 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 	k := kite.New("proxy", Version)
 	k.Config = conf
 
+	// Listen on 3999 by default
+	if k.Config.Port == 0 {
+		k.Config.Port = DefaultPort
+	}
+
 	p := &Proxy{
 		Kite:              k,
+		readyC:            make(chan bool),
+		closeC:            make(chan bool),
 		pubKey:            pubKey,
 		privKey:           privKey,
 		kites:             make(map[string]*PrivateKite),
-		IP:                "0.0.0.0",
-		Port:              DefaultPort,
 		mux:               http.NewServeMux(),
 		RegisterToKontrol: true,
+		PublicHost:        DefaultPublicHost,
 	}
 
 	p.Kite.HandleFunc("register", p.handleRegister)
@@ -82,6 +85,14 @@ func New(conf *config.Config, pubKey, privKey string) *Proxy {
 	return p
 }
 
+func (s *Proxy) CloseNotify() chan bool {
+	return s.closeC
+}
+
+func (s *Proxy) ReadyNotify() chan bool {
+	return s.readyC
+}
+
 func (p *Proxy) Close() {
 	p.listener.Close()
 	for _, k := range p.kites {
@@ -92,68 +103,47 @@ func (p *Proxy) Close() {
 	}
 }
 
-func (p *Proxy) ListenAndServe() error {
+func (p *Proxy) Start() {
+	go p.Run()
+	<-p.readyC
+}
+
+func (p *Proxy) Run() {
+	p.listenAndServe()
+}
+
+func (p *Proxy) listenAndServe() error {
 	var err error
-	p.listener, err = net.Listen("tcp", net.JoinHostPort(p.IP, strconv.Itoa(p.Port)))
+	p.listener, err = net.Listen("tcp", net.JoinHostPort(p.Kite.Config.IP, strconv.Itoa(p.Kite.Config.Port)))
 	if err != nil {
 		return err
 	}
 
 	p.Kite.Log.Notice("Listening on: %s", p.listener.Addr().String())
 
-	kon := kontrolclient.New(p.Kite)
+	close(p.readyC)
+
+	p.url = &url.URL{
+		Scheme: "ws",
+		Host:   p.PublicHost,
+		Path:   "/kite",
+	}
 
 	if p.RegisterToKontrol {
+		kon := kontrolclient.New(p.Kite)
 		reg := registration.New(kon)
-		p.url = &url.URL{
-			Scheme: "ws",
-			Host:   net.JoinHostPort(p.Domain, strconv.Itoa(p.Port)),
-			Path:   "/kite",
+		connected, err := kon.DialForever()
+		if err != nil {
+			p.Kite.Log.Fatal("Cannot connect to kontrol: %s", err.Error())
 		}
-		kon.DialForever()
-		go reg.RegisterToKontrol(p.url)
+		go func() {
+			<-connected
+			reg.RegisterToKontrol(p.url)
+		}()
 	}
 
+	defer close(p.closeC)
 	return http.Serve(p.listener, p.mux)
-}
-
-func (p *Proxy) Start() {
-	go p.ListenAndServe()
-	time.Sleep(1e9)
-}
-
-func (p *Proxy) Run() {
-	p.ListenAndServe()
-}
-
-func (p *Proxy) ListenAndServeTLS(certFile, keyfile string) error {
-	cert, err := tls.X509KeyPair([]byte(p.cert), []byte(p.key))
-	if err != nil {
-		p.Kite.Log.Fatal(err.Error())
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}
-
-	p.listener, err = net.Listen("tcp", net.JoinHostPort(p.IP, strconv.Itoa(p.Port)))
-	if err != nil {
-		p.Kite.Log.Fatal(err.Error())
-	}
-	p.listener = tls.NewListener(p.listener, tlsConfig)
-
-	// Need to update these manually. TODO FIX
-	// p.Kite.URL.Scheme = "wss"
-	// p.Kite.ServingURL.Scheme = "wss"
-
-	// p.Kite.Register(p.listener.Addr())
-
-	server := &http.Server{
-		Handler:   p.mux,
-		TLSConfig: tlsConfig,
-	}
-
-	return server.Serve(p.listener)
 }
 
 func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
