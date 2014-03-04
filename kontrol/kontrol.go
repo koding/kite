@@ -152,6 +152,10 @@ type registerValue struct {
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	log.Info("Register request from: %s", r.Client.Kite)
 
+	if r.Args.One().MustMap()["url"].MustString() == "" {
+		return nil, errors.New("invalid url")
+	}
+
 	var args struct {
 		URL *protocol.KiteURL `json:"url"`
 	}

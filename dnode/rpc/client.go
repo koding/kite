@@ -99,6 +99,10 @@ func (c *Client) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, run
 func (c *Client) Dial(serverURL string) error {
 	var err error
 
+	if serverURL == "" {
+		panic("empty serverURL")
+	}
+
 	if c.Config.Location, err = url.Parse(serverURL); err != nil {
 		return err
 	}
@@ -154,6 +158,10 @@ func (c *Client) dial() error {
 // DialForever connects to the server in background.
 // If the connection drops, it reconnects again.
 func (c *Client) DialForever(serverURL string) (connected chan bool, err error) {
+	if serverURL == "" {
+		panic("empty serverURL")
+	}
+
 	c.Reconnect = true
 
 	connected = make(chan bool, 1)
