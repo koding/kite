@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"errors"
-	"github.com/koding/kite/kitekey"
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/koding/kite/kitekey"
 )
 
 type Run struct{}

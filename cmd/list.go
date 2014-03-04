@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/koding/kite/kitekey"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/koding/kite/kitekey"
 )
 
 type List struct{}

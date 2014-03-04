@@ -3,9 +3,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/koding/kite/kitekey"
 	"os"
 	"path/filepath"
+
+	"github.com/koding/kite/kitekey"
 )
 
 type Uninstall struct{}

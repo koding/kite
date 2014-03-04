@@ -2,12 +2,13 @@
 package kitekey
 
 import (
-	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 const (

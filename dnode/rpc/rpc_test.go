@@ -2,10 +2,11 @@ package rpc
 
 import (
 	"fmt"
-	"github.com/koding/kite/dnode"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/koding/kite/dnode"
 )
 
 func TestClientServer(t *testing.T) {
