@@ -54,7 +54,9 @@ func (k *Kite) Validate() error {
 	return nil
 }
 
-type RegsiterArgs struct {
+// RegisterArgs is used as the function argument to the Kontrol's register
+// method.
+type RegisterArgs struct {
 	URL string `json:"url"`
 }
 

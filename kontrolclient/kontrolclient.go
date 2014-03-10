@@ -84,7 +84,7 @@ type registerResult struct {
 func (k *Kontrol) Register(kiteURL *url.URL) (*registerResult, error) {
 	<-k.ready
 
-	args := protocol.RegsiterArgs{
+	args := protocol.RegisterArgs{
 		URL: kiteURL.String(),
 	}
 
