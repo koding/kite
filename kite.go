@@ -86,9 +86,9 @@ type Kite struct {
 	id      string // Unique kite instance id
 }
 
-// New creates, initialize and then returns a new Kite instance. It accepts
-// a single options argument that is a config struct that needs to be filled
-// with several informations like Name, Port, IP and so on.
+// New creates, initialize and then returns a new Kite instance. Version must
+// be in 3-digit semantic form. Name is important that it's also used to be
+// searched by others.
 func New(name, version string) *Kite {
 	if name == "" {
 		panic("kite: name cannot be empty")
