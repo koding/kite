@@ -78,7 +78,7 @@ func LoadDeps(pkgs ...Pkg) (*Deps, error) {
 	context := build.Default
 	thirdPartyDeps := make([]string, 0)
 
-	for _, importPath := range dependencies.StringSlice() {
+	for _, importPath := range set.StringSlice(dependencies) {
 		p, err := context.Import(importPath, ".", build.AllowBinary)
 		if err != nil {
 			log.Println(err)
