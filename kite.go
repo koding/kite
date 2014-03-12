@@ -30,24 +30,6 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("kite: cannot get hostname: %s", err.Error()))
 	}
-
-	// Debugging helper: Prints stacktrace on SIGUSR1.
-	c := make(chan os.Signal)
-	signal.Notify(c, syscall.SIGUSR1)
-	go func() {
-		for {
-			s := <-c
-			fmt.Println("Got signal:", s)
-			buf := make([]byte, 1<<16)
-			runtime.Stack(buf, true)
-			fmt.Println(string(buf))
-			fmt.Print("Number of goroutines:", runtime.NumGoroutine())
-			m := new(runtime.MemStats)
-			runtime.GC()
-			runtime.ReadMemStats(m)
-			fmt.Printf(", Memory allocated: %+v\n", m.Alloc)
-		}
-	}()
 }
 
 // Kite defines a single process that enables distributed service messaging
@@ -242,4 +224,24 @@ func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 // If you disable concurrency, requests will be processed synchronously.
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
+}
+
+// SetupSignalHandler listens to SIGUSR1 signal and prints a stackrace for every
+// SIGUSR1 signal
+func (k *Kite) SetupSignalHandler() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGUSR1)
+	go func() {
+		for s := range c {
+			fmt.Println("Got signal:", s)
+			buf := make([]byte, 1<<16)
+			runtime.Stack(buf, true)
+			fmt.Println(string(buf))
+			fmt.Print("Number of goroutines:", runtime.NumGoroutine())
+			m := new(runtime.MemStats)
+			runtime.GC()
+			runtime.ReadMemStats(m)
+			fmt.Printf(", Memory allocated: %+v\n", m.Alloc)
+		}
+	}()
 }
