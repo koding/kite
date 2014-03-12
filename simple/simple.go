@@ -11,7 +11,7 @@ import (
 // simple kite server
 type Simple struct {
 	*server.Server
-	Kontrol      *kontrolclient.Kontrol
+	Kontrol      *kontrolclient.KontrolClient
 	Registration *registration.Registration
 }
 

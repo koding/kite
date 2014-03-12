@@ -17,17 +17,17 @@ const (
 )
 
 type Registration struct {
-	kontrol *kontrolclient.Kontrol
+	kontrolClient *kontrolclient.KontrolClient
 
 	// To signal waiters when registration is successfull.
 	ready     chan bool
 	onceReady sync.Once
 }
 
-func New(kon *kontrolclient.Kontrol) *Registration {
+func New(kon *kontrolclient.KontrolClient) *Registration {
 	return &Registration{
-		kontrol: kon,
-		ready:   make(chan bool),
+		kontrolClient: kon,
+		ready:         make(chan bool),
 	}
 }
 
@@ -67,8 +67,8 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 
 	events := make(chan int)
 
-	r.kontrol.OnConnect(func() { events <- Connect })
-	r.kontrol.OnDisconnect(func() { events <- Disconnect })
+	r.kontrolClient.OnConnect(func() { events <- Connect })
+	r.kontrolClient.OnDisconnect(func() { events <- Disconnect })
 
 	var lastRegisteredURL *url.URL
 
@@ -77,7 +77,7 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 		case e := <-events:
 			switch e {
 			case Connect:
-				r.kontrol.Log.Notice("Connected to Kontrol.")
+				r.kontrolClient.Log.Notice("Connected to Kontrol.")
 				if lastRegisteredURL != nil {
 					select {
 					case urls <- lastRegisteredURL:
@@ -85,11 +85,11 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 					}
 				}
 			case Disconnect:
-				r.kontrol.Log.Warning("Disconnected from Kontrol.")
+				r.kontrolClient.Log.Warning("Disconnected from Kontrol.")
 			}
 		case u := <-urls:
-			if _, err := r.kontrol.Register(u); err != nil {
-				r.kontrol.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
+			if _, err := r.kontrolClient.Register(u); err != nil {
+				r.kontrolClient.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
 				time.AfterFunc(kontrolRetryDuration, func() {
 					select {
 					case urls <- u:
@@ -111,15 +111,15 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 // This function never returns.
 func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 	query := protocol.KontrolQuery{
-		Username:    r.kontrol.LocalKite.Config.KontrolUser,
-		Environment: r.kontrol.LocalKite.Config.Environment,
+		Username:    r.kontrolClient.LocalKite.Config.KontrolUser,
+		Environment: r.kontrolClient.LocalKite.Config.Environment,
 		Name:        "proxy",
 	}
 
 	for {
-		kites, err := r.kontrol.GetKites(query)
+		kites, err := r.kontrolClient.GetKites(query)
 		if err != nil {
-			r.kontrol.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
+			r.kontrolClient.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
 			time.Sleep(proxyRetryDuration)
 			continue
 		}
@@ -157,7 +157,7 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 // registerToProxyKite dials the proxy kite and calls register method then
 // returns the reverse-proxy URL.
 func (reg *Registration) registerToProxyKite(r *kite.Client) (*url.URL, error) {
-	Log := reg.kontrol.Log
+	Log := reg.kontrolClient.Log
 
 	err := r.Dial()
 	if err != nil {

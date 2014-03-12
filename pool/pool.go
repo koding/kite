@@ -10,16 +10,16 @@ import (
 
 // Pool is helper for staying connected to every kite in a query.
 type Pool struct {
-	kontrol *kontrolclient.Kontrol
-	query   protocol.KontrolQuery
-	Kites   map[string]*kite.Client
+	kontrolClient *kontrolclient.KontrolClient
+	query         protocol.KontrolQuery
+	Kites         map[string]*kite.Client
 }
 
-func New(kontrol *kontrolclient.Kontrol, query protocol.KontrolQuery) *Pool {
+func New(k *kontrolclient.KontrolClient, q protocol.KontrolQuery) *Pool {
 	return &Pool{
-		kontrol: kontrol,
-		query:   query,
-		Kites:   make(map[string]*kite.Client),
+		kontrolClient: k,
+		query:         q,
+		Kites:         make(map[string]*kite.Client),
 	}
 }
 
@@ -32,7 +32,7 @@ func (p *Pool) Start() chan error {
 
 // Run the pool (blocking).
 func (p *Pool) Run() error {
-	_, err := p.kontrol.WatchKites(p.query, func(event *kontrolclient.Event, err error) {
+	_, err := p.kontrolClient.WatchKites(p.query, func(event *kontrolclient.Event, err error) {
 		switch event.Action {
 		case protocol.Register:
 			p.Kites[event.Kite.ID] = event.Client()

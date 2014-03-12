@@ -17,16 +17,16 @@ const (
 // TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
 	client           *kite.Client
-	kontrol          *Kontrol
+	kontrolClient    *KontrolClient
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
 }
 
-func NewTokenRenewer(r *kite.Client, kon *Kontrol) (*TokenRenewer, error) {
+func NewTokenRenewer(r *kite.Client, kon *KontrolClient) (*TokenRenewer, error) {
 	t := &TokenRenewer{
 		client:           r,
-		kontrol:          kon,
+		kontrolClient:    kon,
 		signalRenewToken: make(chan struct{}, 1),
 		disconnect:       make(chan struct{}),
 	}
@@ -64,7 +64,7 @@ func (t *TokenRenewer) renewLoop() {
 		select {
 		case <-t.signalRenewToken:
 			if err := t.renewToken(); err != nil {
-				t.kontrol.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
+				t.kontrolClient.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
 				// Need to sleep here litle bit because a signal is sent
 				// when an expired token is detected on incoming request.
 				// This sleep prevents the signal from coming too fast.
@@ -93,9 +93,9 @@ func (t *TokenRenewer) sendRenewTokenSignal() {
 	}
 }
 
-// renewToken gets a new token from a kontrol, parses it and sets it as the token.
+// renewToken gets a new token from a kontrolClient, parses it and sets it as the token.
 func (t *TokenRenewer) renewToken() error {
-	tokenString, err := t.kontrol.GetToken(&t.client.Kite)
+	tokenString, err := t.kontrolClient.GetToken(&t.client.Kite)
 	if err != nil {
 		return err
 	}

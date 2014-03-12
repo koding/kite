@@ -120,7 +120,7 @@ func TestRegisterToProxyAndKontrol(t *testing.T) {
 	}
 }
 
-func setup() (*kite.Kite, *kontrolclient.Kontrol, *registration.Registration) {
+func setup() (*kite.Kite, *kontrolclient.KontrolClient, *registration.Registration) {
 
 	k := kite.New("test", "1.0.0")
 	k.Config = conf
