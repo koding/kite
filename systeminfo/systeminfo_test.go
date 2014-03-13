@@ -1,9 +1,6 @@
 package systeminfo
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestInfo(t *testing.T) {
 	i, err := New()
@@ -12,12 +9,12 @@ func TestInfo(t *testing.T) {
 		return
 	}
 
-	fmt.Printf("info: %+v\n", i)
+	t.Logf("info: %+v\n", i)
 
-	fmt.Printf("MemoryTotal: %dM\n", i.MemoryTotal/1024/1024)
-	fmt.Printf("MemoryUsage: %dM\n", i.MemoryUsage/1024/1024)
-	fmt.Printf("DiskTotal: %dG\n", i.DiskTotal/1024/1024)
-	fmt.Printf("DiskUsage: %dG\n", i.DiskUsage/1024/1024)
+	t.Logf("MemoryTotal: %dM\n", i.MemoryTotal/1024/1024)
+	t.Logf("MemoryUsage: %dM\n", i.MemoryUsage/1024/1024)
+	t.Logf("DiskTotal: %dG\n", i.DiskTotal/1024/1024)
+	t.Logf("DiskUsage: %dG\n", i.DiskUsage/1024/1024)
 
 	if i.MemoryTotal == 0 {
 		t.Errorf("unexpected memory total", i.MemoryTotal)

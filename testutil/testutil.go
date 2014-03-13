@@ -5,11 +5,13 @@ package testutil
 import (
 	"net/url"
 	"os"
+	"testing"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/testkeys"
+	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -56,4 +58,22 @@ func NewConfig() *config.Config {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = NewKiteKey().Raw
 	return conf
+}
+
+func init() {
+	// Monkey-patch default logging handler that is used by Kite.Logger
+	// in order to hide logs until "-v" flag is given to "test.sh" script.
+	original := logging.DefaultHandler
+	logging.DefaultHandler = &quietHandler{original}
+}
+
+// quietHandler does not output any log messages until "-v" flag is given in tests.
+type quietHandler struct {
+	logging.Handler
+}
+
+func (h *quietHandler) Handle(rec *logging.Record) {
+	if testing.Verbose() {
+		h.Handler.Handle(rec)
+	}
 }

@@ -1,10 +1,11 @@
 package kite
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
+
+	_ "github.com/koding/kite/testutil"
 )
 
 // Test 2 way communication between kites.
@@ -24,7 +25,7 @@ func TestKite(t *testing.T) {
 	fooChan := make(chan string)
 	handleFoo := func(r *Request) (interface{}, error) {
 		s := r.Args.One().MustString()
-		fmt.Printf("Message received: %s\n", s)
+		t.Logf("Message received: %s\n", s)
 		fooChan <- s
 		return nil, nil
 	}
@@ -45,7 +46,7 @@ func TestKite(t *testing.T) {
 
 	number := result.MustFloat64()
 
-	fmt.Printf("rpc result: %f\n", number)
+	t.Logf("rpc result: %f\n", number)
 
 	if number != 4 {
 		t.Fatalf("Invalid result: %f", number)
@@ -62,7 +63,7 @@ func TestKite(t *testing.T) {
 
 	resultChan := make(chan float64, 1)
 	resultCallback := func(r *Request) {
-		fmt.Printf("Request: %#v\n", r)
+		t.Logf("Request: %#v\n", r)
 		n := r.Args.One().MustFloat64()
 		resultChan <- n
 	}
@@ -87,7 +88,7 @@ func Square(r *Request) (interface{}, error) {
 	a := r.Args[0].MustFloat64()
 	result := a * a
 
-	fmt.Printf("Kite call, sending result '%f' back\n", result)
+	r.LocalKite.Log.Info("Kite call, sending result '%f' back\n", result)
 
 	// Reverse method call
 	r.Client.Go("foo", "bar")
@@ -103,7 +104,7 @@ func SquareCB(r *Request) (interface{}, error) {
 
 	result := a * a
 
-	fmt.Printf("Kite call, sending result '%f' back\n", result)
+	r.LocalKite.Log.Info("Kite call, sending result '%f' back\n", result)
 
 	// Send the result.
 	err := cb(result)
