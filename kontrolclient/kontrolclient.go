@@ -124,34 +124,18 @@ func (k *KontrolClient) WatchKites(query protocol.KontrolQuery, onEvent EventHan
 
 func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback {
 	return func(r *kite.Request) {
-		var returnEvent *Event
-		var returnError error
-
-		args := r.Args.MustSliceOfLength(2)
-
-		// Unmarshal event argument
-		if args[0] != nil {
-			var event = Event{localKite: k.LocalKite}
-			err := args[0].Unmarshal(&event)
-			if err != nil {
-				k.Log.Error(err.Error())
-				return
-			}
-			returnEvent = &event
+		var response struct {
+			Result *Event      `json:"result"`
+			Error  *kite.Error `json:"error"`
 		}
 
-		// Unmarshal error argument
-		if args[1] != nil {
-			var kiteErr kite.Error
-			err := args[1].Unmarshal(&kiteErr)
-			if err != nil {
-				k.Log.Error(err.Error())
-				return
-			}
-			returnError = &kiteErr
+		r.Args.One().MustUnmarshal(&response)
+
+		if response.Result != nil {
+			response.Result.localKite = k.LocalKite
 		}
 
-		onEvent(returnEvent, returnError)
+		onEvent(response.Result, response.Error)
 	}
 }
 

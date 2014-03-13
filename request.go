@@ -41,7 +41,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 		}
 
 		// Only argument to the callback.
-		response := callbackArg{
+		response := Response{
 			Result: result,
 			Error:  kiteErr,
 		}
@@ -86,8 +86,9 @@ func (e Error) Error() string {
 	return fmt.Sprintf("kite error %s - %s", e.Type, e.Message)
 }
 
-// When a callback is called we always pass this as the only argument.
-type callbackArg struct {
+// Response is the type of the object that is returned from request handlers
+// and the type of only argument that is passed to callback functions.
+type Response struct {
 	Error  *Error      `json:"error" dnode:"-"`
 	Result interface{} `json:"result"`
 }
