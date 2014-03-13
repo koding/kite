@@ -43,7 +43,7 @@ func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, t
 		// Only argument to the callback.
 		response := callbackArg{
 			Result: result,
-			Error:  errorForSending(kiteErr),
+			Error:  kiteErr,
 		}
 
 		// Call response callback function.
@@ -88,14 +88,9 @@ func (e Error) Error() string {
 
 // When a callback is called we always pass this as the only argument.
 type callbackArg struct {
-	Error  errorForSending `json:"error"`
-	Result interface{}     `json:"result"`
+	Error  *Error      `json:"error" dnode:"-"`
+	Result interface{} `json:"result"`
 }
-
-// errorForSending is a for sending the error as an argument in a dnode message.
-// Normally Error method of the Error struct is sent as a callback since it is
-// exported. We do not want this behavior.
-type errorForSending *Error
 
 // recoverError returns a function which recovers the error and sets to the
 // given argument as kite.Error.
