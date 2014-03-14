@@ -18,7 +18,6 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/server"
 	"github.com/koding/logging"
@@ -483,7 +482,7 @@ func (k *Kontrol) cancelWatcher(watcherID string) error {
 func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID string, disconnect chan bool, query *protocol.KontrolQuery, callback dnode.Function) {
 	var index uint64 = 0
 	for {
-		var kiteEvent kontrolclient.Event
+		var response kite.Response
 
 		select {
 		case <-disconnect:
@@ -522,7 +521,8 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				)
 				if err != nil {
 					log.Error("Cannot re-watch query: %s", err.Error())
-					callback(nil, &kite.Error{"watchError", err.Error()})
+					response.Error = &kite.Error{"watchError", err.Error()}
+					callback(response)
 					return
 				}
 
@@ -550,15 +550,18 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				kiteEvent.Action = protocol.Register
-				kiteEvent.Kite = *otherKite
-				kiteEvent.URL = val.URL.String()
+				var e protocol.KiteEvent
+				e.Action = protocol.Register
+				e.Kite = *otherKite
+				e.URL = val.URL.String()
 
-				kiteEvent.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.Server.Kite.Kite().Username, k.privateKey)
+				e.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.Server.Kite.Kite().Username, k.privateKey)
 				if err != nil {
 					log.Error("watch notify: %s", err)
 					return
 				}
+
+				response.Result = e
 			case store.Delete: // Delete happens when we detect that otherKite is disconnected.
 				fallthrough
 			case store.Expire: // Expire happens when we don't get heartbeat from otherKite.
@@ -567,13 +570,16 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				kiteEvent.Action = protocol.Deregister
-				kiteEvent.Kite = *otherKite
+				var e protocol.KiteEvent
+				e.Action = protocol.Deregister
+				e.Kite = *otherKite
+
+				response.Result = e
 			default:
 				continue // We don't care other events
 			}
 
-			callback(kiteEvent, nil)
+			callback(response)
 		}
 	}
 }

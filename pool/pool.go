@@ -32,7 +32,7 @@ func (p *Pool) Start() chan error {
 
 // Run the pool (blocking).
 func (p *Pool) Run() error {
-	_, err := p.kontrolClient.WatchKites(p.query, func(event *kontrolclient.Event, err error) {
+	_, err := p.kontrolClient.WatchKites(p.query, func(event *kontrolclient.Event, err *kite.Error) {
 		switch event.Action {
 		case protocol.Register:
 			p.Kites[event.Kite.ID] = event.Client()

@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"sync"
 
+	"github.com/koding/kite"
 	"github.com/koding/kite/protocol"
 )
 
@@ -17,7 +18,7 @@ type Watcher struct {
 	elem          *list.Element
 }
 
-type EventHandler func(*Event, error)
+type EventHandler func(*Event, *kite.Error)
 
 func (k *KontrolClient) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
 	watcher := &Watcher{

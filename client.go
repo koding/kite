@@ -104,9 +104,9 @@ func onError(err error) {
 		}
 
 		if options.ResponseCallback != nil {
-			response := callbackArg{
+			response := Response{
 				Result: nil,
-				Error:  errorForSending(&Error{"methodNotFound", err.Error()}),
+				Error:  &Error{"methodNotFound", err.Error()},
 			}
 			options.ResponseCallback(response)
 		}

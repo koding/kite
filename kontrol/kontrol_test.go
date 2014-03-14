@@ -110,7 +110,7 @@ func TestKontrol(t *testing.T) {
 	events := make(chan *kontrolclient.Event, 3)
 
 	// Test WatchKites
-	watcher, err := konClient.WatchKites(query, func(e *kontrolclient.Event, err error) {
+	watcher, err := konClient.WatchKites(query, func(e *kontrolclient.Event, err *kite.Error) {
 		if err != nil {
 			t.Fatal(err)
 		}
