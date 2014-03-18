@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// Create a kite
-	k := kite.New("mathworker", "1.0.0")
+	k := kite.New("math", "1.0.0")
 
 	// Authentication is disabled for this example
 	k.Config.DisableAuthentication = true
