@@ -1,10 +1,10 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/koding/kite/kitekey"
 )
@@ -43,7 +43,13 @@ func New() *Config {
 	return c
 }
 
-func (c *Config) ReadEnvironmentVariables() {
+func (c *Config) ReadEnvironmentVariables() error {
+	var err error
+
+	if username := os.Getenv("KITE_USERNAME"); username != "" {
+		c.Username = username
+	}
+
 	if environment := os.Getenv("KITE_ENVIRONMENT"); environment != "" {
 		c.Environment = environment
 	}
@@ -51,6 +57,26 @@ func (c *Config) ReadEnvironmentVariables() {
 	if region := os.Getenv("KITE_REGION"); region != "" {
 		c.Region = region
 	}
+
+	if ip := os.Getenv("KITE_IP"); ip != "" {
+		c.IP = ip
+	}
+
+	if port := os.Getenv("KITE_PORT"); port != "" {
+		c.Port, err = strconv.Atoi(port)
+		if err != nil {
+			return err
+		}
+	}
+
+	if kontrolURL := os.Getenv("KITE_KONTROL_URL"); kontrolURL != "" {
+		c.KontrolURL, err = url.Parse(kontrolURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ReadKiteKey parsed the user's kite key and returns a new Config.
@@ -70,17 +96,11 @@ func (c *Config) ReadKiteKey() error {
 		c.KontrolUser = kontrolUser
 	}
 
-	kontrolURL := os.Getenv("KITE_KONTROL_URL")
-	if kontrolURL == "" {
-		var ok bool
-		if kontrolURL, ok = key.Claims["kontrolURL"].(string); !ok {
-			return errors.New("kontrolURL not found in kite.key")
+	if kontrolURL, ok := key.Claims["kontrolURL"].(string); ok {
+		c.KontrolURL, err = url.Parse(kontrolURL)
+		if err != nil {
+			return err
 		}
-	}
-
-	c.KontrolURL, err = url.Parse(kontrolURL)
-	if err != nil {
-		return err
 	}
 
 	if kontrolKey, ok := key.Claims["kontrolKey"].(string); ok {
@@ -102,11 +122,12 @@ func (c *Config) Copy() *Config {
 
 func Get() (*Config, error) {
 	c := New()
-	err := c.ReadKiteKey()
-	if err != nil {
+	if err := c.ReadKiteKey(); err != nil {
 		return nil, err
 	}
-	c.ReadEnvironmentVariables()
+	if err := c.ReadEnvironmentVariables(); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
