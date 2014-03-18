@@ -30,11 +30,17 @@ func (r *Register) Definition() string {
 func (r *Register) Exec(args []string) error {
 	flags := flag.NewFlagSet("register", flag.ExitOnError)
 	to := flags.String("to", "", "target registration server")
+	username := flags.String("username", "", "pick a username")
 	flags.Parse(args)
 
 	if *to == "" {
-		r.client.Log.Fatal("no URL given in -to flag")
+		r.client.Log.Fatal("No URL given in -to flag")
 	}
+
+	if *username == "" {
+		r.client.Log.Fatal("You must give a username with -username flag")
+	}
+	r.client.Config.Username = *username
 
 	parsed, err := url.Parse(*to)
 	if err != nil {
