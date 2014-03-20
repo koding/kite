@@ -55,22 +55,22 @@ func getInstalledKites(kiteName string) ([]string, error) {
 
 	for _, domain := range domains {
 		domainPath := filepath.Join(kitesPath, domain.Name())
-		usernames, err := ioutil.ReadDir(domainPath)
+		users, err := ioutil.ReadDir(domainPath)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		for _, username := range usernames {
-			usernamePath := filepath.Join(domainPath, username.Name())
-			repos, err := ioutil.ReadDir(usernamePath)
+		for _, user := range users {
+			userPath := filepath.Join(domainPath, user.Name())
+			repos, err := ioutil.ReadDir(userPath)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
 
 			for _, repo := range repos {
-				repoPath := filepath.Join(usernamePath, repo.Name())
+				repoPath := filepath.Join(userPath, repo.Name())
 				versions, err := ioutil.ReadDir(repoPath)
 				if err != nil {
 					fmt.Println(err)
@@ -86,7 +86,7 @@ func getInstalledKites(kiteName string) ([]string, error) {
 						continue
 					}
 
-					fullName := filepath.Join(domain.Name(), username.Name(), repo.Name(), version.Name())
+					fullName := filepath.Join(domain.Name(), user.Name(), repo.Name(), version.Name())
 					installedKites = append(installedKites, fullName)
 				}
 			}
