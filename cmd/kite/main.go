@@ -8,7 +8,7 @@ import (
 	"github.com/koding/kite/cmd/cli"
 )
 
-const Version = "0.0.7"
+const Version = "0.0.8"
 
 func main() {
 	client := kite.New("kite-cli", Version)
