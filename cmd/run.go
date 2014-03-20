@@ -22,7 +22,7 @@ func (*Run) Definition() string {
 func (*Run) Exec(args []string) error {
 	// Parse kite name
 	if len(args) == 0 {
-		return errors.New("you should give a kite name")
+		return errors.New("You should give a kite name")
 	}
 
 	// Guess full kite name if short name is given
