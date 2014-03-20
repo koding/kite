@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,11 +31,6 @@ func (*Install) Definition() string {
 const S3URL = "http://koding-kites.s3.amazonaws.com/"
 
 func (*Install) Exec(args []string) error {
-	flags := flag.NewFlagSet("install", flag.ExitOnError)
-	flags.Parse(args)
-
-	args = flags.Args()
-
 	if len(args) != 1 {
 		return errors.New("You should give a URL. Example: github.com/cenkalti/math.kite")
 	}
