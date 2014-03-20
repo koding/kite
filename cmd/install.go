@@ -93,7 +93,7 @@ func (*Install) Exec(args []string) error {
 		return err
 	}
 
-	fmt.Println("Installed successfully:", repoName)
+	fmt.Println("Installed successfully:", filepath.Join(repoName, version))
 	return nil
 }
 
