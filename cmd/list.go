@@ -27,10 +27,6 @@ func (*List) Exec(args []string) error {
 		return err
 	}
 
-	if len(kites) == 0 {
-		return errors.New("No kites installed")
-	}
-
 	for _, k := range kites {
 		fmt.Println(k)
 	}
