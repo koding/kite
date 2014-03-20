@@ -83,7 +83,7 @@ func (s *RegServ) handleRegister(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	return s.register(r.Username, args.Hostname)
+	return s.register(r.Client.Kite.Username, args.Hostname)
 }
 
 func (s *RegServ) register(username, hostname string) (kiteKey string, err error) {
