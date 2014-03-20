@@ -27,8 +27,6 @@ func (*Install) Definition() string {
 	return "Install a kite from repository. Example: github.com/cenkalti/math.kite"
 }
 
-const S3URL = "http://koding-kites.s3.amazonaws.com/"
-
 func (*Install) Exec(args []string) error {
 	if len(args) != 1 {
 		return errors.New("You should give a URL. Example: github.com/cenkalti/math.kite")
