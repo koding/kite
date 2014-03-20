@@ -3,7 +3,9 @@ package cmd
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,40 +25,59 @@ func NewInstall() *Install {
 }
 
 func (*Install) Definition() string {
-	return "Install a kite from repository"
+	return "Install a kite from repository. Example: github.com/cenkalti/math.kite"
 }
 
 const S3URL = "http://koding-kites.s3.amazonaws.com/"
 
 func (*Install) Exec(args []string) error {
-	// Parse kite name
+	flags := flag.NewFlagSet("install", flag.ExitOnError)
+	flags.Parse(args)
+
+	args = flags.Args()
+
 	if len(args) != 1 {
-		return errors.New("You should give a kite name")
+		return errors.New("You should give a URL. Example: github.com/cenkalti/math.kite")
 	}
 
-	kiteFullName := args[0]
-	kiteName, kiteVersion, err := splitVersion(kiteFullName, true)
-	if err != nil {
-		kiteName, kiteVersion = kiteFullName, "latest"
-	}
+	repoName := args[0]
 
-	// Make download request
-	fmt.Println("Downloading...")
-	targz, err := requestPackage(kiteName, kiteVersion)
+	// Download manifest
+	fmt.Println("Downloading manifest file...")
+	manifest, err := getManifest(repoName)
 	if err != nil {
 		return err
 	}
-	defer targz.Close()
+
+	version, err := getVersion(manifest)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Found version: %s\n", version)
+
+	binaryURL, err := getBinaryURL(manifest)
+	if err != nil {
+		return err
+	}
+
+	// Make download request to the kite binary
+	fmt.Println("Downloading kite...")
+	targz, err := http.Get(binaryURL)
+	if err != nil {
+		return err
+	}
+	defer targz.Body.Close()
 
 	// Extract gzip
-	gz, err := gzip.NewReader(targz)
+	gz, err := gzip.NewReader(targz.Body)
 	if err != nil {
 		return err
 	}
 	defer gz.Close()
 
 	// Extract tar
-	tempKitePath, err := ioutil.TempDir("", "kd-kite-install-")
+	tempKitePath, err := ioutil.TempDir("", "kite-install-")
 	if err != nil {
 		return err
 	}
@@ -67,46 +88,78 @@ func (*Install) Exec(args []string) error {
 		return err
 	}
 
-	foundName, foundVersion, bundlePath, err := validatePackage(tempKitePath)
+	bundlePath, err := validatePackage(tempKitePath, repoName)
 	if err != nil {
 		return err
 	}
 
-	if foundName != kiteName {
-		return fmt.Errorf("Invalid package: Bundle name does not match with package name: %s != %s",
-			foundName, kiteName)
-	}
-
-	err = installBundle(bundlePath)
+	err = installKite(bundlePath, repoName, version)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Installed successfully:", foundName+"-"+foundVersion)
+	fmt.Println("Installed successfully:", repoName)
 	return nil
 }
 
-// requestPackage makes a request to the kite repository and returns
-// a io.ReadCloser. The caller must close the returned io.ReadCloser.
-func requestPackage(kiteName, kiteVersion string) (io.ReadCloser, error) {
-	kiteURL := S3URL + kiteName + "-" + kiteVersion + ".kite.tar.gz"
+func getManifest(repoName string) (map[string]interface{}, error) {
+	if !strings.HasPrefix(repoName, "github.com/") {
+		return nil, errors.New("Repo other than github.com is not supported for now")
+	}
 
-	res, err := http.Get(kiteURL)
+	repoName = strings.TrimRight(repoName, "/")
+	manifestURL := "http://raw." + repoName + "/master/.kite.json"
+
+	res, err := http.Get(manifestURL)
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode == 404 {
-		res.Body.Close()
 		return nil, errors.New("Package is not found on the server.")
 	}
 
 	if res.StatusCode != 200 {
-		res.Body.Close()
 		return nil, fmt.Errorf("Unexpected response from server: %d", res.StatusCode)
 	}
 
-	return res.Body, nil
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read response: %s", err.Error())
+	}
+
+	manifest := make(map[string]interface{})
+	err = json.Unmarshal(body, &manifest)
+	if err != nil {
+		return nil, fmt.Errorf("invalid manifest file: %s", err.Error())
+	}
+
+	return manifest, nil
+}
+
+func getBinaryURL(manifest map[string]interface{}) (string, error) {
+	platforms, ok := manifest["platforms"].(map[string]interface{})
+	if !ok {
+		return "", errors.New("no platforms key in kite manifest")
+	}
+
+	// TODO take platform from runtime
+	binaryURL, ok := platforms["darwin_amd64"].(string)
+	if !ok {
+		return "", errors.New("invalid platform URL")
+	}
+
+	return binaryURL, nil
+}
+
+func getVersion(manifest map[string]interface{}) (string, error) {
+	version, ok := manifest["version"].(string)
+	if !ok {
+		return "", errors.New("invalid version string")
+	}
+
+	return version, nil
 }
 
 // extractTar reads from the io.Reader and writes the files into the directory.
@@ -161,44 +214,43 @@ func extractTar(r io.Reader, dir string) error {
 	return nil
 }
 
-// validatePackage returns the package name, version and bundle path.
-func validatePackage(tempKitePath string) (string, string, string, error) {
+// validatePackage does some checks on kite bundle and returns the bundle path.
+func validatePackage(tempKitePath, repoName string) (bundlePath string, err error) {
 	dirs, err := ioutil.ReadDir(tempKitePath)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 
 	if len(dirs) != 1 {
-		return "", "", "", errors.New("Invalid package: Package must contain only one directory.")
+		return "", errors.New("Invalid package: Package must contain only one directory.")
 	}
 
-	bundleName := dirs[0].Name() // Example: asdf-1.2.3.kite
-	if !strings.HasSuffix(bundleName, ".kite") {
-		return "", "", "", errors.New("Invalid package: Direcory name must end with \".kite\".")
+	bundlePath = filepath.Join(tempKitePath, dirs[0].Name())
+
+	parts := strings.Split(repoName, "/")
+	if len(parts) == 0 {
+		return "", errors.New("invalid repo URL")
 	}
 
-	fullName := strings.TrimSuffix(bundleName, ".kite") // Example: asdf-1.2.3
-	kiteName, version, err := splitVersion(fullName, false)
-	if err != nil {
-		return "", "", "", errors.New("Invalid package: No version number in Kite bundle")
-	}
+	kiteName := strings.TrimSuffix(parts[len(parts)-1], ".kite")
 
-	return kiteName, version, filepath.Join(tempKitePath, bundleName), nil
+	_, err = os.Stat(filepath.Join(bundlePath, "bin", kiteName))
+	return bundlePath, err
 }
 
-// installBundle moves the .kite bundle into ~/kd/kites.
-func installBundle(bundlePath string) error {
+// installKite moves the .kite bundle into ~/kd/kites.
+func installKite(bundlePath, repoName, version string) error {
 	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return err
 	}
 
 	kitesPath := filepath.Join(kiteHome, "kites")
-	os.MkdirAll(kitesPath, 0700)
+	repoPath := filepath.Join(kitesPath, repoName)
+	versionPath := filepath.Join(repoPath, version)
 
-	bundleName := filepath.Base(bundlePath)
-	kitePath := filepath.Join(kitesPath, bundleName)
-	return os.Rename(bundlePath, kitePath)
+	os.MkdirAll(repoPath, 0700)
+	return os.Rename(bundlePath, versionPath)
 }
 
 // splitVersion takes a name like "asdf-1.2.3" and
