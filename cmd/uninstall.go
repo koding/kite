@@ -21,13 +21,9 @@ func (*Uninstall) Definition() string {
 
 func (*Uninstall) Exec(args []string) error {
 	if len(args) != 1 {
-		return errors.New("You should give a full kite name. Exampe: fs-1.0.0")
+		return errors.New("You should give a full kite name. Exampe: github.com/koding/fs.kite/1.0.0")
 	}
 	fullName := args[0]
-
-	if _, _, err := splitVersion(fullName, false); err != nil {
-		return err
-	}
 
 	installed, err := isInstalled(fullName)
 	if err != nil {
@@ -52,7 +48,7 @@ func getBundlePath(fullKiteName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(kiteHome, "kites", fullKiteName+".kite"), nil
+	return filepath.Join(kiteHome, "kites", fullKiteName), nil
 }
 
 // isInstalled returns true if the kite is installed.

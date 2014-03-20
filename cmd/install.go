@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/koding/kite/kitekey"
@@ -254,35 +253,6 @@ func installKite(bundlePath, repoName, version string) error {
 	return os.Rename(bundlePath, versionPath)
 }
 
-// splitVersion takes a name like "asdf-1.2.3" and
-// returns the name "asdf" and version "1.2.3" seperately.
-// If allowLatest is true, then the version must not be numeric and can be "latest".
-func splitVersion(fullname string, allowLatest bool) (name, version string, err error) {
-	notFound := errors.New("name does not contain a version number")
-
-	parts := strings.Split(fullname, "-")
-	n := len(parts)
-	if n < 2 {
-		return "", "", notFound
-	}
-
-	name = strings.Join(parts[:n-1], "-")
-	version = parts[n-1]
-
-	if allowLatest && version == "latest" {
-		return name, version, nil
-	}
-
-	versionParts := strings.Split(version, ".")
-	for _, v := range versionParts {
-		if _, err := strconv.Atoi(v); err != nil {
-			return "", "", notFound
-		}
-	}
-
-	return name, version, nil
-}
-
 // isBinaryFile returns true if the path is the path of the binary file
 // in aplication bundle. Example: fs-0.0.1.kite/bin/fs
 func isBinaryFile(path string) bool {
@@ -290,27 +260,8 @@ func isBinaryFile(path string) bool {
 	if len(parts) != 3 {
 		return false
 	}
-
-	binPath, err := getBinPath(parts[0])
-	if err != nil {
+	if parts[1] != "bin" {
 		return false
 	}
-
-	return path == binPath
-}
-
-// getBinPath takes a bundle name and return the path of the kite executable.
-// example: fs-0.0.1.kite -> fs-0.0.1/fs/bin
-func getBinPath(bundleName string) (string, error) {
-	if !strings.HasSuffix(bundleName, ".kite") {
-		return "", fmt.Errorf("Invalid bundle name: %s", bundleName)
-	}
-
-	fullName := strings.TrimSuffix(bundleName, ".kite")
-	name, _, err := splitVersion(fullName, false)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Join([]string{bundleName, "bin", name}, string(os.PathSeparator)), nil
+	return true
 }

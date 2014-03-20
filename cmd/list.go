@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,6 +27,10 @@ func (*List) Exec(args []string) error {
 		return err
 	}
 
+	if len(kites) == 0 {
+		return errors.New("No kites installed")
+	}
+
 	for _, k := range kites {
 		fmt.Println(k)
 	}
@@ -35,7 +40,7 @@ func (*List) Exec(args []string) error {
 
 // getIntalledKites returns installed kites in .kd/kites folder.
 // an empty argument returns all kites.
-func getInstalledKites(kiteName string) ([]string, error) {
+func getInstalledKites(kiteName string) ([]*InstalledKite, error) {
 	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
 		return nil, err
@@ -45,13 +50,13 @@ func getInstalledKites(kiteName string) ([]string, error) {
 	domains, err := ioutil.ReadDir(kitesPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []string{}, nil
+			return nil, nil
 		}
 
 		return nil, err
 	}
 
-	installedKites := []string{} // to be returned
+	var installedKites []*InstalledKite // to be returned
 
 	for _, domain := range domains {
 		domainPath := filepath.Join(kitesPath, domain.Name())
@@ -86,12 +91,36 @@ func getInstalledKites(kiteName string) ([]string, error) {
 						continue
 					}
 
-					fullName := filepath.Join(domain.Name(), user.Name(), repo.Name(), version.Name())
-					installedKites = append(installedKites, fullName)
+					installedKites = append(installedKites, NewInstalledKite(domain.Name(), user.Name(), repo.Name(), version.Name()))
 				}
 			}
 		}
 	}
 
 	return installedKites, nil
+}
+
+type InstalledKite struct {
+	Domain  string
+	User    string
+	Repo    string
+	Version string
+}
+
+func NewInstalledKite(domain, user, repo, version string) *InstalledKite {
+	return &InstalledKite{
+		Domain:  domain,
+		User:    user,
+		Repo:    repo,
+		Version: version,
+	}
+}
+
+func (k *InstalledKite) String() string {
+	return k.Domain + "/" + k.User + "/" + k.Repo + "/" + k.Version
+}
+
+// BinPath returns the path of the executable binary file.
+func (k *InstalledKite) BinPath() string {
+	return filepath.Join(k.Domain, k.User, k.Repo, k.Version, "bin", strings.TrimSuffix(k.Repo, ".kite"))
 }
