@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -144,8 +145,14 @@ func getBinaryURL(manifest map[string]interface{}) (string, error) {
 		return "", errors.New("no platforms key in kite manifest")
 	}
 
-	// TODO take platform from runtime
-	binaryURL, ok := platforms["darwin_amd64"].(string)
+	platform := runtime.GOOS + "_" + runtime.GOARCH
+
+	platformURL, ok := platforms[platform]
+	if !ok {
+		return "", fmt.Errorf("no binary available for platform: %s", platform)
+	}
+
+	binaryURL, ok := platformURL.(string)
 	if !ok {
 		return "", errors.New("invalid platform URL")
 	}
