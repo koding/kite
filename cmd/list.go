@@ -54,28 +54,33 @@ func getInstalledKites(kiteName string) ([]string, error) {
 	installedKites := []string{} // to be returned
 
 	for _, domain := range domains {
-		usernames, err := ioutil.ReadDir(filepath.Join(kitesPath, domain.Name()))
+		domainPath := filepath.Join(kitesPath, domain.Name())
+		usernames, err := ioutil.ReadDir(domainPath)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
 		for _, username := range usernames {
-			repos, err := ioutil.ReadDir(filepath.Join(kitesPath, domain.Name(), username.Name()))
+			usernamePath := filepath.Join(domainPath, username.Name())
+			repos, err := ioutil.ReadDir(usernamePath)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
 
 			for _, repo := range repos {
-				versions, err := ioutil.ReadDir(filepath.Join(kitesPath, domain.Name(), username.Name(), repo.Name()))
+				repoPath := filepath.Join(usernamePath, repo.Name())
+				versions, err := ioutil.ReadDir(repoPath)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
 
 				for _, version := range versions {
-					_, err := os.Stat(filepath.Join(kitesPath, domain.Name(), username.Name(), repo.Name(), version.Name(), "bin", strings.TrimSuffix(repo.Name(), ".kite")))
+					versionPath := filepath.Join(repoPath, version.Name())
+					binaryPath := filepath.Join(versionPath, "bin", strings.TrimSuffix(repo.Name(), ".kite"))
+					_, err := os.Stat(binaryPath)
 					if err != nil {
 						fmt.Println(err)
 						continue
