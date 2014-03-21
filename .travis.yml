@@ -2,7 +2,7 @@ language: go
 go: 1.2
 install:
   - go get -d github.com/koding/etcd
-  - mkdir -p $GOPATH/src/github.com/coreos
-  - mv $GOPATH/src/github.com/koding/etcd $GOPATH/src/github.com/coreos/etcd
+  - mkdir -p /home/travis/gopath/src/github.com/coreos
+  - mv /home/travis/gopath/src/github.com/koding/etcd /home/travis/gopath/src/github.com/coreos/etcd
 script:
   - ./test.sh
