@@ -67,7 +67,7 @@ type RegisterResult struct {
 
 type GetKitesResult struct {
 	Kites     []*KiteWithToken `json:"kites"`
-	WatcherID string           `json:"watcherID"`
+	WatcherID string           `json:"watcherID,omitempty"`
 }
 
 type KiteWithToken struct {
