@@ -1,6 +1,9 @@
 Kite Micro-Service Framework
 ============================
 
+[![GoDoc](https://godoc.org/github.com/koding/kite?status.png)](https://godoc.org/github.com/koding/kite)
+[![Build Status](https://travis-ci.org/koding/kite.png)](https://travis-ci.org/koding/kite)
+
 This document tries to describe Kites and their internals.
 
 What is a Kite?
