@@ -4,5 +4,6 @@ install:
   - go get -d github.com/koding/etcd
   - mkdir -p /home/travis/gopath/src/github.com/coreos
   - mv /home/travis/gopath/src/github.com/koding/etcd /home/travis/gopath/src/github.com/coreos/etcd
+  - go get -d -v ./... && go build -v ./...
 script:
   - ./test.sh
