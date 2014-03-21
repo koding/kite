@@ -1,6 +1,6 @@
-package systeminfo
-
 // +build darwin freebsd linux netbsd openbsd
+
+package systeminfo
 
 import "syscall"
 

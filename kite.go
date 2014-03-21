@@ -9,10 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
-	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
@@ -224,24 +221,4 @@ func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 // If you disable concurrency, requests will be processed synchronously.
 func (k *Kite) DisableConcurrency() {
 	k.server.SetConcurrent(false)
-}
-
-// SetupSignalHandler listens to SIGUSR1 signal and prints a stackrace for every
-// SIGUSR1 signal
-func (k *Kite) SetupSignalHandler() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGUSR1)
-	go func() {
-		for s := range c {
-			fmt.Println("Got signal:", s)
-			buf := make([]byte, 1<<16)
-			runtime.Stack(buf, true)
-			fmt.Println(string(buf))
-			fmt.Print("Number of goroutines:", runtime.NumGoroutine())
-			m := new(runtime.MemStats)
-			runtime.GC()
-			runtime.ReadMemStats(m)
-			fmt.Printf(", Memory allocated: %+v\n", m.Alloc)
-		}
-	}()
 }
