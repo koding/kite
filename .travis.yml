@@ -1,2 +1,8 @@
 language: go
 go: 1.2
+install:
+  - go get github.com/koding/etcd
+  - mkdir -p $GOPATH/src/github.com/coreos
+  - mv $GOPATH/src/github.com/koding/etcd $GOPATH/src/github.com/coreos/etcd
+script:
+  - ./test.sh
