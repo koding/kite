@@ -195,7 +195,7 @@ What about the browser?
 
 Browser is also acts like a Kite. It has it's own methods ("log" for logging a
 message to the console, "alert" for displaying alert to the user, etc.). A
-connected Kite can call methods of the browser. 
+connected Kite can call methods of the browser.
 
 See [kite.js](https://github.com/koding/kite.js) for more information.
 
