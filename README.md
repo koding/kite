@@ -31,6 +31,7 @@ Then, ohters can find it by querying Kontrol.
 There is also a Proxy Kite for giving public URLs to registered kites.
 
 Query has 7 fields:
+
     /<username>/<environment>/<name>/<version>/<region>/<hotname>/<id>
 
 * You must at least give the username.
