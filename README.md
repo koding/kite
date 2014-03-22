@@ -12,7 +12,7 @@ What is Kite?
 -------------
 
 Kite is both the name of the framework and the micro-service that is written by using this framework.
-Basicly, it is an RPC server and it can do anything you want.
+Basically, it is an RPC server and it can do anything you want.
 They can discover other kites using a service called Kontrol, and communicate with them.
 The communication protocol uses a websocket as transport in order to allow web applications to connect directly to kites.
 
@@ -24,10 +24,10 @@ What is *Kontrol*?
 ------------------
 
 Kontrol is the service registry and authentication service used by Kites.
-It is itself a kite, although we are planning to seperate it into two seperate kites.
+It is itself a kite, although we are planning to separate it into two separate kites.
 
 When a kite starts to run, it registers itself to Kontrol.
-Then, ohters can find it by querying Kontrol.
+Then, others can find it by querying Kontrol.
 There is also a Proxy Kite for giving public URLs to registered kites.
 
 Query has 7 fields:
