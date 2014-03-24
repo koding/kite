@@ -72,6 +72,7 @@ func handlePrompt(r *Request) (interface{}, error) {
 func handleGetPass(r *Request) (interface{}, error) {
 	fmt.Print(r.Args.One().MustString())
 	data, err := terminal.ReadPassword(0) // stdin
+	fmt.Println()
 	if err != nil {
 		return nil, err
 	}
