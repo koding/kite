@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"code.google.com/p/go.crypto/ssh/terminal"
 	"code.google.com/p/go.net/websocket"
 	"github.com/koding/kite/systeminfo"
 )
@@ -18,6 +19,7 @@ func (k *Kite) addDefaultHandlers() {
 	k.HandleFunc("kite.log", k.handleLog)
 	k.HandleFunc("kite.print", handlePrint)
 	k.HandleFunc("kite.prompt", handlePrompt)
+	k.HandleFunc("kite.getPass", handleGetPass)
 	if runtime.GOOS == "darwin" {
 		k.HandleFunc("kite.notify", handleNotifyDarwin)
 	}
@@ -64,6 +66,16 @@ func handlePrompt(r *Request) (interface{}, error) {
 	var s string
 	_, err := fmt.Scanln(&s)
 	return s, err
+}
+
+// handleGetPass reads a line of input from a terminal without local echo.
+func handleGetPass(r *Request) (interface{}, error) {
+	fmt.Print(r.Args.One().MustString())
+	data, err := terminal.ReadPassword(0) // stdin
+	if err != nil {
+		return nil, err
+	}
+	return string(data), nil
 }
 
 // handleNotifyDarwin displays a desktop notification on OS X.
