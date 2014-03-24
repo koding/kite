@@ -4,7 +4,6 @@ package regserv
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"time"
 
@@ -60,11 +59,7 @@ func (s *RegServ) Run() {
 
 // RegisterSelf registers this host and writes a key to ~/.kite/kite.key
 func (s *RegServ) RegisterSelf() error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	key, err := s.register(s.Server.Config.Username, hostname)
+	key, err := s.register(s.Server.Config.Username)
 	if err != nil {
 		return err
 	}
@@ -72,21 +67,16 @@ func (s *RegServ) RegisterSelf() error {
 }
 
 func (s *RegServ) handleRegister(r *kite.Request) (interface{}, error) {
-	var args struct {
-		Hostname string
-	}
-	r.Args.One().MustUnmarshal(&args)
-
 	if s.Authenticate != nil {
 		if err := s.Authenticate(r); err != nil {
 			return nil, errors.New("cannot authenticate user")
 		}
 	}
 
-	return s.register(r.Client.Kite.Username, args.Hostname)
+	return s.register(r.Client.Kite.Username)
 }
 
-func (s *RegServ) register(username, hostname string) (kiteKey string, err error) {
+func (s *RegServ) register(username string) (kiteKey string, err error) {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("cannot generate a token")
@@ -97,7 +87,6 @@ func (s *RegServ) register(username, hostname string) (kiteKey string, err error
 	token.Claims = map[string]interface{}{
 		"iss":        s.Server.Kite.Kite().Username,       // Issuer
 		"sub":        username,                            // Subject
-		"aud":        hostname,                            // Hostname of registered machine
 		"iat":        time.Now().UTC().Unix(),             // Issued At
 		"jti":        tknID.String(),                      // JWT ID
 		"kontrolURL": s.Server.Config.KontrolURL.String(), // Kontrol URL

@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/koding/kite"
@@ -51,17 +50,12 @@ func (r *Register) Exec(args []string) error {
 		r.client.Log.Warning("Already registered. Registering again...")
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-
 	regserv := r.client.NewClient(parsed)
 	if err = regserv.Dial(); err != nil {
 		return err
 	}
 
-	result, err := regserv.TellWithTimeout("register", 10*time.Minute, map[string]string{"hostname": hostname})
+	result, err := regserv.TellWithTimeout("register", 10*time.Minute)
 	if err != nil {
 		return err
 	}
