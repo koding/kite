@@ -71,7 +71,7 @@ func TestRegisterToKontrol(t *testing.T) {
 		if first.URL.String() != "ws://zubuzaretta:16500" {
 			t.Errorf("unexpected url: %s", first.URL.String())
 		}
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout")
 	}
 }
@@ -84,7 +84,7 @@ func TestRegisterToProxy(t *testing.T) {
 
 	select {
 	case <-reg.ReadyNotify():
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout")
 	}
 }
@@ -115,7 +115,7 @@ func TestRegisterToProxyAndKontrol(t *testing.T) {
 		if !strings.Contains(first.URL.String(), "/proxy") {
 			t.Errorf("unexpected url: %s", first.URL.String())
 		}
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout")
 	}
 }
