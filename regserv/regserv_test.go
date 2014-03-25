@@ -12,7 +12,7 @@ import (
 func TestRegister(t *testing.T) {
 	regserv := New(testutil.NewConfig(), testkeys.Public, testkeys.Private)
 
-	key, err := regserv.register("foo", "bar")
+	key, err := regserv.register("foo")
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -26,11 +26,6 @@ func TestRegister(t *testing.T) {
 
 	if username := token.Claims["sub"].(string); username != "foo" {
 		t.Errorf("invalid username: %s", username)
-		return
-	}
-
-	if hostname := token.Claims["aud"].(string); hostname != "bar" {
-		t.Errorf("invalid hostname: %s", hostname)
 		return
 	}
 }
