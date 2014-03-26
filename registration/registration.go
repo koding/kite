@@ -123,9 +123,15 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 		// The proxy kite to connect can be overriden with the
 		// environmental variable "KITE_PROXY_URL". If it is not set
 		// we will ask Kontrol for available Proxy kites.
+		// As an authentication informain kiteKey method will be used,
+		// so be careful when using this feature.
 		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
 		if kiteProxyURL != "" {
 			proxyKite = r.kontrolClient.LocalKite.NewClientString(kiteProxyURL)
+			proxyKite.Authentication = &kite.Authentication{
+				Type: "kiteKey",
+				Key:  r.kontrolClient.LocalKite.Config.KiteKey,
+			}
 		} else {
 			kites, err := r.kontrolClient.GetKites(query)
 			if err != nil {
