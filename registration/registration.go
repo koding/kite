@@ -3,6 +3,7 @@ package registration
 import (
 	"math/rand"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -117,27 +118,37 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 	}
 
 	for {
-		kites, err := r.kontrolClient.GetKites(query)
-		if err != nil {
-			r.kontrolClient.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
-			time.Sleep(proxyRetryDuration)
-			continue
-		}
+		var proxyKite *kite.Client
 
-		// If more than one one Proxy Kite is available pick one randomly.
-		// It does not matter which one we connect.
-		proxy := kites[rand.Int()%len(kites)]
+		// The proxy kite to connect can be overriden with the
+		// environmental variable "KITE_PROXY_URL". If it is not set
+		// we will ask Kontrol for available Proxy kites.
+		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
+		if kiteProxyURL == "" {
+			proxyKite = r.kontrolClient.LocalKite.NewClientString(kiteProxyURL)
+		} else {
+			kites, err := r.kontrolClient.GetKites(query)
+			if err != nil {
+				r.kontrolClient.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
+				time.Sleep(proxyRetryDuration)
+				continue
+			}
+
+			// If more than one one Proxy Kite is available pick one randomly.
+			// It does not matter which one we connect.
+			proxyKite = kites[rand.Int()%len(kites)]
+		}
 
 		// Notify us on disconnect
 		disconnect := make(chan bool, 1)
-		proxy.OnDisconnect(func() {
+		proxyKite.OnDisconnect(func() {
 			select {
 			case disconnect <- true:
 			default:
 			}
 		})
 
-		proxyURL, err := r.registerToProxyKite(proxy)
+		proxyURL, err := r.registerToProxyKite(proxyKite)
 		if err != nil {
 			time.Sleep(proxyRetryDuration)
 			continue
