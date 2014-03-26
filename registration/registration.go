@@ -124,7 +124,7 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 		// environmental variable "KITE_PROXY_URL". If it is not set
 		// we will ask Kontrol for available Proxy kites.
 		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
-		if kiteProxyURL == "" {
+		if kiteProxyURL != "" {
 			proxyKite = r.kontrolClient.LocalKite.NewClientString(kiteProxyURL)
 		} else {
 			kites, err := r.kontrolClient.GetKites(query)
