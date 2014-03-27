@@ -206,6 +206,12 @@ func (r *Request) authenticate() *Error {
 	// Trust the Kite if we have initiated the connection.
 	// RemoteAddr() returns "" if this is an outgoing connection.
 	if r.RemoteAddr == "" {
+		// Hack for proxy bug. Since the proxy connection is initiated from local kite
+		// and we don't check authentication for outgoing connections,
+		// this becomes an issue that the Request.Username is not set correctly.
+		if r.Username == "" {
+			r.Username = r.Client.Kite.Username
+		}
 		return nil
 	}
 
