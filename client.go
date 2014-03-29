@@ -114,12 +114,7 @@ func onError(err error) {
 }
 
 func wrapCallbackArgs(args []interface{}, tr dnode.Transport) []interface{} {
-	return []interface{}{&callOptionsOut{
-		WithArgs: args,
-		callOptions: callOptions{
-			Kite: *tr.Properties()["localKite"].(*Kite).Kite(),
-		},
-	}}
+	return args
 }
 
 // newClientWithClient returns a pointer to new Client instance.
@@ -333,7 +328,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan<- uint64) {
 // The caller of the Tell() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
 func (r *Client) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
-	return Callback(func(request *Request) {
+	return Callback(func(arguments dnode.Arguments) {
 		// Single argument of response callback.
 		var resp struct {
 			Result *dnode.Partial `json:"result"`
@@ -357,7 +352,7 @@ func (r *Client) makeResponseCallback(doneChan chan *response, removeCallback <-
 		}
 
 		// We must only get one argument for response callback.
-		arg, err := request.Args.SliceOfLength(1)
+		arg, err := arguments.SliceOfLength(1)
 		if err != nil {
 			resp.Err = &Error{Type: "invalidResponse", Message: err.Error()}
 			return

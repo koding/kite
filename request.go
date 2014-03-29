@@ -141,7 +141,7 @@ type Request struct {
 }
 
 // Wrap your function with Callback to send it as an argument to a Client.
-type Callback func(r *Request)
+type Callback func(dnode.Arguments)
 
 func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(`"[Function]"`), nil
@@ -154,10 +154,8 @@ func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments,
 	kiteErr := new(Error)               // Not used. For recovering the error.
 	defer kite.recoverError(&kiteErr)() // Do not panic no matter what.
 
-	request, _ := kite.parseRequest(method, args, tr)
-
 	// Call the callback function.
-	callArgs := []reflect.Value{reflect.ValueOf(request)}
+	callArgs := []reflect.Value{reflect.ValueOf(args)}
 	handlerFunc.Call(callArgs) // No return value from callback function.
 }
 
