@@ -11,12 +11,8 @@ type Dnode struct {
 	// Registered methods are saved in this map.
 	handlers map[string]reflect.Value
 
-	// Reference to sent callbacks are saved in this map.
-	callbacks map[uint64]reflect.Value
-
-	// Next callback number.
-	// Incremented atomically by registerCallback().
-	seq uint64
+	// Saves and retrieves callbacks
+	scrubber *Scrubber
 
 	// For sending and receiving messages
 	transport Transport
@@ -73,7 +69,7 @@ type Message struct {
 func New(transport Transport) *Dnode {
 	return &Dnode{
 		handlers:   make(map[string]reflect.Value),
-		callbacks:  make(map[uint64]reflect.Value),
+		scrubber:   NewScrubber(),
 		transport:  transport,
 		concurrent: true,
 	}
@@ -83,7 +79,7 @@ func New(transport Transport) *Dnode {
 func (d *Dnode) Copy(transport Transport) *Dnode {
 	return &Dnode{
 		handlers:         d.handlers,
-		callbacks:        make(map[uint64]reflect.Value),
+		scrubber:         NewScrubber(),
 		transport:        transport,
 		concurrent:       d.concurrent,
 		WrapMethodArgs:   d.WrapMethodArgs,
@@ -138,5 +134,5 @@ func (d *Dnode) Run() error {
 // RemoveCallback removes the callback with id from callbacks.
 // Can be used to remove unused callbacks to free memory.
 func (d *Dnode) RemoveCallback(id uint64) {
-	delete(d.callbacks, id)
+	d.scrubber.RemoveCallback(id)
 }

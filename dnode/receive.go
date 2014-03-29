@@ -45,7 +45,7 @@ func (d *Dnode) processMessage(data []byte) error {
 	case float64:
 		id := uint64(method)
 		runner = d.RunCallback
-		if handler, ok = d.callbacks[id]; !ok {
+		if handler, ok = d.scrubber.callbacks[id]; !ok {
 			err = CallbackNotFoundError{id, args}
 			return err
 		}
