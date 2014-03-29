@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
+	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
@@ -123,13 +124,13 @@ func (k *KontrolClient) WatchKites(query protocol.KontrolQuery, onEvent EventHan
 }
 
 func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback {
-	return func(r *kite.Request) {
+	return func(args dnode.Arguments) {
 		var response struct {
 			Result *Event      `json:"result"`
 			Error  *kite.Error `json:"error"`
 		}
 
-		r.Args.One().MustUnmarshal(&response)
+		args.One().MustUnmarshal(&response)
 
 		if response.Result != nil {
 			response.Result.localKite = k.LocalKite
