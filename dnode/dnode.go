@@ -60,9 +60,6 @@ type Message struct {
 
 	// Integer map of callback paths in arguments
 	Callbacks map[string]Path `json:"callbacks"`
-
-	// Links are not used for now.
-	Links []interface{} `json:"links"`
 }
 
 // New returns a pointer to a new Dnode.

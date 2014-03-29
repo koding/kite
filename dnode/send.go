@@ -47,7 +47,6 @@ func (d *Dnode) send(method interface{}, arguments []interface{}) (map[string]Pa
 		Method:    method,
 		Arguments: &Partial{Raw: rawArgs},
 		Callbacks: callbacks,
-		Links:     []interface{}{},
 	}
 
 	data, err := json.Marshal(msg)

@@ -91,7 +91,7 @@ func TestCallMessage(t *testing.T) {
 
 	// Send a single string method.
 	go d.Call("echo", "hello", "world")
-	expected := `{"method":"echo","arguments":["hello","world"],"callbacks":{},"links":[]}`
+	expected := `{"method":"echo","arguments":["hello","world"],"callbacks":{}}`
 	err := assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -100,7 +100,7 @@ func TestCallMessage(t *testing.T) {
 
 	// Send a single integer method.
 	go d.send(5, []interface{}{"hello", "world"})
-	expected = `{"method":5,"arguments":["hello","world"],"callbacks":{},"links":[]}`
+	expected = `{"method":5,"arguments":["hello","world"],"callbacks":{}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -130,7 +130,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Test a single callback function.
 	go d.Call("echo", echo)
-	expected := `{"method":"echo","arguments":["[Function]"],"callbacks":{"0":["0"]},"links":[]}`
+	expected := `{"method":"echo","arguments":["[Function]"],"callbacks":{"0":["0"]}}`
 	err := assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -139,7 +139,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a second method and see that callback number is increased by one.
 	go d.Call("echo", echo)
-	expected = `{"method":"echo","arguments":["[Function]"],"callbacks":{"1":["0"]},"links":[]}`
+	expected = `{"method":"echo","arguments":["[Function]"],"callbacks":{"1":["0"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -148,7 +148,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a string and a callback as an argument.
 	go d.Call("echo", "hello cenk", echo)
-	expected = `{"method":"echo","arguments":["hello cenk","[Function]"],"callbacks":{"2":["1"]},"links":[]}`
+	expected = `{"method":"echo","arguments":["hello cenk","[Function]"],"callbacks":{"2":["1"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -157,7 +157,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a string and a callback as an argument.
 	go d.Call("echo", map[string]interface{}{"fn": echo, "msg": "hello cenk"})
-	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"3":["0","fn"]},"links":[]}`
+	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"3":["0","fn"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -166,7 +166,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Same above with a pointer to map.
 	go d.Call("echo", &map[string]interface{}{"fn": echo, "msg": "hello cenk"})
-	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"4":["0","fn"]},"links":[]}`
+	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"4":["0","fn"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -186,7 +186,7 @@ func TestSendCallback(t *testing.T) {
 	// Send the struct itself.
 	// Pointer receivers will not be accessible.
 	go d.Call("calculate", a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"],"6":["0","add"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"],"6":["0","add"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -196,7 +196,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a pointer to struct.
 	// Pointer receivers will be accessible.
 	go d.Call("calculate", &a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"7":["0","Callbacks","0"],"8":["0","add"],"9":["0","subtract"]},"links":[]}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"7":["0","Callbacks","0"],"8":["0","add"],"9":["0","subtract"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
