@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (s *Scrubber) Unscrub(arguments interface{}, callbacks map[string]Path, f func(uint64) func(Arguments)) error {
+func (s *Scrubber) Unscrub(arguments interface{}, callbacks map[string]Path, f func(uint64) functionReceived) error {
 	v := reflect.ValueOf(arguments)
 	if v.Kind() != reflect.Ptr {
 		panic("arguments must be a pointer")
@@ -20,8 +20,7 @@ func (s *Scrubber) Unscrub(arguments interface{}, callbacks map[string]Path, f f
 			return err
 		}
 
-		err = s.setCallback(v, path, f(id))
-		if err != nil {
+		if err = setCallback(v, path, f(id)); err != nil {
 			return err
 		}
 	}
@@ -29,13 +28,13 @@ func (s *Scrubber) Unscrub(arguments interface{}, callbacks map[string]Path, f f
 	return nil
 }
 
-func (s *Scrubber) setCallback(value reflect.Value, path Path, cb func(Arguments)) error {
+func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 	i := 0
 	for {
 		switch value.Kind() {
 		case reflect.Slice:
 			if i == len(path) {
-				return fmt.Errorf("Callback path too short: %v", path)
+				return fmt.Errorf("callback path too short: %v", path)
 			}
 
 			// Path component may be a string or an integer.
@@ -45,19 +44,19 @@ func (s *Scrubber) setCallback(value reflect.Value, path Path, cb func(Arguments
 			case string:
 				index, err = strconv.Atoi(v)
 				if err != nil {
-					return fmt.Errorf("Integer expected in callback path, got '%v'.", path[i])
+					return fmt.Errorf("integer expected in callback path, got '%v'.", path[i])
 				}
 			case int:
 				index = v
 			default:
-				panic(fmt.Errorf("Unknown type: %#v", path[i]))
+				panic(fmt.Errorf("unknown type: %#v", path[i]))
 			}
 
 			value = value.Index(index)
 			i++
 		case reflect.Map:
 			if i == len(path) {
-				return fmt.Errorf("Callback path too short: %v", path)
+				return fmt.Errorf("callback path too short: %v", path)
 			}
 			if i == len(path)-1 && value.Type().Elem().Kind() == reflect.Interface {
 				value.SetMapIndex(reflect.ValueOf(path[i]), reflect.ValueOf(cb))
@@ -74,6 +73,11 @@ func (s *Scrubber) setCallback(value reflect.Value, path Path, cb func(Arguments
 			}
 			value = value.Elem()
 		case reflect.Struct:
+			if value.Type() == reflect.TypeOf(Function{}) {
+				field := value.FieldByName("Caller")
+				field.Set(reflect.ValueOf(cb))
+				return nil
+			}
 			// if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
 			// 	spec := CallbackSpec{path[i:], cb}
 			// 	innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)
@@ -89,7 +93,7 @@ func (s *Scrubber) setCallback(value reflect.Value, path Path, cb func(Arguments
 			value = value.FieldByName(strings.ToUpper(name[0:1]) + name[1:])
 			i++
 		case reflect.Func:
-			value.Set(reflect.ValueOf(cb))
+			// plain func is not supported, use Function type
 			return nil
 		case reflect.Invalid:
 			// callback path does not exist, skip

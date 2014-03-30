@@ -8,7 +8,7 @@ import (
 // received method.
 type MethodNotFoundError struct {
 	Method string
-	Args   Arguments
+	Args   *Partial
 }
 
 func (e MethodNotFoundError) Error() string {
@@ -19,7 +19,7 @@ func (e MethodNotFoundError) Error() string {
 // received message.
 type CallbackNotFoundError struct {
 	ID   uint64
-	Args Arguments
+	Args *Partial
 }
 
 func (e CallbackNotFoundError) Error() string {

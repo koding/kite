@@ -7,25 +7,49 @@ import (
 	"strings"
 )
 
-const functionPlaceholder = `"[Function]"`
-
-// Callback is a function to send in arguments.
-// Wrap your function to make it marshalable before sending.
-type Callback func(Arguments)
-
-func (c Callback) MarshalJSON() ([]byte, error) {
-	return []byte(functionPlaceholder), nil
+// Function is the type for sending and receiving functions in dnode messages.
+type Function struct {
+	Caller caller
 }
 
-// Funcion is a callable function with arbitrary args and error return value.
-// It is used to wrap the callback function on receiving side.
-type Function func(...interface{}) error
+// Call the received function.
+func (f Function) Call(args ...interface{}) error {
+	return f.Caller.Call(args...)
+}
 
-// UnmarshalJSON marshals the callback as "nil".
-// Value of the callback is not important in dnode protocol.
-// Skips unmarshal errors when unmarshalling a callback placeholder to Callback.
-func (f *Function) UnmarshalJSON(data []byte) error {
+func (f Function) MarshalJSON() ([]byte, error) {
+	if _, ok := f.Caller.(callback); !ok {
+		panic("cannot happen")
+	}
+	return []byte(`"[Function]"`), nil
+}
+
+func (*Function) UnmarshalJSON(data []byte) error {
 	return nil
+}
+
+type caller interface {
+	Call(args ...interface{}) error
+}
+
+// Callback is the wrapper for function when sending.
+func Callback(f func(*Partial)) Function {
+	return Function{callback(f)}
+}
+
+type callback func(*Partial)
+
+func (f callback) Call(args ...interface{}) error {
+	// Callback is only for sending functions to the remote side
+	panic("you cannot call your own callback method")
+}
+
+// functionReceived is a type implementing caller interface.
+// It is used to set the Function when a callback function is received.
+type functionReceived func(...interface{}) error
+
+func (f functionReceived) Call(args ...interface{}) error {
+	return f(args...)
 }
 
 // Path represents a callback function's path in the arguments structure.
@@ -33,6 +57,7 @@ func (f *Function) UnmarshalJSON(data []byte) error {
 type Path []interface{}
 
 // CallbackSpec is a structure encapsulating a Function and it's Path.
+// It is the type of the values in callbacks map.
 type CallbackSpec struct {
 	// Path represents the callback's path in the arguments structure.
 	Path     Path
@@ -57,10 +82,10 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 				if err != nil {
 					return fmt.Errorf("Integer expected in callback path, got '%v'.", c.Path[i])
 				}
-			case int:
-				index = v
+			case float64:
+				index = int(v)
 			default:
-				panic(fmt.Errorf("Unknown type: %#v", c.Path[i]))
+				panic(fmt.Errorf("Unknown type: %#v, %T", c.Path[i], c.Path[i]))
 			}
 
 			value = value.Index(index)
@@ -84,6 +109,11 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			}
 			value = value.Elem()
 		case reflect.Struct:
+			if value.Type() == reflect.TypeOf(Function{}) {
+				caller := value.FieldByName("Caller")
+				caller.Set(reflect.ValueOf(c.Function.Caller))
+			}
+
 			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
 				spec := CallbackSpec{c.Path[i:], c.Function}
 				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)

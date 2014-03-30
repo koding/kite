@@ -22,7 +22,7 @@ func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap m
 	case nil:
 	case []interface{}:
 		for i, item := range obj {
-			s.collectCallbacks(item, append(path, strconv.Itoa(i)), callbackMap)
+			s.collectCallbacks(item, append(path, i), callbackMap)
 		}
 	case map[string]interface{}:
 		for key, item := range obj {
@@ -43,7 +43,8 @@ func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap m
 
 		switch v.Kind() {
 		case reflect.Func:
-			s.registerCallback(v, path, callbackMap)
+			panic("cannot marshal func, use Callback() to wrap it")
+			// s.registerCallback(v, path, callbackMap)
 		case reflect.Ptr:
 			e := v.Elem()
 			if e == reflect.ValueOf(nil) {
@@ -51,9 +52,19 @@ func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap m
 			}
 
 			v2 := reflect.ValueOf(e.Interface())
+			if v2.Type() == reflect.TypeOf(Function{}) {
+				s.registerCallback(v2, path, callbackMap)
+				return
+			}
+
 			s.collectFields(v2, path, callbackMap)
 			s.collectMethods(v, path, callbackMap)
 		case reflect.Struct:
+			if v.Type() == reflect.TypeOf(Function{}) {
+				s.registerCallback(v, path, callbackMap)
+				return
+			}
+
 			s.collectFields(v, path, callbackMap)
 			s.collectMethods(v, path, callbackMap)
 		}
@@ -107,6 +118,10 @@ func (s *Scrubber) collectMethods(v reflect.Value, path Path, callbackMap map[st
 
 // registerCallback is called when a function/method is found in arguments array.
 func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap map[string]Path) {
+	if len(path) == 0 {
+		panic("root element must be a struct or slice")
+	}
+
 	// Make a copy of path because it is reused in caller.
 	pathCopy := make(Path, len(path))
 	copy(pathCopy, path)
@@ -121,5 +136,10 @@ func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap ma
 	callbackMap[seq] = pathCopy
 
 	// Save in client callbacks so we can call it when we receive a call.
-	s.callbacks[next] = val
+	f, ok := val.Interface().(Function)
+	if ok {
+		s.callbacks[next] = f.Caller.(callback)
+	} else {
+		s.callbacks[next] = val.Interface().(func(*Partial))
+	}
 }

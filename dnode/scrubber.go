@@ -1,10 +1,8 @@
 package dnode
 
-import "reflect"
-
 type Scrubber struct {
 	// Reference to sent callbacks are saved in this map.
-	callbacks map[uint64]reflect.Value
+	callbacks map[uint64]func(*Partial)
 
 	// Next callback number.
 	// Incremented atomically by registerCallback().
@@ -14,7 +12,7 @@ type Scrubber struct {
 // New returns a pointer to a new Scrubber.
 func NewScrubber() *Scrubber {
 	return &Scrubber{
-		callbacks: make(map[uint64]reflect.Value),
+		callbacks: make(map[uint64]func(*Partial)),
 	}
 }
 
@@ -24,9 +22,6 @@ func (s *Scrubber) RemoveCallback(id uint64) {
 	delete(s.callbacks, id)
 }
 
-func (s *Scrubber) GetCallback(id uint64) func(Arguments) {
-	return func(a Arguments) {
-		args := []reflect.Value{reflect.ValueOf(a)}
-		s.callbacks[id].Call(args)
-	}
+func (s *Scrubber) GetCallback(id uint64) func(*Partial) {
+	return s.callbacks[id]
 }
