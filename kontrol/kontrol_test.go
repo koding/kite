@@ -173,7 +173,7 @@ func TestKontrol(t *testing.T) {
 }
 
 func Square(r *kite.Request) (interface{}, error) {
-	a, err := r.Args[0].Float64()
+	a, err := r.Args.One().Float64()
 	if err != nil {
 		return nil, err
 	}

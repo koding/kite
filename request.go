@@ -14,7 +14,7 @@ import (
 )
 
 // runMethod is called when a method is received from remote Kite.
-func runMethod(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
+func runMethod(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
 	var (
 		// The request that will be constructed from incoming dnode message.
 		request *Request
@@ -132,7 +132,7 @@ func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
 // Request contains information about the incoming request.
 type Request struct {
 	Method         string
-	Args           dnode.Arguments
+	Args           *dnode.Partial
 	LocalKite      *Kite
 	Client         *Client
 	Username       string
@@ -141,14 +141,14 @@ type Request struct {
 }
 
 // Wrap your function with Callback to send it as an argument to a Client.
-type Callback func(dnode.Arguments)
+type Callback func(*dnode.Partial)
 
 func (c Callback) MarshalJSON() ([]byte, error) {
 	return []byte(`"[Function]"`), nil
 }
 
 // runCallback is called when a callback method call is received from remote Kite.
-func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments, tr dnode.Transport) {
+func runCallback(method string, handlerFunc reflect.Value, args *dnode.Partial, tr dnode.Transport) {
 	kite := tr.Properties()["localKite"].(*Kite)
 
 	kiteErr := new(Error)               // Not used. For recovering the error.
@@ -161,7 +161,7 @@ func runCallback(method string, handlerFunc reflect.Value, args dnode.Arguments,
 
 // parseRequest is used to read a dnode message.
 // It is called when a method or callback is received to parse the message.
-func (k *Kite) parseRequest(method string, arguments dnode.Arguments, tr dnode.Transport) (*Request, dnode.Function) {
+func (k *Kite) parseRequest(method string, arguments *dnode.Partial, tr dnode.Transport) (*Request, dnode.Function) {
 	// Parse dnode method arguments: [options]
 	var options callOptions
 	arguments.One().MustUnmarshal(&options)

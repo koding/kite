@@ -14,7 +14,7 @@ func TestSimpleMethodCall(t *testing.T) {
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	printFunc := func(args Arguments) {
+	printFunc := func(args *Partial) {
 		l.Lock()
 		called = true
 		l.Unlock()
@@ -43,13 +43,13 @@ func TestSimpleMethodCall(t *testing.T) {
 func TestMethodCallWithCallback(t *testing.T) {
 	l := sync.Mutex{}
 	var result float64
-	successFunc := func(args Arguments) {
+	successFunc := func(args *Partial) {
 		fmt.Println("success")
 		l.Lock()
 		result, _ = args.One().Float64()
 		l.Unlock()
 	}
-	failureFunc := func(args Arguments) {
+	failureFunc := func(args *Partial) {
 		fmt.Println("failure")
 		l.Lock()
 		result, _ = args.One().Float64()
@@ -59,7 +59,7 @@ func TestMethodCallWithCallback(t *testing.T) {
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	fooFunc := func(args Arguments) {
+	fooFunc := func(args *Partial) {
 		var callbacks []Function
 		args.MustUnmarshal(&callbacks)
 		callbacks[0](6)
@@ -115,7 +115,7 @@ func TestSendCallback(t *testing.T) {
 	// echo function also sends the messages to this channel so
 	// we can assert the call and passed arguments.
 	echoChan := make(chan string)
-	echoF := func(arguments Arguments) {
+	echoF := func(arguments *Partial) {
 		msg := arguments.One().MustString()
 		fmt.Println(msg)
 		echoChan <- msg
@@ -174,7 +174,7 @@ func TestSendCallback(t *testing.T) {
 	}
 
 	// For testing sending a struct with methods
-	f := func(args Arguments) {}
+	f := func(args *Partial) {}
 	cb := Callback(f)
 	a := Math{
 		Name:      "Pisagor",

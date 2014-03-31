@@ -124,7 +124,7 @@ func (k *KontrolClient) WatchKites(query protocol.KontrolQuery, onEvent EventHan
 }
 
 func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback {
-	return func(args dnode.Arguments) {
+	return func(args *dnode.Partial) {
 		var response struct {
 			Result *Event      `json:"result"`
 			Error  *kite.Error `json:"error"`

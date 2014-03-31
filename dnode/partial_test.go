@@ -6,9 +6,8 @@ import (
 )
 
 func TestUnmarshalArguments(t *testing.T) {
-	arguments := Arguments{
-		&Partial{Raw: []byte(`"hello"`)},
-		&Partial{Raw: []byte(`"world"`)},
+	arguments := &Partial{
+		Raw: []byte(`["hello", "world"]`),
 	}
 
 	var s []string

@@ -94,12 +94,17 @@ func (k *Kite) NewClientString(remoteURL string) *Client {
 func onError(err error) {
 	switch e := err.(type) {
 	case dnode.MethodNotFoundError: // Tell the requester "method is not found".
-		if len(e.Args) == 0 {
+		args, err := e.Args.Slice()
+		if err != nil {
+			return
+		}
+
+		if len(args) < 1 {
 			return
 		}
 
 		var options callOptions
-		if e.Args[0].Unmarshal(&options) != nil {
+		if args[0].Unmarshal(&options) != nil {
 			return
 		}
 
@@ -166,7 +171,7 @@ type callOptions struct {
 	// Arguments to the method
 	Kite             protocol.Kite   `json:"kite"`
 	Authentication   *Authentication `json:"authentication"`
-	WithArgs         dnode.Arguments `json:"withArgs" dnode:"-"`
+	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
 	ResponseCallback dnode.Function  `json:"responseCallback" dnode:"-"`
 }
 
@@ -328,7 +333,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan<- uint64) {
 // The caller of the Tell() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
 func (r *Client) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) Callback {
-	return Callback(func(arguments dnode.Arguments) {
+	return Callback(func(arguments *dnode.Partial) {
 		// Single argument of response callback.
 		var resp struct {
 			Result *dnode.Partial `json:"result"`

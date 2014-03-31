@@ -227,7 +227,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		kite.Callback(func(args dnode.Arguments) { setterFunc() }),
+		kite.Callback(func(args *dnode.Partial) { setterFunc() }),
 	}
 
 	_, err := r.Tell("kite.heartbeat", heartbeatArgs...)
@@ -359,20 +359,21 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	if len(r.Args) != 1 && len(r.Args) != 2 {
+	args := r.Args.MustSlice()
+	if len(args) != 1 && len(args) != 2 {
 		return nil, errors.New("Invalid number of arguments")
 	}
 
 	var query protocol.KontrolQuery
-	err := r.Args[0].Unmarshal(&query)
+	err := args[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid query argument")
 	}
 
 	// To be called when a Kite is registered or deregistered matching the query.
 	var watchCallback dnode.Function
-	if len(r.Args) == 2 {
-		watchCallback = r.Args[1].MustFunction()
+	if len(args) == 2 {
+		watchCallback = args[1].MustFunction()
 	}
 
 	return k.getKites(r, query, watchCallback)

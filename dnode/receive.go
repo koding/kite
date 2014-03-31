@@ -34,25 +34,19 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
-	// Must do this after parsing callbacks.
-	var args Arguments
-	if err = msg.Arguments.Unmarshal(&args); err != nil {
-		return err
-	}
-
 	// Find the handler function. Method may be string or integer.
 	switch method := msg.Method.(type) {
 	case float64:
 		id := uint64(method)
 		runner = d.RunCallback
 		if handler, ok = d.callbacks[id]; !ok {
-			err = CallbackNotFoundError{id, args}
+			err = CallbackNotFoundError{id, msg.Arguments}
 			return err
 		}
 	case string:
 		runner = d.RunMethod
 		if handler, ok = d.handlers[method]; !ok {
-			err = MethodNotFoundError{method, args}
+			err = MethodNotFoundError{method, msg.Arguments}
 			return err
 		}
 	default:
@@ -64,12 +58,12 @@ func (d *Dnode) processMessage(data []byte) error {
 		runner = defaultRunner
 	}
 
-	runner(fmt.Sprint(msg.Method), handler, args, d.transport)
+	runner(fmt.Sprint(msg.Method), handler, msg.Arguments, d.transport)
 
 	return nil
 }
 
-func defaultRunner(method string, handlerFunc reflect.Value, args Arguments, tr Transport) {
+func defaultRunner(method string, handlerFunc reflect.Value, args *Partial, tr Transport) {
 	// Call the handler with arguments.
 	callArgs := []reflect.Value{reflect.ValueOf(args)}
 	handlerFunc.Call(callArgs)

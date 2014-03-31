@@ -63,7 +63,7 @@ func TestKite(t *testing.T) {
 	}
 
 	resultChan := make(chan float64, 1)
-	resultCallback := func(args dnode.Arguments) {
+	resultCallback := func(args *dnode.Partial) {
 		n := args.One().MustFloat64()
 		resultChan <- n
 	}
@@ -85,7 +85,7 @@ func TestKite(t *testing.T) {
 
 // Returns the result. Also tests reverse call.
 func Square(r *Request) (interface{}, error) {
-	a := r.Args[0].MustFloat64()
+	a := r.Args.One().MustFloat64()
 	result := a * a
 
 	r.LocalKite.Log.Info("Kite call, sending result '%f' back\n", result)
