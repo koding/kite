@@ -46,8 +46,8 @@ func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 				if err != nil {
 					return fmt.Errorf("integer expected in callback path, got '%v'.", path[i])
 				}
-			case int:
-				index = v
+			case float64:
+				index = int(v)
 			default:
 				panic(fmt.Errorf("unknown type: %#v", path[i]))
 			}
@@ -74,12 +74,11 @@ func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 			value = value.Elem()
 		case reflect.Struct:
 			if value.Type() == reflect.TypeOf(Function{}) {
-				field := value.FieldByName("Caller")
-				field.Set(reflect.ValueOf(cb))
-				// ff := value.Interface().(Function)
-				// ff.Caller = cb
+				caller := value.FieldByName("Caller")
+				caller.Set(reflect.ValueOf(cb))
 				return nil
 			}
+
 			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
 				spec := CallbackSpec{path[i:], Function{cb}}
 				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)

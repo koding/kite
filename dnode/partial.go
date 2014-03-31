@@ -46,7 +46,7 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	}
 
 	for _, spec := range p.CallbackSpecs {
-		if err := spec.Apply(value); err != nil {
+		if err := setCallback(value, spec.Path, spec.Function.Caller.(functionReceived)); err != nil {
 			return err
 		}
 	}
