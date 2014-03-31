@@ -76,13 +76,15 @@ func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 			if value.Type() == reflect.TypeOf(Function{}) {
 				field := value.FieldByName("Caller")
 				field.Set(reflect.ValueOf(cb))
+				// ff := value.Interface().(Function)
+				// ff.Caller = cb
 				return nil
 			}
-			// if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
-			// 	spec := CallbackSpec{path[i:], cb}
-			// 	innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)
-			// 	return nil
-			// }
+			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
+				spec := CallbackSpec{path[i:], Function{cb}}
+				innerPartial.CallbackSpecs = append(innerPartial.CallbackSpecs, spec)
+				return nil
+			}
 
 			// Path component may be a string or an integer.
 			name, ok := path[i].(string)

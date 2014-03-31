@@ -14,11 +14,11 @@ func TestSimpleMethodCall(t *testing.T) {
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	printFunc := func(args Arguments) {
+	printFunc := func(args *Partial) {
 		l.Lock()
 		called = true
 		l.Unlock()
-		fmt.Println(string(args.One().Raw))
+		fmt.Println(string(args.Raw))
 	}
 	receiver.HandleFunc("print", printFunc)
 	go receiver.Run()
@@ -43,13 +43,13 @@ func TestSimpleMethodCall(t *testing.T) {
 func TestMethodCallWithCallback(t *testing.T) {
 	l := sync.Mutex{}
 	var result float64
-	successFunc := func(args Arguments) {
+	successFunc := func(args *Partial) {
 		fmt.Println("success")
 		l.Lock()
 		result, _ = args.One().Float64()
 		l.Unlock()
 	}
-	failureFunc := func(args Arguments) {
+	failureFunc := func(args *Partial) {
 		fmt.Println("failure")
 		l.Lock()
 		result, _ = args.One().Float64()
@@ -59,10 +59,15 @@ func TestMethodCallWithCallback(t *testing.T) {
 
 	tr1 := newMockTransport()
 	receiver := New(tr1)
-	fooFunc := func(args Arguments) {
+	fooFunc := func(args *Partial) {
 		var callbacks []Function
 		args.MustUnmarshal(&callbacks)
-		callbacks[0](6)
+
+		if len(callbacks) != 2 {
+			t.Fatalf("invalid args length: %d", len(callbacks))
+		}
+
+		callbacks[0].Call(6)
 	}
 	receiver.HandleFunc("foo", fooFunc)
 	go receiver.Run()
@@ -115,8 +120,8 @@ func TestSendCallback(t *testing.T) {
 	// echo function also sends the messages to this channel so
 	// we can assert the call and passed arguments.
 	echoChan := make(chan string)
-	echoF := func(arguments Arguments) {
-		msg := arguments.One().MustString()
+	echoF := func(arg *Partial) {
+		msg := arg.One().MustString()
 		fmt.Println(msg)
 		echoChan <- msg
 	}
@@ -130,7 +135,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Test a single callback function.
 	go d.Call("echo", echo)
-	expected := `{"method":"echo","arguments":["[Function]"],"callbacks":{"0":["0"]}}`
+	expected := `{"method":"echo","arguments":["[Function]"],"callbacks":{"0":[0]}}`
 	err := assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -139,7 +144,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a second method and see that callback number is increased by one.
 	go d.Call("echo", echo)
-	expected = `{"method":"echo","arguments":["[Function]"],"callbacks":{"1":["0"]}}`
+	expected = `{"method":"echo","arguments":["[Function]"],"callbacks":{"1":[0]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -148,7 +153,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a string and a callback as an argument.
 	go d.Call("echo", "hello cenk", echo)
-	expected = `{"method":"echo","arguments":["hello cenk","[Function]"],"callbacks":{"2":["1"]}}`
+	expected = `{"method":"echo","arguments":["hello cenk","[Function]"],"callbacks":{"2":[1]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -157,7 +162,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Send a string and a callback as an argument.
 	go d.Call("echo", map[string]interface{}{"fn": echo, "msg": "hello cenk"})
-	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"3":["0","fn"]}}`
+	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"3":[0,"fn"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -166,7 +171,7 @@ func TestSendCallback(t *testing.T) {
 
 	// Same above with a pointer to map.
 	go d.Call("echo", &map[string]interface{}{"fn": echo, "msg": "hello cenk"})
-	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"4":["0","fn"]}}`
+	expected = `{"method":"echo","arguments":[{"fn":"[Function]","msg":"hello cenk"}],"callbacks":{"4":[0,"fn"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -174,7 +179,7 @@ func TestSendCallback(t *testing.T) {
 	}
 
 	// For testing sending a struct with methods
-	f := func(args Arguments) {}
+	f := func(*Partial) {}
 	cb := Callback(f)
 	a := Math{
 		Name:      "Pisagor",
@@ -186,7 +191,7 @@ func TestSendCallback(t *testing.T) {
 	// Send the struct itself.
 	// Pointer receivers will not be accessible.
 	go d.Call("calculate", a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":["0","Callbacks","0"],"6":["0","add"]}}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"5":[0,"Callbacks",0],"6":[0,"add"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -196,7 +201,7 @@ func TestSendCallback(t *testing.T) {
 	// Send a pointer to struct.
 	// Pointer receivers will be accessible.
 	go d.Call("calculate", &a, 2)
-	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"7":["0","Callbacks","0"],"8":["0","add"],"9":["0","subtract"]}}`
+	expected = `{"method":"calculate","arguments":[{"Name":"Pisagor","Callbacks":["[Function]",1,2,3]},2],"callbacks":{"7":[0,"Callbacks",0],"8":[0,"add"],"9":[0,"subtract"]}}`
 	err = assertSentMessage(tr.sent, expected)
 	if err != nil {
 		t.Error(err)
@@ -321,18 +326,12 @@ type Math struct {
 }
 
 // Value receiver
-func (m Math) Add(val int) int {
-	return m.i + val
-}
+func (m Math) Add(p *Partial) {}
 
 // Pointer receiver
-func (m *Math) Subtract(val int) int {
-	return m.i - val
-}
+func (m *Math) Subtract(p *Partial) {}
 
 // This will not be exported
-func (m *Math) asdf() int {
-	return m.i
-}
+func (m *Math) asdf(p *Partial) {}
 
 func sleep() { time.Sleep(100 * time.Millisecond) }

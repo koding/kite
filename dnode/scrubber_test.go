@@ -18,7 +18,7 @@ func TestScrubUnscrub(t *testing.T) {
 	}
 
 	callbacks := scrubber.Scrub(obj)
-	t.Logf("--- callbacks: %+q\n", callbacks)
+	t.Logf("callbacks: %+q\n", callbacks)
 
 	args := Args{
 		A: 2,
@@ -34,7 +34,7 @@ func TestScrubUnscrub(t *testing.T) {
 	}
 
 	scrubber.Unscrub(&args, callbacks, sendf)
-	t.Logf("--- args: %+v\n", args)
+	t.Logf("args: %+v\n", args)
 
 	if args.C.Caller == nil {
 		t.Fatal("callback is not set")

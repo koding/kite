@@ -3,13 +3,9 @@
 // https://github.com/substack/dnode-protocol/blob/master/doc/protocol.markdown
 package dnode
 
-import (
-	"reflect"
-)
-
 type Dnode struct {
 	// Registered methods are saved in this map.
-	handlers map[string]reflect.Value
+	handlers map[string]func(*Partial)
 
 	// Saves and retrieves callbacks
 	scrubber *Scrubber
@@ -32,7 +28,7 @@ type Dnode struct {
 }
 
 type Wrapper func(args []interface{}, tr Transport) []interface{}
-type Runner func(method string, handlerFunc reflect.Value, args Arguments, tr Transport)
+type Runner func(method string, handlerFunc func(*Partial), args *Partial, tr Transport)
 
 // Transport is an interface for sending and receiving data on network.
 // Each Transport must be unique for each Client.
@@ -65,7 +61,7 @@ type Message struct {
 // New returns a pointer to a new Dnode.
 func New(transport Transport) *Dnode {
 	return &Dnode{
-		handlers:   make(map[string]reflect.Value),
+		handlers:   make(map[string]func(*Partial)),
 		scrubber:   NewScrubber(),
 		transport:  transport,
 		concurrent: true,
@@ -93,7 +89,7 @@ func (d *Dnode) SetConcurrent(value bool) {
 
 // HandleFunc registers the handler for the given method.
 // If a handler already exists for method, HandleFunc panics.
-func (d *Dnode) HandleFunc(method string, handler interface{}) {
+func (d *Dnode) HandleFunc(method string, handler func(*Partial)) {
 	if method == "" {
 		panic("dnode: invalid method " + method)
 	}
@@ -103,12 +99,12 @@ func (d *Dnode) HandleFunc(method string, handler interface{}) {
 	if _, ok := d.handlers[method]; ok {
 		panic("dnode: handler already exists for method")
 	}
-	val := reflect.ValueOf(handler)
-	if val.Kind() != reflect.Func {
-		panic("dnode: handler must be a func")
-	}
+	// val := reflect.ValueOf(handler)
+	// if val.Kind() != reflect.Func {
+	// 	panic("dnode: handler must be a func")
+	// }
 
-	d.handlers[method] = val
+	d.handlers[method] = handler
 }
 
 // Run processes incoming messages. Blocking.

@@ -3,7 +3,6 @@ package dnode
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 )
 
@@ -14,7 +13,7 @@ func (d *Dnode) processMessage(data []byte) error {
 		err     error
 		ok      bool
 		msg     Message
-		handler reflect.Value
+		handler func(*Partial)
 		runner  Runner
 	)
 
@@ -34,25 +33,19 @@ func (d *Dnode) processMessage(data []byte) error {
 		return err
 	}
 
-	// Must do this after parsing callbacks.
-	var args Arguments
-	if err = msg.Arguments.Unmarshal(&args); err != nil {
-		return err
-	}
-
 	// Find the handler function. Method may be string or integer.
 	switch method := msg.Method.(type) {
 	case float64:
 		id := uint64(method)
 		runner = d.RunCallback
 		if handler, ok = d.scrubber.callbacks[id]; !ok {
-			err = CallbackNotFoundError{id, args}
+			err = CallbackNotFoundError{id, msg.Arguments}
 			return err
 		}
 	case string:
 		runner = d.RunMethod
 		if handler, ok = d.handlers[method]; !ok {
-			err = MethodNotFoundError{method, args}
+			err = MethodNotFoundError{method, msg.Arguments}
 			return err
 		}
 	default:
@@ -64,15 +57,13 @@ func (d *Dnode) processMessage(data []byte) error {
 		runner = defaultRunner
 	}
 
-	runner(fmt.Sprint(msg.Method), handler, args, d.transport)
+	runner(fmt.Sprint(msg.Method), handler, msg.Arguments, d.transport)
 
 	return nil
 }
 
-func defaultRunner(method string, handlerFunc reflect.Value, args Arguments, tr Transport) {
-	// Call the handler with arguments.
-	callArgs := []reflect.Value{reflect.ValueOf(args)}
-	handlerFunc.Call(callArgs)
+func defaultRunner(method string, handlerFunc func(*Partial), args *Partial, tr Transport) {
+	handlerFunc(args)
 }
 
 // parseCallbacks parses the message's "callbacks" field and prepares
@@ -86,7 +77,7 @@ func (d *Dnode) parseCallbacks(msg *Message) error {
 		}
 
 		// When the callback is called, we must send the method to the remote.
-		f := Function(func(args ...interface{}) error {
+		f := func(args ...interface{}) error {
 			if args == nil {
 				args = make([]interface{}, 0)
 			}
@@ -96,9 +87,9 @@ func (d *Dnode) parseCallbacks(msg *Message) error {
 
 			_, err := d.send(id, args)
 			return err
-		})
+		}
 
-		spec := CallbackSpec{path, f}
+		spec := CallbackSpec{path, Function{functionReceived(f)}}
 		msg.Arguments.CallbackSpecs = append(msg.Arguments.CallbackSpecs, spec)
 	}
 

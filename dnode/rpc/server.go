@@ -48,7 +48,7 @@ func (s *Server) SetWrappers(wrapMethodArgs, wrapCallbackArgs dnode.Wrapper, run
 
 // HandleFunc registers the handler for the given method.
 // If a handler already exists for method, HandleFunc panics.
-func (s *Server) HandleFunc(method string, handler interface{}) {
+func (s *Server) HandleFunc(method string, handler func(*dnode.Partial)) {
 	s.dnode.HandleFunc(method, handler)
 }
 

@@ -112,6 +112,7 @@ func (c *CallbackSpec) Apply(value reflect.Value) error {
 			if value.Type() == reflect.TypeOf(Function{}) {
 				caller := value.FieldByName("Caller")
 				caller.Set(reflect.ValueOf(c.Function.Caller))
+				return nil
 			}
 
 			if innerPartial, ok := value.Addr().Interface().(*Partial); ok {
