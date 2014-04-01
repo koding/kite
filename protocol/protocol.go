@@ -74,6 +74,10 @@ type GetKitesArgs struct {
 	Who           json.RawMessage `json:"who,omitempty"`
 }
 
+type WhoResult struct {
+	Query KontrolQuery `json:"query"`
+}
+
 type GetKitesResult struct {
 	Kites     []*KiteWithToken `json:"kites"`
 	WatcherID string           `json:"watcherID,omitempty"`
