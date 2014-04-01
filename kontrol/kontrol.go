@@ -685,10 +685,11 @@ func kiteFromEtcdKV(key string) (*protocol.Kite, error) {
 		Username:    fields[1],
 		Environment: fields[2],
 		Name:        fields[3],
-		Version:     fields[4],
-		Region:      fields[5],
-		Hostname:    fields[6],
-		ID:          fields[7],
+		// TODO fix this
+		Version:  strings.TrimPrefix(fields[4], "v"),
+		Region:   fields[5],
+		Hostname: fields[6],
+		ID:       fields[7],
 	}, nil
 }
 
