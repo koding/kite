@@ -169,7 +169,7 @@ func (r *Client) OnDisconnect(handler func()) {
 // It is used when unmarshalling a dnode message.
 type callOptions struct {
 	// Arguments to the method
-	Kite             protocol.Kite   `json:"kite"`
+	Kite             protocol.Kite   `json:"kite" dnode:"-"`
 	Authentication   *Authentication `json:"authentication"`
 	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
 	ResponseCallback dnode.Function  `json:"responseCallback" dnode:"-"`
