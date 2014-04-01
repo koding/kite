@@ -4,8 +4,11 @@
 package protocol
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/koding/kite/dnode"
 )
 
 // Kite is the base struct containing the public fields. It is usually embeded
@@ -63,6 +66,12 @@ type RegisterArgs struct {
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
 	URL string `json:"url"`
+}
+
+type GetKitesArgs struct {
+	Query         KontrolQuery    `json:"query"`
+	WatchCallback dnode.Callback  `json:"watchCallback"`
+	Who           json.RawMessage `json:"who"`
 }
 
 type GetKitesResult struct {

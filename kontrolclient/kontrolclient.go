@@ -141,7 +141,11 @@ func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback
 }
 
 func (k *KontrolClient) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
-	clients, watcherID, err := k.getKites(query, k.eventCallbackHandler(onEvent))
+	args := protocol.GetKitesArgs{
+		Query:         query,
+		WatchCallback: dnode.Callback(k.eventCallbackHandler(onEvent)),
+	}
+	clients, watcherID, err := k.getKites(args)
 	if err != nil && err != ErrNoKitesAvailable {
 		return "", err // return only when something really happened
 	}
@@ -169,7 +173,7 @@ func (k *KontrolClient) watchKites(query protocol.KontrolQuery, onEvent EventHan
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *KontrolClient) GetKites(query protocol.KontrolQuery) ([]*kite.Client, error) {
-	clients, _, err := k.getKites(query)
+	clients, _, err := k.getKites(protocol.GetKitesArgs{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +186,10 @@ func (k *KontrolClient) GetKites(query protocol.KontrolQuery) ([]*kite.Client, e
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *KontrolClient) getKites(args ...interface{}) (kites []*kite.Client, watcherID string, err error) {
+func (k *KontrolClient) getKites(args protocol.GetKitesArgs) (kites []*kite.Client, watcherID string, err error) {
 	<-k.ready
 
-	response, err := k.Client.Tell("getKites", args...)
+	response, err := k.Client.Tell("getKites", args)
 	if err != nil {
 		return nil, "", err
 	}

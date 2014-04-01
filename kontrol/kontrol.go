@@ -359,24 +359,19 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	args := r.Args.MustSlice()
-	if len(args) != 1 && len(args) != 2 {
-		return nil, errors.New("Invalid number of arguments")
+	// This type is here until inversion branch is merged.
+	// Reason: We can't use the same struct for marshaling and unmarshaling.
+	// TODO use the struct in protocol
+	type GetKitesArgs struct {
+		Query         protocol.KontrolQuery `json:"query"`
+		WatchCallback dnode.Function        `json:"watchCallback"`
+		Who           json.RawMessage       `json:"who"`
 	}
 
-	var query protocol.KontrolQuery
-	err := args[0].Unmarshal(&query)
-	if err != nil {
-		return nil, errors.New("Invalid query argument")
-	}
+	var args GetKitesArgs
+	r.Args.One().MustUnmarshal(&args)
 
-	// To be called when a Kite is registered or deregistered matching the query.
-	var watchCallback dnode.Function
-	if len(args) == 2 {
-		watchCallback = args[1].MustFunction()
-	}
-
-	return k.getKites(r, query, watchCallback)
+	return k.getKites(r, args.Query, args.WatchCallback)
 }
 
 func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) (*protocol.GetKitesResult, error) {
