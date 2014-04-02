@@ -104,10 +104,6 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 	k.Server.Kite.Authenticators[keyType] = fn
 }
 
-// func (k *Kontrol) EnableTLS(certFile, keyFile string) {
-// 	k.Server.Kite.EnableTLS(certFile, keyFile)
-// }
-
 func (k *Kontrol) Run() {
 	k.init()
 	k.Server.Run()
