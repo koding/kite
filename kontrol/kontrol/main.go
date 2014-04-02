@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -12,8 +13,8 @@ import (
 
 func main() {
 	var (
-		publicKeyFile  = flag.String("public-key", "", "")
-		privateKeyFile = flag.String("private-key", "", "")
+		publicKeyFile  = flag.String("public-key", "", "Public RSA key")
+		privateKeyFile = flag.String("private-key", "", "Private RSA key")
 		ip             = flag.String("ip", "0.0.0.0", "")
 		port           = flag.Int("port", 4000, "")
 		etcdAddr       = flag.String("etcd-addr", "http://127.0.0.1:4001", "The public host:port used for etcd server.")
@@ -23,6 +24,8 @@ func main() {
 		name           = flag.String("name", "", "name of the instance")
 		dataDir        = flag.String("data-dir", "", "directory to store data")
 		peers          = flag.String("peers", "", "comma seperated peer addresses")
+		tlsCertFile    = flag.String("tls-cert", "", "TLS certificate file")
+		tlsKeyFile     = flag.String("tls-key", "", "TLS key file")
 	)
 
 	flag.Parse()
@@ -37,12 +40,12 @@ func main() {
 
 	publicKey, err := ioutil.ReadFile(*publicKeyFile)
 	if err != nil {
-		log.Fatalln("cannot read public key file")
+		log.Fatalf("cannot read public key file: %s", err.Error())
 	}
 
 	privateKey, err := ioutil.ReadFile(*privateKeyFile)
 	if err != nil {
-		log.Fatalln("cannot read private key file")
+		log.Fatalf("cannot read private key file: %s", err.Error())
 	}
 
 	conf := config.MustGet()
@@ -54,6 +57,15 @@ func main() {
 	k.EtcdBindAddr = *etcdBindAddr
 	k.PeerAddr = *peerAddr
 	k.PeerBindAddr = *peerBindAddr
+
+	if *tlsCertFile != "" || *tlsKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(*tlsCertFile, *tlsKeyFile)
+		if err != nil {
+			log.Fatalf("cannot load TLS certificate: %s", err.Error())
+		}
+
+		k.Server.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
 
 	if *name != "" {
 		k.Name = *name
