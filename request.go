@@ -115,7 +115,7 @@ func (k *Kite) recoverError(kiteErr **Error) func() {
 			debug.PrintStack()
 		}
 
-		k.Log.Warning("Error in received message %s", (*kiteErr).Error())
+		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
 
 	}
 }
