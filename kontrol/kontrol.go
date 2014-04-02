@@ -390,6 +390,14 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
+	// TODO fix for version string bug
+	parts := strings.Split(key, "/")
+	aud := key
+	if len(parts) > 4 {
+		parts[4] = strings.TrimPrefix(parts[4], "v")
+		aud = strings.Join(parts, "/")
+	}
+
 	var result = new(protocol.GetKitesResult)
 
 	// Create e watcher on query.
@@ -452,7 +460,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.Server.Kite.Kite().Username, key, k.privateKey)
+	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.Server.Kite.Kite().Username, aud, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
