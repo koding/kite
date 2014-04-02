@@ -369,13 +369,45 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	// Reason: We can't use the same struct for marshaling and unmarshaling.
 	// TODO use the struct in protocol
 	type GetKitesArgs struct {
-		Query         protocol.KontrolQuery `json:"query"`
-		WatchCallback dnode.Function        `json:"watchCallback"`
-		Who           json.RawMessage       `json:"who"`
+		Query         protocol.KontrolQuery  `json:"query"`
+		WatchCallback dnode.Function         `json:"watchCallback"`
+		Who           map[string]interface{} `json:"who"`
 	}
 
 	var args GetKitesArgs
 	r.Args.One().MustUnmarshal(&args)
+
+	if len(args.Who) != 0 {
+		// Find all kites in the query and pick one.
+		allKites, err := k.getKites(r, args.Query, args.WatchCallback)
+		if err != nil {
+			return nil, err
+		}
+		if len(allKites.Kites) == 0 {
+			return allKites, err
+		}
+
+		// Create new kite client for calling kite.who method
+		whoKite := allKites.Kites[0]
+		whoClient := k.Server.Kite.NewClientString(whoKite.URL)
+		whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
+		whoClient.Kite = whoKite.Kite
+
+		err = whoClient.Dial()
+		if err != nil {
+			return nil, err
+		}
+
+		result, err := whoClient.Tell("kite.who", args.Who)
+		if err != nil {
+			return nil, err
+		}
+
+		// Replace the original query with the query returned from kite.who method.
+		var whoResult protocol.WhoResult
+		result.MustUnmarshal(&whoResult)
+		args.Query = whoResult.Query
+	}
 
 	return k.getKites(r, args.Query, args.WatchCallback)
 }
