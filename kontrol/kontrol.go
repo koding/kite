@@ -397,6 +397,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer whoClient.Close()
 
 		result, err := whoClient.Tell("kite.who", args.Who)
 		if err != nil {
