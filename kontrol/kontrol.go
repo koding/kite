@@ -54,6 +54,9 @@ type Kontrol struct {
 	// To cancel running watchers, we must store the references
 	watchers      map[string]*store.Watcher
 	watchersMutex sync.Mutex
+
+	// Holds refence to all connected clients (key is ID of kite)
+	clients map[string]*kite.Client
 }
 
 // New creates a new kontrol.
@@ -88,6 +91,7 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 		publicKey:    publicKey,
 		privateKey:   privateKey,
 		watchers:     make(map[string]*store.Watcher),
+		clients:      make(map[string]*kite.Client),
 	}
 
 	log = k.Log
@@ -96,6 +100,9 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
+
+	k.OnFirstRequest(func(c *kite.Client) { kontrol.clients[c.ID] = c })
+	k.OnDisconnect(func(c *kite.Client) { delete(kontrol.clients, c.ID) })
 
 	return kontrol
 }
@@ -386,18 +393,23 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		if len(allKites.Kites) == 0 {
 			return allKites, err
 		}
-
-		// Create new kite client for calling kite.who method
 		whoKite := allKites.Kites[0]
-		whoClient := k.Server.Kite.NewClientString(whoKite.URL)
-		whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
-		whoClient.Kite = whoKite.Kite
 
-		err = whoClient.Dial()
-		if err != nil {
-			return nil, err
+		// We will call the "kite.who" method of the selected kite.
+		// If the kite is connected to us, we can use the existing connection.
+		// Otherwise we need to open a new connection to the selected kite.
+		whoClient := k.clients[whoKite.Kite.ID]
+		if whoClient == nil {
+			whoClient = k.Server.Kite.NewClientString(whoKite.URL)
+			whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
+			whoClient.Kite = whoKite.Kite
+
+			err = whoClient.Dial()
+			if err != nil {
+				return nil, err
+			}
+			defer whoClient.Close()
 		}
-		defer whoClient.Close()
 
 		result, err := whoClient.Tell("kite.who", args.Who)
 		if err != nil {
