@@ -66,7 +66,7 @@ func LoadDeps(pkgs ...Pkg) (*Deps, error) {
 	}
 
 	// get all dependencies for applications defined above
-	dependencies := set.New()
+	dependencies := set.New(set.ThreadSafe)
 	for _, pkg := range packages {
 		for _, imp := range pkg.Deps {
 			dependencies.Add(imp)
