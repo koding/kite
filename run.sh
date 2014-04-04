@@ -2,6 +2,12 @@
 set -e
 set -x
 
+##### WARNING!!!
+#
+# THIS IS A HELPER SCRIPT FOR DEVELOPMENT.
+# IT IS USED TO RUN KONTROL, PROXY AND EXAMPLE KITE.
+#
+
 ##### MANUAL STEPS
 #
 # 1. make sure that your gopath is set correctly (kite-repo:koding-repo)
