@@ -17,6 +17,9 @@ func (s *Scrubber) Scrub(obj interface{}) (callbacks map[string]Path) {
 // with callbacks. This is a recursive function. The top level send must
 // sends arguments as rawObj, an empty path and empty callbackMap parameter.
 func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap map[string]Path) {
+	// fmt.Printf("--- collectCallbacks: %#v\n", rawObj)
+
+	// TODO Use reflection and remove this outer switch statement.
 	switch obj := rawObj.(type) {
 	// skip nil values
 	case nil:
@@ -122,9 +125,19 @@ func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap ma
 		panic("root element must be a struct or slice")
 	}
 
-	// Make a copy of path because it is reused in caller.
-	pathCopy := make(Path, len(path))
-	copy(pathCopy, path)
+	var cb func(*Partial) // We are going to save this in scubber
+
+	// Save in client callbacks so we can call it when we receive a call.
+	switch f := val.Interface().(type) {
+	case Function:
+		cb = f.Caller.(callback)
+	case func(*Partial):
+		cb = f
+	default:
+		// TODO enable panic in registerCallback ans see what happens.
+		// panic(fmt.Sprintf("invalid callback: %#v", i))
+		return
+	}
 
 	// Subtract one to start counting from zero.
 	// This is not absolutely necessary, just cosmetics.
@@ -132,14 +145,12 @@ func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap ma
 
 	seq := strconv.FormatUint(next, 10)
 
-	// Add to callback map to be sent to remote.
-	callbackMap[seq] = pathCopy
+	// Save in scubber callbacks
+	s.callbacks[next] = cb
 
-	// Save in client callbacks so we can call it when we receive a call.
-	f, ok := val.Interface().(Function)
-	if ok {
-		s.callbacks[next] = f.Caller.(callback)
-	} else {
-		s.callbacks[next] = val.Interface().(func(*Partial))
-	}
+	// Add to callback map to be sent to remote.
+	// Make a copy of path because it is reused in caller.
+	pathCopy := make(Path, len(path))
+	copy(pathCopy, path)
+	callbackMap[seq] = pathCopy
 }

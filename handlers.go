@@ -39,7 +39,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	go func() {
 		for {
 			time.Sleep(time.Duration(seconds) * time.Second)
-			if ping() != nil {
+			if err := ping.Call(); err != nil {
 				return
 			}
 		}
@@ -101,10 +101,11 @@ func handleTunnel(r *Request) (interface{}, error) {
 	}
 
 	conf := &websocket.Config{
-		Location:  parsed,
-		Version:   websocket.ProtocolVersionHybi13,
-		Origin:    &url.URL{Scheme: "http", Host: "localhost"},
-		TlsConfig: r.Client.TLSConfig,
+		Location: parsed,
+		Version:  websocket.ProtocolVersionHybi13,
+		Origin:   &url.URL{Scheme: "http", Host: "localhost"},
+		// TODO enable TLSConfig field in handleTunnel
+		// TlsConfig: r.Client.TLSConfig,
 	}
 
 	remoteConn, err := websocket.DialConfig(conf)
