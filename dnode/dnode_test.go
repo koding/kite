@@ -120,8 +120,8 @@ func TestSendCallback(t *testing.T) {
 	// echo function also sends the messages to this channel so
 	// we can assert the call and passed arguments.
 	echoChan := make(chan string)
-	echoF := func(arg *Partial) {
-		msg := arg.One().MustString()
+	echoF := func(arguments *Partial) {
+		msg := arguments.One().MustString()
 		fmt.Println(msg)
 		echoChan <- msg
 	}
@@ -179,8 +179,7 @@ func TestSendCallback(t *testing.T) {
 	}
 
 	// For testing sending a struct with methods
-	f := func(*Partial) {}
-	cb := Callback(f)
+	cb := Callback(func(*Partial) {})
 	a := Math{
 		Name:      "Pisagor",
 		i:         6,

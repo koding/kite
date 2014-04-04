@@ -130,6 +130,9 @@ func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap ma
 	// Save in client callbacks so we can call it when we receive a call.
 	switch f := val.Interface().(type) {
 	case Function:
+		if f.Caller == nil {
+			return
+		}
 		cb = f.Caller.(callback)
 	case func(*Partial):
 		cb = f

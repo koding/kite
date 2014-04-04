@@ -12,7 +12,7 @@ func (f Function) Call(args ...interface{}) error {
 
 func (f Function) MarshalJSON() ([]byte, error) {
 	if _, ok := f.Caller.(callback); !ok {
-		panic("cannot happen")
+		return []byte(`"null"`), nil
 	}
 	return []byte(`"[Function]"`), nil
 }

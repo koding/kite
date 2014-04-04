@@ -347,7 +347,7 @@ func (c *Client) callOnDisconnectHandlers() {
 // It is used when unmarshalling a dnode message.
 type callOptions struct {
 	// Arguments to the method
-	Kite             protocol.Kite   `json:"kite" bson:"-"`
+	Kite             protocol.Kite   `json:"kite" dnode:"-"`
 	Authentication   *Authentication `json:"authentication"`
 	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
 	ResponseCallback dnode.Function  `json:"responseCallback"`
@@ -433,7 +433,7 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 	// When a callback is called it will send the response to this channel.
 	doneChan := make(chan *response, 1)
 
-	cb := c.makeResponseCallback(doneChan, removeCallback)
+	cb := c.makeResponseCallback(doneChan, removeCallback, method, args)
 	args = c.wrapMethodArgs(args, cb)
 
 	// BUG: This sometimes does not return an error, even if the remote
@@ -549,7 +549,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan<- uint64) {
 // makeResponseCallback prepares and returns a callback function sent to the server.
 // The caller of the Tell() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
-func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64) dnode.Function {
+func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64, method string, args []interface{}) dnode.Function {
 	return Callback(func(arguments *dnode.Partial) {
 		// Single argument of response callback.
 		var resp struct {
@@ -560,7 +560,7 @@ func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-
 		// Notify that the callback is finished.
 		defer func() {
 			if resp.Err != nil {
-				c.LocalKite.Log.Warning("Error received from remote Kite: %s", resp.Err.Error())
+				c.LocalKite.Log.Warning("Error received from kite: %q method: %q args: %#v err: %s", c.Kite.Name, method, args, resp.Err.Error())
 				doneChan <- &response{resp.Result, resp.Err}
 			} else {
 				doneChan <- &response{resp.Result, nil}
