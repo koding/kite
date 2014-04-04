@@ -99,10 +99,6 @@ func (d *Dnode) HandleFunc(method string, handler func(*Partial)) {
 	if _, ok := d.handlers[method]; ok {
 		panic("dnode: handler already exists for method")
 	}
-	// val := reflect.ValueOf(handler)
-	// if val.Kind() != reflect.Func {
-	// 	panic("dnode: handler must be a func")
-	// }
 
 	d.handlers[method] = handler
 }
