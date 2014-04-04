@@ -211,7 +211,7 @@ func (c *Client) readLoop() error {
 		processed := make(chan bool)
 		go func(msg []byte, processed chan bool) {
 			if err := c.processMessage(msg); err != nil {
-				c.LocalKite.Log.Warning("error processing msg: %q", string(msg))
+				c.LocalKite.Log.Warning("error processing message err: %s message: %q", err.Error(), string(msg))
 			}
 			close(processed)
 		}(msg, processed)
@@ -229,7 +229,6 @@ func (c *Client) processMessage(data []byte) error {
 		ok      bool
 		msg     dnode.Message
 		handler HandlerFunc
-		// runner  func(*dnode.Partial)
 	)
 
 	// Call error handler.
@@ -612,9 +611,10 @@ func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-
 func onError(err error) {
 	// TODO do not marshal options again here
 	switch e := err.(type) {
-	case dnode.MethodNotFoundError: // Tell the requester "method is not found".
-		args, err := e.Args.Slice()
-		if err != nil {
+	case MethodNotFoundError: // Tell the requester "method is not found".
+		fmt.Println("--- MethodNotFoundError")
+		args, err2 := e.Args.Slice()
+		if err2 != nil {
 			return
 		}
 
@@ -623,7 +623,7 @@ func onError(err error) {
 		}
 
 		var options callOptions
-		if err = args[0].Unmarshal(&options); err != nil {
+		if err := args[0].Unmarshal(&options); err != nil {
 			return
 		}
 
