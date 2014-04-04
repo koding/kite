@@ -1,10 +1,10 @@
 package proxy
 
 import (
+	"io"
 	"sync"
 
 	"code.google.com/p/go.net/websocket"
-	"github.com/koding/kite/util"
 )
 
 type Tunnel struct {
@@ -39,6 +39,22 @@ func (t *Tunnel) StartNotify() chan bool {
 
 func (t *Tunnel) Run(remoteConn *websocket.Conn) {
 	close(t.startChan)
-	<-util.JoinStreams(t.localConn, remoteConn)
+	<-JoinStreams(t.localConn, remoteConn)
 	t.Close()
+}
+
+func JoinStreams(local, remote io.ReadWriteCloser) chan error {
+	errc := make(chan error, 2)
+
+	copy := func(dst io.WriteCloser, src io.ReadCloser) {
+		_, err := io.Copy(dst, src)
+		src.Close()
+		dst.Close()
+		errc <- err
+	}
+
+	go copy(local, remote)
+	go copy(remote, local)
+
+	return errc
 }
