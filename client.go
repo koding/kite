@@ -612,7 +612,6 @@ func onError(err error) {
 	// TODO do not marshal options again here
 	switch e := err.(type) {
 	case MethodNotFoundError: // Tell the requester "method is not found".
-		fmt.Println("--- MethodNotFoundError")
 		args, err2 := e.Args.Slice()
 		if err2 != nil {
 			return
