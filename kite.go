@@ -155,7 +155,7 @@ func (k *Kite) handleWS(ws *websocket.Conn) {
 	// Run after methods are registered and delegate is set
 	c.readLoop()
 
-	c.callOnConnectHandlers()
+	c.callOnDisconnectHandlers()
 	k.callOnDisconnectHandlers(c)
 }
 

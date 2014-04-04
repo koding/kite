@@ -186,7 +186,6 @@ func (c *Client) run() (err error) {
 		err = c.readLoop()
 
 		// falls here when connection disconnects
-
 		c.callOnDisconnectHandlers()
 
 		if !c.Reconnect {
