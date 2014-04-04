@@ -58,7 +58,7 @@ type Kite struct {
 	server *websocket.Server
 
 	// Handlers to call when a new connection is received.
-	onConnectHandlers []func(*websocket.Conn)
+	onConnectHandlers []func(*Client)
 
 	// Handlers to call before the first request of connected kite.
 	onFirstRequestHandlers []func(*Client)
@@ -102,7 +102,7 @@ func New(name, version string) *Kite {
 
 	k.server.Handler = k.handleWS
 
-	k.OnConnect(func(conn *websocket.Conn) { k.Log.Info("New connection from: %s", conn.Request().RemoteAddr) })
+	k.OnConnect(func(c *Client) { k.Log.Info("New connection from: %s", c.RemoteAddr()) })
 	k.OnFirstRequest(func(c *Client) { k.Log.Info("Connection %q is identified as %q", c.RemoteAddr(), c.Kite) })
 	k.OnDisconnect(func(c *Client) { k.Log.Info("Client has disconnected: %q", c.Kite) })
 
@@ -150,7 +150,7 @@ func (k *Kite) handleWS(ws *websocket.Conn) {
 	c := k.NewClient(nil)
 	c.conn = ws
 
-	k.callOnConnectHandlers(ws)
+	k.callOnConnectHandlers(c)
 
 	// Run after methods are registered and delegate is set
 	c.readLoop()
@@ -181,7 +181,7 @@ func newLogger(name string) logging.Logger {
 	return logger
 }
 
-func (k *Kite) OnConnect(handler func(conn *websocket.Conn)) {
+func (k *Kite) OnConnect(handler func(*Client)) {
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
 }
 
@@ -195,9 +195,9 @@ func (k *Kite) OnDisconnect(handler func(*Client)) {
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
 }
 
-func (k *Kite) callOnConnectHandlers(conn *websocket.Conn) {
+func (k *Kite) callOnConnectHandlers(c *Client) {
 	for _, handler := range k.onConnectHandlers {
-		handler(conn)
+		handler(c)
 	}
 }
 
