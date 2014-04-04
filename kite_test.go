@@ -11,27 +11,25 @@ import (
 
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
+	// Create a mathworker kite
 	mathKite := New("mathworker", "0.0.1")
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
 	mathKite.Config.DisableAuthentication = true
 	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
-	exp2Kite := New("exp2", "0.0.1")
-	go http.ListenAndServe("127.0.0.1:3637", exp2Kite)
-
-	// Wait until they start serving
+	// Wait until it's started
 	time.Sleep(time.Second)
 
+	// Create exp2 kite
+	exp2Kite := New("exp2", "0.0.1")
 	fooChan := make(chan string)
-	handleFoo := func(r *Request) (interface{}, error) {
+	exp2Kite.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		s := r.Args.One().MustString()
 		t.Logf("Message received: %s\n", s)
 		fooChan <- s
 		return nil, nil
-	}
-
-	exp2Kite.HandleFunc("foo", handleFoo)
+	})
 
 	// exp2 connects to mathworker
 	remote := exp2Kite.NewClientString("ws://127.0.0.1:3636")
@@ -107,7 +105,7 @@ func SquareCB(r *Request) (interface{}, error) {
 	r.LocalKite.Log.Info("Kite call, sending result '%f' back\n", result)
 
 	// Send the result.
-	err := cb(result)
+	err := cb.Call(result)
 	if err != nil {
 		return nil, err
 	}

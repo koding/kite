@@ -17,7 +17,7 @@ func TestClientServer(t *testing.T) {
 		a, _ := args[0].Float64()
 		b, _ := args[1].Float64()
 		result, _ := args[2].Function()
-		result(a + b)
+		result.Call(a + b)
 	}
 	s.HandleFunc("add", add)
 
@@ -34,12 +34,14 @@ func TestClientServer(t *testing.T) {
 	}
 	defer c.Close()
 
-	// Call a method
-	c.Call("add", 1, 2, func(p *dnode.Partial) {
+	cb := func(p *dnode.Partial) {
 		var r float64
 		p.Unmarshal(&r)
 		fmt.Println("Add result:", r)
-	})
+	}
+
+	// Call a method
+	c.Call("add", 1, 2, dnode.Callback(cb))
 
 	sleep()
 }

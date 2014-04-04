@@ -33,16 +33,19 @@ func init() {
 }
 
 func TestKontrol(t *testing.T) {
+	// Start kontrol
 	kon := New(conf.Copy(), testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 
+	// Start proxy
 	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	time.Sleep(1e9)
 
+	// Start mathworker
 	mathKite := simple.New("mathworker", "0.0.1")
 	mathKite.Config = conf.Copy()
 	mathKite.HandleFunc("square", Square)
@@ -50,6 +53,7 @@ func TestKontrol(t *testing.T) {
 
 	<-mathKite.Registration.ReadyNotify()
 
+	// exp2 kite is the mathworker client
 	exp2Kite := kite.New("exp2", "0.0.1")
 	exp2Kite.Config = conf.Copy()
 
@@ -67,6 +71,7 @@ func TestKontrol(t *testing.T) {
 
 	<-connected
 
+	// exp2 queries for mathkite
 	kites, err := konClient.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +81,7 @@ func TestKontrol(t *testing.T) {
 		t.Fatal("No mathworker available")
 	}
 
+	// exp2 connectes to mathworker
 	remoteMathWorker := kites[0]
 	err = remoteMathWorker.Dial()
 	if err != nil {

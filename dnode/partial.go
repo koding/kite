@@ -46,7 +46,7 @@ func (p *Partial) Unmarshal(v interface{}) error {
 	}
 
 	for _, spec := range p.CallbackSpecs {
-		if err := spec.Apply(value); err != nil {
+		if err := setCallback(value, spec.Path, spec.Function.Caller.(functionReceived)); err != nil {
 			return err
 		}
 	}
@@ -136,8 +136,7 @@ func (p *Partial) MustSliceOfLength(length int) []*Partial {
 }
 
 func (p *Partial) One() *Partial {
-	a := p.MustSliceOfLength(1)
-	return a[0]
+	return p.MustSliceOfLength(1)[0]
 }
 
 func (p *Partial) MustMap() map[string]*Partial {

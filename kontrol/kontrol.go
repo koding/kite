@@ -175,7 +175,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
 	host, port, _ := net.SplitHostPort(args.URL.Host)
 	if host == "0.0.0.0" || host == "" {
-		host, _, _ = net.SplitHostPort(r.RemoteAddr)
+		host, _, _ = net.SplitHostPort(r.Client.RemoteAddr())
 		args.URL.Host = net.JoinHostPort(host, port)
 	}
 
@@ -446,7 +446,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// matching the query.
 	// Registering watcher should be done before making etcd.Get() because
 	// Get() may return an empty result.
-	if watchCallback != nil {
+	if watchCallback.Caller != nil {
 		watcher, err := k.store.Watch(
 			KitesPrefix+key, // prefix
 			true,            // recursive
@@ -577,7 +577,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				if err != nil {
 					log.Error("Cannot re-watch query: %s", err.Error())
 					response.Error = &kite.Error{"watchError", err.Error()}
-					callback(response)
+					callback.Call(response)
 					return
 				}
 
@@ -634,7 +634,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				continue // We don't care other events
 			}
 
-			callback(response)
+			callback.Call(response)
 		}
 	}
 }

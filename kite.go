@@ -11,9 +11,9 @@ import (
 	"os"
 	"strings"
 
+	"code.google.com/p/go.net/websocket"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/dnode/rpc"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
@@ -51,11 +51,17 @@ type Kite struct {
 	// Key data must be PEM encoded.
 	trustedKontrolKeys map[string]string
 
+	// Handlers added with Kite.HandleFunc().
 	handlers map[string]HandlerFunc // method map for exported methods
-	server   *rpc.Server            // Dnode rpc server
 
-	// Handlers to call when a Kite opens a connection to this Kite.
+	// Websocket server for handling incoming connections.
+	server *websocket.Server
+
+	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)
+
+	// Handlers to call before the first request of connected kite.
+	onFirstRequestHandlers []func(*Client)
 
 	// Handlers to call when a client has disconnected.
 	onDisconnectHandlers []func(*Client)
@@ -86,31 +92,19 @@ func New(name, version string) *Kite {
 		Config:             config.New(),
 		Log:                newLogger(name),
 		Authenticators:     make(map[string]func(*Request) error),
-		server:             rpc.NewServer(),
-		handlers:           make(map[string]HandlerFunc),
 		trustedKontrolKeys: make(map[string]string),
+		handlers:           make(map[string]HandlerFunc),
+		server:             &websocket.Server{},
 		name:               name,
 		version:            version,
 		id:                 kiteID.String(),
 	}
 
-	// Wrap/unwrap dnode messages.
-	k.server.SetWrappers(wrapMethodArgs, wrapCallbackArgs, runMethod, runCallback, onError)
+	k.server.Handler = k.handleWS
 
-	// Server needs a reference to local kite
-	k.server.Properties()["localKite"] = k
-
-	k.server.OnConnect(func(c *rpc.Client) {
-		k.Log.Info("New connection from: %s", c.RemoteAddr())
-	})
-
-	// Call registered handlers when a client has disconnected.
-	k.server.OnDisconnect(func(c *rpc.Client) {
-		if r, ok := c.Properties()["client"]; ok {
-			// Run OnDisconnect handlers.
-			k.notifyClientDisconnected(r.(*Client))
-		}
-	})
+	k.OnConnect(func(c *Client) { k.Log.Info("New connection from: %s", c.RemoteAddr()) })
+	k.OnFirstRequest(func(c *Client) { k.Log.Info("Connection %q is identified as %q", c.RemoteAddr(), c.Kite) })
+	k.OnDisconnect(func(c *Client) { k.Log.Info("Client has disconnected: %q", c.Kite) })
 
 	// Every kite should be able to authenticate the user from token.
 	// Tokens are granted by Kontrol Kite.
@@ -147,6 +141,24 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	k.server.ServeHTTP(w, req)
 }
 
+// handleWS is the websocket connection handler.
+func (k *Kite) handleWS(ws *websocket.Conn) {
+	defer ws.Close()
+
+	// This Client also handles the connected client.
+	// Since both sides can send/receive messages the client code is reused here.
+	c := k.NewClient(nil)
+	c.conn = ws
+
+	k.callOnConnectHandlers(c)
+
+	// Run after methods are registered and delegate is set
+	c.readLoop()
+
+	c.callOnDisconnectHandlers()
+	k.callOnDisconnectHandlers(c)
+}
+
 // newLogger returns a new logger object for desired name and level.
 func newLogger(name string) logging.Logger {
 	logger := logging.NewLogger(name)
@@ -169,9 +181,13 @@ func newLogger(name string) logging.Logger {
 	return logger
 }
 
+func (k *Kite) OnConnect(handler func(*Client)) {
+	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+}
+
 // OnFirstRequest registers a function to run when a Kite connects to this Kite.
 func (k *Kite) OnFirstRequest(handler func(*Client)) {
-	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+	k.onFirstRequestHandlers = append(k.onFirstRequestHandlers, handler)
 }
 
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
@@ -179,22 +195,21 @@ func (k *Kite) OnDisconnect(handler func(*Client)) {
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
 }
 
-// notifyFirstRequest runs the registered handlers with OnFirstRequest().
-func (k *Kite) notifyFirstRequest(r *Client) {
-	k.Log.Info("Client '%s' is identified as '%s'",
-		r.client.RemoteAddr(), r.Kite)
-
+func (k *Kite) callOnConnectHandlers(c *Client) {
 	for _, handler := range k.onConnectHandlers {
-		handler(r)
+		handler(c)
 	}
 }
 
-// notifyClientDisconnected runs the registered handlers with OnDisconnect().
-func (k *Kite) notifyClientDisconnected(r *Client) {
-	k.Log.Info("Client has disconnected: %s", r.Kite)
+func (k *Kite) callOnFirstRequestHandlers(c *Client) {
+	for _, handler := range k.onFirstRequestHandlers {
+		handler(c)
+	}
+}
 
+func (k *Kite) callOnDisconnectHandlers(c *Client) {
 	for _, handler := range k.onDisconnectHandlers {
-		handler(r)
+		handler(c)
 	}
 }
 
@@ -215,10 +230,4 @@ func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
 	}
 
 	return []byte(k.Config.KontrolKey), nil
-}
-
-// Normally, each incoming request is processed in a new goroutine.
-// If you disable concurrency, requests will be processed synchronously.
-func (k *Kite) DisableConcurrency() {
-	k.server.SetConcurrent(false)
 }

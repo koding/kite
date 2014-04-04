@@ -3,7 +3,6 @@ package dnode
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 )
 
@@ -14,7 +13,7 @@ func (d *Dnode) processMessage(data []byte) error {
 		err     error
 		ok      bool
 		msg     Message
-		handler reflect.Value
+		handler func(*Partial)
 		runner  Runner
 	)
 
@@ -39,7 +38,7 @@ func (d *Dnode) processMessage(data []byte) error {
 	case float64:
 		id := uint64(method)
 		runner = d.RunCallback
-		if handler, ok = d.callbacks[id]; !ok {
+		if handler, ok = d.scrubber.callbacks[id]; !ok {
 			err = CallbackNotFoundError{id, msg.Arguments}
 			return err
 		}
@@ -63,15 +62,29 @@ func (d *Dnode) processMessage(data []byte) error {
 	return nil
 }
 
-func defaultRunner(method string, handlerFunc reflect.Value, args *Partial, tr Transport) {
-	// Call the handler with arguments.
-	callArgs := []reflect.Value{reflect.ValueOf(args)}
-	handlerFunc.Call(callArgs)
+func defaultRunner(method string, handlerFunc func(*Partial), args *Partial, tr Transport) {
+	handlerFunc(args)
 }
 
 // parseCallbacks parses the message's "callbacks" field and prepares
 // callback functions in "arguments" field.
 func (d *Dnode) parseCallbacks(msg *Message) error {
+	return ParseCallbacks(msg, func(id uint64, args []interface{}) error {
+		if args == nil {
+			args = make([]interface{}, 0)
+		}
+		if d.WrapCallbackArgs != nil {
+			args = d.WrapCallbackArgs(args, d.transport)
+		}
+
+		_, err := d.send(id, args)
+		return err
+	})
+}
+
+// parseCallbacks parses the message's "callbacks" field and prepares
+// callback functions in "arguments" field.
+func ParseCallbacks(msg *Message, sender func(id uint64, args []interface{}) error) error {
 	// Parse callbacks field and create callback functions.
 	for methodID, path := range msg.Callbacks {
 		id, err := strconv.ParseUint(methodID, 10, 64)
@@ -79,20 +92,8 @@ func (d *Dnode) parseCallbacks(msg *Message) error {
 			return err
 		}
 
-		// When the callback is called, we must send the method to the remote.
-		f := Function(func(args ...interface{}) error {
-			if args == nil {
-				args = make([]interface{}, 0)
-			}
-			if d.WrapCallbackArgs != nil {
-				args = d.WrapCallbackArgs(args, d.transport)
-			}
-
-			_, err := d.send(id, args)
-			return err
-		})
-
-		spec := CallbackSpec{path, f}
+		f := func(args ...interface{}) error { return sender(id, args) }
+		spec := CallbackSpec{path, Function{functionReceived(f)}}
 		msg.Arguments.CallbackSpecs = append(msg.Arguments.CallbackSpecs, spec)
 	}
 
