@@ -208,10 +208,16 @@ func (c *Client) readLoop() error {
 			return err
 		}
 
-		if c.Concurrent {
-			go c.processMessage(msg)
-		} else {
-			c.processMessage(msg)
+		processed := make(chan bool)
+		go func(msg []byte, processed chan bool) {
+			if err := c.processMessage(msg); err != nil {
+				c.LocalKite.Log.Warning("error processing msg: %q", string(msg))
+			}
+			close(processed)
+		}(msg, processed)
+
+		if !c.Concurrent {
+			<-processed
 		}
 	}
 }
