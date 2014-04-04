@@ -78,7 +78,7 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 		case e := <-events:
 			switch e {
 			case Connect:
-				r.kontrolClient.Log.Notice("Connected to Kontrol.")
+				r.kontrolClient.LocalKite.Log.Notice("Connected to Kontrol.")
 				if lastRegisteredURL != nil {
 					select {
 					case urls <- lastRegisteredURL:
@@ -86,11 +86,11 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 					}
 				}
 			case Disconnect:
-				r.kontrolClient.Log.Warning("Disconnected from Kontrol.")
+				r.kontrolClient.LocalKite.Log.Warning("Disconnected from Kontrol.")
 			}
 		case u := <-urls:
 			if _, err := r.kontrolClient.Register(u); err != nil {
-				r.kontrolClient.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
+				r.kontrolClient.LocalKite.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds", err, kontrolRetryDuration/time.Second)
 				time.AfterFunc(kontrolRetryDuration, func() {
 					select {
 					case urls <- u:
@@ -135,7 +135,7 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 		} else {
 			kites, err := r.kontrolClient.GetKites(query)
 			if err != nil {
-				r.kontrolClient.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
+				r.kontrolClient.LocalKite.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
 				time.Sleep(proxyRetryDuration)
 				continue
 			}
@@ -174,7 +174,7 @@ func (r *Registration) keepRegisteredToProxyKite(urls chan<- *url.URL) {
 // registerToProxyKite dials the proxy kite and calls register method then
 // returns the reverse-proxy URL.
 func (reg *Registration) registerToProxyKite(r *kite.Client) (*url.URL, error) {
-	Log := reg.kontrolClient.Log
+	Log := reg.kontrolClient.LocalKite.Log
 
 	err := r.Dial()
 	if err != nil {

@@ -172,7 +172,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
 	host, port, _ := net.SplitHostPort(args.URL.Host)
 	if host == "0.0.0.0" || host == "" {
-		host, _, _ = net.SplitHostPort(r.RemoteAddr)
+		host, _, _ = net.SplitHostPort(r.Client.RemoteAddr())
 		args.URL.Host = net.JoinHostPort(host, port)
 	}
 
@@ -227,7 +227,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		kite.Callback(func(args dnode.Arguments) { setterFunc() }),
+		kite.Callback(func(args *dnode.Partial) { setterFunc() }),
 	}
 
 	_, err := r.Tell("kite.heartbeat", heartbeatArgs...)
@@ -359,20 +359,22 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	if len(r.Args) != 1 && len(r.Args) != 2 {
+	args := r.Args.MustSlice()
+
+	if len(args) != 1 && len(args) != 2 {
 		return nil, errors.New("Invalid number of arguments")
 	}
 
 	var query protocol.KontrolQuery
-	err := r.Args[0].Unmarshal(&query)
+	err := args[0].Unmarshal(&query)
 	if err != nil {
 		return nil, errors.New("Invalid query argument")
 	}
 
 	// To be called when a Kite is registered or deregistered matching the query.
 	var watchCallback dnode.Function
-	if len(r.Args) == 2 {
-		watchCallback = r.Args[1].MustFunction()
+	if len(args) == 2 {
+		watchCallback = args[1].MustFunction()
 	}
 
 	return k.getKites(r, query, watchCallback)
@@ -391,7 +393,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// matching the query.
 	// Registering watcher should be done before making etcd.Get() because
 	// Get() may return an empty result.
-	if watchCallback != nil {
+	if watchCallback.Caller != nil {
 		watcher, err := k.store.Watch(
 			KitesPrefix+key, // prefix
 			true,            // recursive
@@ -522,7 +524,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				if err != nil {
 					log.Error("Cannot re-watch query: %s", err.Error())
 					response.Error = &kite.Error{"watchError", err.Error()}
-					callback(response)
+					callback.Call(response)
 					return
 				}
 
@@ -579,7 +581,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				continue // We don't care other events
 			}
 
-			callback(response)
+			callback.Call(response)
 		}
 	}
 }

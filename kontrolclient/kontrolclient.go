@@ -19,8 +19,6 @@ var ErrNoKitesAvailable = errors.New("no kites availabile")
 type KontrolClient struct {
 	*kite.Client
 
-	LocalKite *kite.Kite
-
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
 	ready chan bool
@@ -44,10 +42,9 @@ func New(k *kite.Kite) *KontrolClient {
 	}
 
 	kontrolClient := &KontrolClient{
-		Client:    client,
-		LocalKite: k,
-		ready:     make(chan bool),
-		watchers:  list.New(),
+		Client:   client,
+		ready:    make(chan bool),
+		watchers: list.New(),
 	}
 
 	var once sync.Once
@@ -64,7 +61,7 @@ func New(k *kite.Kite) *KontrolClient {
 		for e := kontrolClient.watchers.Front(); e != nil; e = e.Next() {
 			watcher := e.Value.(*Watcher)
 			if err := watcher.rewatch(); err != nil {
-				kontrolClient.Log.Error("Cannot rewatch query: %+v", watcher)
+				kontrolClient.LocalKite.Log.Error("Cannot rewatch query: %+v", watcher)
 			}
 		}
 		kontrolClient.watchersMutex.RUnlock()
@@ -100,11 +97,11 @@ func (k *KontrolClient) Register(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	k.Log.Info("Registered to kontrol with URL: %s", rr.URL)
+	k.LocalKite.Log.Info("Registered to kontrol with URL: %s", rr.URL)
 
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
-		k.Log.Error("Cannot parse registered URL: %s", err.Error())
+		k.LocalKite.Log.Error("Cannot parse registered URL: %s", err.Error())
 	}
 
 	return &registerResult{parsed}, nil
@@ -123,8 +120,8 @@ func (k *KontrolClient) WatchKites(query protocol.KontrolQuery, onEvent EventHan
 	return k.newWatcher(watcherID, &query, onEvent), nil
 }
 
-func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback {
-	return func(args dnode.Arguments) {
+func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) dnode.Function {
+	return dnode.Callback(func(args *dnode.Partial) {
 		var response struct {
 			Result *Event      `json:"result"`
 			Error  *kite.Error `json:"error"`
@@ -137,7 +134,7 @@ func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) kite.Callback
 		}
 
 		onEvent(response.Result, response.Error)
-	}
+	})
 }
 
 func (k *KontrolClient) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
@@ -152,7 +149,7 @@ func (k *KontrolClient) watchKites(query protocol.KontrolQuery, onEvent EventHan
 			KiteEvent: protocol.KiteEvent{
 				Action: protocol.Register,
 				Kite:   client.Kite,
-				URL:    client.URL.String(),
+				URL:    client.WSConfig.Location.String(),
 				Token:  client.Authentication.Key,
 			},
 			localKite: k.LocalKite,
@@ -211,12 +208,12 @@ func (k *KontrolClient) getKites(args ...interface{}) (kites []*kite.Client, wat
 
 		parsed, err := url.Parse(currentKite.URL)
 		if err != nil {
-			k.Log.Error("invalid url came from kontrol", currentKite.URL)
+			k.LocalKite.Log.Error("invalid url came from kontrol", currentKite.URL)
 		}
 
 		clients[i] = k.LocalKite.NewClientString(currentKite.URL)
 		clients[i].Kite = currentKite.Kite
-		clients[i].URL = parsed
+		clients[i].WSConfig.Location = parsed
 		clients[i].Authentication = auth
 	}
 
@@ -224,7 +221,7 @@ func (k *KontrolClient) getKites(args ...interface{}) (kites []*kite.Client, wat
 	for _, r := range clients {
 		token, err := NewTokenRenewer(r, k)
 		if err != nil {
-			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
+			k.LocalKite.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
 			continue
 		}
 		token.RenewWhenExpires()

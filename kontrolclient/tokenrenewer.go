@@ -64,7 +64,7 @@ func (t *TokenRenewer) renewLoop() {
 		select {
 		case <-t.signalRenewToken:
 			if err := t.renewToken(); err != nil {
-				t.kontrolClient.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
+				t.kontrolClient.LocalKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
 				// Need to sleep here litle bit because a signal is sent
 				// when an expired token is detected on incoming request.
 				// This sleep prevents the signal from coming too fast.
