@@ -51,7 +51,7 @@ func (r *Query) Exec(args []string) error {
 
 	for i, client := range result {
 		var k *protocol.Kite = &client.Kite
-		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, client.URL)
+		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, client.WSConfig.Location)
 	}
 
 	return nil
