@@ -17,14 +17,14 @@ func (e MethodNotFoundError) Error() string {
 	return fmt.Sprintf("Method not found: %s", e.Method)
 }
 
-// CallbackNotFoundError is returned when there is no registered callback for
+// callbackNotFoundError is returned when there is no registered callback for
 // received message.
-type CallbackNotFoundError struct {
+type callbackNotFoundError struct {
 	ID   uint64
 	Args *dnode.Partial
 }
 
-func (e CallbackNotFoundError) Error() string {
+func (e callbackNotFoundError) Error() string {
 	return fmt.Sprintf("Callback ID not found: %d", e.ID)
 }
 

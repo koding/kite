@@ -284,7 +284,7 @@ func (c *Client) processMessage(data []byte) error {
 		id := uint64(method)
 		callback := c.scrubber.GetCallback(id)
 		if callback == nil {
-			err = CallbackNotFoundError{id, msg.Arguments}
+			err = callbackNotFoundError{id, msg.Arguments}
 			return err
 		}
 		c.runCallback(callback, msg.Arguments)
