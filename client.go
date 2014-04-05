@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,6 +155,8 @@ func (c *Client) dial() (err error) {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
+	fixPortNumber(c.WSConfig.Location)
+
 	c.conn, err = websocket.DialConfig(c.WSConfig)
 	if err != nil {
 		return err
@@ -163,6 +167,28 @@ func (c *Client) dial() (err error) {
 	go c.callOnConnectHandlers()
 
 	return nil
+}
+
+// fixPortNumber appends 80 or 443 depending on the scheme
+// if there is no port number in the URL.
+func fixPortNumber(u *url.URL) {
+	_, _, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		if missingPortErr, ok := err.(*net.AddrError); ok && missingPortErr.Err == "missing port in address" {
+			var port string
+			switch u.Scheme {
+			case "ws":
+				port = "80"
+			case "wss":
+				port = "443"
+			default:
+				panic("unknown scheme: " + u.Scheme)
+			}
+			u.Host = net.JoinHostPort(strings.TrimRight(missingPortErr.Addr, ":"), port)
+		} else {
+			panic(err) // Other kind of error
+		}
+	}
 }
 
 func (c *Client) dialForever(connectNotifyChan chan bool) {
