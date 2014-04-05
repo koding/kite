@@ -5,6 +5,10 @@ type Function struct {
 	Caller caller
 }
 
+type caller interface {
+	Call(args ...interface{}) error
+}
+
 // Call the received function.
 func (f Function) Call(args ...interface{}) error {
 	return f.Caller.Call(args...)
@@ -19,10 +23,6 @@ func (f Function) MarshalJSON() ([]byte, error) {
 
 func (*Function) UnmarshalJSON(data []byte) error {
 	return nil
-}
-
-type caller interface {
-	Call(args ...interface{}) error
 }
 
 // Callback is the wrapper for function when sending.
@@ -45,10 +45,6 @@ func (f functionReceived) Call(args ...interface{}) error {
 	return f(args...)
 }
 
-// Path represents a callback function's path in the arguments structure.
-// Contains mixture of string and integer values.
-type Path []interface{}
-
 // CallbackSpec is a structure encapsulating a Function and it's Path.
 // It is the type of the values in callbacks map.
 type CallbackSpec struct {
@@ -56,3 +52,7 @@ type CallbackSpec struct {
 	Path     Path
 	Function Function
 }
+
+// Path represents a callback function's path in the arguments structure.
+// Contains mixture of string and integer values.
+type Path []interface{}
