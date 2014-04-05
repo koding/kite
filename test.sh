@@ -17,7 +17,6 @@ do
 done
 
 go test $VERBOSE ./dnode
-go test $VERBOSE ./dnode/rpc
 go test $VERBOSE ./cmd/cli
 go test $VERBOSE ./systeminfo
 go test $VERBOSE ./
