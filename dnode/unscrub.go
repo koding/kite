@@ -73,7 +73,7 @@ func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 			}
 			value = value.Elem()
 		case reflect.Struct:
-			if value.Type() == reflect.TypeOf(Function{}) {
+			if value.Type().Implements(callerType) {
 				caller := value.FieldByName("Caller")
 				caller.Set(reflect.ValueOf(cb))
 				return nil
