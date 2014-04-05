@@ -13,6 +13,7 @@ import (
 	"time"
 
 	etcdErr "github.com/coreos/etcd/error"
+	"github.com/coreos/etcd/etcd"
 	"github.com/coreos/etcd/store"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	Version           = "0.0.2"
+	Version           = "0.0.3"
 	DefaultPort       = 4000
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
@@ -38,18 +39,15 @@ var log logging.Logger
 
 type Kontrol struct {
 	Server       *server.Server
-	Name         string       // Name of the etcd instance
-	DataDir      string       // etcd data dir
-	EtcdAddr     string       // The public host:port used for etcd server.
-	EtcdBindAddr string       // The listening host:port used for etcd server.
-	PeerAddr     string       // The public host:port used for peer communication.
-	PeerBindAddr string       // The listening host:port used for peer communication.
-	Peers        []string     // other peers in cluster (must be peer address of other instances)
-	store        store.Store  // etcd data store
-	psListener   net.Listener // etcd peer server listener (default port: 7001)
-	sListener    net.Listener // etcd http server listener (default port: 4001)
-	publicKey    string       // RSA key for validation of tokens
-	privateKey   string       // RSA key for signing tokens
+	Name         string   // Name of the etcd instance
+	DataDir      string   // etcd data dir
+	EtcdAddr     string   // The public host:port used for etcd server.
+	EtcdBindAddr string   // The listening host:port used for etcd server.
+	PeerAddr     string   // The public host:port used for peer communication.
+	PeerBindAddr string   // The listening host:port used for peer communication.
+	Peers        []string // other peers in cluster (must be peer address of other instances)
+	publicKey    string   // RSA key for validation of tokens
+	privateKey   string   // RSA key for signing tokens
 
 	// To cancel running watchers, we must store the references
 	watchers      map[string]*store.Watcher
@@ -57,6 +55,8 @@ type Kontrol struct {
 
 	// Holds refence to all connected clients (key is ID of kite)
 	clients map[string]*kite.Client
+
+	etcd *etcd.Etcd
 }
 
 // New creates a new kontrol.
@@ -92,6 +92,7 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 		privateKey:   privateKey,
 		watchers:     make(map[string]*store.Watcher),
 		clients:      make(map[string]*kite.Client),
+		etcd:         etcd.New(nil), // create with default config, we'll update it when running kontrol.
 	}
 
 	log = k.Log
@@ -125,17 +126,24 @@ func (k *Kontrol) Start() {
 func (k *Kontrol) init() {
 	rand.Seed(time.Now().UnixNano())
 
-	// Run etcd
-	etcdReady := make(chan bool)
-	go k.runEtcd(etcdReady)
-	<-etcdReady
+	// Update etcd config before running
+	k.etcd.Config.Name = k.Name
+	k.etcd.Config.DataDir = k.DataDir
+	k.etcd.Config.Addr = k.EtcdAddr
+	k.etcd.Config.BindAddr = k.EtcdBindAddr
+	k.etcd.Config.Peer.Addr = k.PeerAddr
+	k.etcd.Config.Peer.BindAddr = k.PeerBindAddr
+	k.etcd.Config.Peers = k.Peers
+
+	go k.etcd.Run()
+	<-k.etcd.ReadyNotify()
 
 	go k.registerSelf()
 }
 
 // ClearKites removes everything under "/kites" from etcd.
 func (k *Kontrol) ClearKites() error {
-	_, err := k.store.Delete(
+	_, err := k.etcd.Store.Delete(
 		KitesPrefix, // path
 		true,        // recursive
 		true,        // dir
@@ -217,7 +225,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.store.Delete(
+		k.etcd.Store.Delete(
 			etcdKey, // path
 			false,   // recursive
 			false,   // dir
@@ -271,7 +279,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 
 		// Set the kite key.
 		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-		_, err := k.store.Set(
+		_, err := k.etcd.Store.Set(
 			etcdKey,     // path
 			false,       // dir
 			valueString, // value
@@ -283,7 +291,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 		}
 
 		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.store.Update(
+		_, err = k.etcd.Store.Update(
 			KitesPrefix+"/"+kite.Username, // path
 			"",       // new value
 			expireAt, // expire time
@@ -447,7 +455,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// Registering watcher should be done before making etcd.Get() because
 	// Get() may return an empty result.
 	if watchCallback.Caller != nil {
-		watcher, err := k.store.Watch(
+		watcher, err := k.etcd.Store.Watch(
 			KitesPrefix+key, // prefix
 			true,            // recursive
 			true,            // stream
@@ -485,7 +493,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Get kites from etcd
-	event, err := k.store.Get(
+	event, err := k.etcd.Store.Get(
 		KitesPrefix+key, // path
 		true,            // recursive, return all child directories too
 		false,           // sorting flag, we don't care about sorting for now
@@ -568,7 +576,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				// has canceled our watcher. We need to create a new watcher with the same key.
 				key, _ := getQueryKey(query) // can't fail
 				var err error
-				watcher, err = k.store.Watch(
+				watcher, err = k.etcd.Store.Watch(
 					KitesPrefix+key, // prefix
 					true,            // recursive
 					true,            // stream
@@ -599,8 +607,13 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				var val registerValue
-				err = json.Unmarshal([]byte(etcdEvent.Node.Value), &val)
+				nodeVal := etcdEvent.Node.Value
+				if nodeVal == nil {
+					continue
+				}
+
+				var registerVal registerValue
+				err = json.Unmarshal([]byte(*nodeVal), &registerVal)
 				if err != nil {
 					continue
 				}
@@ -608,7 +621,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				var e protocol.KiteEvent
 				e.Action = protocol.Register
 				e.Kite = *otherKite
-				e.URL = val.URL.String()
+				e.URL = registerVal.URL.String()
 
 				e.Token, err = generateToken(etcdEvent.Node.Key, query.Username, k.Server.Kite.Kite().Username, k.privateKey)
 				if err != nil {
@@ -668,7 +681,7 @@ func addTokenToKites(nodes store.NodeExterns, username, issuer, queryKey, privat
 		}
 
 		rv := new(registerValue)
-		json.Unmarshal([]byte(node.Value), rv)
+		json.Unmarshal([]byte(*node.Value), rv)
 
 		kitesWithToken[i].URL = rv.URL.String()
 	}
@@ -754,7 +767,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	event, err := k.store.Get(
+	event, err := k.etcd.Store.Get(
 		KitesPrefix+kiteKey, // path
 		false, // recursive
 		false, // sorted
@@ -767,7 +780,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	}
 
 	var kiteVal registerValue
-	err = json.Unmarshal([]byte(event.Node.Value), &kiteVal)
+	err = json.Unmarshal([]byte(*event.Node.Value), &kiteVal)
 	if err != nil {
 		return nil, err
 	}
