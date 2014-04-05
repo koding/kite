@@ -1,8 +1,7 @@
 language: go
 go: 1.2
 install:
-  - mkdir -p /home/travis/gopath/src/github.com/coreos
-  - git clone https://github.com/koding/etcd.git /home/travis/gopath/src/github.com/coreos/etcd
-  - go get -d -v ./... && go build -v ./...
+  - go get -d -v ./...
+  - go build -v ./...
 script:
   - ./test.sh
