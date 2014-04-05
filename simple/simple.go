@@ -1,3 +1,5 @@
+// Package simple implements a helper for kites to serve on HTTP,
+// and registration to kontrol and proxy kites.
 package simple
 
 import (

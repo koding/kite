@@ -1,3 +1,4 @@
+// Package registration contains a helper for registering kontrol and proxy kites.
 package registration
 
 import (

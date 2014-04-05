@@ -1,3 +1,4 @@
+// Package server implements a HTTP(S) server for kites.
 package server
 
 import (

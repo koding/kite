@@ -1,3 +1,4 @@
+// Package kontrolclient implements a kite.Client for interacting with Kontrol kite.
 package kontrolclient
 
 import (

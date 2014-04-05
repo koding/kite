@@ -1,4 +1,4 @@
-// Kite is the command line tool for using kite services.
+// Command line tool for using kite services.
 package main
 
 import (

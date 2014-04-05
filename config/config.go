@@ -1,3 +1,4 @@
+// Package config contains a Config struct for kites.
 package config
 
 import (
