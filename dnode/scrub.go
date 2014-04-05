@@ -13,6 +13,8 @@ func (s *Scrubber) Scrub(obj interface{}) (callbacks map[string]Path) {
 	return callbacks
 }
 
+var callerType = reflect.TypeOf((*caller)(nil)).Elem()
+
 // collectCallbacks walks over the rawObj and populates callbackMap
 // with callbacks. This is a recursive function. The top level send must
 // sends arguments as rawObj, an empty path and empty callbackMap parameter.
@@ -55,7 +57,7 @@ func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap m
 			}
 
 			v2 := reflect.ValueOf(e.Interface())
-			if v2.Type() == reflect.TypeOf(Function{}) {
+			if v2.Type().Implements(callerType) {
 				s.registerCallback(v2, path, callbackMap)
 				return
 			}
@@ -63,7 +65,7 @@ func (s *Scrubber) collectCallbacks(rawObj interface{}, path Path, callbackMap m
 			s.collectFields(v2, path, callbackMap)
 			s.collectMethods(v, path, callbackMap)
 		case reflect.Struct:
-			if v.Type() == reflect.TypeOf(Function{}) {
+			if v.Type().Implements(callerType) {
 				s.registerCallback(v, path, callbackMap)
 				return
 			}
