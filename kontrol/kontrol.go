@@ -38,7 +38,9 @@ const (
 var log logging.Logger
 
 type Kontrol struct {
-	Server       *server.Server
+	Server *server.Server
+
+	// etcd options
 	Name         string   // Name of the etcd instance
 	DataDir      string   // etcd data dir
 	EtcdAddr     string   // The public host:port used for etcd server.
@@ -46,8 +48,10 @@ type Kontrol struct {
 	PeerAddr     string   // The public host:port used for peer communication.
 	PeerBindAddr string   // The listening host:port used for peer communication.
 	Peers        []string // other peers in cluster (must be peer address of other instances)
-	publicKey    string   // RSA key for validation of tokens
-	privateKey   string   // RSA key for signing tokens
+
+	// RSA keys
+	publicKey  string // for validating tokens
+	privateKey string // for signing tokens
 
 	// To cancel running watchers, we must store the references
 	watchers      map[string]*store.Watcher
