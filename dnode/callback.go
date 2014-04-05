@@ -1,5 +1,7 @@
 package dnode
 
+import "strconv"
+
 // Function is the type for sending and receiving functions in dnode messages.
 type Function struct {
 	Caller caller
@@ -56,3 +58,21 @@ type CallbackSpec struct {
 // Path represents a callback function's path in the arguments structure.
 // Contains mixture of string and integer values.
 type Path []interface{}
+
+// parseCallbacks parses the message's "callbacks" field and prepares
+// callback functions in "arguments" field.
+func ParseCallbacks(msg *Message, sender func(id uint64, args []interface{}) error) error {
+	// Parse callbacks field and create callback functions.
+	for methodID, path := range msg.Callbacks {
+		id, err := strconv.ParseUint(methodID, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		f := func(args ...interface{}) error { return sender(id, args) }
+		spec := CallbackSpec{path, Function{functionReceived(f)}}
+		msg.Arguments.CallbackSpecs = append(msg.Arguments.CallbackSpecs, spec)
+	}
+
+	return nil
+}

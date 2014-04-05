@@ -284,13 +284,13 @@ func (c *Client) processMessage(data []byte) error {
 		id := uint64(method)
 		callback := c.scrubber.GetCallback(id)
 		if callback == nil {
-			err = callbackNotFoundError{id, msg.Arguments}
+			err = dnode.CallbackNotFoundError{id, msg.Arguments}
 			return err
 		}
 		c.runCallback(callback, msg.Arguments)
 	case string:
 		if handler, ok = c.LocalKite.handlers[method]; !ok {
-			err = MethodNotFoundError{method, msg.Arguments}
+			err = dnode.MethodNotFoundError{method, msg.Arguments}
 			return err
 		}
 		c.runMethod(method, handler, msg.Arguments)
@@ -637,7 +637,7 @@ func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-
 func onError(err error) {
 	// TODO do not marshal options again here
 	switch e := err.(type) {
-	case MethodNotFoundError: // Tell the requester "method is not found".
+	case dnode.MethodNotFoundError: // Tell the requester "method is not found".
 		args, err2 := e.Args.Slice()
 		if err2 != nil {
 			return
