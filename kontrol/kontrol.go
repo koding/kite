@@ -238,7 +238,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		kite.Callback(func(args *dnode.Partial) { setterFunc() }),
+		dnode.Callback(func(args *dnode.Partial) { setterFunc() }),
 	}
 
 	_, err := r.Tell("kite.heartbeat", heartbeatArgs...)

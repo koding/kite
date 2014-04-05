@@ -130,11 +130,6 @@ type Request struct {
 	Authentication *Authentication
 }
 
-// Wrap your function with Callback to send it as an argument to a Client.
-func Callback(f func(*dnode.Partial)) dnode.Function {
-	return dnode.Callback(f)
-}
-
 // runCallback is called when a callback method call is received from remote Kite.
 func (c *Client) runCallback(callback func(*dnode.Partial), args *dnode.Partial) {
 	kiteErr := new(Error)                      // Not used. For recovering the error.

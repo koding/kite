@@ -581,7 +581,7 @@ func sendCallbackID(callbacks map[string]dnode.Path, ch chan<- uint64) {
 // The caller of the Tell() is blocked until the server calls this callback function.
 // Sets theResponse and notifies the caller by sending to done channel.
 func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-chan uint64, method string, args []interface{}) dnode.Function {
-	return Callback(func(arguments *dnode.Partial) {
+	return dnode.Callback(func(arguments *dnode.Partial) {
 		// Single argument of response callback.
 		var resp struct {
 			Result *dnode.Partial `json:"result"`

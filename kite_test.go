@@ -66,7 +66,7 @@ func TestKite(t *testing.T) {
 		resultChan <- n
 	}
 
-	result, err = remote.Tell("squareCB", 3, Callback(resultCallback))
+	result, err = remote.Tell("squareCB", 3, dnode.Callback(resultCallback))
 	if err != nil {
 		t.Fatal(err)
 	}
