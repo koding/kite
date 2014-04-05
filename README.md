@@ -4,7 +4,7 @@ Kite Micro-Service Framework
 Kite is a framework for developing micro-services in Go.
 
 [![GoDoc](https://godoc.org/github.com/koding/kite?status.png)](https://godoc.org/github.com/koding/kite)
-[![Build Status](https://travis-ci.org/koding/kite.png)](https://travis-ci.org/koding/kite)
+[![Build Status](https://travis-ci.org/koding/kite.svg?branch=master)](https://travis-ci.org/koding/kite)
 
 ![Kite](http://i.imgur.com/iNcltPN.png)
 
