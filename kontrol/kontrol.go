@@ -268,12 +268,7 @@ func (k *Kontrol) registerSelf() {
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
 func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter func() error, etcdKey string) {
-	// TODO prefix version string with a letter. Otherwise it does not work when getting the key.
-	// I will look into this in detail later.
-	kite2 := *kite
-	kite2.Version = "v" + kite2.Version
-
-	etcdKey = KitesPrefix + kite2.String()
+	etcdKey = KitesPrefix + kite.String()
 
 	valueBytes, _ := json.Marshal(value)
 	valueString := string(valueBytes)
@@ -368,11 +363,6 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 
 		if empty && v != "" {
 			return "", fmt.Errorf("Invalid query. Query option is not set: %s", empytField)
-		}
-
-		// TODO remove the prefix from version string.
-		if k == "version" {
-			v = "v" + v
 		}
 
 		path = path + v + "/"
