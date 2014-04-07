@@ -4,7 +4,6 @@ package main
 import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/cmd"
-	"github.com/koding/kite/cmd/build"
 	"github.com/koding/kite/cmd/cli"
 )
 
@@ -17,7 +16,6 @@ func main() {
 	root.AddCommand("version", cmd.Version(Version))
 	root.AddCommand("register", cmd.NewRegister(client))
 	root.AddCommand("install", cmd.NewInstall())
-	root.AddCommand("build", build.NewBuild())
 	root.AddCommand("list", cmd.NewList())
 	root.AddCommand("run", cmd.NewRun())
 	root.AddCommand("tell", cmd.NewTell(client))
