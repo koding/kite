@@ -103,9 +103,8 @@ func (s *Server) listenAndServe() error {
 }
 
 func (s *Server) UseTLS(certPEM, keyPEM string) {
-	config := &tls.Config{}
-	if s.TLSConfig != nil {
-		s.TLSConfig = config
+	if s.TLSConfig == nil {
+		s.TLSConfig = &tls.Config{}
 	}
 
 	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
@@ -113,7 +112,7 @@ func (s *Server) UseTLS(certPEM, keyPEM string) {
 		panic(err)
 	}
 
-	config.Certificates = append(config.Certificates, cert)
+	s.TLSConfig.Certificates = append(s.TLSConfig.Certificates, cert)
 }
 
 func (s *Server) UseTLSFile(certFile, keyFile string) {
