@@ -102,10 +102,10 @@ func (s *Server) listenAndServe() error {
 	return http.Serve(s.listener, s.Kite)
 }
 
-func (k *Server) UseTLS(certPEM, keyPEM string) {
+func (s *Server) UseTLS(certPEM, keyPEM string) {
 	config := &tls.Config{}
-	if k.TLSConfig != nil {
-		k.TLSConfig = config
+	if s.TLSConfig != nil {
+		s.TLSConfig = config
 	}
 
 	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
@@ -116,14 +116,14 @@ func (k *Server) UseTLS(certPEM, keyPEM string) {
 	config.Certificates = append(config.Certificates, cert)
 }
 
-func (k *Server) UseTLSFile(certFile, keyFile string) {
+func (s *Server) UseTLSFile(certFile, keyFile string) {
 	certData, err := ioutil.ReadFile(certFile)
 	if err != nil {
-		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
+		s.Log.Fatal("Cannot read certificate file: %s", err.Error())
 	}
 	keyData, err := ioutil.ReadFile(keyFile)
 	if err != nil {
-		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
+		s.Log.Fatal("Cannot read certificate file: %s", err.Error())
 	}
-	k.UseTLS(string(certData), string(keyData))
+	s.UseTLS(string(certData), string(keyData))
 }
