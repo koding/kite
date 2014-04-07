@@ -121,7 +121,7 @@ func (k *Server) UseTLSFile(certFile, keyFile string) {
 	if err != nil {
 		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
 	}
-	keyData, err := ioutil.ReadFile(certFile)
+	keyData, err := ioutil.ReadFile(keyFile)
 	if err != nil {
 		k.Log.Fatal("Cannot read certificate file: %s", err.Error())
 	}
