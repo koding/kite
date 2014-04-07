@@ -18,11 +18,11 @@ type Config struct {
 	Region                string
 	KiteKey               string
 	DisableAuthentication bool
+	DisableConcurrency    bool
 
 	// Options for Server
-	IP                 string
-	Port               int
-	DisableConcurrency bool
+	IP   string
+	Port int
 
 	KontrolURL  *url.URL
 	KontrolKey  string
