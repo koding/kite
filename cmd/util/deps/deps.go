@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"sort"
 
-	"github.com/fatih/set"
+	"gopkg.in/fatih/set.v0"
 )
 
 const (
@@ -66,7 +66,7 @@ func LoadDeps(pkgs ...Pkg) (*Deps, error) {
 	}
 
 	// get all dependencies for applications defined above
-	dependencies := set.New(set.ThreadSafe)
+	dependencies := set.New()
 	for _, pkg := range packages {
 		for _, imp := range pkg.Deps {
 			dependencies.Add(imp)
