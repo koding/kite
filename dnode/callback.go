@@ -1,6 +1,9 @@
 package dnode
 
-import "strconv"
+import (
+	"errors"
+	"strconv"
+)
 
 // Function is the type for sending and receiving functions in dnode messages.
 type Function struct {
@@ -13,7 +16,16 @@ type caller interface {
 
 // Call the received function.
 func (f Function) Call(args ...interface{}) error {
+	if !f.IsValid() {
+		return errors.New("invalid function")
+	}
 	return f.Caller.Call(args...)
+}
+
+// IsValid returns true if f represents a Function.
+// It returns false if f is the zero Value.
+func (f Function) IsValid() bool {
+	return f.Caller != nil
 }
 
 func (f Function) MarshalJSON() ([]byte, error) {
