@@ -388,6 +388,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 
 	if len(args.Who) != 0 {
 		// Find all kites in the query and pick one.
+		// TODO do not allow "who" and "watchCallback" fields to be set at the same time.
 		allKites, err := k.getKites(r, args.Query, args.WatchCallback)
 		if err != nil {
 			return nil, err
