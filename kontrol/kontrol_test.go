@@ -61,6 +61,7 @@ func TestKontrol(t *testing.T) {
 		Username:    exp2Kite.Kite().Username,
 		Environment: exp2Kite.Kite().Environment,
 		Name:        "mathworker",
+		Version:     "0.0.1",
 	}
 
 	konClient := kontrolclient.New(exp2Kite)
