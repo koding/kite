@@ -31,7 +31,7 @@ const (
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
-	TokenTTL          = 1 * time.Hour
+	TokenTTL          = 48 * time.Hour
 	TokenLeeway       = 1 * time.Minute
 )
 
