@@ -46,7 +46,7 @@ func TestKontrol(t *testing.T) {
 	time.Sleep(1e9)
 
 	// Start mathworker
-	mathKite := simple.New("mathworker", "0.0.1")
+	mathKite := simple.New("mathworker", "1.2.3")
 	mathKite.Config = conf.Copy()
 	mathKite.HandleFunc("square", Square)
 	mathKite.Start()
@@ -61,7 +61,7 @@ func TestKontrol(t *testing.T) {
 		Username:    exp2Kite.Kite().Username,
 		Environment: exp2Kite.Kite().Environment,
 		Name:        "mathworker",
-		Version:     "0.0.1",
+		Version:     "~> 1.1",
 	}
 
 	konClient := kontrolclient.New(exp2Kite)
@@ -152,7 +152,7 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// Start a new mathworker kite
-	mathKite2 := simple.New("mathworker", "0.0.1")
+	mathKite2 := simple.New("mathworker", "1.2.3")
 	mathKite2.Config = conf.Copy()
 	mathKite2.Start()
 
