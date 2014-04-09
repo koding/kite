@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	Version           = "0.0.3"
+	Version           = "0.0.4"
 	DefaultPort       = 4000
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
@@ -434,7 +434,14 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
-	var result = new(protocol.GetKitesResult)
+	// Generate token once here because we are using the same token for every
+	// kite we return and generating many tokens is really slow.
+	token, err := generateToken(key, r.Username, k.Server.Kite.Kite().Username, k.privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var result = new(protocol.GetKitesResult) // to be returned
 
 	// Create e watcher on query.
 	// The callback is going to be called when a Kite registered/unregistered
@@ -496,7 +503,8 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Attach tokens to kites
-	kitesAndTokens, err := addTokenToKites(flatten(event.Node.Nodes), r.Username, k.Server.Kite.Kite().Username, key, k.privateKey)
+	nodes := flatten(event.Node.Nodes)
+	kitesAndTokens, err := kitesFromNodes(nodes, token)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +516,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		shuffled[v] = kitesAndTokens[i]
 	}
 
-	result.Kites = shuffled
+	result.Kites = kitesAndTokens
 	return result, nil
 }
 
@@ -653,39 +661,26 @@ func flatten(in store.NodeExterns) (out store.NodeExterns) {
 	return
 }
 
-func addTokenToKites(nodes store.NodeExterns, username, issuer, queryKey, privateKey string) ([]*protocol.KiteWithToken, error) {
+func kitesFromNodes(nodes store.NodeExterns, token string) ([]*protocol.KiteWithToken, error) {
 	kitesWithToken := make([]*protocol.KiteWithToken, len(nodes))
 
 	for i, node := range nodes {
+		rv := new(registerValue)
+		json.Unmarshal([]byte(*node.Value), rv)
+
 		kite, err := kiteFromEtcdKV(node.Key)
 		if err != nil {
 			return nil, err
 		}
 
-		kitesWithToken[i], err = addTokenToKite(kite, username, issuer, queryKey, privateKey)
-		if err != nil {
-			return nil, err
+		kitesWithToken[i] = &protocol.KiteWithToken{
+			Kite:  *kite,
+			Token: token,
+			URL:   rv.URL.String(),
 		}
-
-		rv := new(registerValue)
-		json.Unmarshal([]byte(*node.Value), rv)
-
-		kitesWithToken[i].URL = rv.URL.String()
 	}
 
 	return kitesWithToken, nil
-}
-
-func addTokenToKite(kite *protocol.Kite, username, issuer, queryKey, privateKey string) (*protocol.KiteWithToken, error) {
-	tkn, err := generateToken(queryKey, username, issuer, privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return &protocol.KiteWithToken{
-		Kite:  *kite,
-		Token: tkn,
-	}, nil
 }
 
 // generateToken returns a JWT token string. Please see the URL for details:
