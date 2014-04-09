@@ -41,7 +41,9 @@ func (*Function) UnmarshalJSON(data []byte) error {
 
 // Callback is the wrapper for function when sending.
 func Callback(f func(*Partial)) Function {
-	return Function{callback(f)}
+	return Function{
+		Caller: callback(f),
+	}
 }
 
 type callback func(*Partial)
