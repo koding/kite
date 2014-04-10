@@ -417,15 +417,17 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		// TODO This approach will NOT work when there are more than one kontrol instance.
 		whoClient := k.clients[whoKite.Kite.ID]
 		if whoClient == nil {
-			whoClient = k.Server.Kite.NewClientString(whoKite.URL)
-			whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
-			whoClient.Kite = whoKite.Kite
+			// TODO Enable code below after fix.
+			return nil, errors.New("target kite is not connected")
+			// whoClient = k.Server.Kite.NewClientString(whoKite.URL)
+			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
+			// whoClient.Kite = whoKite.Kite
 
-			err = whoClient.Dial()
-			if err != nil {
-				return nil, err
-			}
-			defer whoClient.Close()
+			// err = whoClient.Dial()
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// defer whoClient.Close()
 		}
 
 		result, err := whoClient.Tell("kite.who", args.Who)
