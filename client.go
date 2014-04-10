@@ -210,18 +210,13 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 
 // run consumes incoming dnode messages. Reconnects if necessary.
 func (c *Client) run() {
-	for {
-		c.readLoop()
+	c.readLoop()
 
-		// falls here when connection disconnects
-		c.callOnDisconnectHandlers()
+	// falls here when connection disconnects
+	c.callOnDisconnectHandlers()
 
-		if !c.Reconnect {
-			break
-		}
-
+	if c.Reconnect {
 		go c.dialForever(nil)
-		break
 	}
 }
 
