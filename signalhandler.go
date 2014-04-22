@@ -13,7 +13,7 @@ import (
 var debugMode bool
 
 // SetupSignalHandler listens to signals and toggles the log level to DEBUG
-// mode when it received a SIGUSR1 signal. Another SIGUSR1 toggles the log
+// mode when it received a SIGUSR2 signal. Another SIGUSR2 toggles the log
 // level back to the old level.
 func (k *Kite) SetupSignalHandler() {
 	c := make(chan os.Signal, 1)
