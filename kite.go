@@ -159,24 +159,30 @@ func (k *Kite) handleWS(ws *websocket.Conn) {
 	k.callOnDisconnectHandlers(c)
 }
 
+// getLogLevel returns the logging level defined via the KITE_LOG_LEVEL
+// environment. It returns logging.Info by default if no environment variable
+// is set.
+func getLogLevel() logging.Level {
+	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
+	case "DEBUG":
+		return logging.DEBUG
+	case "NOTICE":
+		return logging.NOTICE
+	case "WARNING":
+		return logging.WARNING
+	case "ERROR":
+		return logging.ERROR
+	case "CRITICAL":
+		return logging.CRITICAL
+	default:
+		return logging.INFO
+	}
+}
+
 // newLogger returns a new logger object for desired name and level.
 func newLogger(name string) logging.Logger {
 	logger := logging.NewLogger(name)
-
-	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
-	case "DEBUG":
-		logger.SetLevel(logging.DEBUG)
-	case "NOTICE":
-		logger.SetLevel(logging.NOTICE)
-	case "WARNING":
-		logger.SetLevel(logging.WARNING)
-	case "ERROR":
-		logger.SetLevel(logging.ERROR)
-	case "CRITICAL":
-		logger.SetLevel(logging.CRITICAL)
-	default:
-		logger.SetLevel(logging.INFO)
-	}
+	logger.SetLevel(getLogLevel())
 
 	return logger
 }

@@ -3,29 +3,35 @@
 package kite
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
+
+	"github.com/koding/logging"
 )
 
-// SetupSignalHandler listens to SIGUSR1 signal and prints a stackrace for every
-// SIGUSR1 signal
+var debugMode bool
+
+// SetupSignalHandler listens to signals and toggles the log level to DEBUG
+// mode when it received a SIGUSR1 signal. Another SIGUSR1 toggles the log
+// level back to the old level.
 func (k *Kite) SetupSignalHandler() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGUSR1)
+	signal.Notify(c, syscall.SIGUSR2)
 	go func() {
 		for s := range c {
-			fmt.Println("Got signal:", s)
-			buf := make([]byte, 1<<16)
-			runtime.Stack(buf, true)
-			fmt.Println(string(buf))
-			fmt.Print("Number of goroutines:", runtime.NumGoroutine())
-			m := new(runtime.MemStats)
-			runtime.GC()
-			runtime.ReadMemStats(m)
-			fmt.Printf(", Memory allocated: %+v\n", m.Alloc)
+			k.Log.Info("Got signal: %s", s)
+
+			if debugMode {
+				// toogle back to old settings.
+				k.Log.Info("Disabling debug mode")
+				k.Log.SetLevel(getLogLevel())
+				debugMode = false
+			} else {
+				k.Log.Info("Enabling debug mode")
+				k.Log.SetLevel(logging.DEBUG)
+				debugMode = true
+			}
 		}
 	}()
 }

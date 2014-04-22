@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -303,9 +302,7 @@ func (c *Client) Close() {
 
 // sendData sends the msg over the websocket.
 func (c *Client) sendData(msg []byte) error {
-	if os.Getenv("DNODE_PRINT_SEND") != "" {
-		fmt.Fprintf(os.Stderr, "\nSending: %s\n", string(msg))
-	}
+	c.LocalKite.Log.Debug("Sending : %s", string(msg))
 
 	if c.conn == nil {
 		return errors.New("not connected")
@@ -323,9 +320,7 @@ func (c *Client) receiveData() ([]byte, error) {
 	var msg []byte
 	err := websocket.Message.Receive(c.conn, &msg)
 
-	if os.Getenv("DNODE_PRINT_RECV") != "" {
-		fmt.Fprintf(os.Stderr, "\nReceived: %s\n", string(msg))
-	}
+	c.LocalKite.Log.Debug("Received : %s", string(msg))
 
 	return msg, err
 }
