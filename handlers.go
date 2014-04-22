@@ -15,6 +15,7 @@ import (
 func (k *Kite) addDefaultHandlers() {
 	k.HandleFunc("kite.systemInfo", systemInfo)
 	k.HandleFunc("kite.heartbeat", k.handleHeartbeat)
+	k.HandleFunc("kite.ping", handlePing)
 	k.HandleFunc("kite.tunnel", handleTunnel)
 	k.HandleFunc("kite.log", k.handleLog)
 	k.HandleFunc("kite.print", handlePrint)
@@ -53,6 +54,11 @@ func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	msg := r.Args.One().MustString()
 	k.Log.Info(fmt.Sprintf("%s: %s", r.Client.Name, msg))
 	return nil, nil
+}
+
+//handlePing returns a simple "pong" string
+func handlePing(r *Request) (interface{}, error) {
+	return "pong", nil
 }
 
 // handlePrint prints a message to stdout.
