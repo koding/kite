@@ -1,4 +1,4 @@
-package kontrolclient
+package kite
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite"
 )
 
 const (
@@ -16,14 +15,14 @@ const (
 
 // TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
-	client           *kite.Client
+	client           *Client
 	kontrolClient    *KontrolClient
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
 }
 
-func NewTokenRenewer(r *kite.Client, kon *KontrolClient) (*TokenRenewer, error) {
+func NewTokenRenewer(r *Client, kon *KontrolClient) (*TokenRenewer, error) {
 	t := &TokenRenewer{
 		client:           r,
 		kontrolClient:    kon,

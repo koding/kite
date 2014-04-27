@@ -1,7 +1,6 @@
-// Package kite is a library for creating small micro-services.
-// Two main types implemented by this package are
-// Kite for creating a micro-service server called "Kite" and
-// Client for communicating with another kites.
+// Package kite is a library for creating micro-services.  Two main types
+// implemented by this package are Kite for creating a micro-service server
+// called "Kite" and Client for communicating with another kites.
 package kite
 
 import (
@@ -35,7 +34,8 @@ func init() {
 // make request to other kites.
 //
 // Do not use this struct directly. Use kite.New function, add your handlers
-// with HandleFunc mehtod, then call Start or Run method.
+// with HandleFunc mehtod, then call Run method to start the inbuilt server (or
+// pass it to any http.Handler compatible server)
 type Kite struct {
 	Config *config.Config
 
@@ -56,6 +56,10 @@ type Kite struct {
 
 	// Websocket server for handling incoming connections.
 	server *websocket.Server
+
+	// kontrolclient is used to register to kontrol and query third party kites
+	// from kontrol
+	kontrolclient *KontrolClient
 
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)

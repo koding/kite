@@ -1,10 +1,9 @@
-package kontrolclient
+package kite
 
 import (
 	"container/list"
 	"sync"
 
-	"github.com/koding/kite"
 	"github.com/koding/kite/protocol"
 )
 
@@ -18,7 +17,7 @@ type Watcher struct {
 	elem          *list.Element
 }
 
-type EventHandler func(*Event, *kite.Error)
+type EventHandler func(*Event, *Error)
 
 func (k *KontrolClient) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
 	watcher := &Watcher{

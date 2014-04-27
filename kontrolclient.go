@@ -1,5 +1,5 @@
-// Package kontrolclient implements a kite.Client for interacting with Kontrol kite.
-package kontrolclient
+// kontrolclient implements a kite.Client for interacting with Kontrol kite.
+package kite
 
 import (
 	"container/list"
@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
@@ -18,7 +17,7 @@ var ErrNoKitesAvailable = errors.New("no kites availabile")
 
 // KontrolClient is a kite for registering and querying Kites from Kontrol.
 type KontrolClient struct {
-	*kite.Client
+	*Client
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
@@ -29,15 +28,45 @@ type KontrolClient struct {
 	watchersMutex sync.RWMutex
 }
 
+// Event is the struct that is emitted from Kontrol.WatchKites method.
+type Event struct {
+	protocol.KiteEvent
+
+	localKite *Kite
+}
+
+type registerResult struct {
+	URL *url.URL
+}
+
+// RegisterToKontrol registers the given kiteUrl to kontrol.
+func (k *Kite) RegisterToKontrol(kiteUrl *url.URL) (*registerResult, error) {
+	// create a client instance and connect to kontrol for the first time
+	if k.kontrolclient == nil {
+		kontrolClient, err := k.newKontrolClient()
+		if err != nil {
+			return nil, err
+		}
+
+		k.kontrolclient = kontrolClient
+
+		if err := k.kontrolclient.Dial(); err != nil {
+			return nil, err
+		}
+	}
+
+	return k.kontrolclient.Register(kiteUrl)
+}
+
 // NewKontrol returns a pointer to new KontrolClient instance.
-func New(k *kite.Kite) *KontrolClient {
+func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 	if k.Config.KontrolURL == nil {
-		panic("no kontrol URL given in config")
+		return nil, errors.New("no kontrol URL given in config")
 	}
 
 	client := k.NewClient(k.Config.KontrolURL)
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
-	client.Authentication = &kite.Authentication{
+	client.Authentication = &Authentication{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
@@ -68,11 +97,7 @@ func New(k *kite.Kite) *KontrolClient {
 		kontrolClient.watchersMutex.RUnlock()
 	})
 
-	return kontrolClient
-}
-
-type registerResult struct {
-	URL *url.URL
+	return kontrolClient, nil
 }
 
 // Register registers current Kite to Kontrol. After registration other Kites
@@ -124,8 +149,8 @@ func (k *KontrolClient) WatchKites(query protocol.KontrolQuery, onEvent EventHan
 func (k *KontrolClient) eventCallbackHandler(onEvent EventHandler) dnode.Function {
 	return dnode.Callback(func(args *dnode.Partial) {
 		var response struct {
-			Result *Event      `json:"result"`
-			Error  *kite.Error `json:"error"`
+			Result *Event `json:"result"`
+			Error  *Error `json:"error"`
 		}
 
 		args.One().MustUnmarshal(&response)
@@ -170,7 +195,7 @@ func (k *KontrolClient) watchKites(query protocol.KontrolQuery, onEvent EventHan
 // contains ready to connect Client instances. The caller must connect
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
-func (k *KontrolClient) GetKites(query protocol.KontrolQuery) ([]*kite.Client, error) {
+func (k *KontrolClient) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
 	clients, _, err := k.getKites(protocol.GetKitesArgs{Query: query})
 	if err != nil {
 		return nil, err
@@ -184,7 +209,7 @@ func (k *KontrolClient) GetKites(query protocol.KontrolQuery) ([]*kite.Client, e
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *KontrolClient) getKites(args protocol.GetKitesArgs) (kites []*kite.Client, watcherID string, err error) {
+func (k *KontrolClient) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID string, err error) {
 	<-k.ready
 
 	response, err := k.Client.Tell("getKites", args)
@@ -198,7 +223,7 @@ func (k *KontrolClient) getKites(args protocol.GetKitesArgs) (kites []*kite.Clie
 		return nil, "", err
 	}
 
-	clients := make([]*kite.Client, len(result.Kites))
+	clients := make([]*Client, len(result.Kites))
 	for i, currentKite := range result.Kites {
 		_, err := jwt.Parse(currentKite.Token, k.LocalKite.RSAKey)
 		if err != nil {
@@ -206,7 +231,7 @@ func (k *KontrolClient) getKites(args protocol.GetKitesArgs) (kites []*kite.Clie
 		}
 
 		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-		auth := &kite.Authentication{
+		auth := &Authentication{
 			Type: "token",
 			Key:  currentKite.Token,
 		}
@@ -251,4 +276,20 @@ func (k *KontrolClient) GetToken(kite *protocol.Kite) (string, error) {
 	}
 
 	return tkn, nil
+}
+
+// Create new Client from Register events. It panics if the action is not
+// Register.
+func (e *Event) Client() *Client {
+	if e.Action != protocol.Register {
+		panic("This method can only be called for 'Register' event.")
+	}
+
+	r := e.localKite.NewClientString(e.URL)
+	r.Kite = e.Kite
+	r.Authentication = &Authentication{
+		Type: "token",
+		Key:  e.Token,
+	}
+	return r
 }
