@@ -11,7 +11,6 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
 	"github.com/koding/kite/server"
 	"github.com/nu7hatch/gouuid"
@@ -41,18 +40,10 @@ func New(conf *config.Config, pubKey, privKey string) *RegServ {
 }
 
 func (s *RegServ) Run() {
-	kon := kontrolclient.New(s.Server.Kite)
-	reg := registration.New(kon)
+	reg := registration.New(s.Server.Kite)
 
-	connected, err := kon.DialForever()
-	if err != nil {
-		s.Server.Log.Fatal(err.Error())
-	}
 	s.Server.Start()
-	go func() {
-		<-connected
-		reg.RegisterToProxyAndKontrol()
-	}()
+	go reg.RegisterToProxyAndKontrol()
 
 	<-s.Server.CloseNotify()
 }

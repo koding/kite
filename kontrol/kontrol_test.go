@@ -10,7 +10,6 @@ import (
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
 	"github.com/koding/kite/simple"
@@ -64,16 +63,8 @@ func TestKontrol(t *testing.T) {
 		Version:     "~> 1.1",
 	}
 
-	konClient := kontrolclient.New(exp2Kite)
-	connected, err := konClient.DialForever()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	<-connected
-
 	// exp2 queries for mathkite
-	kites, err := konClient.GetKites(query)
+	kites, err := exp2Kite.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +82,7 @@ func TestKontrol(t *testing.T) {
 
 	// Test Kontrol.GetToken
 	t.Logf("oldToken: %s", remoteMathWorker.Authentication.Key)
-	newToken, err := konClient.GetToken(&remoteMathWorker.Kite)
+	newToken, err := exp2Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
 	}
@@ -114,10 +105,10 @@ func TestKontrol(t *testing.T) {
 		t.Fatalf("Invalid result: %d", result)
 	}
 
-	events := make(chan *kontrolclient.Event, 3)
+	events := make(chan *kite.Event, 3)
 
 	// Test WatchKites
-	watcher, err := konClient.WatchKites(query, func(e *kontrolclient.Event, err *kite.Error) {
+	watcher, err := exp2Kite.WatchKites(query, func(e *kite.Event, err *kite.Error) {
 		if err != nil {
 			t.Fatal(err)
 		}

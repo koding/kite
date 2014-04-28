@@ -10,7 +10,6 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
 	"github.com/koding/kite/simple"
@@ -38,12 +37,6 @@ func TestPool(t *testing.T) {
 
 	foo := kite.New("foo", "1.0.0")
 	foo.Config = conf.Copy()
-	konClient := kontrolclient.New(foo)
-	connected, err := konClient.DialForever()
-	if err != nil {
-		t.Fatal(err)
-	}
-	<-connected
 
 	query := protocol.KontrolQuery{
 		Username:    conf.Username,
@@ -51,7 +44,7 @@ func TestPool(t *testing.T) {
 		Name:        "bar",
 	}
 
-	p := New(konClient, query)
+	p := New(foo, query)
 	p.Start()
 	// defer p.Close()
 

@@ -4,22 +4,22 @@ package pool
 
 import (
 	"github.com/koding/kite"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
 )
 
 // Pool is helper for staying connected to every kite in a query.
 type Pool struct {
-	kontrolClient *kontrolclient.KontrolClient
-	query         protocol.KontrolQuery
-	Kites         map[string]*kite.Client
+	localKite *kite.Kite
+	query     protocol.KontrolQuery
+	Kites     map[string]*kite.Client
 }
 
-func New(k *kontrolclient.KontrolClient, q protocol.KontrolQuery) *Pool {
+func New(k *kite.Kite, q protocol.KontrolQuery) *Pool {
+	k.SetupKontrolClient()
 	return &Pool{
-		kontrolClient: k,
-		query:         q,
-		Kites:         make(map[string]*kite.Client),
+		localKite: k,
+		query:     q,
+		Kites:     make(map[string]*kite.Client),
 	}
 }
 
@@ -32,7 +32,7 @@ func (p *Pool) Start() chan error {
 
 // Run the pool (blocking).
 func (p *Pool) Run() error {
-	_, err := p.kontrolClient.WatchKites(p.query, func(event *kontrolclient.Event, err *kite.Error) {
+	_, err := p.localKite.WatchKites(p.query, func(event *kite.Event, err *kite.Error) {
 		switch event.Action {
 		case protocol.Register:
 			p.Kites[event.Kite.ID] = event.Client()

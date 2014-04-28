@@ -5,7 +5,6 @@ package simple
 import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
 	"github.com/koding/kite/server"
 )
@@ -13,7 +12,7 @@ import (
 // simple kite server
 type Simple struct {
 	*server.Server
-	Kontrol      *kontrolclient.KontrolClient
+	LocalKite    *kite.Kite
 	Registration *registration.Registration
 }
 
@@ -29,12 +28,10 @@ func New(name, version string) *Simple {
 
 	server := server.New(k)
 
-	kon := kontrolclient.New(k)
-
 	s := &Simple{
 		Server:       server,
-		Kontrol:      kon,
-		Registration: registration.New(kon),
+		LocalKite:    k,
+		Registration: registration.New(k),
 	}
 
 	return s
@@ -47,15 +44,8 @@ func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
 
 func (s *Simple) Start() {
 	s.Log.Info("Kite has started: %s", s.Kite.Kite())
-	connected, err := s.Kontrol.DialForever()
-	if err != nil {
-		s.Server.Log.Fatal("Cannot dial kontrol: %s", err.Error())
-	}
 	s.Server.Start()
-	go func() {
-		<-connected
-		s.Registration.RegisterToProxyAndKontrol()
-	}()
+	go s.Registration.RegisterToProxyAndKontrol()
 }
 
 func (s *Simple) Run() {
@@ -64,6 +54,6 @@ func (s *Simple) Run() {
 }
 
 func (s *Simple) Close() {
-	s.Kontrol.Close()
+	s.LocalKite.Kontrol.Close()
 	s.Server.Close()
 }
