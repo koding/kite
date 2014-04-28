@@ -21,7 +21,7 @@ type KontrolClient struct {
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection.
-	ready chan bool
+	Ready chan struct{}
 
 	// Watchers are saved here to re-watch on reconnect.
 	watchers      *list.List
@@ -39,6 +39,22 @@ type registerResult struct {
 	URL *url.URL
 }
 
+// SetupKontrolClient setups and prepares a new kontrol client instance.
+// Usually needed for preparations.
+func (k *Kite) SetupKontrolClient() error {
+	if k.Kontrol != nil {
+		return nil // already prepared
+	}
+
+	kontrolClient, err := k.newKontrolClient()
+	if err != nil {
+		return err
+	}
+
+	k.Kontrol = kontrolClient
+	return nil
+}
+
 // newKontrolClient returns a ready and connected KontrolClient instance.
 func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 	if k.Config.KontrolURL == nil {
@@ -54,7 +70,7 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 
 	kontrolClient := &KontrolClient{
 		Client:   client,
-		ready:    make(chan bool),
+		Ready:    make(chan struct{}),
 		watchers: list.New(),
 	}
 
@@ -65,7 +81,7 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
-		once.Do(func() { close(kontrolClient.ready) })
+		once.Do(func() { close(kontrolClient.Ready) })
 
 		// Re-register existing watchers.
 		kontrolClient.watchersMutex.RLock()
@@ -78,7 +94,8 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 		kontrolClient.watchersMutex.RUnlock()
 	})
 
-	if err := kontrolClient.Dial(); err != nil {
+	// non blocking, is going to reconnect if the connection goes down.
+	if _, err := kontrolClient.DialForever(); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +117,7 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		k.Kontrol = kontrolClient
 	}
 
-	<-k.Kontrol.ready
+	<-k.Kontrol.Ready
 
 	args := protocol.RegisterArgs{
 		URL: kiteURL.String(),
@@ -139,7 +156,7 @@ func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*W
 		k.Kontrol = kontrolClient
 	}
 
-	<-k.Kontrol.ready
+	<-k.Kontrol.Ready
 
 	watcherID, err := k.watchKites(query, onEvent)
 	if err != nil {
@@ -195,7 +212,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 }
 
 // GetKites returns the list of Kites matching the query. The returned list
-// contains ready to connect Client instances. The caller must connect
+// contains Ready to connect Client instances. The caller must connect
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
@@ -222,7 +239,7 @@ func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
 
 // used internally for GetKites() and WatchKites()
 func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID string, err error) {
-	<-k.Kontrol.ready
+	<-k.Kontrol.Ready
 
 	response, err := k.Kontrol.Tell("getKites", args)
 	if err != nil {
@@ -283,7 +300,7 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 		k.Kontrol = kontrolClient
 	}
 
-	<-k.Kontrol.ready
+	<-k.Kontrol.Ready
 
 	result, err := k.Kontrol.Tell("getToken", kite)
 	if err != nil {

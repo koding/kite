@@ -44,7 +44,7 @@ func init() {
 
 func TestRegisterToKontrol(t *testing.T) {
 	k, reg := setup()
-	defer k.kontrol.Close()
+	defer k.Kontrol.Close()
 
 	kiteURL := &url.URL{Scheme: "ws", Host: "zubuzaretta:16500"}
 
@@ -77,26 +77,26 @@ func TestRegisterToKontrol(t *testing.T) {
 
 func TestRegisterToProxy(t *testing.T) {
 	k, reg := setup()
-	defer k.kontrol.Close()
+	defer k.Kontrol.Close()
 
 	go reg.RegisterToProxy()
 
 	select {
 	case <-reg.ReadyNotify():
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("timeout")
 	}
 }
 
 func TestRegisterToProxyAndKontrol(t *testing.T) {
 	k, reg := setup()
-	defer k.kontrol.Close()
+	defer k.Kontrol.Close()
 
 	go reg.RegisterToProxyAndKontrol()
 
 	select {
 	case <-reg.ReadyNotify():
-		kites, err := clt.GetKites(protocol.KontrolQuery{
+		kites, err := k.GetKites(protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,
 			Name:        k.Kite().Name,

@@ -129,15 +129,8 @@ func (p *Proxy) listenAndServe() error {
 	}
 
 	if p.RegisterToKontrol {
-		reg := registration.New(k)
-		connected, err := kon.DialForever()
-		if err != nil {
-			p.Kite.Log.Fatal("Cannot connect to kontrol: %s", err.Error())
-		}
-		go func() {
-			<-connected
-			reg.RegisterToKontrol(p.url)
-		}()
+		reg := registration.New(p.Kite)
+		go reg.RegisterToKontrol(p.url)
 	}
 
 	defer close(p.closeC)

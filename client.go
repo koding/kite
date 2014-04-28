@@ -140,7 +140,8 @@ func (c *Client) Dial() (err error) {
 	return nil
 }
 
-// Dial connects to the remote Kite. If it can't connect, it retries indefinitely.
+// Dial connects to the remote Kite. If it can't connect, it retries
+// indefinitely. It returns a channel to check if it's connected or not.
 func (c *Client) DialForever() (connected chan bool, err error) {
 	c.LocalKite.Log.Info("Dialing remote kite: [%s %s]", c.Kite.Name, c.WSConfig.Location.String())
 
@@ -148,6 +149,23 @@ func (c *Client) DialForever() (connected chan bool, err error) {
 	connected = make(chan bool, 1) // This will be closed on first connection.
 	go c.dialForever(connected)
 	return
+}
+
+func (c *Client) dialForever(connectNotifyChan chan bool) {
+	dial := func() error {
+		if !c.Reconnect {
+			return nil
+		}
+		return c.dial()
+	}
+
+	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
+
+	if connectNotifyChan != nil {
+		close(connectNotifyChan)
+	}
+
+	go c.run()
 }
 
 func (c *Client) dial() (err error) {
@@ -188,23 +206,6 @@ func fixPortNumber(u *url.URL) {
 			panic(err) // Other kind of error
 		}
 	}
-}
-
-func (c *Client) dialForever(connectNotifyChan chan bool) {
-	dial := func() error {
-		if !c.Reconnect {
-			return nil
-		}
-		return c.dial()
-	}
-
-	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
-
-	if connectNotifyChan != nil {
-		close(connectNotifyChan)
-	}
-
-	go c.run()
 }
 
 // run consumes incoming dnode messages. Reconnects if necessary.

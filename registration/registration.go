@@ -26,6 +26,8 @@ type Registration struct {
 }
 
 func New(k *kite.Kite) *Registration {
+	k.SetupKontrolClient()
+
 	return &Registration{
 		kite:  k,
 		ready: make(chan bool),
@@ -44,6 +46,7 @@ func (r *Registration) signalReady() {
 func (r *Registration) RegisterToKontrol(kiteURL *url.URL) {
 	urls := make(chan *url.URL, 1)
 	urls <- kiteURL
+
 	r.mainLoop(urls)
 }
 
@@ -57,6 +60,7 @@ func (r *Registration) RegisterToProxyAndKontrol() {
 	urls := make(chan *url.URL, 1)
 
 	go r.keepRegisteredToProxyKite(urls)
+
 	r.mainLoop(urls)
 }
 
