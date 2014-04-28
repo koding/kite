@@ -8,29 +8,29 @@ import (
 )
 
 type Watcher struct {
-	id            string
-	query         *protocol.KontrolQuery
-	handler       EventHandler
-	kontrolClient *KontrolClient
-	canceled      bool
-	mutex         sync.Mutex
-	elem          *list.Element
+	id        string
+	query     *protocol.KontrolQuery
+	handler   EventHandler
+	localKite *Kite
+	canceled  bool
+	mutex     sync.Mutex
+	elem      *list.Element
 }
 
 type EventHandler func(*Event, *Error)
 
-func (k *KontrolClient) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
+func (k *Kite) newWatcher(id string, query *protocol.KontrolQuery, handler EventHandler) *Watcher {
 	watcher := &Watcher{
-		id:            id,
-		query:         query,
-		handler:       handler,
-		kontrolClient: k,
+		id:        id,
+		query:     query,
+		handler:   handler,
+		localKite: k,
 	}
 
 	// Add to the kontrol's watchers list.
-	k.watchersMutex.Lock()
-	watcher.elem = k.watchers.PushBack(watcher)
-	k.watchersMutex.Unlock()
+	k.kontrol.watchersMutex.Lock()
+	watcher.elem = k.kontrol.watchers.PushBack(watcher)
+	k.kontrol.watchersMutex.Unlock()
 
 	return watcher
 }
@@ -43,14 +43,14 @@ func (w *Watcher) Cancel() error {
 		return nil
 	}
 
-	_, err := w.kontrolClient.Tell("cancelWatcher", w.id)
+	_, err := w.localKite.kontrol.Tell("cancelWatcher", w.id)
 	if err == nil {
 		w.canceled = true
 
 		// Remove from kontrolClient's watcher list.
-		w.kontrolClient.watchersMutex.Lock()
-		w.kontrolClient.watchers.Remove(w.elem)
-		w.kontrolClient.watchersMutex.Unlock()
+		w.localKite.kontrol.watchersMutex.Lock()
+		w.localKite.kontrol.watchers.Remove(w.elem)
+		w.localKite.kontrol.watchersMutex.Unlock()
 	}
 
 	return err
@@ -60,7 +60,7 @@ func (w *Watcher) rewatch() error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	id, err := w.kontrolClient.watchKites(*w.query, w.handler)
+	id, err := w.localKite.watchKites(*w.query, w.handler)
 	if err != nil {
 		return err
 	}

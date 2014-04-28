@@ -16,16 +16,16 @@ const (
 // TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
 	client           *Client
-	kontrolClient    *KontrolClient
+	localKite        *Kite
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
 }
 
-func NewTokenRenewer(r *Client, kon *KontrolClient) (*TokenRenewer, error) {
+func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 	t := &TokenRenewer{
 		client:           r,
-		kontrolClient:    kon,
+		localKite:        k,
 		signalRenewToken: make(chan struct{}, 1),
 		disconnect:       make(chan struct{}),
 	}
@@ -34,7 +34,7 @@ func NewTokenRenewer(r *Client, kon *KontrolClient) (*TokenRenewer, error) {
 
 // parse the token string and set
 func (t *TokenRenewer) parse(tokenString string) error {
-	token, err := jwt.Parse(tokenString, t.client.LocalKite.RSAKey)
+	token, err := jwt.Parse(tokenString, t.localKite.RSAKey)
 	if err != nil {
 		return fmt.Errorf("Cannot parse token: %s", err.Error())
 	}
@@ -63,7 +63,7 @@ func (t *TokenRenewer) renewLoop() {
 		select {
 		case <-t.signalRenewToken:
 			if err := t.renewToken(); err != nil {
-				t.kontrolClient.LocalKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
+				t.localKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
 				// Need to sleep here litle bit because a signal is sent
 				// when an expired token is detected on incoming request.
 				// This sleep prevents the signal from coming too fast.
@@ -94,7 +94,7 @@ func (t *TokenRenewer) sendRenewTokenSignal() {
 
 // renewToken gets a new token from a kontrolClient, parses it and sets it as the token.
 func (t *TokenRenewer) renewToken() error {
-	tokenString, err := t.kontrolClient.GetToken(&t.client.Kite)
+	tokenString, err := t.localKite.GetToken(&t.client.Kite)
 	if err != nil {
 		return err
 	}
