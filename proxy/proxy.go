@@ -14,7 +14,6 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/registration"
 )
 
@@ -130,8 +129,7 @@ func (p *Proxy) listenAndServe() error {
 	}
 
 	if p.RegisterToKontrol {
-		kon := kontrolclient.New(p.Kite)
-		reg := registration.New(kon)
+		reg := registration.New(k)
 		connected, err := kon.DialForever()
 		if err != nil {
 			p.Kite.Log.Fatal("Cannot connect to kontrol: %s", err.Error())

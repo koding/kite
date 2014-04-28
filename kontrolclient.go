@@ -91,22 +91,22 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 // This method does not handle the reconnection case. If you want to keep
 // registered to kontrol, use kite/registration package.
 func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
-	if k.kontrol == nil {
+	if k.Kontrol == nil {
 		kontrolClient, err := k.newKontrolClient()
 		if err != nil {
 			return nil, err
 		}
 
-		k.kontrol = kontrolClient
+		k.Kontrol = kontrolClient
 	}
 
-	<-k.kontrol.ready
+	<-k.Kontrol.ready
 
 	args := protocol.RegisterArgs{
 		URL: kiteURL.String(),
 	}
 
-	response, err := k.kontrol.Tell("register", args)
+	response, err := k.Kontrol.Tell("register", args)
 	if err != nil {
 		return nil, err
 	}
@@ -130,16 +130,16 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
 func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
-	if k.kontrol == nil {
+	if k.Kontrol == nil {
 		kontrolClient, err := k.newKontrolClient()
 		if err != nil {
 			return nil, err
 		}
 
-		k.kontrol = kontrolClient
+		k.Kontrol = kontrolClient
 	}
 
-	<-k.kontrol.ready
+	<-k.Kontrol.ready
 
 	watcherID, err := k.watchKites(query, onEvent)
 	if err != nil {
@@ -199,13 +199,13 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
-	if k.kontrol == nil {
+	if k.Kontrol == nil {
 		kontrolClient, err := k.newKontrolClient()
 		if err != nil {
 			return nil, err
 		}
 
-		k.kontrol = kontrolClient
+		k.Kontrol = kontrolClient
 	}
 
 	clients, _, err := k.getKites(protocol.GetKitesArgs{Query: query})
@@ -222,9 +222,9 @@ func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
 
 // used internally for GetKites() and WatchKites()
 func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID string, err error) {
-	<-k.kontrol.ready
+	<-k.Kontrol.ready
 
-	response, err := k.kontrol.Tell("getKites", args)
+	response, err := k.Kontrol.Tell("getKites", args)
 	if err != nil {
 		return nil, "", err
 	}
@@ -274,18 +274,18 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 
 // GetToken is used to get a new token for a single Kite.
 func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
-	if k.kontrol == nil {
+	if k.Kontrol == nil {
 		kontrolClient, err := k.newKontrolClient()
 		if err != nil {
 			return "", err
 		}
 
-		k.kontrol = kontrolClient
+		k.Kontrol = kontrolClient
 	}
 
-	<-k.kontrol.ready
+	<-k.Kontrol.ready
 
-	result, err := k.kontrol.Tell("getToken", kite)
+	result, err := k.Kontrol.Tell("getToken", kite)
 	if err != nil {
 		return "", err
 	}

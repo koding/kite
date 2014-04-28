@@ -59,7 +59,7 @@ type Kite struct {
 
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
-	kontrol *KontrolClient
+	Kontrol *KontrolClient
 
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)
