@@ -6,7 +6,6 @@ import (
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrolclient"
 	"github.com/koding/kite/protocol"
 )
 
@@ -39,12 +38,7 @@ func (r *Query) Exec(args []string) error {
 	flags.StringVar(&query.ID, "id", "", "")
 	flags.Parse(args)
 
-	kontrol := kontrolclient.New(r.client)
-	if err := kontrol.Dial(); err != nil {
-		return err
-	}
-
-	result, err := kontrol.GetKites(query)
+	result, err := r.client.GetKites(query)
 	if err != nil {
 		return err
 	}
