@@ -54,13 +54,14 @@ func (k *Kite) Run() {
 func (k *Kite) Close() {
 	k.Log.Notice("Closing kite...")
 
+	if k.Kontrol != nil {
+		k.Kontrol.Close()
+	}
+
 	if k.listener != nil {
 		k.listener.Close()
 	}
 
-	if k.Kontrol != nil {
-		k.Kontrol.Close()
-	}
 }
 
 func (k *Kite) Addr() string {
