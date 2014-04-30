@@ -31,6 +31,7 @@ func main() {
 		peerAddr     = flag.String("peer-addr", "http://127.0.0.1:7001", "The public host:port used for peer communication.")
 		peerBindAddr = flag.String("peer-bind-addr", ":7001", "The listening host:port used for peer communication.")
 		peers        = flag.String("peers", "", "comma seperated peer addresses")
+		version      = flag.String("version", "0.0.1", "version of kontrol")
 	)
 
 	flag.Parse()
@@ -57,7 +58,7 @@ func main() {
 	conf.IP = *ip
 	conf.Port = *port
 
-	k := kontrol.New(conf, string(publicKey), string(privateKey))
+	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
 	k.EtcdAddr = *etcdAddr
 	k.EtcdBindAddr = *etcdBindAddr
 	k.PeerAddr = *peerAddr
@@ -69,7 +70,7 @@ func main() {
 			log.Fatalf("cannot load TLS certificate: %s", err.Error())
 		}
 
-		k.Server.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+		k.Kite.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
 
 	if *name != "" {
