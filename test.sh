@@ -16,6 +16,10 @@ do
      esac
 done
 
+echo '-- Building all packages --\n'
+go build -v ./...
+
+echo '\n-- Testing all packages -- \n'
 go test $VERBOSE ./dnode
 go test $VERBOSE ./cmd/cli
 go test $VERBOSE ./systeminfo
