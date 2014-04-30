@@ -33,6 +33,7 @@ func TestSimple(t *testing.T) {
 
 	s := New("hello", "1.0.0")
 	s.HandleFunc("hello", hello)
+	s.Config = conf.Copy()
 	s.Start()
 
 	<-s.Registration.ReadyNotify()

@@ -33,21 +33,21 @@ func New(name, version string) *Simple {
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
 func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
-	s.HandleFunc(method, handler)
+	s.Kite.HandleFunc(method, handler)
 }
 
 func (s *Simple) Start() {
 	s.Log.Info("Kite has started: %s", s.Kite.Kite())
-	s.Start()
+	s.Kite.Start()
 	go s.Registration.RegisterToProxyAndKontrol()
 }
 
 func (s *Simple) Run() {
-	s.Start()
+	s.Kite.Start()
 	<-s.CloseNotify()
 }
 
 func (s *Simple) Close() {
 	s.Kontrol.Close()
-	s.Close()
+	s.Kite.Close()
 }
