@@ -16,6 +16,7 @@ func main() {
 		ip             = flag.String("ip", "0.0.0.0", "")
 		port           = flag.Int("port", 3999, "")
 		publicHost     = flag.String("public-host", "127.0.0.1:3999", "")
+		version        = flag.String("version", "0.0.1", "")
 	)
 
 	flag.Parse()
@@ -42,7 +43,7 @@ func main() {
 	conf.IP = *ip
 	conf.Port = *port
 
-	p := proxy.New(conf, string(publicKey), string(privateKey))
+	p := proxy.New(conf, *version, string(publicKey), string(privateKey))
 	p.PublicHost = *publicHost
 
 	p.Run()

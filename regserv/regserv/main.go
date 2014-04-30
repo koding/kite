@@ -26,6 +26,7 @@ func main() {
 		kontrolURL     = flag.String("kontrol-url", "", "")
 		publicKeyFile  = flag.String("public-key", "", "")
 		privateKeyFile = flag.String("private-key", "", "")
+		version        = flag.String("version", "0.0.1", "")
 	)
 
 	flag.Parse()
@@ -62,7 +63,7 @@ func main() {
 		}
 		conf.KontrolURL = parsed
 
-		s := regserv.New(conf, string(publicKey), string(privateKey))
+		s := regserv.New(conf, *version, string(publicKey), string(privateKey))
 		err = s.RegisterSelf()
 		if err != nil {
 			log.Fatal(err)
@@ -82,12 +83,12 @@ func main() {
 	conf.IP = *ip
 	conf.Port = *port
 
-	s := regserv.New(conf, string(publicKey), string(privateKey))
+	s := regserv.New(conf, *version, string(publicKey), string(privateKey))
 
 	// Request must not be authenticated because clients do not have a
 	// kite.key before they register. We will authenticate them in
 	// "register" method handler.
-	s.Server.Config.DisableAuthentication = true
+	s.Kite.Config.DisableAuthentication = true
 
 	s.Run()
 }
