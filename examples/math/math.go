@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/koding/kite"
-	"github.com/koding/kite/server"
 )
 
 func main() {
@@ -18,9 +17,8 @@ func main() {
 	k.HandleFunc("square", Square)
 
 	// Attach to a server and run it
-	s := server.New(k)
-	s.Config.Port = 3636
-	s.Run()
+	k.Config.Port = 3636
+	k.Run()
 }
 
 func Square(r *kite.Request) (interface{}, error) {
