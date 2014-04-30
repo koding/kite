@@ -29,6 +29,32 @@ func init() {
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
+
+}
+
+func TestRegister(t *testing.T) {
+	t.Log("Setting up kontrol")
+	kon := New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
+	kon.DataDir, _ = ioutil.TempDir("", "")
+	defer os.RemoveAll(kon.DataDir)
+	defer kon.Close()
+	kon.Start()
+
+	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
+
+	t.Log("Setting up mathworker")
+	m := kite.New("mathworker", "1.1.1")
+	m.Config = conf.Copy()
+
+	t.Log("Registering mathworker")
+	res, err := m.Register(kiteURL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if kiteURL.String() != res.URL.String() {
+		t.Error("register: got %s expected %s", res.URL.String(), kiteURL.String())
+	}
 }
 
 func TestKontrol(t *testing.T) {
