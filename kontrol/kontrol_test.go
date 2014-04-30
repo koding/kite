@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +36,62 @@ func init() {
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
+}
+
+func TestMultiple(t *testing.T) {
+	prepareKite := func(name, version string) func() {
+		m := kite.New(name, version)
+		m.Config = conf.Copy()
+
+		kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
+		_, err := m.Register(kiteURL)
+		if err != nil {
+			t.Error(err)
+		}
+
+		return func() { m.Close() }
+	}
+
+	t.Log("Creating 100 example kites")
+	for i := 0; i < 100; i++ {
+		cls := prepareKite("example", "0.1."+strconv.Itoa(i))
+		defer cls() // close them later
+	}
+
+	query := protocol.KontrolQuery{
+		Username:    conf.Username,
+		Environment: conf.Environment,
+		Name:        "example",
+	}
+
+	t.Log("Querying for example kites")
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
+			exp.Config = conf.Copy()
+			kites, err := exp.GetKites(query)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(kites) == 0 {
+				t.Fatal("no example kites available")
+			}
+
+			if len(kites) != 100 {
+				t.Fatal("expecting 100 kites, got %d", len(kites))
+			}
+		}(i)
+	}
+
+	t.Log("waiting until all getKites calls are finished")
+	wg.Wait()
 }
 
 func TestGetKites(t *testing.T) {
