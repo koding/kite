@@ -128,6 +128,12 @@ func (k *Kontrol) Start() {
 	k.Kite.Start()
 }
 
+// Close stops kontrol and closes all connections
+func (k *Kontrol) Close() {
+	k.Kite.Close()
+	k.etcd.Stop()
+}
+
 // init does common operations of Run() and Start().
 func (k *Kontrol) init() {
 	rand.Seed(time.Now().UnixNano())
