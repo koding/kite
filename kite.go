@@ -4,8 +4,10 @@
 package kite
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -69,6 +71,12 @@ type Kite struct {
 
 	// Handlers to call when a client has disconnected.
 	onDisconnectHandlers []func(*Client)
+
+	// server fields, are initialized and used when
+	listener  net.Listener
+	TLSConfig *tls.Config
+	readyC    chan bool // To signal when kite is ready to accept connections
+	closeC    chan bool // To signal when kite is closed with Close()
 
 	name    string
 	version string
