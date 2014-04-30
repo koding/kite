@@ -6,13 +6,11 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/registration"
-	"github.com/koding/kite/server"
 )
 
 // simple kite server
 type Simple struct {
-	*server.Server
-	LocalKite    *kite.Kite
+	*kite.Kite
 	Registration *registration.Registration
 }
 
@@ -25,12 +23,8 @@ func New(name, version string) *Simple {
 	}
 
 	k.Config = conf
-
-	server := server.New(k)
-
 	s := &Simple{
-		Server:       server,
-		LocalKite:    k,
+		Kite:         k,
 		Registration: registration.New(k),
 	}
 
@@ -39,21 +33,21 @@ func New(name, version string) *Simple {
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
 func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
-	s.Server.Kite.HandleFunc(method, handler)
+	s.HandleFunc(method, handler)
 }
 
 func (s *Simple) Start() {
 	s.Log.Info("Kite has started: %s", s.Kite.Kite())
-	s.Server.Start()
+	s.Start()
 	go s.Registration.RegisterToProxyAndKontrol()
 }
 
 func (s *Simple) Run() {
 	s.Start()
-	<-s.Server.CloseNotify()
+	<-s.CloseNotify()
 }
 
 func (s *Simple) Close() {
-	s.LocalKite.Kontrol.Close()
-	s.Server.Close()
+	s.Kontrol.Close()
+	s.Close()
 }

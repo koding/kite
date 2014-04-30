@@ -21,7 +21,6 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/server"
 	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
 )
@@ -39,7 +38,7 @@ const (
 var log logging.Logger
 
 type Kontrol struct {
-	Server *server.Server
+	Kite *kite.Kite
 
 	// etcd options
 	Name         string   // Name of the etcd instance
@@ -85,7 +84,7 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 	hostname := k.Kite().Hostname
 
 	kontrol := &Kontrol{
-		Server:       server.New(k),
+		Kite:         k,
 		Name:         hostname,
 		DataDir:      "kontrol-data." + hostname,
 		EtcdAddr:     "http://localhost:4001",
@@ -114,17 +113,17 @@ func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
 }
 
 func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error) {
-	k.Server.Kite.Authenticators[keyType] = fn
+	k.Kite.Authenticators[keyType] = fn
 }
 
 func (k *Kontrol) Run() {
 	k.init()
-	k.Server.Run()
+	k.Kite.Run()
 }
 
 func (k *Kontrol) Start() {
 	k.init()
-	k.Server.Start()
+	k.Kite.Start()
 }
 
 // init does common operations of Run() and Start().
@@ -253,9 +252,9 @@ func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 // registerSelf adds Kontrol itself to etcd as a kite.
 func (k *Kontrol) registerSelf() {
 	value := &registerValue{
-		URL: &protocol.KiteURL{*k.Server.Config.KontrolURL},
+		URL: &protocol.KiteURL{*k.Kite.Config.KontrolURL},
 	}
-	setter, _ := k.makeSetter(k.Server.Kite.Kite(), value)
+	setter, _ := k.makeSetter(k.Kite.Kite(), value)
 	for {
 		if err := setter(); err != nil {
 			log.Error(err.Error())
@@ -419,7 +418,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		if whoClient == nil {
 			// TODO Enable code below after fix.
 			return nil, errors.New("target kite is not connected")
-			// whoClient = k.Server.Kite.NewClientString(whoKite.URL)
+			// whoClient = k.Kite.NewClientString(whoKite.URL)
 			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
 			// whoClient.Kite = whoKite.Kite
 
@@ -477,7 +476,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 	// Generate token once here because we are using the same token for every
 	// kite we return and generating many tokens is really slow.
-	token, err := generateToken(audience, r.Username, k.Server.Kite.Kite().Username, k.privateKey)
+	token, err := generateToken(audience, r.Username, k.Kite.Kite().Username, k.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -845,5 +844,5 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return generateToken(kiteKey, r.Username, k.Server.Kite.Kite().Username, k.privateKey)
+	return generateToken(kiteKey, r.Username, k.Kite.Kite().Username, k.privateKey)
 }

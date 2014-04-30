@@ -12,7 +12,7 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
-	"github.com/koding/kite/simple"
+	"github.com/koding/kite/registration"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -33,26 +33,32 @@ func init() {
 
 func TestKontrol(t *testing.T) {
 	// Start kontrol
+	t.Log("Setting up kontrol")
 	kon := New(conf.Copy(), testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 
 	// Start proxy
+	t.Log("Setting up proxy")
 	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	time.Sleep(1e9)
 
 	// Start mathworker
-	mathKite := simple.New("mathworker", "1.2.3")
+	t.Log("Setting up mathworker")
+	mathKite := kite.New("mathworker", "1.2.3")
 	mathKite.Config = conf.Copy()
 	mathKite.HandleFunc("square", Square)
 	mathKite.Start()
 
-	<-mathKite.Registration.ReadyNotify()
+	reg := registration.New(mathKite)
+	go reg.RegisterToProxyAndKontrol()
+	<-reg.ReadyNotify()
 
 	// exp2 kite is the mathworker client
+	t.Log("Setting up exp2 kite")
 	exp2Kite := kite.New("exp2", "0.0.1")
 	exp2Kite.Config = conf.Copy()
 
@@ -64,6 +70,7 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// exp2 queries for mathkite
+	t.Log("Querying for mathworkers")
 	kites, err := exp2Kite.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +115,7 @@ func TestKontrol(t *testing.T) {
 	events := make(chan *kite.Event, 3)
 
 	// Test WatchKites
+	t.Log("calling  watchkites")
 	watcher, err := exp2Kite.WatchKites(query, func(e *kite.Event, err *kite.Error) {
 		if err != nil {
 			t.Fatal(err)
@@ -130,6 +138,7 @@ func TestKontrol(t *testing.T) {
 		t.Fatal("timeout")
 	}
 
+	t.Log("closing mathworker")
 	mathKite.Close()
 
 	// We must get Deregister event
@@ -143,9 +152,14 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// Start a new mathworker kite
-	mathKite2 := simple.New("mathworker", "1.2.3")
+	t.Log("Setting up mathworker2")
+	mathKite2 := kite.New("mathworker", "1.2.3")
 	mathKite2.Config = conf.Copy()
 	mathKite2.Start()
+
+	reg2 := registration.New(mathKite2)
+	go reg2.RegisterToProxyAndKontrol()
+	<-reg2.ReadyNotify()
 
 	// We must get Register event
 	select {

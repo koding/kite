@@ -110,6 +110,8 @@ func New(name, version string) *Kite {
 		name:               name,
 		version:            version,
 		id:                 kiteID.String(),
+		readyC:             make(chan bool),
+		closeC:             make(chan bool),
 	}
 
 	k.server.Handler = k.handleWS
