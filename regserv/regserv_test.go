@@ -10,7 +10,7 @@ import (
 )
 
 func TestRegister(t *testing.T) {
-	regserv := New(testutil.NewConfig(), testkeys.Public, testkeys.Private)
+	regserv := New(testutil.NewConfig(), "0.0.1", testkeys.Public, testkeys.Private)
 
 	key, err := regserv.register("foo")
 	if err != nil {

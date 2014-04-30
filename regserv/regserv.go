@@ -15,7 +15,9 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
-const Version = "0.0.2"
+const (
+	RegservVersion = "0.0.2"
+)
 
 // RegServ is a registration kite. Users can register their machines by
 // running "kite register" command.
@@ -26,8 +28,8 @@ type RegServ struct {
 	privateKey   string
 }
 
-func New(conf *config.Config, pubKey, privKey string) *RegServ {
-	k := kite.New("regserv", Version)
+func New(conf *config.Config, version, pubKey, privKey string) *RegServ {
+	k := kite.New("regserv", version)
 	k.Config = conf
 	r := &RegServ{
 		Kite:       k,

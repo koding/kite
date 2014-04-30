@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	Version           = "0.0.4"
+	KontrolVersion    = "0.0.4"
 	DefaultPort       = 4000
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
@@ -63,7 +63,9 @@ type Kontrol struct {
 	etcd *etcd.Etcd
 }
 
-// New creates a new kontrol.
+// New creates a new kontrol instance with the given verson and config
+// instance. Publickey is used for validating tokens and privateKey is used for
+// signing tokens.
 //
 // peers can be given nil if not running on cluster.
 //
@@ -72,8 +74,8 @@ type Kontrol struct {
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
-func New(conf *config.Config, publicKey, privateKey string) *Kontrol {
-	k := kite.New("kontrol", Version)
+func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
+	k := kite.New("kontrol", version)
 	k.Config = conf
 
 	// Listen on 4000 by default

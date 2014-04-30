@@ -34,14 +34,14 @@ func init() {
 func TestKontrol(t *testing.T) {
 	// Start kontrol
 	t.Log("Setting up kontrol")
-	kon := New(conf.Copy(), testkeys.Public, testkeys.Private)
+	kon := New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 
 	// Start proxy
 	t.Log("Setting up proxy")
-	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	prx := proxy.New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	time.Sleep(1e9)

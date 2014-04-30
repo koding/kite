@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	Version           = "0.0.2"
+	ProxyVersion      = "0.0.2"
 	DefaultPort       = 3999
 	DefaultPublicHost = "localhost:3999"
 )
@@ -49,8 +49,8 @@ type Proxy struct {
 	url *url.URL
 }
 
-func New(conf *config.Config, pubKey, privKey string) *Proxy {
-	k := kite.New("proxy", Version)
+func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
+	k := kite.New("proxy", version)
 	k.Config = conf
 
 	// Listen on 3999 by default

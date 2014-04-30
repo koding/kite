@@ -22,13 +22,13 @@ func TestSimple(t *testing.T) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	kon := kontrol.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
 	kon.ClearKites()
 
-	prx := proxy.New(conf.Copy(), testkeys.Public, testkeys.Private)
+	prx := proxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	s := New("hello", "1.0.0")
