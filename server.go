@@ -53,8 +53,14 @@ func (k *Kite) Run() {
 // Close stops the server and the kontrol client instance.
 func (k *Kite) Close() {
 	k.Log.Notice("Closing kite...")
-	k.listener.Close()
-	k.Kontrol.Close()
+
+	if k.listener != nil {
+		k.listener.Close()
+	}
+
+	if k.Kontrol != nil {
+		k.Kontrol.Close()
+	}
 }
 
 func (k *Kite) Addr() string {
