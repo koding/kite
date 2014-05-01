@@ -3,6 +3,7 @@ package kontrol
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/url"
 	"os"
 	"strconv"
@@ -36,48 +37,27 @@ func init() {
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
 	kon.Start()
-}
 
-func BenchmarkGetKites(b *testing.B) {
-	prepareKite := func(name, version string) func() {
-		m := kite.New(name, version)
-		m.Config = conf.Copy()
-
-		kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
-		_, err := m.Register(kiteURL)
-		if err != nil {
-			b.Error(err)
-		}
-
-		return func() { m.Close() }
-	}
-
-	for i := 0; i < 100; i++ {
-		cls := prepareKite("example", "0.1."+strconv.Itoa(i))
-		defer cls() // close them later
-	}
-
-	query := protocol.KontrolQuery{
-		Username:    conf.Username,
-		Environment: conf.Environment,
-		Name:        "example",
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
-		exp.Config = conf.Copy()
-		_, err := exp.GetKites(query)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+	rand.Seed(time.Now().UTC().UnixNano())
 }
 
 func TestMultiple(t *testing.T) {
-	prepareKite := func(name, version string) func() {
-		m := kite.New(name, version)
+	testDuration := time.Second * 10
+
+	// number of available example kites to be queried
+	kiteNumber := 50
+
+	// number of clients that will query example kites
+	clientNumber := 100
+
+	// number of kites that will be queried. Means if there are 50 example
+	// kites available only 10 of them will be queried. Increasing this number
+	// makes the test fail.
+	queryNumber := 1
+
+	fmt.Printf("Creating %d example kites\n", kiteNumber)
+	for i := 0; i < kiteNumber; i++ {
+		m := kite.New("example"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
 		m.Config = conf.Copy()
 
 		kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
@@ -85,57 +65,59 @@ func TestMultiple(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-
-		return func() { m.Close() }
+		defer m.Close()
 	}
 
-	fmt.Println("Creating 100 example kites")
-	for i := 0; i < 100; i++ {
-		// cls := prepareKite("example"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
-		cls := prepareKite("example", "0.1."+strconv.Itoa(i))
-		defer cls() // close them later
-	}
-
-	n := 100 // increasing the number makes the test fail
-	fmt.Printf("Querying for example kites with %d conccurent clients\n", n)
-
-	// setup up clients earlier
-	clients := make([]*kite.Kite, n)
-	for i := 0; i < n; i++ {
-		exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
-		exp.Config = conf.Copy()
-		// exp.Config.Username = conf.Username + strconv.Itoa(i)
-		clients[i] = exp
-	}
-
-	query := protocol.KontrolQuery{
-		Username:    conf.Username,
-		Environment: conf.Environment,
-		Name:        "example",
+	fmt.Printf("Creating %d clients\n", clientNumber)
+	clients := make([]*kite.Kite, clientNumber)
+	for i := 0; i < clientNumber; i++ {
+		c := kite.New("client"+strconv.Itoa(i), "0.0.1")
+		c.Config = conf.Copy()
+		c.SetupKontrolClient()
+		clients[i] = c
 	}
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			start := time.Now()
+	fmt.Printf("Querying for example kites with %d conccurent clients randomly\n", clientNumber)
+	timeout := time.After(testDuration)
 
-			_, err := clients[i].GetKites(query)
+	// every one second
+	for {
+		select {
+		case <-time.Tick(time.Second):
+			for i := 0; i < clientNumber; i++ {
+				wg.Add(1)
 
-			elapsedTime := time.Since(start)
-			end := time.Now()
+				go func(i int) {
+					defer wg.Done()
 
-			if err != nil {
-				t.Errorf("[%d] aborted at %s (elapsed %f sec) err: %s\n",
-					i, end.Format(time.StampMilli), elapsedTime.Seconds(), err)
-			} else {
-				fmt.Printf("[%d] finished at %s (elapsed %f sec)\n",
-					i, end.Format(time.StampMilli), elapsedTime.Seconds())
+					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
+					query := protocol.KontrolQuery{
+						Username:    conf.Username,
+						Environment: conf.Environment,
+						Name:        "example" + strconv.Itoa(rand.Intn(queryNumber)),
+					}
+
+					start := time.Now()
+					_, err := clients[i].GetKites(query)
+					elapsedTime := time.Since(start)
+					if err != nil {
+						// we don't fail here otherwise pprof can't gather information
+						fmt.Printf("[%d] aborted, elapsed %f sec err: %s\n",
+							i, elapsedTime.Seconds(), err)
+					} else {
+						fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
+
+					}
+				}(i)
 			}
-		}(i)
+		case <-timeout:
+			fmt.Println("test stopped")
+			t.SkipNow()
+		}
+
 	}
 
 	wg.Wait()
