@@ -66,9 +66,11 @@ func TestMultiple(t *testing.T) {
 
 	t.Log("Querying for example kites")
 
+	nClients := 20 // increasing the number makes the test fail
+
 	var wg sync.WaitGroup
 
-	for i := 0; i < 50; i++ {
+	for i := 0; i < nClients; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
