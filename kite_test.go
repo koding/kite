@@ -1,13 +1,93 @@
 package kite
 
 import (
+	"fmt"
+	"math/rand"
 	"net/http"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/koding/kite/dnode"
 	_ "github.com/koding/kite/testutil"
 )
+
+func TestMultiple(t *testing.T) {
+	testDuration := time.Second * 5
+
+	// number of available mathworker kites to be called
+	kiteNumber := 100
+
+	// number of exp kites that will call mathwork kites
+	clientNumber := 100
+
+	// ports are startinf from 6000 up to 6000 + kiteNumber
+	port := 6000
+
+	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)
+	for i := 0; i < kiteNumber; i++ {
+		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
+
+		m.HandleFunc("square", Square)
+		m.Config.DisableAuthentication = true
+
+		go http.ListenAndServe("127.0.0.1:"+strconv.Itoa(port+i), m)
+	}
+
+	// Wait until it's started
+	time.Sleep(time.Second * 2)
+
+	fmt.Printf("Creating %d exp clients\n", clientNumber)
+	clients := make([]*Client, clientNumber)
+	for i := 0; i < clientNumber; i++ {
+		c := New("exp"+strconv.Itoa(i), "0.0.1").NewClientString("ws://127.0.0.1:" + strconv.Itoa(port+i))
+		if err := c.Dial(); err != nil {
+			t.Fatal(err)
+		}
+
+		clients[i] = c
+	}
+
+	var wg sync.WaitGroup
+
+	fmt.Printf("Calling mathworker kites with %d conccurent clients randomly\n", clientNumber)
+	timeout := time.After(testDuration)
+
+	// every one second
+	for {
+		select {
+		case <-time.Tick(time.Second):
+			for i := 0; i < clientNumber; i++ {
+				wg.Add(1)
+
+				go func(i int) {
+					defer wg.Done()
+					start := time.Now()
+
+					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
+
+					result, err := clients[i].Tell("square", 2)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					elapsedTime := time.Since(start)
+
+					number := result.MustFloat64()
+
+					fmt.Printf("rpc result: %f elapsedTime %f sec\n", number, elapsedTime.Seconds())
+				}(i)
+			}
+		case <-timeout:
+			fmt.Println("test stopped")
+			t.SkipNow()
+		}
+
+	}
+
+	wg.Wait()
+}
 
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
