@@ -35,7 +35,12 @@ const (
 	TokenLeeway       = 1 * time.Minute
 )
 
-var log logging.Logger
+var (
+	log logging.Logger
+
+	tokenCache   = make(map[string]string)
+	tokenCacheMu sync.Mutex
+)
 
 type Kontrol struct {
 	Kite *kite.Kite
@@ -540,6 +545,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		true,  // recursive, return all child directories too
 		false, // sorting flag, we don't care about sorting for now
 	)
+
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			result.Kites = make([]*protocol.KiteWithToken, 0) // do not send null
@@ -554,6 +560,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	nodes := flatten(event.Node.Nodes)
 
 	// Convert etcd nodes to kites.
+
 	kites := make([]*protocol.KiteWithToken, len(nodes))
 	for i, n := range nodes {
 		kites[i], err = kiteWithTokenFromEtcdNode(n, token)
@@ -771,7 +778,16 @@ func kiteWithTokenFromEtcdNode(node *store.NodeExtern, token string) (*protocol.
 
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(queryKey string, username, issuer, privateKey string) (string, error) {
+func generateToken(queryKey, username, issuer, privateKey string) (string, error) {
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+
+	uniqKey := queryKey + username + issuer // neglect privateKey, its always the same
+	signed, ok := tokenCache[uniqKey]
+	if ok {
+		return signed, nil
+	}
+
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
@@ -794,11 +810,12 @@ func generateToken(queryKey string, username, issuer, privateKey string) (string
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
 	tkn.Claims["jti"] = tknID.String()                               // JWT ID
 
-	signed, err := tkn.SignedString([]byte(privateKey))
+	signed, err = tkn.SignedString([]byte(privateKey))
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
 
+	tokenCache[uniqKey] = signed
 	return signed, nil
 }
 

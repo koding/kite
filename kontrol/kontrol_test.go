@@ -38,6 +38,43 @@ func init() {
 	kon.Start()
 }
 
+func BenchmarkGetKites(b *testing.B) {
+	prepareKite := func(name, version string) func() {
+		m := kite.New(name, version)
+		m.Config = conf.Copy()
+
+		kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
+		_, err := m.Register(kiteURL)
+		if err != nil {
+			b.Error(err)
+		}
+
+		return func() { m.Close() }
+	}
+
+	for i := 0; i < 100; i++ {
+		cls := prepareKite("example", "0.1."+strconv.Itoa(i))
+		defer cls() // close them later
+	}
+
+	query := protocol.KontrolQuery{
+		Username:    conf.Username,
+		Environment: conf.Environment,
+		Name:        "example",
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
+		exp.Config = conf.Copy()
+		_, err := exp.GetKites(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestMultiple(t *testing.T) {
 	prepareKite := func(name, version string) func() {
 		m := kite.New(name, version)
@@ -52,10 +89,23 @@ func TestMultiple(t *testing.T) {
 		return func() { m.Close() }
 	}
 
-	t.Log("Creating 100 example kites")
+	fmt.Println("Creating 100 example kites")
 	for i := 0; i < 100; i++ {
+		// cls := prepareKite("example"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
 		cls := prepareKite("example", "0.1."+strconv.Itoa(i))
 		defer cls() // close them later
+	}
+
+	n := 100 // increasing the number makes the test fail
+	fmt.Printf("Querying for example kites with %d conccurent clients\n", n)
+
+	// setup up clients earlier
+	clients := make([]*kite.Kite, n)
+	for i := 0; i < n; i++ {
+		exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
+		exp.Config = conf.Copy()
+		// exp.Config.Username = conf.Username + strconv.Itoa(i)
+		clients[i] = exp
 	}
 
 	query := protocol.KontrolQuery{
@@ -64,35 +114,30 @@ func TestMultiple(t *testing.T) {
 		Name:        "example",
 	}
 
-	t.Log("Querying for example kites")
-
-	nClients := 20 // increasing the number makes the test fail
-
 	var wg sync.WaitGroup
 
-	for i := 0; i < nClients; i++ {
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			start := time.Now()
 
-			exp := kite.New("exp"+strconv.Itoa(i), "0.0.1")
-			exp.Config = conf.Copy()
-			kites, err := exp.GetKites(query)
+			_, err := clients[i].GetKites(query)
+
+			elapsedTime := time.Since(start)
+			end := time.Now()
+
 			if err != nil {
-				t.Fatal(err)
-			}
+				t.Errorf("[%d] aborted at %s (elapsed %f sec) err: %s\n",
+					i, end.Format(time.StampMilli), elapsedTime.Seconds(), err)
+			} else {
+				fmt.Printf("[%d] finished at %s (elapsed %f sec)\n",
+					i, end.Format(time.StampMilli), elapsedTime.Seconds())
 
-			if len(kites) == 0 {
-				t.Fatal("no example kites available")
-			}
-
-			if len(kites) != 100 {
-				t.Fatal("expecting 100 kites, got %d", len(kites))
 			}
 		}(i)
 	}
 
-	t.Log("waiting until all getKites calls are finished")
 	wg.Wait()
 }
 
