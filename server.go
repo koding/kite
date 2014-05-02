@@ -43,7 +43,7 @@ func (k *Kite) Run() {
 	if err != nil {
 		if strings.Contains(err.Error(), errClosing) {
 			// The server is closed by Close() method
-			k.Log.Notice("Kite server is closed.")
+			k.Log.Info("Kite server is closed.")
 			return
 		}
 		k.Log.Fatal(err.Error())
@@ -52,7 +52,7 @@ func (k *Kite) Run() {
 
 // Close stops the server and the kontrol client instance.
 func (k *Kite) Close() {
-	k.Log.Notice("Closing kite...")
+	k.Log.Info("Closing kite...")
 
 	if k.Kontrol != nil {
 		k.Kontrol.Close()
@@ -77,7 +77,7 @@ func (k *Kite) listenAndServe() error {
 		return err
 	}
 
-	k.Log.Notice("Listening: %s", k.listener.Addr().String())
+	k.Log.Info("Listening: %s", k.listener.Addr().String())
 
 	if k.TLSConfig != nil {
 		if k.TLSConfig.NextProtos == nil {

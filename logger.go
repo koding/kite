@@ -1,14 +1,17 @@
 package kite
 
 import (
-	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/koding/logging"
 )
 
 type Level int
+
+var debugMode bool
 
 // Logging levels.
 const (
@@ -21,19 +24,26 @@ const (
 
 // Logger is the interface used to log messages in different levels.
 type Logger interface {
+	// Fatal logs to the FATAL, ERROR, WARNING, INFO and DEBUG levels,
+	// including a stack trace of all running goroutines, then calls
+	// os.Exit(1).
 	Fatal(format string, args ...interface{})
+
+	// Error logs to the ERROR, WARNING, INFO and DEBUG level.
 	Error(format string, args ...interface{})
+
+	// Warning logs to the WARNING, INFO and DEBUG level.
 	Warning(format string, args ...interface{})
+
+	// Info logs to the INFO and DEBUG level.
 	Info(format string, args ...interface{})
+
+	// Debug logs to the DEBUG level.
 	Debug(format string, args ...interface{})
 }
 
-func newLogger() Logger {
-	return log.New(os.Stderr, "kite", log.LstdFlags)
-}
-
 // getLogLevel returns the logging level defined via the KITE_LOG_LEVEL
-// environment. It returns logging.Info by default if no environment variable
+// environment. It returns Info by default if no environment variable
 // is set.
 func getLogLevel() Level {
 	switch strings.ToUpper(os.Getenv("KITE_LOG_LEVEL")) {
@@ -44,16 +54,60 @@ func getLogLevel() Level {
 	case "ERROR":
 		return ERROR
 	case "FATAL":
-		return CRITICAL
+		return FATAL
 	default:
 		return INFO
 	}
 }
 
-// newLogger returns a new logger object for desired name and level.
-func newKodingLogger(name string) Logger {
-	logger := logging.NewLogger(name)
-	logger.SetLevel(getLogLevel())
+// convertLevel converst a kite level into logging level
+func convertLevel(l Level) logging.Level {
+	switch l {
+	case DEBUG:
+		return logging.DEBUG
+	case WARNING:
+		return logging.WARNING
+	case ERROR:
+		return logging.ERROR
+	case FATAL:
+		return logging.CRITICAL
+	default:
+		return logging.INFO
+	}
+}
 
-	return logger
+// newLogger returns a new logger object for desired name and level.
+func newLogger(name string) (Logger, func(Level)) {
+	logger := logging.NewLogger(name)
+	logger.SetLevel(convertLevel(getLogLevel()))
+
+	setLevel := func(l Level) {
+		logger.SetLevel(convertLevel(l))
+	}
+
+	return logger, setLevel
+}
+
+// SetupSignalHandler listens to signals and toggles the log level to DEBUG
+// mode when it received a SIGUSR2 signal. Another SIGUSR2 toggles the log
+// level back to the old level.
+func (k *Kite) SetupSignalHandler() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGUSR2)
+	go func() {
+		for s := range c {
+			k.Log.Info("Got signal: %s", s)
+
+			if debugMode {
+				// toogle back to old settings.
+				k.Log.Info("Disabling debug mode")
+				k.SetLogLevel(getLogLevel())
+				debugMode = false
+			} else {
+				k.Log.Info("Enabling debug mode")
+				k.SetLogLevel(DEBUG)
+				debugMode = true
+			}
+		}
+	}()
 }

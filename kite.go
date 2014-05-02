@@ -40,8 +40,11 @@ func init() {
 type Kite struct {
 	Config *config.Config
 
-	// Prints logging messages to stderr.
+	// Log logs with the given Logger interface
 	Log Logger
+
+	// SetLogLevel changes the level of the logger. Default is INFO.
+	SetLogLevel func(Level)
 
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.authentication.type).
@@ -99,9 +102,12 @@ func New(name, version string) *Kite {
 		panic(fmt.Sprintf("kite: cannot generate unique ID: %s", err.Error()))
 	}
 
+	l, setlevel := newLogger(name)
+
 	k := &Kite{
 		Config:             config.New(),
-		Log:                newLogger(name),
+		Log:                l,
+		SetLogLevel:        setlevel,
 		Authenticators:     make(map[string]func(*Request) error),
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]HandlerFunc),
