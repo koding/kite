@@ -533,7 +533,7 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 
 // Used to remove callbacks after error occurs in send().
 func (c *Client) removeCallbacks(callbacks map[string]dnode.Path) {
-	for sid, _ := range callbacks {
+	for sid := range callbacks {
 		// We don't check for error because we have created
 		// the callbacks map in the send function above.
 		// It does not come from remote, so cannot contain errors.
