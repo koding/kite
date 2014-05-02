@@ -1,4 +1,4 @@
-package registration_test
+package kite
 
 import (
 	"io/ioutil"

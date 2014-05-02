@@ -12,6 +12,13 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
+type kontrolEvent int
+
+const (
+	connected kontrolEvent = iota
+	disconnected
+)
+
 // Returned from GetKites when query matches no kites.
 var ErrNoKitesAvailable = errors.New("no kites availabile")
 
@@ -26,6 +33,9 @@ type KontrolClient struct {
 	// Watchers are saved here to re-watch on reconnect.
 	watchers      *list.List
 	watchersMutex sync.RWMutex
+
+	// events is used for reconnection logic
+	events chan kontrolEvent
 }
 
 // Event is the struct that is emitted from Kontrol.WatchKites method.
@@ -68,16 +78,21 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 		Key:  k.Config.KiteKey,
 	}
 
+	events := make(chan kontrolEvent)
+
 	kontrolClient := &KontrolClient{
 		Client:   client,
 		Ready:    make(chan struct{}),
 		watchers: list.New(),
+		events:   events,
 	}
 
 	var once sync.Once
 
 	kontrolClient.OnConnect(func() {
 		k.Log.Info("Connected to Kontrol ")
+
+		events <- connected
 
 		// signal all other methods that are listening on this channel, that we
 		// are ready.
@@ -92,6 +107,10 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 			}
 		}
 		kontrolClient.watchersMutex.RUnlock()
+	})
+
+	kontrolClient.OnDisconnect(func() {
+		events <- disconnect
 	})
 
 	// non blocking, is going to reconnect if the connection goes down.
@@ -330,4 +349,167 @@ func (e *Event) Client() *Client {
 		Key:  e.Token,
 	}
 	return r
+}
+
+// Register to Kontrol. This method is blocking.
+func (k *Kite) RegisterToKontrol(kiteURL *url.URL) {
+	urls := make(chan *url.URL, 1)
+	urls <- kiteURL
+
+	k.mainLoop(urls)
+}
+
+// Register to Proxy. This method is blocking.
+func (k *Kite) RegisterToProxy() {
+	k.keepRegisteredToProxyKite(nil)
+}
+
+// Register to Proxy, then Kontrol. This method is blocking.
+func (k *Kite) RegisterToProxyAndKontrol() {
+	urls := make(chan *url.URL, 1)
+
+	go k.keepRegisteredToProxyKite(urls)
+
+	k.mainLoop(urls)
+}
+
+func (k *Kite) mainLoop(urls chan *url.URL) {
+	var lastRegisteredURL *url.URL
+
+	for {
+		select {
+		case e := <-k.Kontrol.events:
+			switch e {
+			case Connect:
+				k.Log.Info("Connected to Kontrol.")
+				if lastRegisteredURL != nil {
+					select {
+					case urls <- lastRegisteredURL:
+					default:
+					}
+				}
+			case Disconnect:
+				k.Log.Warning("Disconnected from Kontrol.")
+			}
+		case u := <-urls:
+			if _, err := k.Register(u); err != nil {
+				k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
+					err, kontrolRetryDuration/time.Second)
+
+				time.AfterFunc(kontrolRetryDuration, func() {
+					select {
+					case urls <- u:
+					default:
+					}
+				})
+			} else {
+				lastRegisteredURL = u
+				k.signalReady()
+			}
+		}
+	}
+}
+
+// keepRegisteredToProxyKite finds a proxy kite by asking kontrol then registers
+// itselfs on proxy. On error, retries forever. On every successfull
+// registration, it sends the proxied URL to the urls channel. The caller must
+// receive from this channel and should register to the kontrol with that URL.
+// This function never returns.
+func (k *Kite) keepRegisteredToProxyKite(urls chan<- *url.URL) *url.URL {
+	query := protocol.KontrolQuery{
+		Username:    k.Config.KontrolUser,
+		Environment: k.Config.Environment,
+		Name:        "proxy",
+	}
+
+	for {
+		var proxyKite *kite.Client
+
+		// The proxy kite to connect can be overriden with the
+		// environmental variable "KITE_PROXY_URL". If it is not set
+		// we will ask Kontrol for available Proxy kites.
+		// As an authentication informain kiteKey method will be used,
+		// so be careful when using this feature.
+		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
+		if kiteProxyURL != "" {
+			proxyKite = k.NewClientString(kiteProxyURL)
+			proxyKite.Authentication = &kite.Authentication{
+				Type: "kiteKey",
+				Key:  k.Config.KiteKey,
+			}
+		} else {
+			kites, err := k.GetKites(query)
+			if err != nil {
+				k.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
+				time.Sleep(proxyRetryDuration)
+				continue
+			}
+
+			// If more than one one Proxy Kite is available pick one randomly.
+			// It does not matter which one we connect.
+			proxyKite = kites[rand.Int()%len(kites)]
+		}
+
+		// Notify us on disconnect
+		disconnect := make(chan bool, 1)
+		proxyKite.OnDisconnect(func() {
+			select {
+			case disconnect <- true:
+			default:
+			}
+		})
+
+		proxyURL, err := k.registerToProxyKite(proxyKite)
+		if err != nil {
+			time.Sleep(proxyRetryDuration)
+			continue
+		}
+
+		if urls != nil {
+			urls <- proxyURL
+		} else {
+			return proxyURL
+			k.signalReady()
+		}
+
+		// Block until disconnect from Proxy Kite.
+		<-disconnect
+	}
+}
+
+// registerToProxyKite dials the proxy kite and calls register method then
+// returns the reverse-proxy URL.
+func (k *Kite) registerToProxyKite(c *Client) (*url.URL, error) {
+	err := c.Dial()
+	if err != nil {
+		k.Log.Error("Cannot connect to Proxy kite: %s", err.Error())
+		return nil, err
+	}
+
+	// Disconnect from Proxy Kite if error happens while registering.
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
+
+	result, err := c.Tell("register")
+	if err != nil {
+		k.Log.Error("Proxy register error: %s", err.Error())
+		return nil, err
+	}
+
+	proxyURL, err := result.String()
+	if err != nil {
+		k.Log.Error("Proxy register result error: %s", err.Error())
+		return nil, err
+	}
+
+	parsed, err := url.Parse(proxyURL)
+	if err != nil {
+		k.Log.Error("Cannot parse Proxy URL: %s", err.Error())
+		return nil, err
+	}
+
+	return parsed, nil
 }
