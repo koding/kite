@@ -15,7 +15,6 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
-	"github.com/koding/kite/registration"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -42,7 +41,7 @@ func init() {
 }
 
 func TestMultiple(t *testing.T) {
-	testDuration := time.Second * 10
+	testDuration := time.Second * 5
 
 	// number of available example kites to be queried
 	kiteNumber := 50
@@ -204,9 +203,8 @@ func TestKontrol(t *testing.T) {
 	mathKite.HandleFunc("square", Square)
 	mathKite.Start()
 
-	reg := registration.New(mathKite)
-	go reg.RegisterToProxyAndKontrol()
-	<-reg.ReadyNotify()
+	go mathKite.RegisterToProxy(true)
+	<-mathKite.ReadyNotify()
 
 	// exp2 kite is the mathworker client
 	t.Log("Setting up exp2 kite")
@@ -308,9 +306,8 @@ func TestKontrol(t *testing.T) {
 	mathKite2.Config = conf.Copy()
 	mathKite2.Start()
 
-	reg2 := registration.New(mathKite2)
-	go reg2.RegisterToProxyAndKontrol()
-	<-reg2.ReadyNotify()
+	go mathKite2.RegisterToProxy(true)
+	<-mathKite2.ReadyNotify()
 
 	// We must get Register event
 	select {

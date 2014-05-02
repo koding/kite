@@ -46,7 +46,7 @@ func TestRegisterToKontrol(t *testing.T) {
 	defer k.Close()
 
 	kiteURL := &url.URL{Scheme: "ws", Host: "zubuzaretta:16500"}
-	go k.RegisterToKontrol(kiteURL)
+	go k.RegisterForever(kiteURL)
 
 	select {
 	case <-k.ReadyNotify():

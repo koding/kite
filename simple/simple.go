@@ -36,7 +36,7 @@ func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
 func (s *Simple) Start() {
 	s.Log.Info("Kite has started: %s", s.Kite.Kite())
 	s.Kite.Start()
-	go s.Kite.RegisterToProxyAndKontrol()
+	go s.Kite.RegisterToProxy(true)
 }
 
 func (s *Simple) Run() {

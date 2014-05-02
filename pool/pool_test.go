@@ -53,7 +53,7 @@ func TestPool(t *testing.T) {
 		bar.Config = conf.Copy()
 		bar.Start()
 		defer bar.Close()
-		<-bar.Registration.ReadyNotify()
+		<-bar.ReadyNotify()
 	}
 
 	// We must wait for a until the pool receives events from kontrol.

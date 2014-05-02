@@ -128,7 +128,7 @@ func (p *Proxy) listenAndServe() error {
 	}
 
 	if p.RegisterToKontrol {
-		go p.Kite.RegisterToKontrol(p.url)
+		go p.Kite.RegisterForever(p.url)
 	}
 
 	defer close(p.closeC)

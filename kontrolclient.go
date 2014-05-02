@@ -62,9 +62,9 @@ type registerResult struct {
 	URL *url.URL
 }
 
-// setupKontrolClient setups and prepares a the kontrol instance. It connects
+// SetupKontrolClient setups and prepares a the kontrol instance. It connects
 // to kontrol and reconnects if needed.
-func (k *Kite) setupKontrolClient() error {
+func (k *Kite) SetupKontrolClient() error {
 	if k.Kontrol.Client != nil {
 		return nil // already prepared
 	}
@@ -122,9 +122,9 @@ func (k *Kite) setupKontrolClient() error {
 }
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
-// is called for current kites and every new kite event.
+// is called for current kites and every nekite event.
 func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
-	if err := k.setupKontrolClient(); err != nil {
+	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
 
@@ -188,7 +188,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
-	if err := k.setupKontrolClient(); err != nil {
+	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
 
@@ -258,7 +258,7 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 
 // GetToken is used to get a new token for a single Kite.
 func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
-	if err := k.setupKontrolClient(); err != nil {
+	if err := k.SetupKontrolClient(); err != nil {
 		return "", err
 	}
 
@@ -302,15 +302,17 @@ func (k *Kite) signalReady() {
 	k.Kontrol.onceRegistered.Do(func() { close(k.Kontrol.readyRegistered) })
 }
 
-// Register to Kontrol. This method is blocking.
-func (k *Kite) RegisterToKontrol(kiteURL *url.URL) {
-	k.Kontrol.registerChan <- kiteURL
-	k.mainLoop()
-}
+// RegisterForever is equilavent to Register(), however it's blocking and
+// doesn't return any error. Instead it tries to re-register if there is a
+// disconnection.
+func (k *Kite) RegisterForever(kiteURL *url.URL) {
+	// initiate a registiration if a url is given, if not just skip it.
+	if kiteURL != nil {
+		k.Kontrol.registerChan <- kiteURL
+	}
 
-func (k *Kite) mainLoop() {
 	for u := range k.Kontrol.registerChan {
-		_, err := k.register(u)
+		_, err := k.Register(u)
 		if err == nil {
 			k.Kontrol.lastRegisteredURL = u
 			k.signalReady()
@@ -334,9 +336,9 @@ func (k *Kite) mainLoop() {
 // can find it via GetKites() method.
 //
 // This method does not handle the reconnection case. If you want to keep
-// registered to kontrol, use kite/registration package.
-func (k *Kite) register(kiteURL *url.URL) (*registerResult, error) {
-	if err := k.setupKontrolClient(); err != nil {
+// registered to kontrol, use RegisterForever().
+func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
+	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
 
@@ -374,7 +376,7 @@ func (k *Kite) register(kiteURL *url.URL) (*registerResult, error) {
 // doesn't register himself to kontrol.
 func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
 	if registerToKontrol {
-		go k.mainLoop()
+		go k.RegisterForever(nil)
 	}
 
 	query := protocol.KontrolQuery{

@@ -36,7 +36,7 @@ func TestSimple(t *testing.T) {
 	s.Config = conf.Copy()
 	s.Start()
 
-	<-s.Registration.ReadyNotify()
+	<-s.ServerReadyNotify()
 }
 
 func hello(r *kite.Request) (interface{}, error) {

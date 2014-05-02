@@ -41,7 +41,7 @@ func New(conf *config.Config, version, pubKey, privKey string) *RegServ {
 
 func (s *RegServ) Run() {
 	s.Kite.Start()
-	go s.Kite.RegisterToProxyAndKontrol()
+	go s.Kite.RegisterToProxy(true)
 
 	<-s.Kite.ServerCloseNotify()
 }
