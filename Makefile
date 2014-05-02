@@ -1,7 +1,13 @@
 NO_COLOR=\033[0m
 OK_COLOR=\033[0;32m
+KITE_HOME=/tmp/test_kite_home
 
-all: format vet lint
+DEBUG?=0
+ifeq ($(DEBUG), 1)
+	VERBOSE="-v"
+endif
+
+all: test
 
 format:
 	@echo "$(OK_COLOR)==> Formatting the code $(NO_COLOR)"
@@ -15,10 +21,28 @@ install:
 	@`which go` install -v ./kontrol/kontrol
 	@`which go` install -v ./proxy/proxy
 
-
 test:
-	@echo "$(OK_COLOR)==> Running tests $(NO_COLOR)"
-	@`which go` test 
+	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
+	@echo "Cleaning $(KITE_HOME) directory"
+
+	rm -rf $(KITE_HOME)
+	@echo "Creating test key"
+	@`which go` run ./testutil/writekey/main.go
+
+	@echo "$(OK_COLOR)==> Building packages $(NO_COLOR)"
+	@`which go` build -v ./...
+
+	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
+	@`which go` test $(VERBOSE) ./dnode
+	@`which go` test $(VERBOSE) ./cmd/cli
+	@`which go` test $(VERBOSE) ./systeminfo
+	@`which go` test $(VERBOSE) ./
+	@`which go` test $(VERBOSE) ./registration/test
+	@`which go` test $(VERBOSE) ./regserv
+	@`which go` test $(VERBOSE) ./kontrol
+	@`which go` test $(VERBOSE) ./proxy
+	@`which go` test $(VERBOSE) ./simple
+	@`which go` test $(VERBOSE) ./pool
 
 doc:
 	@`which godoc` github.com/koding/kite | less
@@ -34,4 +58,4 @@ lint:
 ctags:
 	@ctags -R --languages=c,go
 
-.PHONY: all format test doc vet lint ctags
+.PHONY: all install format test doc vet lint ctags
