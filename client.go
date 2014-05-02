@@ -74,6 +74,38 @@ type Client struct {
 	firstRequestHandlersNotified sync.Once
 }
 
+// callOptions is the type of first argument in the dnode message.
+// It is used when unmarshalling a dnode message.
+type callOptions struct {
+	// Arguments to the method
+	Kite             protocol.Kite   `json:"kite" dnode:"-"`
+	Authentication   *Authentication `json:"authentication"`
+	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
+	ResponseCallback dnode.Function  `json:"responseCallback"`
+}
+
+// callOptionsOut is the same structure with callOptions.
+// It is used when marshalling a dnode message.
+type callOptionsOut struct {
+	callOptions
+
+	// Override this when sending because args will not be a *dnode.Partial.
+	WithArgs []interface{} `json:"withArgs"`
+}
+
+// Authentication is used when connecting a Client.
+type Authentication struct {
+	// Type can be "kiteKey", "token" or "sessionID" for now.
+	Type string `json:"type"`
+	Key  string `json:"key"`
+}
+
+// response is the type of the return value of Tell() and Go() methods.
+type response struct {
+	Result *dnode.Partial
+	Err    error
+}
+
 // NewClient returns a pointer to a new Client. The returned instance
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
@@ -364,25 +396,6 @@ func (c *Client) callOnDisconnectHandlers() {
 	c.m.RUnlock()
 }
 
-// callOptions is the type of first argument in the dnode message.
-// It is used when unmarshalling a dnode message.
-type callOptions struct {
-	// Arguments to the method
-	Kite             protocol.Kite   `json:"kite" dnode:"-"`
-	Authentication   *Authentication `json:"authentication"`
-	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
-	ResponseCallback dnode.Function  `json:"responseCallback"`
-}
-
-// callOptionsOut is the same structure with callOptions.
-// It is used when marshalling a dnode message.
-type callOptionsOut struct {
-	callOptions
-
-	// Override this when sending because args will not be a *dnode.Partial.
-	WithArgs []interface{} `json:"withArgs"`
-}
-
 func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Function) []interface{} {
 	options := callOptionsOut{
 		WithArgs: args,
@@ -393,19 +406,6 @@ func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Funct
 		},
 	}
 	return []interface{}{options}
-}
-
-// Authentication is used when connecting a Client.
-type Authentication struct {
-	// Type can be "kiteKey", "token" or "sessionID" for now.
-	Type string `json:"type"`
-	Key  string `json:"key"`
-}
-
-// response is the type of the return value of Tell() and Go() methods.
-type response struct {
-	Result *dnode.Partial
-	Err    error
 }
 
 // Tell makes a blocking method call to the server.
