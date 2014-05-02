@@ -76,7 +76,9 @@ func convertLevel(l Level) logging.Level {
 	}
 }
 
-// newLogger returns a new logger object for desired name and level.
+// newLogger returns a new kite logger based on koding/logging package and a
+// SetLogLvel function. The current logLevel is INFO by default, which can be
+// changed with KITE_LOG_LEVEL environment variable.
 func newLogger(name string) (Logger, func(Level)) {
 	logger := logging.NewLogger(name)
 	logger.SetLevel(convertLevel(getLogLevel()))
