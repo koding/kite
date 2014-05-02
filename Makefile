@@ -24,8 +24,8 @@ install:
 test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
+	@rm -rf $(KITE_HOME)
 
-	rm -rf $(KITE_HOME)
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
 
