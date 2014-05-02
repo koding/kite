@@ -3,7 +3,6 @@ package kite
 import (
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -67,48 +66,11 @@ func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.P
 	}
 }
 
-// Error is the type of the kite related errors returned from kite package.
-type Error struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-}
-
-func (e Error) Error() string {
-	return fmt.Sprintf("kite error %s - %s", e.Type, e.Message)
-}
-
 // Response is the type of the object that is returned from request handlers
 // and the type of only argument that is passed to callback functions.
 type Response struct {
 	Error  *Error      `json:"error" dnode:"-"`
 	Result interface{} `json:"result"`
-}
-
-// recoverError returns a function which recovers the error and sets to the
-// given argument as kite.Error.
-//
-// TODO: change that it doesn't use a pointer of pointer,
-// a simpler and cleaner solution would work in the future,
-func (k *Kite) recoverError(kiteErr **Error) func() {
-	return func() {
-		r := recover()
-		if r == nil {
-			return
-		}
-
-		switch err := r.(type) {
-		case *Error:
-			*kiteErr = err
-		case *dnode.ArgumentError:
-			*kiteErr = &Error{"argumentError", err.Error()}
-		default:
-			*kiteErr = &Error{"genericError", fmt.Sprint(r)}
-			debug.PrintStack()
-		}
-
-		k.Log.Warning("Error in received message: %s", (*kiteErr).Error())
-
-	}
 }
 
 // HandlerFunc is the type of the handlers registered to Kite.
