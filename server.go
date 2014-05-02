@@ -12,11 +12,11 @@ import (
 	"strings"
 )
 
-func (k *Kite) CloseNotify() chan bool {
+func (k *Kite) ServerCloseNotify() chan bool {
 	return k.closeC
 }
 
-func (k *Kite) ReadyNotify() chan bool {
+func (k *Kite) ServerReadyNotify() chan bool {
 	return k.readyC
 }
 

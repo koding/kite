@@ -14,7 +14,6 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/registration"
 )
 
 const (
@@ -129,8 +128,7 @@ func (p *Proxy) listenAndServe() error {
 	}
 
 	if p.RegisterToKontrol {
-		reg := registration.New(p.Kite)
-		go reg.RegisterToKontrol(p.url)
+		go p.Kite.RegisterToKontrol(p.url)
 	}
 
 	defer close(p.closeC)

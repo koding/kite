@@ -75,6 +75,7 @@ type Kite struct {
 	onDisconnectHandlers []func(*Client)
 
 	// server fields, are initialized and used when
+	// TODO: move them to their own struct, just like KontrolClient
 	listener  net.Listener
 	TLSConfig *tls.Config
 	readyC    chan bool // To signal when kite is ready to accept connections

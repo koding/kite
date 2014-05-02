@@ -11,7 +11,6 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
-	"github.com/koding/kite/registration"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -41,10 +40,8 @@ func New(conf *config.Config, version, pubKey, privKey string) *RegServ {
 }
 
 func (s *RegServ) Run() {
-	reg := registration.New(s.Kite)
-
 	s.Kite.Start()
-	go reg.RegisterToProxyAndKontrol()
+	go s.Kite.RegisterToProxyAndKontrol()
 
 	<-s.Kite.CloseNotify()
 }
