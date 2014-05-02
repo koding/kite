@@ -118,7 +118,7 @@ func (p *Proxy) listenAndServe() error {
 		return err
 	}
 
-	p.Kite.Log.Notice("Listening on: %s", p.listener.Addr().String())
+	p.Kite.Log.Info("Listening on: %s", p.listener.Addr().String())
 
 	close(p.readyC)
 
@@ -180,7 +180,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 
 	signed, err := token.SignedString([]byte(p.privKey))
 	if err != nil {
-		p.Kite.Log.Critical("Cannot sign token: %s", err.Error())
+		p.Kite.Log.Error("Cannot sign token: %s", err.Error())
 		return
 	}
 

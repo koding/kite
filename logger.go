@@ -93,6 +93,7 @@ func newLogger(name string) (Logger, func(Level)) {
 // level back to the old level.
 func (k *Kite) SetupSignalHandler() {
 	c := make(chan os.Signal, 1)
+
 	signal.Notify(c, syscall.SIGUSR2)
 	go func() {
 		for s := range c {
@@ -101,10 +102,20 @@ func (k *Kite) SetupSignalHandler() {
 			if debugMode {
 				// toogle back to old settings.
 				k.Log.Info("Disabling debug mode")
+				if k.SetLogLevel == nil {
+					k.Log.Error("SetLogLevel is not defined")
+					continue
+				}
+
 				k.SetLogLevel(getLogLevel())
 				debugMode = false
 			} else {
 				k.Log.Info("Enabling debug mode")
+				if k.SetLogLevel == nil {
+					k.Log.Error("SetLogLevel is not defined")
+					continue
+				}
+
 				k.SetLogLevel(DEBUG)
 				debugMode = true
 			}

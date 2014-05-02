@@ -21,7 +21,6 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/logging"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -36,7 +35,7 @@ const (
 )
 
 var (
-	log logging.Logger
+	log kite.Logger
 
 	tokenCache   = make(map[string]string)
 	tokenCacheMu sync.Mutex
@@ -229,7 +228,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
 	// Register to etcd.
 	err = setKey()
 	if err != nil {
-		log.Critical("etcd setKey error: %s", err)
+		log.Error("etcd setKey error: %s", err)
 		return errors.New("internal error - register")
 	}
 
@@ -298,7 +297,7 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 			expireAt,    // expire time
 		)
 		if err != nil {
-			log.Critical("etcd error: %s", err)
+			log.Error("etcd error: %s", err)
 			return err
 		}
 
@@ -552,7 +551,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 			return result, nil
 		}
 
-		log.Critical("etcd error: %s", err)
+		log.Error("etcd error: %s", err)
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 

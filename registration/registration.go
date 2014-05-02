@@ -82,7 +82,7 @@ func (r *Registration) mainLoop(urls chan *url.URL) {
 		case e := <-events:
 			switch e {
 			case Connect:
-				r.kite.Log.Notice("Connected to Kontrol.")
+				r.kite.Log.Info("Connected to Kontrol.")
 				if lastRegisteredURL != nil {
 					select {
 					case urls <- lastRegisteredURL:
