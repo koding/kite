@@ -43,7 +43,7 @@ func (s *RegServ) Run() {
 	s.Kite.Start()
 	go s.Kite.RegisterToProxyAndKontrol()
 
-	<-s.Kite.CloseNotify()
+	<-s.Kite.ServerCloseNotify()
 }
 
 // RegisterSelf registers this host and writes a key to ~/.kite/kite.key

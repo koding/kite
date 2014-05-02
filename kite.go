@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -105,6 +106,12 @@ func New(name, version string) *Kite {
 
 	l, setlevel := newLogger(name)
 
+	kontrolClient := &KontrolClient{
+		readyConnected:  make(chan struct{}),
+		readyRegistered: make(chan struct{}),
+		registerChan:    make(chan *url.URL, 1),
+	}
+
 	k := &Kite{
 		Config:             config.New(),
 		Log:                l,
@@ -113,6 +120,7 @@ func New(name, version string) *Kite {
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]HandlerFunc),
 		server:             &websocket.Server{},
+		Kontrol:            kontrolClient,
 		name:               name,
 		version:            version,
 		id:                 kiteID.String(),

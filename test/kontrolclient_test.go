@@ -1,4 +1,4 @@
-package kite
+package kontrolclient_test
 
 import (
 	"io/ioutil"
@@ -13,7 +13,6 @@ import (
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
-	"github.com/koding/kite/registration"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -43,15 +42,14 @@ func init() {
 }
 
 func TestRegisterToKontrol(t *testing.T) {
-	k, reg := setup()
-	defer k.Kontrol.Close()
+	k := setup()
+	defer k.Close()
 
 	kiteURL := &url.URL{Scheme: "ws", Host: "zubuzaretta:16500"}
-
-	go reg.RegisterToKontrol(kiteURL)
+	go k.RegisterToKontrol(kiteURL)
 
 	select {
-	case <-reg.ReadyNotify():
+	case <-k.ReadyNotify():
 		kites, err := k.GetKites(protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,
@@ -76,26 +74,26 @@ func TestRegisterToKontrol(t *testing.T) {
 }
 
 func TestRegisterToProxy(t *testing.T) {
-	k, reg := setup()
-	defer k.Kontrol.Close()
+	k := setup()
+	defer k.Close()
 
-	go reg.RegisterToProxy()
+	go k.RegisterToProxy(false)
 
 	select {
-	case <-reg.ReadyNotify():
+	case <-k.ReadyNotify():
 	case <-time.After(10 * time.Second):
 		t.Fatal("timeout")
 	}
 }
 
 func TestRegisterToProxyAndKontrol(t *testing.T) {
-	k, reg := setup()
-	defer k.Kontrol.Close()
+	k := setup()
+	defer k.Close()
 
-	go reg.RegisterToProxyAndKontrol()
+	go k.RegisterToProxy(true)
 
 	select {
-	case <-reg.ReadyNotify():
+	case <-k.ReadyNotify():
 		kites, err := k.GetKites(protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,
@@ -119,12 +117,11 @@ func TestRegisterToProxyAndKontrol(t *testing.T) {
 	}
 }
 
-func setup() (*kite.Kite, *registration.Registration) {
+func setup() *kite.Kite {
 	k := kite.New("test", "1.0.0")
 	k.Config = conf
 	k.HandleFunc("hello", hello)
-
-	return k, registration.New(k)
+	return k
 }
 
 func hello(r *kite.Request) (interface{}, error) {

@@ -18,11 +18,6 @@ import (
 type kontrolEvent int
 
 const (
-	connected kontrolEvent = iota
-	disconnected
-)
-
-const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
 )
@@ -37,6 +32,7 @@ type KontrolClient struct {
 	// used for synchronizing methods that needs to be called after
 	// successful connection or/and registiration to kontrol.
 	onceConnected   sync.Once
+	onceRegistered  sync.Once
 	readyConnected  chan struct{}
 	readyRegistered chan struct{}
 
@@ -46,6 +42,13 @@ type KontrolClient struct {
 
 	// events is used for reconnection logic
 	events chan kontrolEvent
+
+	// lastRegisteredURL stores the Kite url what was send/registered
+	// succesfully to kontrol
+	lastRegisteredURL *url.URL
+
+	// registerChan registers the url's it receives from the channel to Kontrol
+	registerChan chan *url.URL
 }
 
 // Event is the struct that is emitted from Kontrol.WatchKites method.
@@ -59,26 +62,15 @@ type registerResult struct {
 	URL *url.URL
 }
 
-// SetupKontrolClient setups and prepares a new kontrol client instance.
-// Usually needed for preperations.
-func (k *Kite) SetupKontrolClient() error {
-	if k.Kontrol != nil {
+// setupKontrolClient setups and prepares a the kontrol instance. It connects
+// to kontrol and reconnects if needed.
+func (k *Kite) setupKontrolClient() error {
+	if k.Kontrol.Client != nil {
 		return nil // already prepared
 	}
 
-	kontrolClient, err := k.newKontrolClient()
-	if err != nil {
-		return err
-	}
-
-	k.Kontrol = kontrolClient
-	return nil
-}
-
-// newKontrolClient returns a ready and connected KontrolClient instance.
-func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 	if k.Config.KontrolURL == nil {
-		return nil, errors.New("no kontrol URL given in config")
+		return errors.New("no kontrol URL given in config")
 	}
 
 	client := k.NewClient(k.Config.KontrolURL)
@@ -88,60 +80,52 @@ func (k *Kite) newKontrolClient() (*KontrolClient, error) {
 		Key:  k.Config.KiteKey,
 	}
 
-	events := make(chan kontrolEvent)
+	k.Kontrol.Client = client
+	k.Kontrol.watchers = list.New()
 
-	kontrolClient := &KontrolClient{
-		Client:          client,
-		readyConnected:  make(chan struct{}),
-		readyRegistered: make(chan struct{}),
-		watchers:        list.New(),
-		events:          events,
-	}
-
-	var once sync.Once
-
-	kontrolClient.OnConnect(func() {
+	k.Kontrol.OnConnect(func() {
 		k.Log.Info("Connected to Kontrol ")
 
-		events <- connected
+		// try to re-register on connect
+		if k.Kontrol.lastRegisteredURL != nil {
+			select {
+			case k.Kontrol.registerChan <- k.Kontrol.lastRegisteredURL:
+			default:
+			}
+		}
 
 		// signal all other methods that are listening on this channel, that we
 		// are connected to kontrol.
-		once.Do(func() { close(kontrolClient.readyRegistered) })
+		k.Kontrol.onceConnected.Do(func() { close(k.Kontrol.readyConnected) })
 
 		// Re-register existing watchers.
-		kontrolClient.watchersMutex.RLock()
-		for e := kontrolClient.watchers.Front(); e != nil; e = e.Next() {
+		k.Kontrol.watchersMutex.RLock()
+		for e := k.Kontrol.watchers.Front(); e != nil; e = e.Next() {
 			watcher := e.Value.(*Watcher)
 			if err := watcher.rewatch(); err != nil {
 				k.Log.Error("Cannot rewatch query: %+v", watcher)
 			}
 		}
-		kontrolClient.watchersMutex.RUnlock()
+		k.Kontrol.watchersMutex.RUnlock()
 	})
 
-	kontrolClient.OnDisconnect(func() {
-		events <- disconnected
+	k.Kontrol.OnDisconnect(func() {
+		k.Log.Warning("Disconnected from Kontrol.")
 	})
 
 	// non blocking, is going to reconnect if the connection goes down.
-	if _, err := kontrolClient.DialForever(); err != nil {
-		return nil, err
+	if _, err := k.Kontrol.DialForever(); err != nil {
+		return err
 	}
 
-	return kontrolClient, nil
+	return nil
 }
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every new kite event.
 func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
-	if k.Kontrol == nil {
-		kontrolClient, err := k.newKontrolClient()
-		if err != nil {
-			return nil, err
-		}
-
-		k.Kontrol = kontrolClient
+	if err := k.setupKontrolClient(); err != nil {
+		return nil, err
 	}
 
 	<-k.Kontrol.readyConnected
@@ -204,13 +188,8 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
 func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
-	if k.Kontrol == nil {
-		kontrolClient, err := k.newKontrolClient()
-		if err != nil {
-			return nil, err
-		}
-
-		k.Kontrol = kontrolClient
+	if err := k.setupKontrolClient(); err != nil {
+		return nil, err
 	}
 
 	clients, _, err := k.getKites(protocol.GetKitesArgs{Query: query})
@@ -279,13 +258,8 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 
 // GetToken is used to get a new token for a single Kite.
 func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
-	if k.Kontrol == nil {
-		kontrolClient, err := k.newKontrolClient()
-		if err != nil {
-			return "", err
-		}
-
-		k.Kontrol = kontrolClient
+	if err := k.setupKontrolClient(); err != nil {
+		return "", err
 	}
 
 	<-k.Kontrol.readyConnected
@@ -325,66 +299,34 @@ func (k *Kite) ReadyNotify() chan struct{} {
 }
 
 func (k *Kite) signalReady() {
-	k.Kontrol.onceConnected.Do(func() { close(k.Kontrol.readyRegistered) })
+	k.Kontrol.onceRegistered.Do(func() { close(k.Kontrol.readyRegistered) })
 }
 
 // Register to Kontrol. This method is blocking.
 func (k *Kite) RegisterToKontrol(kiteURL *url.URL) {
-	urls := make(chan *url.URL, 1)
-	urls <- kiteURL
-
-	k.mainLoop(urls)
+	k.Kontrol.registerChan <- kiteURL
+	k.mainLoop()
 }
 
-// Register to Proxy. This method is blocking.
-func (k *Kite) RegisterToProxy() {
-	k.keepRegisteredToProxyKite(nil)
-}
-
-// Register to Proxy, then Kontrol. This method is blocking.
-func (k *Kite) RegisterToProxyAndKontrol() {
-	urls := make(chan *url.URL, 1)
-
-	go k.keepRegisteredToProxyKite(urls)
-
-	k.mainLoop(urls)
-}
-
-func (k *Kite) mainLoop(urls chan *url.URL) {
-	var lastRegisteredURL *url.URL
-
-	for {
-		select {
-		case e := <-k.Kontrol.events:
-			switch e {
-			case connected:
-				k.Log.Info("Connected to Kontrol.")
-				if lastRegisteredURL != nil {
-					select {
-					case urls <- lastRegisteredURL:
-					default:
-					}
-				}
-			case disconnected:
-				k.Log.Warning("Disconnected from Kontrol.")
-			}
-		case u := <-urls:
-			_, err := k.register(u)
-			if err != nil {
-				k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
-					err, kontrolRetryDuration/time.Second)
-
-				time.AfterFunc(kontrolRetryDuration, func() {
-					select {
-					case urls <- u:
-					default:
-					}
-				})
-			} else {
-				lastRegisteredURL = u
-				k.signalReady()
-			}
+func (k *Kite) mainLoop() {
+	for u := range k.Kontrol.registerChan {
+		_, err := k.register(u)
+		if err == nil {
+			k.Kontrol.lastRegisteredURL = u
+			k.signalReady()
+			continue
 		}
+
+		k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
+			err, kontrolRetryDuration/time.Second)
+
+		time.AfterFunc(kontrolRetryDuration, func() {
+			select {
+			case k.Kontrol.registerChan <- u:
+			default:
+			}
+		})
+
 	}
 }
 
@@ -394,13 +336,8 @@ func (k *Kite) mainLoop(urls chan *url.URL) {
 // This method does not handle the reconnection case. If you want to keep
 // registered to kontrol, use kite/registration package.
 func (k *Kite) register(kiteURL *url.URL) (*registerResult, error) {
-	if k.Kontrol == nil {
-		kontrolClient, err := k.newKontrolClient()
-		if err != nil {
-			return nil, err
-		}
-
-		k.Kontrol = kontrolClient
+	if err := k.setupKontrolClient(); err != nil {
+		return nil, err
 	}
 
 	<-k.Kontrol.readyConnected
@@ -430,12 +367,16 @@ func (k *Kite) register(kiteURL *url.URL) (*registerResult, error) {
 	return &registerResult{parsed}, nil
 }
 
-// keepRegisteredToProxyKite finds a proxy kite by asking kontrol then registers
-// itselfs on proxy. On error, retries forever. On every successfull
-// registration, it sends the proxied URL to the urls channel. The caller must
-// receive from this channel and should register to the kontrol with that URL.
-// This function never returns.
-func (k *Kite) keepRegisteredToProxyKite(urls chan<- *url.URL) *url.URL {
+// RegisterToProxy finds a proxy kite by asking kontrol then registers itselfs
+// on proxy. On error, retries forever. On every successfull registration, it
+// sends the proxied URL to the registerChan channel (onlt if registerKontrol
+// is enabled).  If registerKontrol is false it returns the proxy url and
+// doesn't register himself to kontrol.
+func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
+	if registerToKontrol {
+		go k.mainLoop()
+	}
+
 	query := protocol.KontrolQuery{
 		Username:    k.Config.KontrolUser,
 		Environment: k.Config.Environment,
@@ -485,8 +426,8 @@ func (k *Kite) keepRegisteredToProxyKite(urls chan<- *url.URL) *url.URL {
 			continue
 		}
 
-		if urls != nil {
-			urls <- proxyURL
+		if registerToKontrol {
+			k.Kontrol.registerChan <- proxyURL
 		} else {
 			k.signalReady()
 		}

@@ -5,13 +5,11 @@ package simple
 import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/registration"
 )
 
 // simple kite server
 type Simple struct {
 	*kite.Kite
-	Registration *registration.Registration
 }
 
 func New(name, version string) *Simple {
@@ -24,8 +22,7 @@ func New(name, version string) *Simple {
 
 	k.Config = conf
 	s := &Simple{
-		Kite:         k,
-		Registration: registration.New(k),
+		Kite: k,
 	}
 
 	return s
@@ -39,12 +36,12 @@ func (s *Simple) HandleFunc(method string, handler kite.HandlerFunc) {
 func (s *Simple) Start() {
 	s.Log.Info("Kite has started: %s", s.Kite.Kite())
 	s.Kite.Start()
-	go s.Registration.RegisterToProxyAndKontrol()
+	go s.Kite.RegisterToProxyAndKontrol()
 }
 
 func (s *Simple) Run() {
 	s.Kite.Start()
-	<-s.CloseNotify()
+	<-s.ServerCloseNotify()
 }
 
 func (s *Simple) Close() {

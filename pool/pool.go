@@ -15,7 +15,6 @@ type Pool struct {
 }
 
 func New(k *kite.Kite, q protocol.KontrolQuery) *Pool {
-	k.SetupKontrolClient()
 	return &Pool{
 		localKite: k,
 		query:     q,
