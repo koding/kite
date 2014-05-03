@@ -295,7 +295,7 @@ func (c *Client) processMessage(data []byte) error {
 	}
 
 	sender := func(id uint64, args []interface{}) error {
-		_, err := c.marshalAndSend(id, args)
+		_, err = c.marshalAndSend(id, args)
 		return err
 	}
 
