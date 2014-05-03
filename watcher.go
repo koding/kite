@@ -28,9 +28,9 @@ func (k *Kite) newWatcher(id string, query *protocol.KontrolQuery, handler Event
 	}
 
 	// Add to the kontrol's watchers list.
-	k.Kontrol.watchersMutex.Lock()
-	watcher.elem = k.Kontrol.watchers.PushBack(watcher)
-	k.Kontrol.watchersMutex.Unlock()
+	k.kontrol.watchersMutex.Lock()
+	watcher.elem = k.kontrol.watchers.PushBack(watcher)
+	k.kontrol.watchersMutex.Unlock()
 
 	return watcher
 }
@@ -43,14 +43,14 @@ func (w *Watcher) Cancel() error {
 		return nil
 	}
 
-	_, err := w.localKite.Kontrol.Tell("cancelWatcher", w.id)
+	_, err := w.localKite.kontrol.Tell("cancelWatcher", w.id)
 	if err == nil {
 		w.canceled = true
 
 		// Remove from kontrolClient's watcher list.
-		w.localKite.Kontrol.watchersMutex.Lock()
-		w.localKite.Kontrol.watchers.Remove(w.elem)
-		w.localKite.Kontrol.watchersMutex.Unlock()
+		w.localKite.kontrol.watchersMutex.Lock()
+		w.localKite.kontrol.watchers.Remove(w.elem)
+		w.localKite.kontrol.watchersMutex.Unlock()
 	}
 
 	return err

@@ -45,6 +45,5 @@ func (s *Simple) Run() {
 }
 
 func (s *Simple) Close() {
-	s.Kontrol.Close()
 	s.Kite.Close()
 }
