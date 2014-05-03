@@ -25,8 +25,8 @@ const (
 // Returned from GetKites when query matches no kites.
 var ErrNoKitesAvailable = errors.New("no kites availabile")
 
-// KontrolClient is a kite for registering and querying Kites from Kontrol.
-type KontrolClient struct {
+// kontrolClient is a kite for registering and querying Kites from Kontrol.
+type kontrolClient struct {
 	*Client
 
 	// used for synchronizing methods that needs to be called after
@@ -63,7 +63,9 @@ type registerResult struct {
 }
 
 // SetupKontrolClient setups and prepares a the kontrol instance. It connects
-// to kontrol and reconnects if needed.
+// to kontrol and reconnects again if there is any disconnections. This method
+// is called internally whenever a kontrol client specific action is taking.
+// However if you wish to connect earlier you may call this method.
 func (k *Kite) SetupKontrolClient() error {
 	if k.kontrol.Client != nil {
 		return nil // already prepared

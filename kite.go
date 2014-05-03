@@ -64,7 +64,7 @@ type Kite struct {
 
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
-	kontrol *KontrolClient
+	kontrol *kontrolClient
 
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)
@@ -106,7 +106,7 @@ func New(name, version string) *Kite {
 
 	l, setlevel := newLogger(name)
 
-	kontrolClient := &KontrolClient{
+	kClient := &kontrolClient{
 		readyConnected:  make(chan struct{}),
 		readyRegistered: make(chan struct{}),
 		registerChan:    make(chan *url.URL, 1),
@@ -120,7 +120,7 @@ func New(name, version string) *Kite {
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]HandlerFunc),
 		server:             &websocket.Server{},
-		kontrol:            kontrolClient,
+		kontrol:            kClient,
 		name:               name,
 		version:            version,
 		id:                 kiteID.String(),
