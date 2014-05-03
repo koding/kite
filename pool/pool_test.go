@@ -12,7 +12,6 @@ import (
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
-	"github.com/koding/kite/simple"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -49,9 +48,10 @@ func TestPool(t *testing.T) {
 	// defer p.Close()
 
 	for i := 0; i < 2; i++ {
-		bar := simple.New("bar", "1.0.0")
+		bar := kite.New("bar", "1.0.0")
 		bar.Config = conf.Copy()
 		bar.Start()
+		go bar.RegisterToProxy(true)
 		defer bar.Close()
 		<-bar.ReadyNotify()
 	}

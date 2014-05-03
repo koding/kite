@@ -41,7 +41,6 @@ test:
 	@`which go` test $(VERBOSE) ./regserv
 	@`which go` test $(VERBOSE) ./kontrol
 	@`which go` test $(VERBOSE) ./proxy
-	@`which go` test $(VERBOSE) ./simple
 	@`which go` test $(VERBOSE) ./pool
 
 doc:
