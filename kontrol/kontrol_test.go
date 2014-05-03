@@ -34,8 +34,8 @@ func init() {
 
 	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
-	defer os.RemoveAll(kon.DataDir)
-	kon.Start()
+	go kon.Run()
+	<-kon.Kite.ServerReadyNotify()
 
 	rand.Seed(time.Now().UTC().UnixNano())
 }
@@ -202,7 +202,8 @@ func TestKontrol(t *testing.T) {
 	mathKite := kite.New("mathworker", "1.2.3")
 	mathKite.Config = conf.Copy()
 	mathKite.HandleFunc("square", Square)
-	mathKite.Start()
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
 
 	go mathKite.RegisterToProxy(true)
 	<-mathKite.ReadyNotify()
@@ -305,7 +306,8 @@ func TestKontrol(t *testing.T) {
 	t.Log("Setting up mathworker2")
 	mathKite2 := kite.New("mathworker", "1.2.3")
 	mathKite2.Config = conf.Copy()
-	mathKite2.Start()
+	go mathKite2.Run()
+	<-mathKite2.ServerReadyNotify()
 
 	go mathKite2.RegisterToProxy(true)
 	<-mathKite2.ReadyNotify()
@@ -386,4 +388,10 @@ func TestGetQueryKey(t *testing.T) {
 	if key != "" {
 		t.Errorf("Key is not expected: %s", key)
 	}
+}
+
+// Cleanup function, is executed as last function
+func TestZCleanup(t *testing.T) {
+	fmt.Println("cleannning")
+	os.RemoveAll(kon.DataDir)
 }

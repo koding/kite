@@ -127,11 +127,6 @@ func (k *Kontrol) Run() {
 	k.Kite.Run()
 }
 
-func (k *Kontrol) Start() {
-	k.init()
-	k.Kite.Start()
-}
-
 // Close stops kontrol and closes all connections
 func (k *Kontrol) Close() {
 	k.etcd.Stop()

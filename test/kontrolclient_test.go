@@ -34,7 +34,8 @@ func init() {
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	defer os.RemoveAll(kon.DataDir)
-	kon.Start()
+	go kon.Run()
+	<-kon.Kite.ServerReadyNotify()
 
 	prx := proxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
 	prx.Kite.Config.DisableAuthentication = true
