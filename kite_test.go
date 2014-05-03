@@ -14,7 +14,8 @@ import (
 )
 
 func TestMultiple(t *testing.T) {
-	testDuration := time.Second * 5
+	t.Skip("Run it manually")
+	testDuration := time.Second * 10
 
 	// number of available mathworker kites to be called
 	kiteNumber := 100
@@ -22,7 +23,7 @@ func TestMultiple(t *testing.T) {
 	// number of exp kites that will call mathwork kites
 	clientNumber := 100
 
-	// ports are startinf from 6000 up to 6000 + kiteNumber
+	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
 
 	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)

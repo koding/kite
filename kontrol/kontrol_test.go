@@ -41,7 +41,8 @@ func init() {
 }
 
 func TestMultiple(t *testing.T) {
-	testDuration := time.Second * 5
+	t.Skip("Run it manually")
+	testDuration := time.Second * 10
 
 	// number of available example kites to be queried
 	kiteNumber := 50
