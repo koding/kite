@@ -46,12 +46,12 @@ What is *Kontrol*?
 ------------------
 
 Kontrol is the service registry and authentication service used by Kites.  It
-is itself a kite, although we are planning to separate it into two separate
-kites.
+is itself a kite too.
 
-When a kite starts to run, it registers itself to Kontrol.  Then, others can
-find it by querying Kontrol.  There is also a Proxy Kite for giving public URLs
-to registered kites.
+When a kite starts to run, it can registers itself to Kontrol with the
+`Register()` method if wished.  That enables others to find it by querying
+Kontrol. There is also a Proxy Kite for giving public URLs to registered
+kites.
 
 Query has 7 fields:
 
@@ -73,10 +73,10 @@ See [kite.js library](https://github.com/koding/kite.js) for more information.
 How can I write a new kite?
 ---------------------------
 
-* Import `kite/simple` package.
-* Create a new instance with `simple.New()`.
+* Import `kite` package.
+* Create a new instance with `kite.New()`.
 * Add your method handlers with `k.HandleFunc()`.
 * Call `k.Run()`
 
-See [an example](https://github.com/koding/kite/blob/master/examples/math_simple/math_simple.go)
+See [an example](https://github.com/koding/kite/blob/master/examples/math/math.go)
 for the code of an example kite.
