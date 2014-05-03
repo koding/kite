@@ -15,8 +15,6 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-type kontrolEvent int
-
 const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
@@ -39,9 +37,6 @@ type kontrolClient struct {
 	// watchers are saved here to re-watch on reconnect.
 	watchers      *list.List
 	watchersMutex sync.RWMutex
-
-	// events is used for reconnection logic
-	events chan kontrolEvent
 
 	// lastRegisteredURL stores the Kite url what was send/registered
 	// succesfully to kontrol
