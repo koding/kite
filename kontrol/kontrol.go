@@ -663,7 +663,12 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				)
 				if err != nil {
 					log.Error("Cannot re-watch query: %s", err.Error())
-					callback.Call(kite.Response{Error: &kite.Error{"watchError", err.Error()}})
+					callback.Call(kite.Response{
+						Error: &kite.Error{
+							Type:    "watchError",
+							Message: err.Error(),
+						},
+					})
 					return
 				}
 

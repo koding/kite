@@ -464,7 +464,10 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 	if err != nil {
 		responseChan <- &response{
 			Result: nil,
-			Err:    &Error{"sendError", err.Error()},
+			Err: &Error{
+				Type:    "sendError",
+				Message: err.Error(),
+			},
 		}
 		return
 	}
@@ -480,9 +483,21 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 		case resp := <-doneChan:
 			responseChan <- resp
 		case <-c.disconnect:
-			responseChan <- &response{nil, &Error{"disconnect", "Remote kite has disconnected"}}
+			responseChan <- &response{
+				nil,
+				&Error{
+					Type:    "disconnect",
+					Message: "Remote kite has disconnected",
+				},
+			}
 		case <-time.After(timeout):
-			responseChan <- &response{nil, &Error{"timeout", fmt.Sprintf("No response to %q method in %s", method, timeout)}}
+			responseChan <- &response{
+				nil,
+				&Error{
+					Type:    "timeout",
+					Message: fmt.Sprintf("No response to %q method in %s", method, timeout),
+				},
+			}
 
 			// Remove the callback function from the map so we do not
 			// consume memory for unused callbacks.
@@ -645,7 +660,10 @@ func onError(err error) {
 		if options.ResponseCallback.Caller != nil {
 			response := Response{
 				Result: nil,
-				Error:  &Error{"methodNotFound", err.Error()},
+				Error: &Error{
+					Type:    "methodNotFound",
+					Message: err.Error(),
+				},
 			}
 			options.ResponseCallback.Call(response)
 		}
