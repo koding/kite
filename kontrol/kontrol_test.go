@@ -172,6 +172,28 @@ func TestGetKites(t *testing.T) {
 	}
 }
 
+func TestGetToken(t *testing.T) {
+	t.Log("Setting up mathworker5")
+	testName := "mathworker5"
+	testVersion := "1.1.1"
+	m := kite.New(testName, testVersion)
+	m.Config = conf.Copy()
+	m.Config.Port = 6666
+
+	t.Log("Registering mathworker5")
+	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:6666"}
+	_, err := m.Register(kiteURL)
+	if err != nil {
+		t.Error(err)
+	}
+	defer m.Close()
+
+	_, err = m.GetToken(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestRegister(t *testing.T) {
 	t.Log("Setting up mathworker3")
 	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:4444"}
