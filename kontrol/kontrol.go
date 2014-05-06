@@ -850,21 +850,16 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	event, err := k.etcd.Store.Get(
+	_, err = k.etcd.Store.Get(
 		KitesPrefix+kiteKey, // path
 		false, // recursive
 		false, // sorted
 	)
+
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return nil, errors.New("Kite not found")
 		}
-		return nil, err
-	}
-
-	var kiteVal registerValue
-	err = json.Unmarshal([]byte(*event.Node.Value), &kiteVal)
-	if err != nil {
 		return nil, err
 	}
 
