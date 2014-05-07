@@ -79,6 +79,22 @@ func TestTokenInvalidation(t *testing.T) {
 		t.Error("token invalidation doesn't work")
 	}
 
+	TokenTTL = time.Second * 4
+
+	token3, err := m.GetToken(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+
+	token4, err := m.GetToken(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if token3 != token4 {
+		t.Error("tokens should be the same")
+	}
+
 }
 
 func TestMultiple(t *testing.T) {
