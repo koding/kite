@@ -30,12 +30,12 @@ const (
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
-	TokenTTL          = 48 * time.Hour
 	TokenLeeway       = 1 * time.Minute
 )
 
 var (
-	log kite.Logger
+	log      kite.Logger
+	TokenTTL = 48 * time.Hour
 
 	tokenCache   = make(map[string]string)
 	tokenCacheMu sync.Mutex
@@ -814,7 +814,19 @@ func generateToken(queryKey, username, issuer, privateKey string) (string, error
 		return "", errors.New("Server error: Cannot generate a token")
 	}
 
+	// cache our token
 	tokenCache[uniqKey] = signed
+
+	// cache invalidation, because we cache the token in tokenCache we need to
+	// invalidate it expiration time. This was handled usually within JWT, but
+	// now we have to do it manually for our own cache.
+	time.AfterFunc(TokenTTL, func() {
+		tokenCacheMu.Lock()
+		defer tokenCacheMu.Unlock()
+
+		delete(tokenCache, uniqKey)
+	})
+
 	return signed, nil
 }
 

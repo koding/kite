@@ -40,6 +40,47 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+func TestTokenInvalidation(t *testing.T) {
+	oldval := TokenTTL
+	defer func() {
+		TokenTTL = oldval
+	}()
+
+	TokenTTL = time.Millisecond * 500
+
+	t.Log("Setting up mathworker6")
+	testName := "mathworker6"
+	testVersion := "1.1.1"
+	m := kite.New(testName, testVersion)
+	m.Config = conf.Copy()
+	m.Config.Port = 6666
+
+	t.Log("Registering mathworker6")
+	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:6666"}
+	_, err := m.Register(kiteURL)
+	if err != nil {
+		t.Error(err)
+	}
+	defer m.Close()
+
+	token, err := m.GetToken(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(time.Millisecond * 700)
+
+	token2, err := m.GetToken(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if token == token2 {
+		t.Error("token invalidation doesn't work")
+	}
+
+}
+
 func TestMultiple(t *testing.T) {
 	t.Skip("Run it manually")
 	testDuration := time.Second * 10
@@ -414,6 +455,5 @@ func TestGetQueryKey(t *testing.T) {
 
 // Cleanup function, is executed as last function
 func TestZCleanup(t *testing.T) {
-	fmt.Println("cleannning")
 	os.RemoveAll(kon.DataDir)
 }
