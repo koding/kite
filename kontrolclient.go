@@ -304,13 +304,7 @@ func (k *Kite) signalReady() {
 // attempt. It returns nil if ReadNotify() is ready and it's registered
 // succesfull.
 func (k *Kite) RegisterForever(kiteURL *url.URL) error {
-	// initiate a registiration if a url is given, if not just skip it.
-	if kiteURL != nil {
-		k.kontrol.registerChan <- kiteURL
-	}
-
 	errs := make(chan error, 1)
-
 	go func() {
 		for u := range k.kontrol.registerChan {
 			_, err := k.Register(u)
@@ -337,12 +331,21 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 		}
 	}()
 
+	// don't block if there the given url is nil
+	if kiteURL == nil {
+		return nil
+	}
+
+	// initiate a registiration if a url is given
+	k.kontrol.registerChan <- kiteURL
+
 	select {
 	case <-k.ReadyNotify():
 		return nil
 	case err := <-errs:
 		return err
 	}
+
 }
 
 // Register registers current Kite to Kontrol. After registration other Kites
