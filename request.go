@@ -81,10 +81,23 @@ func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.P
 	// Call the handler function.
 	var err error
 	result, err = handlerFunc(request)
-
 	if err != nil {
-		panic(err) // This will be recoverd from kite.recoverError() above.
+		switch t := err.(type) {
+		case *Error:
+			kiteErr = t
+		case *dnode.ArgumentError:
+			kiteErr = &Error{
+				Type:    "argumentError",
+				Message: err.Error(),
+			}
+		default:
+			kiteErr = &Error{
+				Type:    "genericError",
+				Message: err.Error(),
+			}
+		}
 	}
+
 }
 
 // HandleFunc registers a handler to run when a method call is received from a Kite.
