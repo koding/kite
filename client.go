@@ -596,7 +596,7 @@ func (c *Client) makeResponseCallback(doneChan chan *response, removeCallback <-
 		// Notify that the callback is finished.
 		defer func() {
 			if resp.Err != nil {
-				c.LocalKite.Log.Warning("Error received from kite: %q method: %q args: %#v err: %s", c.Kite.Name, method, args, resp.Err.Error())
+				c.LocalKite.Log.Debug("Error received from kite: %q method: %q args: %#v err: %s", c.Kite.Name, method, args, resp.Err.Error())
 				doneChan <- &response{resp.Result, resp.Err}
 			} else {
 				doneChan <- &response{resp.Result, nil}
