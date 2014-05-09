@@ -45,7 +45,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// The request that will be constructed from incoming dnode message.
 	request, callFunc = c.newRequest(method.name, args)
 
-	if !c.LocalKite.Config.DisableAuthentication {
+	if method.authenticate {
 		if err := request.authenticate(); err != nil {
 			callFunc(nil, err)
 			return
@@ -150,7 +150,6 @@ func (r *Request) authenticate() *Error {
 	// Fix username of the remote Kite if it is invalid.
 	// This prevents a Kite to impersonate someone else's Kite.
 	r.Client.Kite.Username = r.Username
-
 	return nil
 }
 

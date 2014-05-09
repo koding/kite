@@ -19,8 +19,9 @@ func TestProxy(t *testing.T) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	prx := New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	prx.Kite.Config.DisableAuthentication = true // no kontrol running in test
+	prxConf := conf.Copy()
+	prxConf.DisableAuthentication = true // no kontrol running in test
+	prx := New(prxConf, "0.1.0", testkeys.Public, testkeys.Private)
 	prx.Start()
 
 	// Proxy kite is ready.
