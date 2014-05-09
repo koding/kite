@@ -27,10 +27,6 @@ type Response struct {
 	Result interface{} `json:"result"`
 }
 
-// HandlerFunc is the type of the handlers registered to Kite.
-// The returned result must be Marshalable with json package.
-type HandlerFunc func(*Request) (result interface{}, err error)
-
 // runMethod is called when a method is received from remote Kite.
 func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.Partial) {
 	var (
@@ -98,11 +94,6 @@ func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.P
 		}
 	}
 
-}
-
-// HandleFunc registers a handler to run when a method call is received from a Kite.
-func (k *Kite) HandleFunc(method string, handler HandlerFunc) {
-	k.handlers[method] = handler
 }
 
 // runCallback is called when a callback method call is received from remote Kite.

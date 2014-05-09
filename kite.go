@@ -57,7 +57,7 @@ type Kite struct {
 	trustedKontrolKeys map[string]string
 
 	// Handlers added with Kite.HandleFunc().
-	handlers map[string]HandlerFunc // method map for exported methods
+	handlers map[string]*Method // method map for exported methods
 
 	// Websocket server for handling incoming connections.
 	server *websocket.Server
@@ -118,7 +118,7 @@ func New(name, version string) *Kite {
 		SetLogLevel:        setlevel,
 		Authenticators:     make(map[string]func(*Request) error),
 		trustedKontrolKeys: make(map[string]string),
-		handlers:           make(map[string]HandlerFunc),
+		handlers:           make(map[string]*Method),
 		server:             &websocket.Server{},
 		kontrol:            kClient,
 		name:               name,
