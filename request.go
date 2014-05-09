@@ -28,7 +28,7 @@ type Response struct {
 }
 
 // runMethod is called when a method is received from remote Kite.
-func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.Partial) {
+func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	var (
 		// The request that will be constructed from incoming dnode message.
 		request *Request
@@ -65,7 +65,7 @@ func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.P
 	// MustString(), MustSlice()... without the fear of panic.
 	defer c.LocalKite.recoverError(&kiteErr)()
 
-	request, callback = c.newRequest(method, args)
+	request, callback = c.newRequest(method.name, args)
 
 	if !c.LocalKite.Config.DisableAuthentication {
 		kiteErr = request.authenticate()
@@ -76,7 +76,7 @@ func (c *Client) runMethod(method string, handlerFunc HandlerFunc, args *dnode.P
 
 	// Call the handler function.
 	var err error
-	result, err = handlerFunc(request)
+	result, err = method.handler.ServeKite(request)
 	if err != nil {
 		switch t := err.(type) {
 		case *Error:

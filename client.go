@@ -320,7 +320,7 @@ func (c *Client) processMessage(data []byte) error {
 			return err
 		}
 
-		c.runMethod(method, m.handler, msg.Arguments)
+		c.runMethod(m, msg.Arguments)
 	default:
 		return fmt.Errorf("Method is not string or integer: %+v (%T)", msg.Method, msg.Method)
 	}
