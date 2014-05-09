@@ -6,7 +6,7 @@ type Handler interface {
 	ServeKite(*Request) (result interface{}, err error)
 }
 
-// The HandlerFunc type is an adapter to allow the use of ordinary functions as
+// HandlerFunc is a type adapter to allow the use of ordinary functions as
 // Kite handlers. If h is a function with the appropriate signature,
 // HandlerFunc(h) is a Handler object that calls h.
 type HandlerFunc func(*Request) (result interface{}, err error)
@@ -16,7 +16,7 @@ func (h HandlerFunc) ServeKite(r *Request) (interface{}, error) {
 	return h(r)
 }
 
-// Method defines a method and the Handlerfunc it is bind to.
+// Method defines a method and the Handler it is bind to.
 type Method struct {
 	// name is the method name
 	name string
