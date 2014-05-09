@@ -20,6 +20,7 @@ import (
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"
 )
@@ -52,6 +53,12 @@ type Kontrol struct {
 	PeerAddr     string   // The public host:port used for peer communication.
 	PeerBindAddr string   // The listening host:port used for peer communication.
 	Peers        []string // other peers in cluster (must be peer address of other instances)
+
+	// MachineAuthenticate is used to authenticate the request in the
+	// "handleMachine" method.  The reason for a separate auth function is, the
+	// request must not be authenticated because clients do not have a kite.key
+	// before they register to this machine.
+	MachineAuthenticate func(r *kite.Request) error
 
 	// RSA keys
 	publicKey  string // for validating tokens
@@ -108,7 +115,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	log = k.Log
 
 	k.HandleFunc("register", kontrol.handleRegister)
-	k.HandleFunc("registerMachine", kontrol.handleMachine)
+	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
@@ -166,14 +173,27 @@ func (k *Kontrol) ClearKites() error {
 	return nil
 }
 
+// RegisterSelf registers this host and writes a key to ~/.kite/kite.key
+func (k *Kontrol) RegisterSelf() error {
+	key, err := k.registerUser(k.Kite.Config.Username)
+	if err != nil {
+		return err
+	}
+	return kitekey.Write(key)
+}
+
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
-	// Only authentication type of machine is is going to be used here
-	if r.Authentication.Type != "machine" {
-		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
+	if k.MachineAuthenticate != nil {
+		if err := k.MachineAuthenticate(r); err != nil {
+			return nil, errors.New("cannot authenticate user")
+		}
 	}
 
 	username := r.Args.One().MustString() // username should be send as an argument
+	return k.registerUser(username)
+}
 
+func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	// Only accept requests of type machine
 	tknID, err := uuid.NewV4()
 	if err != nil {
