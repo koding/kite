@@ -108,6 +108,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	log = k.Log
 
 	k.HandleFunc("register", kontrol.handleRegister)
+	k.HandleFunc("registerMachine", kontrol.handleMachine)
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
@@ -163,6 +164,36 @@ func (k *Kontrol) ClearKites() error {
 		return fmt.Errorf("Cannot clear etcd: %s", err)
 	}
 	return nil
+}
+
+func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
+	// Only authentication type of machine is is going to be used here
+	if r.Authentication.Type != "machine" {
+		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
+	}
+
+	username := r.Args.One().MustString() // username should be send as an argument
+
+	// Only accept requests of type machine
+	tknID, err := uuid.NewV4()
+	if err != nil {
+		return "", errors.New("cannot generate a token")
+	}
+
+	token := jwt.New(jwt.GetSigningMethod("RS256"))
+
+	token.Claims = map[string]interface{}{
+		"iss":        k.Kite.Kite().Username,            // Issuer
+		"sub":        username,                          // Subject
+		"iat":        time.Now().UTC().Unix(),           // Issued At
+		"jti":        tknID.String(),                    // JWT ID
+		"kontrolURL": k.Kite.Config.KontrolURL.String(), // Kontrol URL
+		"kontrolKey": strings.TrimSpace(k.publicKey),    // Public key of kontrol
+	}
+
+	k.Kite.Log.Info("Registered machine on user: %s", username)
+
+	return token.SignedString([]byte(k.privateKey))
 }
 
 // registerValue is the type of the value that is saved to etcd.
