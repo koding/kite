@@ -94,9 +94,9 @@ func TestMultiple(t *testing.T) {
 func TestKite(t *testing.T) {
 	// Create a mathworker kite
 	mathKite := New("mathworker", "0.0.1")
+	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
-	mathKite.Config.DisableAuthentication = true
 	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
 	// Wait until it's started

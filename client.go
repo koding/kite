@@ -277,10 +277,10 @@ func (c *Client) readLoop() error {
 // processMessage processes a single message and calls a handler or callback.
 func (c *Client) processMessage(data []byte) error {
 	var (
-		err     error
-		ok      bool
-		msg     dnode.Message
-		handler HandlerFunc
+		err error
+		ok  bool
+		msg dnode.Message
+		m   *Method
 	)
 
 	// Call error handler.
@@ -315,11 +315,12 @@ func (c *Client) processMessage(data []byte) error {
 		}
 		c.runCallback(callback, msg.Arguments)
 	case string:
-		if handler, ok = c.LocalKite.handlers[method]; !ok {
+		if m, ok = c.LocalKite.handlers[method]; !ok {
 			err = dnode.MethodNotFoundError{method, msg.Arguments}
 			return err
 		}
-		c.runMethod(method, handler, msg.Arguments)
+
+		c.runMethod(m, msg.Arguments)
 	default:
 		return fmt.Errorf("Method is not string or integer: %+v (%T)", msg.Method, msg.Method)
 	}

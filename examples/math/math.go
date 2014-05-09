@@ -10,11 +10,8 @@ func main() {
 	// Create a kite
 	k := kite.New("math", "1.0.0")
 
-	// Authentication is disabled for this example
-	k.Config.DisableAuthentication = true
-
-	// Add our handler method
-	k.HandleFunc("square", Square)
+	// Add our handler method,authentication is disabled for this example
+	k.HandleFunc("square", Square).DisableAuthentication()
 
 	// Attach to a server and run it
 	k.Config.Port = 3636
