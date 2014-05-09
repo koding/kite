@@ -35,7 +35,12 @@ func New(conf *config.Config, version, pubKey, privKey string) *RegServ {
 		publicKey:  pubKey,
 		privateKey: privKey,
 	}
-	k.HandleFunc("register", r.handleRegister)
+
+	// Request must not be authenticated because clients do not have a kite.key
+	// before they register. We will authenticate them in "register" handler
+	// with its own regserv.Authenticate function, therefore disable the
+	// in-built kite authenticators.
+	k.HandleFunc("register", r.handleRegister).DisableAuthentication()
 	return r
 }
 
