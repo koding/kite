@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/proxy"
 	"github.com/koding/kite/testkeys"
@@ -38,6 +40,23 @@ func init() {
 	<-kon.Kite.ServerReadyNotify()
 
 	rand.Seed(time.Now().UTC().UnixNano())
+}
+
+func TestRegisterMachine(t *testing.T) {
+	key, err := kon.registerUser("foo")
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	token, err := jwt.Parse(key, kitekey.GetKontrolKey)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if username := token.Claims["sub"].(string); username != "foo" {
+		t.Fatalf("invalid username: %s", username)
+	}
 }
 
 func TestTokenInvalidation(t *testing.T) {
