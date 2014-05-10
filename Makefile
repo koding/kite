@@ -17,7 +17,6 @@ format:
 install:
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
 	@`which go` install -v ./cmd/kite
-	@`which go` install -v ./regserv/regserv
 	@`which go` install -v ./kontrol/kontrol
 	@`which go` install -v ./proxy/proxy
 
@@ -38,7 +37,6 @@ test:
 	@`which go` test $(VERBOSE) ./systeminfo
 	@`which go` test $(VERBOSE) ./
 	@`which go` test $(VERBOSE) ./test
-	@`which go` test $(VERBOSE) ./regserv
 	@`which go` test $(VERBOSE) ./kontrol
 	@`which go` test $(VERBOSE) ./proxy
 	@`which go` test $(VERBOSE) ./pool

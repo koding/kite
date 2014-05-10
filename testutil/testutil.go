@@ -1,5 +1,4 @@
-// Package testutil provides a default Kontrol and RegServ kites for
-// using in tests.
+// Package testutil provides a default Kontrol kites for using in tests.
 package testutil
 
 import (
@@ -15,8 +14,8 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
-// NewKiteKey returns a new generated kite key. (Copied and modified from regserv.go)
-// If the host does not have a kite.key file kite.New() panics.
+// NewKiteKey returns a new generated kite key. (Copied and modified from
+// kontrol.go) If the host does not have a kite.key file kite.New() panics.
 // This is a helper to put a fake key on it's location.
 func NewKiteKey() *jwt.Token {
 	tknID, err := uuid.NewV4()

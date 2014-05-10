@@ -10,8 +10,6 @@ import (
 	"github.com/koding/kite/kitekey"
 )
 
-const defaultRegServ = "ws://localhost:3998/regserv"
-
 type Register struct {
 	client *kite.Kite
 }
@@ -50,12 +48,12 @@ func (r *Register) Exec(args []string) error {
 		r.client.Log.Warning("Already registered. Registering again...")
 	}
 
-	regserv := r.client.NewClient(parsed)
-	if err = regserv.Dial(); err != nil {
+	kontrol := r.client.NewClient(parsed)
+	if err = kontrol.Dial(); err != nil {
 		return err
 	}
 
-	result, err := regserv.TellWithTimeout("register", 10*time.Minute)
+	result, err := kontrol.TellWithTimeout("registerMachine", 10*time.Minute)
 	if err != nil {
 		return err
 	}
