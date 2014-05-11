@@ -50,7 +50,7 @@ func TestRegisterToKontrol(t *testing.T) {
 	go k.RegisterForever(kiteURL)
 
 	select {
-	case <-k.ReadyNotify():
+	case <-k.KontrolReadyNotify():
 		kites, err := k.GetKites(protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,
@@ -81,7 +81,7 @@ func TestRegisterToProxy(t *testing.T) {
 	go k.RegisterToProxy(false)
 
 	select {
-	case <-k.ReadyNotify():
+	case <-k.KontrolReadyNotify():
 	case <-time.After(10 * time.Second):
 		t.Fatal("timeout")
 	}
@@ -94,7 +94,7 @@ func TestRegisterToProxyAndKontrol(t *testing.T) {
 	go k.RegisterToProxy(true)
 
 	select {
-	case <-k.ReadyNotify():
+	case <-k.KontrolReadyNotify():
 		kites, err := k.GetKites(protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,

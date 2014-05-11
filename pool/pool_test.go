@@ -56,7 +56,7 @@ func TestPool(t *testing.T) {
 
 		go bar.RegisterToProxy(true)
 		defer bar.Close()
-		<-bar.ReadyNotify()
+		<-bar.KontrolReadyNotify()
 	}
 
 	// We must wait for a until the pool receives events from kontrol.

@@ -291,10 +291,14 @@ func (e *Event) Client() *Client {
 	return r
 }
 
-func (k *Kite) ReadyNotify() chan struct{} {
+// KontrolReadyNotify returns a channel that is closed when a successful
+// registiration to kontrol is done.
+func (k *Kite) KontrolReadyNotify() chan struct{} {
 	return k.kontrol.readyRegistered
 }
 
+// signalReady is an internal method to notify that a sucessful registiration
+// is done.
 func (k *Kite) signalReady() {
 	k.kontrol.onceRegistered.Do(func() { close(k.kontrol.readyRegistered) })
 }
@@ -340,7 +344,7 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 	k.kontrol.registerChan <- kiteURL
 
 	select {
-	case <-k.ReadyNotify():
+	case <-k.KontrolReadyNotify():
 		return nil
 	case err := <-errs:
 		return err
