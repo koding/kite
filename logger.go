@@ -83,6 +83,11 @@ func newLogger(name string) (Logger, func(Level)) {
 	logger := logging.NewLogger(name)
 	logger.SetLevel(convertLevel(getLogLevel()))
 
+	if os.Getenv("KITE_LOG_NOCOLOR") != "" {
+		logging.StdoutHandler.Colorize = false
+		logging.StderrHandler.Colorize = false
+	}
+
 	setLevel := func(l Level) {
 		logger.SetLevel(convertLevel(l))
 	}
