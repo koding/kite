@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
@@ -26,10 +27,12 @@ func (t *Tell) Definition() string {
 
 func (t *Tell) Exec(args []string) error {
 	var to, method string
+	var timeout time.Duration
 
 	flags := flag.NewFlagSet("tell", flag.ExitOnError)
 	flags.StringVar(&to, "to", "", "URL of remote kite")
 	flags.StringVar(&method, "method", "", "method to be called")
+	flags.DurationVar(&timeout, "timeout", 4*time.Second, "timeout of tell method")
 	flags.Parse(args)
 
 	parsed, err := url.Parse(to)
@@ -63,7 +66,7 @@ func (t *Tell) Exec(args []string) error {
 		}
 	}
 
-	result, err := remote.Tell(method, params...)
+	result, err := remote.TellWithTimeout(method, timeout, params...)
 	if err != nil {
 		return err
 	}
