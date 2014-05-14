@@ -14,6 +14,10 @@ type Error struct {
 }
 
 func (e Error) Error() string {
+	if e.Type == "genericError" {
+		return e.Message
+	}
+
 	return fmt.Sprintf("kite error %s - %s - %s", e.Type, e.Message, e.Code)
 }
 
