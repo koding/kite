@@ -33,7 +33,7 @@ func main() {
 		i := rand.Intn(10)
 
 		// Call a method of mathworker kite
-		response, err := mathWorker.Tell("square", i)
+		response, err := mathWorker.TellWithTimeout("square", 4*time.Second, i)
 		if err != nil {
 			k.Log.Error(err.Error())
 			continue

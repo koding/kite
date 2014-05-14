@@ -345,7 +345,7 @@ func TestKontrol(t *testing.T) {
 	t.Logf("newToken: %s", newToken)
 
 	// Run "square" method
-	response, err := remoteMathWorker.Tell("square", 2)
+	response, err := remoteMathWorker.TellWithTimeout("square", 4*time.Second, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

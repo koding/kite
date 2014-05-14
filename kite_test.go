@@ -68,7 +68,7 @@ func TestMultiple(t *testing.T) {
 
 					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
-					result, err := clients[i].Tell("square", 2)
+					result, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -120,7 +120,7 @@ func TestKite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := remote.Tell("square", 2)
+	result, err := remote.TellWithTimeout("square", 4*time.Second, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestKite(t *testing.T) {
 		resultChan <- n
 	}
 
-	result, err = remote.Tell("squareCB", 3, dnode.Callback(resultCallback))
+	result, err = remote.TellWithTimeout("squareCB", 4*time.Second, 3, dnode.Callback(resultCallback))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestKite(t *testing.T) {
 		t.Fatal("Did not get the message")
 	}
 
-	result, err = remote.TellWithTimeout("sleep", time.Second*1)
+	result, err = remote.TellWithTimeout("sleep", time.Second)
 	if err == nil {
 		t.Fatal("Did get message in 1 seconds, however the sleep method takes 2 seconds to response")
 	}

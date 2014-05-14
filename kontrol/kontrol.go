@@ -303,7 +303,7 @@ func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 		dnode.Callback(func(args *dnode.Partial) { setterFunc() }),
 	}
 
-	_, err := r.Tell("kite.heartbeat", heartbeatArgs...)
+	_, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
 	return err
 }
 
@@ -487,7 +487,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 			// defer whoClient.Close()
 		}
 
-		result, err := whoClient.Tell("kite.who", args.Who)
+		result, err := whoClient.TellWithTimeout("kite.who", 4*time.Second, args.Who)
 		if err != nil {
 			return nil, err
 		}

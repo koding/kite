@@ -3,6 +3,7 @@ package kite
 import (
 	"container/list"
 	"sync"
+	"time"
 
 	"github.com/koding/kite/protocol"
 )
@@ -43,7 +44,7 @@ func (w *Watcher) Cancel() error {
 		return nil
 	}
 
-	_, err := w.localKite.kontrol.Tell("cancelWatcher", w.id)
+	_, err := w.localKite.kontrol.TellWithTimeout("cancelWatcher", 4*time.Second, w.id)
 	if err == nil {
 		w.canceled = true
 

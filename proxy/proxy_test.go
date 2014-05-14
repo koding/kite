@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
@@ -40,7 +41,7 @@ func TestProxy(t *testing.T) {
 
 	// Kite1 is connected to proxy.
 
-	result, err := prxClt.Tell("register")
+	result, err := prxClt.TellWithTimeout("register", 4*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestProxy(t *testing.T) {
 
 	// kite2 is connected to kite1 via proxy kite.
 
-	result, err = kite1remote.Tell("foo")
+	result, err = kite1remote.TellWithTimeout("foo", 4*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
