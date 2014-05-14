@@ -97,6 +97,7 @@ func TestKite(t *testing.T) {
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
+	mathKite.HandleFunc("sleep", Sleep)
 	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
 	// Wait until it's started
@@ -160,6 +161,27 @@ func TestKite(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Did not get the message")
 	}
+
+	result, err = remote.TellWithTimeout("sleep", time.Second*1)
+	if err == nil {
+		t.Fatal("Did get message in 1 seconds, however the sleep method takes 2 seconds to response")
+	}
+
+	result, err = remote.Tell("sleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result.MustBool() {
+		t.Fatal("sleep result must be true")
+	}
+
+}
+
+// Sleeps for 2 seconds and returns true
+func Sleep(r *Request) (interface{}, error) {
+	time.Sleep(time.Second * 2)
+	return true, nil
 }
 
 // Returns the result. Also tests reverse call.

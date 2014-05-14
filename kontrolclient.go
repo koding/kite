@@ -205,7 +205,7 @@ func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
 func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID string, err error) {
 	<-k.kontrol.readyConnected
 
-	response, err := k.kontrol.Tell("getKites", args)
+	response, err := k.kontrol.TellWithTimeout("getKites", 4*time.Second, args)
 	if err != nil {
 		return nil, "", err
 	}
@@ -261,7 +261,7 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 
 	<-k.kontrol.readyConnected
 
-	result, err := k.kontrol.Tell("getToken", kite)
+	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
 	if err != nil {
 		return "", err
 	}
@@ -367,7 +367,7 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		URL: kiteURL.String(),
 	}
 
-	response, err := k.kontrol.Tell("register", args)
+	response, err := k.kontrol.TellWithTimeout("register", 4*time.Second, args)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (k *Kite) registerToProxyKite(c *Client) (*url.URL, error) {
 		}
 	}()
 
-	result, err := c.Tell("register")
+	result, err := c.TellWithTimeout("register", 4*time.Second)
 	if err != nil {
 		k.Log.Error("Proxy register error: %s", err.Error())
 		return nil, err

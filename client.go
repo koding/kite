@@ -17,10 +17,6 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-// Default timeout value for Client.Tell method.
-// It can be overriden with Client.SetTellTimeout.
-const DefaultTellTimeout = 4 * time.Second
-
 var forever = backoff.NewExponentialBackoff()
 
 func init() {
@@ -50,9 +46,6 @@ type Client struct {
 
 	// To signal waiters of Go() on disconnect.
 	disconnect chan struct{}
-
-	// Duration to wait reply from remote when making a request with Tell().
-	tellTimeout time.Duration
 
 	// Websocket connection
 	conn *websocket.Conn
@@ -125,7 +118,6 @@ func (k *Kite) NewClient(remoteURL *url.URL) *Client {
 		},
 		Concurrent: true,
 	}
-	r.SetTellTimeout(DefaultTellTimeout)
 
 	var m sync.Mutex
 	r.OnDisconnect(func() {
@@ -146,9 +138,6 @@ func (k *Kite) NewClientString(remoteURL string) *Client {
 	}
 	return k.NewClient(parsed)
 }
-
-// SetTellTimeout sets the timeout duration for requests made with Tell().
-func (c *Client) SetTellTimeout(d time.Duration) { c.tellTimeout = d }
 
 func (c *Client) RemoteAddr() string {
 	if c.conn != nil {
@@ -473,9 +462,11 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 		return
 	}
 
-	// Use default timeout from r (Client) if zero.
-	if timeout == 0 {
-		timeout = c.tellTimeout
+	// nil value of afterTimeout means no timeout, it will not selected in
+	// select statement
+	var afterTimeout <-chan time.Time
+	if timeout > 0 {
+		afterTimeout = time.After(timeout)
 	}
 
 	// Waits until the response has came or the connection has disconnected.
@@ -491,7 +482,7 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 					Message: "Remote kite has disconnected",
 				},
 			}
-		case <-time.After(timeout):
+		case <-afterTimeout:
 			responseChan <- &response{
 				nil,
 				&Error{
