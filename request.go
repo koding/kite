@@ -44,12 +44,15 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 
 	// The request that will be constructed from incoming dnode message.
 	request, callFunc = c.newRequest(method.name, args)
-
 	if method.authenticate {
 		if err := request.authenticate(); err != nil {
 			callFunc(nil, err)
 			return
 		}
+	} else {
+		// if not valided accept any username it sends, also useful for test
+		// cases.
+		request.Username = request.Client.Kite.Username
 	}
 
 	// Call the handler function.
