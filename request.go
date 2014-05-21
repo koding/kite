@@ -81,7 +81,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	args.One().MustUnmarshal(&options)
 
 	// Notify the handlers registered with Kite.OnFirstRequest().
-	if c.RemoteAddr() != "" {
+	if _, ok := c.session.(*WebsocketSession); !ok {
 		c.firstRequestHandlersNotified.Do(func() {
 			c.Kite = options.Kite
 			c.LocalKite.callOnFirstRequestHandlers(c)
@@ -120,8 +120,8 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 // authenticator function.
 func (r *Request) authenticate() *Error {
 	// Trust the Kite if we have initiated the connection.
-	// RemoteAddr() returns "" if this is an outgoing connection.
-	if r.Client.RemoteAddr() == "" {
+	// Following cast means, session is opened by the client.
+	if _, ok := r.Client.session.(*WebsocketSession); ok {
 		return nil
 	}
 

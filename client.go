@@ -13,6 +13,7 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/cenkalti/backoff"
+	"github.com/igm/sockjs-go/sockjs"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
@@ -47,8 +48,8 @@ type Client struct {
 	// To signal waiters of Go() on disconnect.
 	disconnect chan struct{}
 
-	// Websocket connection
-	conn *websocket.Conn
+	// SockJS session
+	session sockjs.Session
 
 	// dnode scrubber for saving callbacks sent to remote.
 	scrubber *dnode.Scrubber
@@ -103,9 +104,6 @@ type response struct {
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
 func (k *Kite) NewClient(remoteURL *url.URL) *Client {
-	// Must send an "Origin" header. Does not checked on server.
-	origin, _ := url.Parse("")
-
 	r := &Client{
 		LocalKite:     k,
 		disconnect:    make(chan struct{}),
@@ -113,7 +111,6 @@ func (k *Kite) NewClient(remoteURL *url.URL) *Client {
 		scrubber:      dnode.NewScrubber(),
 		WSConfig: &websocket.Config{
 			Version:  websocket.ProtocolVersionHybi13,
-			Origin:   origin,
 			Location: remoteURL,
 		},
 		Concurrent: true,
@@ -139,18 +136,18 @@ func (k *Kite) NewClientString(remoteURL string) *Client {
 	return k.NewClient(parsed)
 }
 
-func (c *Client) RemoteAddr() string {
-	if c.conn != nil {
-		if req := c.conn.Request(); req != nil {
-			return req.RemoteAddr
-		}
-	}
-	return ""
-}
-
 // Dial connects to the remote Kite. Returns error if it can't.
 func (c *Client) Dial() (err error) {
 	c.LocalKite.Log.Info("Dialing remote kite: [%s %s]", c.Kite.Name, c.WSConfig.Location.String())
+
+	// TODO Randomize server_id and session_id
+	c.WSConfig.Location.Path += "/kite/000/asdf/websocket"
+
+	// Sockjs checks for "Origin" header. Must be same with Location.
+	c.WSConfig.Origin = &url.URL{
+		Scheme: "http",
+		Host:   c.WSConfig.Location.Host,
+	}
 
 	if err := c.dial(); err != nil {
 		return err
@@ -189,16 +186,18 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 	go c.run()
 }
 
-func (c *Client) dial() (err error) {
+func (c *Client) dial() error {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
 	fixPortNumber(c.WSConfig.Location)
 
-	c.conn, err = websocket.DialConfig(c.WSConfig)
+	conn, err := websocket.DialConfig(c.WSConfig)
 	if err != nil {
 		return err
 	}
+
+	c.session = NewWebsocketSession(conn)
 
 	// Must be run in a goroutine because a handler may wait a response from
 	// server.
@@ -318,8 +317,8 @@ func (c *Client) processMessage(data []byte) error {
 
 func (c *Client) Close() {
 	c.Reconnect = false
-	if c.conn != nil {
-		c.conn.Close()
+	if c.session != nil {
+		c.session.Close(0, "")
 	}
 }
 
@@ -327,25 +326,24 @@ func (c *Client) Close() {
 func (c *Client) sendData(msg []byte) error {
 	c.LocalKite.Log.Debug("Sending : %s", string(msg))
 
-	if c.conn == nil {
+	if c.session == nil {
 		return errors.New("not connected")
 	}
 
-	return websocket.Message.Send(c.conn, string(msg))
+	return c.session.Send(string(msg))
 }
 
 // receiveData reads a message from the websocket.
 func (c *Client) receiveData() ([]byte, error) {
-	if c.conn == nil {
+	if c.session == nil {
 		return nil, errors.New("not connected")
 	}
 
-	var msg []byte
-	err := websocket.Message.Receive(c.conn, &msg)
+	msg, err := c.session.Recv()
 
-	c.LocalKite.Log.Debug("Received : %s", string(msg))
+	c.LocalKite.Log.Debug("Received : %s", msg)
 
-	return msg, err
+	return []byte(msg), err
 }
 
 // OnConnect registers a function to run on connect.

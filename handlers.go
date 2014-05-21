@@ -119,6 +119,8 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	go r.LocalKite.server.Handler(remoteConn)
+	session := NewWebsocketSession(remoteConn)
+
+	go r.LocalKite.sockjsHandler(session)
 	return nil, nil
 }
