@@ -37,10 +37,7 @@ Import it with:
 import "github.com/koding/kite"
 ```
 
-and use `kite` as the package name inside the code. Check out the
-[examples](https://github.com/koding/kite/tree/master/examples) folder for a
-simple usage case.
-
+and use `kite` as the package name inside the code. 
 
 What is *Kontrol*?
 ------------------
@@ -75,8 +72,56 @@ How can I write a new kite?
 
 * Import `kite` package.
 * Create a new instance with `kite.New()`.
-* Add your method handlers with `k.HandleFunc()`.
+* Add your method handlers with `k.HandleFunc()` or `k.Handle()`.
 * Call `k.Run()`
 
-See [an example](https://github.com/koding/kite/blob/master/examples/math/math.go)
-for the code of an example kite.
+Below you can find an example, a math kite which calculates the square of a
+received number:
+
+```go
+package main
+
+import "github.com/koding/kite"
+
+func main() {
+	// Create a kite
+	k := kite.New("math", "1.0.0")
+
+	// Add our handler method with the name "square"
+	k.HandleFunc("square", func(r *kite.Request) (interface{}, error) {
+		a := r.Args.One().MustFloat64()
+		result := a * a    // calculate the square
+		return result, nil // send back the result
+	}).DisableAuthentication()
+
+	// Attach to a server with port 3636 and run it
+	k.Config.Port = 3636
+	k.Run()
+}
+```
+
+Now let's connect to it and send a `4` as an argument.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/koding/kite"
+)
+
+func main() {
+	k := kite.New("exp2", "1.0.0")
+
+	// Connect to our math kite
+	mathWorker := k.NewClientString("ws://localhost:3636")
+	mathWorker.Dial()
+
+	response, _ := mathWorker.Tell("square", 4) // call "square" method with argument 4
+	fmt.Println("result:", response.MustFloat64())
+}
+```
+
+Check out the [examples](https://github.com/koding/kite/tree/master/examples)
+folder for more examples.
