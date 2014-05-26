@@ -349,7 +349,6 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 	case err := <-errs:
 		return err
 	}
-
 }
 
 // Register registers current Kite to Kontrol. After registration other Kites

@@ -114,7 +114,7 @@ func TestKite(t *testing.T) {
 	})
 
 	// exp2 connects to mathworker
-	remote := exp2Kite.NewClientString("ws://127.0.0.1:3636")
+	remote := exp2Kite.NewClientString("http://127.0.0.1:3636/kite")
 	err := remote.Dial()
 	if err != nil {
 		t.Fatal(err)

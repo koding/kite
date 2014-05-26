@@ -140,15 +140,6 @@ func (k *Kite) NewClientString(remoteURL string) *Client {
 func (c *Client) Dial() (err error) {
 	c.LocalKite.Log.Info("Dialing remote kite: [%s %s]", c.Kite.Name, c.WSConfig.Location.String())
 
-	// TODO Randomize server_id and session_id
-	c.WSConfig.Location.Path += "/kite/000/asdf/websocket"
-
-	// Sockjs checks for "Origin" header. Must be same with Location.
-	c.WSConfig.Origin = &url.URL{
-		Scheme: "http",
-		Host:   c.WSConfig.Location.Host,
-	}
-
 	if err := c.dial(); err != nil {
 		return err
 	}
@@ -191,6 +182,30 @@ func (c *Client) dial() error {
 	defer c.redialBackOff.Reset()
 
 	fixPortNumber(c.WSConfig.Location)
+
+	// Kites use WebSocket transport for SockJS session.
+	// Do not modify original location because it may be used again and give error.
+	newLocation := new(url.URL)
+	*newLocation = *c.WSConfig.Location
+	switch newLocation.Scheme {
+	case "http":
+		newLocation.Scheme = "ws"
+	case "https":
+		newLocation.Scheme = "wss"
+	default:
+		return fmt.Errorf("invalid scheme in url: %s", newLocation.Scheme)
+	}
+
+	// TODO Randomize server_id and session_id
+	newLocation.Path += "/000/asdf/websocket"
+
+	c.WSConfig.Location = newLocation
+
+	// Sockjs checks for "Origin" header. Must be same with Location.
+	c.WSConfig.Origin = &url.URL{
+		Scheme: "http",
+		Host:   c.WSConfig.Location.Host,
+	}
 
 	conn, err := websocket.DialConfig(c.WSConfig)
 	if err != nil {

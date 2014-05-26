@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -240,13 +239,6 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// for generating tokens for this kite.
 	if r.Authentication.Type != "kiteKey" {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
-	}
-
-	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
-	host, port, _ := net.SplitHostPort(args.URL.Host)
-	if host == "0.0.0.0" || host == "" {
-		host, _, _ = net.SplitHostPort(r.Client.RemoteAddr())
-		args.URL.Host = net.JoinHostPort(host, port)
 	}
 
 	err := k.register(r.Client, args.URL)

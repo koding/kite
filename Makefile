@@ -38,8 +38,8 @@ test:
 	@`which go` test $(VERBOSE) ./
 	@`which go` test $(VERBOSE) ./test
 	@`which go` test $(VERBOSE) ./kontrol
-	@`which go` test $(VERBOSE) ./proxy
-	@`which go` test $(VERBOSE) ./pool
+	# @`which go` test $(VERBOSE) ./proxy
+	# @`which go` test $(VERBOSE) ./pool
 
 doc:
 	@`which godoc` github.com/koding/kite | less

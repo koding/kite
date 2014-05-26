@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/proxy"
+	// "github.com/koding/kite/proxy"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -19,7 +20,7 @@ import (
 func TestPool(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
@@ -31,8 +32,8 @@ func TestPool(t *testing.T) {
 	<-kon.Kite.ServerReadyNotify()
 	// defer kon.Close()
 
-	prx := proxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	prx.Start()
+	// prx := proxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+	// prx.Start()
 	// defer prx.Close()
 
 	foo := kite.New("foo", "1.0.0")
@@ -49,18 +50,19 @@ func TestPool(t *testing.T) {
 	// defer p.Close()
 
 	for i := 0; i < 2; i++ {
-		bar := kite.New("bar", "1.0.0")
+		bar := kite.New("x", "1.0.0")
 		bar.Config = conf.Copy()
+		bar.Config.Port = 6760 + i
 		go bar.Run()
 		<-bar.ServerReadyNotify()
 
-		go bar.RegisterToProxy(true)
+		go bar.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(bar.Config.Port+i), Path: "/kite"})
 		defer bar.Close()
 		<-bar.KontrolReadyNotify()
 	}
 
 	// We must wait for a until the pool receives events from kontrol.
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 
 	if len(p.Kites) != 2 {
 		t.Fatalf("expected 2 kited, found: %d", len(p.Kites))
