@@ -50,7 +50,7 @@ func TestPool(t *testing.T) {
 	// defer p.Close()
 
 	for i := 0; i < 2; i++ {
-		bar := kite.New("x", "1.0.0")
+		bar := kite.New("bar", "1.0.0")
 		bar.Config = conf.Copy()
 		bar.Config.Port = 6760 + i
 		go bar.Run()
