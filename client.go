@@ -162,16 +162,14 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 	go c.run()
 }
 
-func (c *Client) dial() error {
+func (c *Client) dial() (err error) {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
-	session, err := sockjsclient.ConnectWebsocketSession(c.URL)
+	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
 	if err != nil {
 		return err
 	}
-
-	c.session = session
 
 	// Must be run in a goroutine because a handler may wait a response from
 	// server.
