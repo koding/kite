@@ -3,6 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -38,6 +39,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// functions like MustString(), MustSlice()... without the fear of panic.
 	defer func() {
 		if r := recover(); r != nil {
+			debug.PrintStack()
 			callFunc(nil, createError(r))
 		}
 	}()
