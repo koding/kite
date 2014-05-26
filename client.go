@@ -268,7 +268,7 @@ func (c *Client) processMessage(data []byte) error {
 func (c *Client) Close() {
 	c.Reconnect = false
 	if c.session != nil {
-		c.session.Close(0, "")
+		c.session.Close(3000, "Go away!")
 	}
 }
 
