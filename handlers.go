@@ -9,6 +9,7 @@ import (
 
 	"code.google.com/p/go.crypto/ssh/terminal"
 	"code.google.com/p/go.net/websocket"
+	"github.com/koding/kite/sockjsclient"
 	"github.com/koding/kite/systeminfo"
 )
 
@@ -119,7 +120,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	session := NewWebsocketSession(remoteConn)
+	session := sockjsclient.NewWebsocketSession(remoteConn)
 
 	go r.LocalKite.sockjsHandler(session)
 	return nil, nil

@@ -12,6 +12,7 @@ import (
 	"github.com/igm/sockjs-go/sockjs"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/sockjsclient"
 )
 
 var forever = backoff.NewExponentialBackoff()
@@ -165,7 +166,7 @@ func (c *Client) dial() error {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
-	session, err := ConnectWebsocketSession(c.URL)
+	session, err := sockjsclient.ConnectWebsocketSession(c.URL)
 	if err != nil {
 		return err
 	}

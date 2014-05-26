@@ -1,4 +1,4 @@
-package kite
+package sockjsclient
 
 // http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html
 
