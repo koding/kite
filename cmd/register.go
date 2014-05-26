@@ -3,7 +3,6 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/koding/kite"
@@ -39,17 +38,12 @@ func (r *Register) Exec(args []string) error {
 	}
 	r.client.Config.Username = *username
 
-	parsed, err := url.Parse(*to)
-	if err != nil {
-		return err
-	}
-
-	if _, err = kitekey.Read(); err == nil {
+	if _, err := kitekey.Read(); err == nil {
 		r.client.Log.Warning("Already registered. Registering again...")
 	}
 
-	kontrol := r.client.NewClient(parsed)
-	if err = kontrol.Dial(); err != nil {
+	kontrol := r.client.NewClient(*to)
+	if err := kontrol.Dial(); err != nil {
 		return err
 	}
 
@@ -58,8 +52,7 @@ func (r *Register) Exec(args []string) error {
 		return err
 	}
 
-	err = kitekey.Write(result.MustString())
-	if err != nil {
+	if err := kitekey.Write(result.MustString()); err != nil {
 		return err
 	}
 

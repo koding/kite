@@ -17,7 +17,7 @@ func main() {
 	k := kite.New("exp2", "1.0.0")
 
 	// Create mathworker client
-	mathWorker := k.NewClientString("http://localhost:3636/kite")
+	mathWorker := k.NewClient("http://localhost:3636/kite")
 
 	// Connect to remote kite
 	connected, err := mathWorker.DialForever()

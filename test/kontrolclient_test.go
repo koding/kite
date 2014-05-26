@@ -66,8 +66,8 @@ func TestRegisterToKontrol(t *testing.T) {
 		if first.Kite != *k.Kite() {
 			t.Errorf("unexpected kite key: %s", first.Kite)
 		}
-		if first.WSConfig.Location.String() != "http://zubuzaretta:16500/kite" {
-			t.Errorf("unexpected url: %s", first.WSConfig.Location.String())
+		if first.URL != "http://zubuzaretta:16500/kite" {
+			t.Errorf("unexpected url: %s", first.URL)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout")

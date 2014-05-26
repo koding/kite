@@ -468,7 +468,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		if whoClient == nil {
 			// TODO Enable code below after fix.
 			return nil, errors.New("target kite is not connected")
-			// whoClient = k.Kite.NewClientString(whoKite.URL)
+			// whoClient = k.Kite.NewClient(whoKite.URL)
 			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
 			// whoClient.Kite = whoKite.Kite
 
