@@ -28,11 +28,16 @@ func NewKiteKey() *jwt.Token {
 		panic(err)
 	}
 
+	username := "testuser"
+	if testuser := os.Getenv("TESTKEY_USERNAME"); testuser != "" {
+		username = testuser
+	}
+
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
 		"iss":        "testuser",              // Issuer
-		"sub":        "testuser",              // Issued to
+		"sub":        username,                // Issued to
 		"aud":        hostname,                // Hostname of registered machine
 		"iat":        time.Now().UTC().Unix(), // Issued At
 		"jti":        tknID.String(),          // JWT ID
