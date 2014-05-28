@@ -33,7 +33,7 @@ go run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/
 
 # run essential kites
 go run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data &
-go run proxy/proxy/main.go     -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem &
+# go run proxy/proxy/main.go     -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem &
 
 # run simple math kite
-go run examples/math-simple.go
+go run examples/math/math.go
