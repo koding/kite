@@ -36,4 +36,4 @@ go run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/
 # go run proxy/proxy/main.go     -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem &
 
 # run simple math kite
-go run examples/math/math-register.go
+go run examples/math-register/math-register.go
