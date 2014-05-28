@@ -16,6 +16,7 @@ type Config struct {
 	Username              string
 	Environment           string
 	Region                string
+	Id                    string
 	KiteKey               string
 	DisableAuthentication bool
 	DisableConcurrency    bool
@@ -95,6 +96,11 @@ func (c *Config) ReadKiteKey() error {
 
 	if kontrolUser, ok := key.Claims["iss"].(string); ok {
 		c.KontrolUser = kontrolUser
+	}
+
+	// jti is used for jwt's but let's also use it for kite ID
+	if id, ok := key.Claims["jti"].(string); ok {
+		c.Id = id
 	}
 
 	if kontrolURL, ok := key.Claims["kontrolURL"].(string); ok {

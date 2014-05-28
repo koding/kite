@@ -17,8 +17,10 @@ func main() {
 	k.HandleFunc("square", Square)
 
 	// Get config from kite.Key directly, usually it's under ~/.kite/kite.key
-	k.Config = config.MustGet()
+	config := config.MustGet()
+	k.Config = config
 	k.Config.Port = 6667
+	k.Id = config.Id
 
 	// Register to kite with this url
 	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:6667"}
