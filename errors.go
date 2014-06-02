@@ -18,11 +18,11 @@ func (e Error) Code() string {
 }
 
 func (e Error) Error() string {
-	if e.Type == "genericError" {
+	if e.Type == "genericError" || e.Type == "" {
 		return e.Message
 	}
 
-	return fmt.Sprintf("kite error %s - %s - %s", e.Type, e.Message, e.Code)
+	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
 // createError creates a new kite.Error for the given r variable
