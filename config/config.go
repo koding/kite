@@ -30,7 +30,8 @@ type Config struct {
 	KontrolUser string
 }
 
-var defaultConfig = &Config{
+// DefaultConfig contains the default settings.
+var DefaultConfig = &Config{
 	Username:    "unknown",
 	Environment: "unknown",
 	Region:      "unknown",
@@ -41,7 +42,7 @@ var defaultConfig = &Config{
 // New returns a new Config initialized with defaults.
 func New() *Config {
 	c := new(Config)
-	*c = *defaultConfig
+	*c = *DefaultConfig
 	return c
 }
 
