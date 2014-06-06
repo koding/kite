@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
@@ -26,7 +27,8 @@ type Proxy struct {
 	TLSConfig *tls.Config
 
 	// Holds registered kites. Keys are kite IDs.
-	kites map[string]*url.URL
+	kites   map[string]*url.URL
+	kitesMu sync.Mutex
 
 	// muxer for proxy
 	mux *http.ServeMux
@@ -56,20 +58,48 @@ func New(conf *config.Config) *Proxy {
 		RegisterToKontrol: true,
 		PublicHost:        DefaultPublicHost,
 	}
+
+	// third part kites are going to use this to register themself to
+	// proxy-kite and get a proxy url, which they use for register to kontrol.
 	p.Kite.HandleFunc("register", p.handleRegister)
 
+	// create our websocketproxy http.handler
 	proxy := &websocketproxy.WebsocketProxy{
 		Backend: p.backend,
 	}
 
 	p.mux.Handle("/kite", k)
-	p.mux.Handle("/", proxy)
+	p.mux.Handle("/proxy", proxy)
 
 	return p
 }
 
-func (p *Proxy) backend(r *http.Request) *url.URL {
-	return nil
+func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
+	p.kites[r.Client.ID] = r.Client.WSConfig.Location
+
+	proxyURL := url.URL{
+		Scheme:   p.Url.Scheme,
+		Host:     p.Url.Host,
+		Path:     "proxy",
+		RawQuery: "kiteId=" + r.Client.ID,
+	}
+
+	return proxyURL.String(), nil
+}
+
+func (p *Proxy) backend(req *http.Request) *url.URL {
+	kiteId := req.URL.Query().Get("kiteId")
+
+	p.kitesMu.Lock()
+	defer p.kitesMu.Unlock()
+
+	backendURL, ok := p.kites[kiteId]
+	if !ok {
+		p.Kite.Log.Error("kite for id '%s' is not found: %s", kiteId, req.URL.String())
+		return nil
+	}
+
+	return backendURL
 }
 
 func (p *Proxy) registerURL(scheme string) *url.URL {
@@ -138,17 +168,4 @@ func (p *Proxy) ListenAndServeTLS(certFile, keyFile string) error {
 
 	defer p.Kite.Close()
 	return server.Serve(p.listener)
-}
-
-func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
-	p.kites[r.Client.ID] = r.Client.WSConfig.Location
-
-	proxyURL := url.URL{
-		Scheme:   p.Url.Scheme,
-		Host:     p.Url.Host,
-		Path:     "proxy",
-		RawQuery: "kiteID=" + r.Client.ID,
-	}
-
-	return proxyURL.String(), nil
 }
