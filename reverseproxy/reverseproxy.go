@@ -9,6 +9,7 @@ import (
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
+	"github.com/koding/websocketproxy"
 )
 
 const (
@@ -28,7 +29,7 @@ type Proxy struct {
 	kites map[string]*url.URL
 
 	// muxer for proxy
-	mux http.Handler
+	mux *http.ServeMux
 
 	// If given it must match the domain in certificate.
 	PublicHost string
@@ -48,20 +49,27 @@ func New(conf *config.Config) *Proxy {
 		k.Config.Port = DefaultPort
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/kite", k)
-
 	p := &Proxy{
 		Kite:              k,
 		kites:             make(map[string]*url.URL),
-		mux:               mux,
+		mux:               http.NewServeMux(),
 		RegisterToKontrol: true,
 		PublicHost:        DefaultPublicHost,
 	}
-
 	p.Kite.HandleFunc("register", p.handleRegister)
 
+	proxy := &websocketproxy.WebsocketProxy{
+		Backend: p.backend,
+	}
+
+	p.mux.Handle("/kite", k)
+	p.mux.Handle("/", proxy)
+
 	return p
+}
+
+func (p *Proxy) backend(r *http.Request) *url.URL {
+	return nil
 }
 
 func (p *Proxy) registerURL(scheme string) *url.URL {
