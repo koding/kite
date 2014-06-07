@@ -81,6 +81,4 @@ func TestProxy(t *testing.T) {
 	if s != "bar" {
 		t.Fatalf("Wrong reply: %s", s)
 	}
-
-	kite1.Close()
 }
