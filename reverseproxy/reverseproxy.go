@@ -81,16 +81,6 @@ func New(conf *config.Config) *Proxy {
 		},
 	}
 
-	registerURL := &url.URL{
-		Scheme: p.Scheme,
-		Host:   p.PublicHost,
-		Path:   "/kite",
-	}
-
-	if err := p.Kite.RegisterForever(registerURL); err != nil {
-		k.Log.Fatal("Registering to Kontrol: %s", err)
-	}
-
 	p.mux.Handle("/kite", k)
 	p.mux.Handle("/proxy", proxy)
 
