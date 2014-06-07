@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/websocketproxy"
@@ -15,7 +16,7 @@ import (
 
 const (
 	Version           = "0.0.1"
-	Name              = "reverseproxy"
+	Name              = "proxy"
 	DefaultPort       = 3999
 	DefaultPublicHost = "localhost:3999"
 )
@@ -25,6 +26,9 @@ type Proxy struct {
 
 	listener  net.Listener
 	TLSConfig *tls.Config
+
+	readyC chan bool // To signal when kite is ready to accept connections
+	closeC chan bool // To signal when kite is closed with Close()
 
 	// Holds registered kites. Keys are kite IDs.
 	kites   map[string]*url.URL
@@ -54,6 +58,8 @@ func New(conf *config.Config) *Proxy {
 	p := &Proxy{
 		Kite:              k,
 		kites:             make(map[string]*url.URL),
+		readyC:            make(chan bool),
+		closeC:            make(chan bool),
 		mux:               http.NewServeMux(),
 		RegisterToKontrol: true,
 		PublicHost:        DefaultPublicHost,
@@ -66,25 +72,54 @@ func New(conf *config.Config) *Proxy {
 	// create our websocketproxy http.handler
 	proxy := &websocketproxy.WebsocketProxy{
 		Backend: p.backend,
+		Upgrader: &websocket.Upgrader{
+			ReadBufferSize:  4096,
+			WriteBufferSize: 4096,
+			CheckOrigin: func(r *http.Request) bool {
+				// TODO: change this to publicdomain and also kites should add them to
+				return true
+			},
+		},
 	}
 
 	p.mux.Handle("/kite", k)
 	p.mux.Handle("/proxy", proxy)
 
+	k.OnDisconnect(func(r *kite.Client) {
+		k.Log.Info("Removing kite Id '%s' from proxy. It's disconnected", r.Kite.ID)
+		delete(p.kites, r.Kite.ID)
+	})
+
 	return p
 }
 
+func (p *Proxy) CloseNotify() chan bool {
+	return p.closeC
+}
+
+func (p *Proxy) ReadyNotify() chan bool {
+	return p.readyC
+}
+
 func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
-	p.kites[r.Client.ID] = r.Client.WSConfig.Location
+	kiteUrl, err := url.Parse(r.Args.One().MustString())
+	if err != nil {
+		return nil, err
+	}
+
+	p.kites[r.Client.ID] = kiteUrl
 
 	proxyURL := url.URL{
-		Scheme:   p.Url.Scheme,
-		Host:     p.Url.Host,
+		Scheme:   "ws",
+		Host:     p.PublicHost,
 		Path:     "proxy",
 		RawQuery: "kiteId=" + r.Client.ID,
 	}
 
-	return proxyURL.String(), nil
+	s := proxyURL.String()
+	p.Kite.Log.Info("Registering kite with url: '%s'. Can be reached now with: '%s'", kiteUrl, s)
+
+	return s, nil
 }
 
 func (p *Proxy) backend(req *http.Request) *url.URL {
@@ -98,6 +133,8 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 		p.Kite.Log.Error("kite for id '%s' is not found: %s", kiteId, req.URL.String())
 		return nil
 	}
+
+	p.Kite.Log.Info("Returning backend url: '%s' for kiteId: %s", backendURL.String(), kiteId)
 
 	return backendURL
 }
@@ -116,16 +153,17 @@ func (p *Proxy) registerURL(scheme string) *url.URL {
 }
 
 // ListenAndServe listens on the TCP network address addr and then calls Serve
-// with handler to handle requests on incoming connections. Handler is
-// typically nil, in which case the DefaultServeMux is used.
+// with handler to handle requests on incoming connections.
 func (p *Proxy) ListenAndServe() error {
 	var err error
 	p.listener, err = net.Listen("tcp",
 		net.JoinHostPort(p.Kite.Config.IP, strconv.Itoa(p.Kite.Config.Port)))
-
 	if err != nil {
 		return err
 	}
+	p.Kite.Log.Info("Listening on: %s", p.listener.Addr().String())
+
+	close(p.readyC)
 
 	if p.RegisterToKontrol {
 		go p.Kite.RegisterForever(p.registerURL("ws"))
@@ -135,7 +173,7 @@ func (p *Proxy) ListenAndServe() error {
 		Handler: p.mux,
 	}
 
-	defer p.Kite.Close()
+	defer close(p.closeC)
 	return server.Serve(p.listener)
 }
 
@@ -154,6 +192,10 @@ func (p *Proxy) ListenAndServeTLS(certFile, keyFile string) error {
 	if err != nil {
 		p.Kite.Log.Fatal(err.Error())
 	}
+	p.Kite.Log.Info("Listening on: %s", p.listener.Addr().String())
+
+	// now we are ready
+	close(p.readyC)
 
 	p.listener = tls.NewListener(p.listener, tlsConfig)
 
@@ -166,6 +208,11 @@ func (p *Proxy) ListenAndServeTLS(certFile, keyFile string) error {
 		TLSConfig: tlsConfig,
 	}
 
+	defer close(p.closeC)
 	defer p.Kite.Close()
 	return server.Serve(p.listener)
+}
+
+func (p *Proxy) Run() {
+	p.ListenAndServe()
 }
