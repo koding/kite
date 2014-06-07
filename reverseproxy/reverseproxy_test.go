@@ -1,13 +1,18 @@
 package reverseproxy
 
 import (
+	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -20,59 +25,100 @@ func TestProxy(t *testing.T) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
-	proxyConf := conf.Copy()
-	proxyConf.DisableAuthentication = true // no kontrol running in test
+	// start kontrol
+	color.Green("Starting kontrol")
+	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+	kon.DataDir, _ = ioutil.TempDir("", "")
+	defer os.RemoveAll(kon.DataDir)
+	go kon.Run()
+	<-kon.Kite.ServerReadyNotify()
 
+	// start proxy
+	color.Green("Starting Proxy and registering to Kontrol")
+	proxyConf := conf.Copy()
 	proxy := New(proxyConf)
 	go proxy.Run()
 	<-proxy.ReadyNotify()
 
-	// Proxy kite is ready.
-	kite1 := kite.New("kite1", "1.0.0")
-	kite1.Config = conf.Copy()
-	kite1.Config.DisableAuthentication = true
-	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
+	// start now backend kite
+	color.Green("Starting BackendKite")
+	backendKite := kite.New("backendKite", "1.0.0")
+	backendKite.Config = conf.Copy()
+	backendKite.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
 		return "bar", nil
 	})
 
-	kite1.Config.Port = 7777
-	kite1URL := &url.URL{Scheme: "ws", Host: "localhost:7777"}
-	go kite1.Run()
+	backendKite.Config.Port = 7777
+	kiteUrl := &url.URL{Scheme: "ws", Host: "localhost:7777"}
 
-	<-kite1.ServerReadyNotify()
+	go backendKite.Run()
+	<-backendKite.ServerReadyNotify()
 
-	prxClt := kite1.NewClientString("ws://localhost:3999/kite")
-	err := prxClt.Dial()
+	// now search for a proxy from kontrol
+	color.Green("BackendKite is searching proxy from kontrol")
+	kites, err := backendKite.GetKites(protocol.KontrolQuery{
+		Username:    "testuser",
+		Environment: config.DefaultConfig.Environment,
+		Name:        Name,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Kite1 is connected to proxy.
-	result, err := prxClt.TellWithTimeout("register", 4*time.Second, kite1URL.String())
+	proxyKite := kites[0]
+	err = proxyKite.Dial()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// backendKite is connected to proxy, now let us register to proxy and get
+	// a proxy url. We send our url to proxy, it needs it in order to proxy us
+	color.Green("Backendkite found proxy, now registering to it")
+	result, err := proxyKite.TellWithTimeout("register", 4*time.Second, kiteUrl.String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	proxyURL := result.MustString()
-
 	t.Logf("Registered to proxy with URL: %s", proxyURL)
 
 	if !strings.Contains(proxyURL, "/proxy") {
 		t.Fatalf("Invalid proxy URL: %s", proxyURL)
 	}
 
-	kite2 := kite.New("kite2", "1.0.0")
-	kite2.Config = conf.Copy()
-
-	kite1remote := kite2.NewClientString(proxyURL)
-
-	err = kite1remote.Dial()
+	registerURL, err := url.Parse(result.MustString())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// kite2 is connected to kite1 via proxy kite.
-	result, err = kite1remote.TellWithTimeout("foo", 4*time.Second)
+	// register ourself to kontrol with this proxyUrl
+	color.Green("BackendKite is registering to Kontrol with the result from proxy")
+	go backendKite.RegisterForever(registerURL)
+	<-backendKite.KontrolReadyNotify()
+
+	// now another completely foreign kite and will search for our backend
+	// kite, connect to it and execute the "foo" method
+	color.Green("Foreign kite started")
+	foreignKite := kite.New("foreignKite", "1.0.0")
+	foreignKite.Config = conf.Copy()
+
+	color.Green("Querying backendKite now")
+	backendKites, err := foreignKite.GetKites(protocol.KontrolQuery{
+		Username:    "testuser",
+		Environment: config.DefaultConfig.Environment,
+		Name:        "backendKite",
+	})
+
+	remoteBackendKite := backendKites[0]
+	color.Green("Dialing BackendKite")
+	err = remoteBackendKite.Dial()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// foreignKite is connected to backendKite via proxy kite, fire our call...
+	color.Green("Calling BackendKite's foo method")
+	result, err = remoteBackendKite.TellWithTimeout("foo", 4*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

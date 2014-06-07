@@ -19,6 +19,7 @@ const (
 	Name              = "proxy"
 	DefaultPort       = 3999
 	DefaultPublicHost = "localhost:3999"
+	DefaultScheme     = "ws"
 )
 
 type Proxy struct {
@@ -40,10 +41,8 @@ type Proxy struct {
 	// If given it must match the domain in certificate.
 	PublicHost string
 
-	RegisterToKontrol bool
-
-	// Proxy URL that get registered to Kontrol
-	Url *url.URL
+	// ws or wss
+	Scheme string
 }
 
 func New(conf *config.Config) *Proxy {
@@ -56,13 +55,13 @@ func New(conf *config.Config) *Proxy {
 	}
 
 	p := &Proxy{
-		Kite:              k,
-		kites:             make(map[string]*url.URL),
-		readyC:            make(chan bool),
-		closeC:            make(chan bool),
-		mux:               http.NewServeMux(),
-		RegisterToKontrol: true,
-		PublicHost:        DefaultPublicHost,
+		Kite:       k,
+		kites:      make(map[string]*url.URL),
+		readyC:     make(chan bool),
+		closeC:     make(chan bool),
+		mux:        http.NewServeMux(),
+		PublicHost: DefaultPublicHost,
+		Scheme:     DefaultScheme,
 	}
 
 	// third part kites are going to use this to register themself to
@@ -82,9 +81,20 @@ func New(conf *config.Config) *Proxy {
 		},
 	}
 
+	registerURL := &url.URL{
+		Scheme: p.Scheme,
+		Host:   p.PublicHost,
+		Path:   "/kite",
+	}
+
+	if err := p.Kite.RegisterForever(registerURL); err != nil {
+		k.Log.Fatal("Registering to Kontrol: %s", err)
+	}
+
 	p.mux.Handle("/kite", k)
 	p.mux.Handle("/proxy", proxy)
 
+	// OnDisconnect is called whenever a kite is disconnected from us.
 	k.OnDisconnect(func(r *kite.Client) {
 		k.Log.Info("Removing kite Id '%s' from proxy. It's disconnected", r.Kite.ID)
 		delete(p.kites, r.Kite.ID)
@@ -110,7 +120,7 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	p.kites[r.Client.ID] = kiteUrl
 
 	proxyURL := url.URL{
-		Scheme:   "ws",
+		Scheme:   p.Scheme,
 		Host:     p.PublicHost,
 		Path:     "proxy",
 		RawQuery: "kiteId=" + r.Client.ID,
@@ -139,19 +149,6 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 	return backendURL
 }
 
-func (p *Proxy) registerURL(scheme string) *url.URL {
-	registerURL := p.Url
-	if p.Url == nil {
-		registerURL = &url.URL{
-			Scheme: scheme,
-			Host:   p.PublicHost,
-			Path:   "/kite",
-		}
-	}
-
-	return registerURL
-}
-
 // ListenAndServe listens on the TCP network address addr and then calls Serve
 // with handler to handle requests on incoming connections.
 func (p *Proxy) ListenAndServe() error {
@@ -165,10 +162,6 @@ func (p *Proxy) ListenAndServe() error {
 
 	close(p.readyC)
 
-	if p.RegisterToKontrol {
-		go p.Kite.RegisterForever(p.registerURL("ws"))
-	}
-
 	server := http.Server{
 		Handler: p.mux,
 	}
@@ -180,7 +173,7 @@ func (p *Proxy) ListenAndServe() error {
 func (p *Proxy) ListenAndServeTLS(certFile, keyFile string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		p.Kite.Log.Fatal(err.Error())
+		p.Kite.Log.Fatal("Could not load cert/key files: %s", err.Error())
 	}
 
 	tlsConfig := &tls.Config{
@@ -199,17 +192,12 @@ func (p *Proxy) ListenAndServeTLS(certFile, keyFile string) error {
 
 	p.listener = tls.NewListener(p.listener, tlsConfig)
 
-	if p.RegisterToKontrol {
-		go p.Kite.RegisterForever(p.registerURL("wss"))
-	}
-
 	server := &http.Server{
 		Handler:   p.mux,
 		TLSConfig: tlsConfig,
 	}
 
 	defer close(p.closeC)
-	defer p.Kite.Close()
 	return server.Serve(p.listener)
 }
 
