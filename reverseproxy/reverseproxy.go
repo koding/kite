@@ -15,11 +15,8 @@ import (
 )
 
 const (
-	Version           = "0.0.1"
-	Name              = "proxy"
-	DefaultPort       = 3999
-	DefaultPublicHost = "localhost:3999"
-	DefaultScheme     = "ws"
+	Version = "0.0.1"
+	Name    = "proxy"
 )
 
 type Proxy struct {
@@ -38,11 +35,10 @@ type Proxy struct {
 	// muxer for proxy
 	mux *http.ServeMux
 
-	// If given it must match the domain in certificate.
-	PublicHost string
-
-	// ws or wss
-	Scheme string
+	// Proxy properties used to give urls and bind the listener
+	Scheme     string
+	PublicHost string // If given it must match the domain in certificate.
+	Port       int
 }
 
 func New(conf *config.Config) *Proxy {
@@ -50,18 +46,14 @@ func New(conf *config.Config) *Proxy {
 	k.Config = conf
 
 	// Listen on 3999 by default
-	if k.Config.Port == 0 {
-		k.Config.Port = DefaultPort
-	}
 
 	p := &Proxy{
-		Kite:       k,
-		kites:      make(map[string]*url.URL),
-		readyC:     make(chan bool),
-		closeC:     make(chan bool),
-		mux:        http.NewServeMux(),
-		PublicHost: DefaultPublicHost,
-		Scheme:     DefaultScheme,
+		Kite:   k,
+		kites:  make(map[string]*url.URL),
+		readyC: make(chan bool),
+		closeC: make(chan bool),
+		mux:    http.NewServeMux(),
+		Port:   k.Config.Port,
 	}
 
 	// third part kites are going to use this to register themself to
@@ -111,7 +103,7 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 
 	proxyURL := url.URL{
 		Scheme:   p.Scheme,
-		Host:     p.PublicHost,
+		Host:     p.PublicHost + ":" + strconv.Itoa(p.Port),
 		Path:     "proxy",
 		RawQuery: "kiteId=" + r.Client.ID,
 	}

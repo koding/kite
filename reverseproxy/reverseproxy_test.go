@@ -1,9 +1,11 @@
 package reverseproxy
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -36,9 +38,25 @@ func TestProxy(t *testing.T) {
 	// start proxy
 	color.Green("Starting Proxy and registering to Kontrol")
 	proxyConf := conf.Copy()
+	proxyConf.Port = 3999
 	proxy := New(proxyConf)
+	proxy.PublicHost = "localhost"
+	proxy.Scheme = "ws"
 	go proxy.Run()
 	<-proxy.ReadyNotify()
+
+	proxyRegisterURL := &url.URL{
+		Scheme: proxy.Scheme,
+		Host:   proxy.PublicHost + ":" + strconv.Itoa(proxy.Port),
+		Path:   "/kite",
+	}
+
+	fmt.Printf("proxyRegisterURL %+v\n", proxyRegisterURL)
+
+	_, err := proxy.Kite.Register(proxyRegisterURL)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// start now backend kite
 	color.Green("Starting BackendKite")
@@ -80,8 +98,6 @@ func TestProxy(t *testing.T) {
 	}
 
 	proxyURL := result.MustString()
-	t.Logf("Registered to proxy with URL: %s", proxyURL)
-
 	if !strings.Contains(proxyURL, "/proxy") {
 		t.Fatalf("Invalid proxy URL: %s", proxyURL)
 	}

@@ -605,7 +605,6 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	nodes := flatten(event.Node.Nodes)
 
 	// Convert etcd nodes to kites.
-
 	kites := make([]*protocol.KiteWithToken, len(nodes))
 	for i, n := range nodes {
 		kites[i], err = kiteWithTokenFromEtcdNode(n, token)
