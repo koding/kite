@@ -456,10 +456,8 @@ func (k *Kite) RegisterWithProxy(registerURL *url.URL, proxyQuery protocol.Kontr
 // sends the proxied URL to the registerChan channel (onlt if registerKontrol
 // is enabled).  If registerKontrol is false it returns the proxy url and
 // doesn't register himself to kontrol.
-func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
-	if registerToKontrol {
-		go k.RegisterForever(nil)
-	}
+func (k *Kite) RegisterToProxy() *url.URL {
+	go k.RegisterForever(nil)
 
 	query := protocol.KontrolQuery{
 		Username:    k.Config.KontrolUser,
@@ -510,11 +508,7 @@ func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
 			continue
 		}
 
-		if registerToKontrol {
-			k.kontrol.registerChan <- proxyURL
-		} else {
-			k.signalReady()
-		}
+		k.kontrol.registerChan <- proxyURL
 
 		// Block until disconnect from Proxy Kite.
 		<-disconnect

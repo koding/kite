@@ -78,7 +78,7 @@ func TestRegisterToProxy(t *testing.T) {
 	k := setup()
 	defer k.Close()
 
-	go k.RegisterToProxy(false)
+	go k.RegisterToProxy()
 
 	select {
 	case <-k.KontrolReadyNotify():
@@ -91,7 +91,7 @@ func TestRegisterToProxyAndKontrol(t *testing.T) {
 	k := setup()
 	defer k.Close()
 
-	go k.RegisterToProxy(true)
+	go k.RegisterToProxy()
 
 	select {
 	case <-k.KontrolReadyNotify():
