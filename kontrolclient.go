@@ -537,12 +537,14 @@ func (k *Kite) registerToProxyKite(c *Client, kiteURL *url.URL) (*url.URL, error
 		}
 	}()
 
-	var result *dnode.Partial
-	if kiteURL != nil {
-		result, err = c.TellWithTimeout("register", 4*time.Second, kiteURL.String())
-	} else {
-		result, err = c.TellWithTimeout("register", 4*time.Second)
+	// do not panic if we call Tell method below
+	if kiteURL == nil {
+		kiteURL = &url.URL{}
 	}
+
+	// this could be tunnelproxy or reverseproxy. Tunnelproxy doesn't need an
+	// URL however Reverseproxy needs one.
+	result, err := c.TellWithTimeout("register", 4*time.Second, kiteURL.String())
 	if err != nil {
 		k.Log.Error("Proxy register error: %s", err.Error())
 		return nil, err
