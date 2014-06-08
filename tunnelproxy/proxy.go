@@ -1,5 +1,5 @@
-// Package proxy implements a reverse-proxy for kites behind firewall or NAT.
-package proxy
+// Package tunnelproxy implements a reverse-proxy for kites behind firewall or NAT.
+package tunnelproxy
 
 import (
 	"crypto/tls"

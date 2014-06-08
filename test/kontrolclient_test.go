@@ -12,15 +12,15 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/proxy"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
+	"github.com/koding/kite/tunnelproxy"
 )
 
 var (
 	conf *config.Config
 	kon  *kontrol.Kontrol
-	prx  *proxy.Proxy
+	prx  *tunnelproxy.Proxy
 )
 
 func init() {
@@ -37,7 +37,7 @@ func init() {
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
-	prx := proxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+	prx := tunnelproxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
 	prx.Kite.Config.DisableAuthentication = true
 	prx.Start()
 }
