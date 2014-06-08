@@ -399,7 +399,7 @@ func (k *Kite) RegisterToTunnel() {
 	query := &protocol.KontrolQuery{
 		Username:    k.Config.KontrolUser,
 		Environment: k.Config.Environment,
-		Name:        "proxy",
+		Name:        "tunnelproxy",
 	}
 
 	k.RegisterToProxy(nil, query)

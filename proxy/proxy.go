@@ -49,7 +49,7 @@ type Proxy struct {
 }
 
 func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
-	k := kite.New("proxy", version)
+	k := kite.New("tunnelproxy", version)
 	k.Config = conf
 
 	// Listen on 3999 by default
