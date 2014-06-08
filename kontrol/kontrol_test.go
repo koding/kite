@@ -303,7 +303,7 @@ func TestKontrol(t *testing.T) {
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
 
-	go mathKite.RegisterToProxy()
+	go mathKite.RegisterToTunnel()
 	<-mathKite.KontrolReadyNotify()
 
 	// exp2 kite is the mathworker client
@@ -407,7 +407,7 @@ func TestKontrol(t *testing.T) {
 	go mathKite2.Run()
 	<-mathKite2.ServerReadyNotify()
 
-	go mathKite2.RegisterToProxy()
+	go mathKite2.RegisterToTunnel()
 	<-mathKite2.KontrolReadyNotify()
 
 	// We must get Register event

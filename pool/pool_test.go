@@ -54,7 +54,7 @@ func TestPool(t *testing.T) {
 		go bar.Run()
 		<-bar.ServerReadyNotify()
 
-		go bar.RegisterToProxy()
+		go bar.RegisterToTunnel()
 		defer bar.Close()
 		<-bar.KontrolReadyNotify()
 	}

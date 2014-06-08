@@ -390,81 +390,28 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 	return &registerResult{parsed}, nil
 }
 
-// RegisterWithProxy is just like RegisterForever but registers the given URL
-// to kontrol over a kite-proxy. A Kiteproxy is a reverseproxy that can be used
-// for SSL termination or handling hundreds of kites behind a single. This is a
-// blocking function.
-func (k *Kite) RegisterWithProxy(registerURL *url.URL, proxyQuery protocol.KontrolQuery) {
-	// start kontrol register service, our proxy url will be send here later
-	go k.RegisterForever(nil)
-
-	// try to connect always, even if we get disconnected.
-	for {
-		var proxyKite *Client
-
-		// The proxy kite to connect can be overriden with the
-		// environmental variable "KITE_PROXY_URL". If it is not set
-		// we will ask Kontrol for available Proxy kites.
-		// As an authentication informain kiteKey method will be used,
-		// so be careful when using this feature.
-		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
-		if kiteProxyURL != "" {
-			proxyKite = k.NewClientString(kiteProxyURL)
-			proxyKite.Authentication = &Authentication{
-				Type: "kiteKey",
-				Key:  k.Config.KiteKey,
-			}
-		} else {
-			kites, err := k.GetKites(proxyQuery)
-			if err != nil {
-				k.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
-				time.Sleep(proxyRetryDuration)
-				continue
-			}
-
-			// If more than one one Proxy Kite is available pick one randomly.
-			// It does not matter which one we connect.
-			proxyKite = kites[rand.Int()%len(kites)]
-		}
-
-		// Notify us on disconnect, we are going to use another proxy kite to
-		// connect.
-		disconnect := make(chan bool, 1)
-		proxyKite.OnDisconnect(func() {
-			select {
-			case disconnect <- true:
-			default:
-			}
-		})
-
-		proxyURL, err := k.registerToProxyKite(proxyKite, registerURL)
-		if err != nil {
-			time.Sleep(proxyRetryDuration)
-			continue
-		}
-
-		k.Log.Info("Registered Kite URL: '%s' to Proxy. Can be reached with Proxy URL: '%s'", registerURL, proxyURL)
-		k.kontrol.registerChan <- proxyURL
-
-		// Block until disconnect from Proxy Kite.
-		<-disconnect
-	}
-}
-
-// RegisterToProxy finds a proxy kite by asking kontrol then registers itselfs
-// on proxy. On error, retries forever. On every successfull registration, it
-// sends the proxied URL to the registerChan channel (onlt if registerKontrol
-// is enabled).  If registerKontrol is false it returns the proxy url and
-// doesn't register himself to kontrol.
-func (k *Kite) RegisterToProxy() *url.URL {
-	go k.RegisterForever(nil)
-
-	query := protocol.KontrolQuery{
+// RegisterToTunnel finds a tunnel proxy kite by asking kontrol then registers
+// itselfs on proxy. On error, retries forever. On every successfull
+// registration, it sends the proxied URL to the registerChan channel. There is
+// no register URL needed because the Tunnel Proxy automatically gets the IP
+// from tunneling. This is a blocking function.
+func (k *Kite) RegisterToTunnel() {
+	query := &protocol.KontrolQuery{
 		Username:    k.Config.KontrolUser,
 		Environment: k.Config.Environment,
 		Name:        "proxy",
 	}
 
+	k.RegisterToProxy(nil, query)
+}
+
+// RegisterToProxy is just like RegisterForever but registers the given URL
+// to kontrol over a kite-proxy. A Kiteproxy is a reverseproxy that can be used
+// for SSL termination or handling hundreds of kites behind a single. This is a
+// blocking function.
+func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuery) {
+	go k.RegisterForever(nil)
+
 	for {
 		var proxyKite *Client
 
@@ -481,7 +428,7 @@ func (k *Kite) RegisterToProxy() *url.URL {
 				Key:  k.Config.KiteKey,
 			}
 		} else {
-			kites, err := k.GetKites(query)
+			kites, err := k.GetKites(*query)
 			if err != nil {
 				k.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
 				time.Sleep(proxyRetryDuration)
@@ -502,7 +449,7 @@ func (k *Kite) RegisterToProxy() *url.URL {
 			}
 		})
 
-		proxyURL, err := k.registerToProxyKite(proxyKite, nil)
+		proxyURL, err := k.registerToProxyKite(proxyKite, registerURL)
 		if err != nil {
 			time.Sleep(proxyRetryDuration)
 			continue

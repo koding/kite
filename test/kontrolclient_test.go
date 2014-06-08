@@ -74,11 +74,11 @@ func TestRegisterToKontrol(t *testing.T) {
 	}
 }
 
-func TestRegisterToProxy(t *testing.T) {
+func TestRegisterToTunnel(t *testing.T) {
 	k := setup()
 	defer k.Close()
 
-	go k.RegisterToProxy()
+	go k.RegisterToTunnel()
 
 	select {
 	case <-k.KontrolReadyNotify():
@@ -87,11 +87,11 @@ func TestRegisterToProxy(t *testing.T) {
 	}
 }
 
-func TestRegisterToProxyAndKontrol(t *testing.T) {
+func TestRegisterToTunnelAndKontrol(t *testing.T) {
 	k := setup()
 	defer k.Close()
 
-	go k.RegisterToProxy()
+	go k.RegisterToTunnel()
 
 	select {
 	case <-k.KontrolReadyNotify():
