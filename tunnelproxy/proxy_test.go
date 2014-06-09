@@ -33,7 +33,7 @@ func TestProxy(t *testing.T) {
 		return "bar", nil
 	})
 
-	prxClt := kite1.NewClientString("ws://localhost:3999/kite")
+	prxClt := kite1.NewClient("ws://localhost:3999/kite")
 	err := prxClt.Dial()
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestProxy(t *testing.T) {
 	kite2 := kite.New("kite2", "1.0.0")
 	kite2.Config = conf.Copy()
 
-	kite1remote := kite2.NewClientString(proxyURL)
+	kite1remote := kite2.NewClient(proxyURL)
 
 	err = kite1remote.Dial()
 	if err != nil {
