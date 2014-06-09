@@ -102,7 +102,7 @@ func TestProxy(t *testing.T) {
 		t.Fatalf("Invalid proxy URL: %s", proxyURL)
 	}
 
-	registerURL, err := url.Parse(result.MustString())
+	registerURL, err := url.Parse(proxyURL)
 	if err != nil {
 		t.Fatal(err)
 	}
