@@ -147,7 +147,7 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	p.kites[r.Client.ID] = newPrivateKite(r.Client)
 
 	proxyURL := url.URL{
-		Scheme:   p.url.Scheme,
+		Scheme:   "http",
 		Host:     p.url.Host,
 		Path:     "proxy",
 		RawQuery: "kiteID=" + r.Client.ID,
