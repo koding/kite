@@ -16,6 +16,7 @@ type Config struct {
 	Username              string
 	Environment           string
 	Region                string
+	Id                    string
 	KiteKey               string
 	DisableAuthentication bool
 	DisableConcurrency    bool
@@ -29,7 +30,8 @@ type Config struct {
 	KontrolUser string
 }
 
-var defaultConfig = &Config{
+// DefaultConfig contains the default settings.
+var DefaultConfig = &Config{
 	Username:    "unknown",
 	Environment: "unknown",
 	Region:      "unknown",
@@ -40,7 +42,7 @@ var defaultConfig = &Config{
 // New returns a new Config initialized with defaults.
 func New() *Config {
 	c := new(Config)
-	*c = *defaultConfig
+	*c = *DefaultConfig
 	return c
 }
 
@@ -95,6 +97,11 @@ func (c *Config) ReadKiteKey() error {
 
 	if kontrolUser, ok := key.Claims["iss"].(string); ok {
 		c.KontrolUser = kontrolUser
+	}
+
+	// jti is used for jwt's but let's also use it for kite ID
+	if id, ok := key.Claims["jti"].(string); ok {
+		c.Id = id
 	}
 
 	if kontrolURL, ok := key.Claims["kontrolURL"].(string); ok {

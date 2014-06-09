@@ -2,6 +2,7 @@ language: go
 go: 1.2
 install:
   - go get -d -v ./...
+  - go get github.com/fatih/color
   - go build -v ./...
 script:
   - make test

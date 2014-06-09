@@ -360,6 +360,8 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		URL: kiteURL.String(),
 	}
 
+	k.Log.Info("Registering to kontrol with URL: %s", kiteURL.String())
+
 	response, err := k.kontrol.TellWithTimeout("register", 4*time.Second, args)
 	if err != nil {
 		return nil, err
@@ -381,21 +383,27 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 	return &registerResult{parsed}, nil
 }
 
-// RegisterToProxy finds a proxy kite by asking kontrol then registers itselfs
-// on proxy. On error, retries forever. On every successfull registration, it
-// sends the proxied URL to the registerChan channel (onlt if registerKontrol
-// is enabled).  If registerKontrol is false it returns the proxy url and
-// doesn't register himself to kontrol.
-func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
-	if registerToKontrol {
-		go k.RegisterForever(nil)
-	}
-
-	query := protocol.KontrolQuery{
+// RegisterToTunnel finds a tunnel proxy kite by asking kontrol then registers
+// itselfs on proxy. On error, retries forever. On every successfull
+// registration, it sends the proxied URL to the registerChan channel. There is
+// no register URL needed because the Tunnel Proxy automatically gets the IP
+// from tunneling. This is a blocking function.
+func (k *Kite) RegisterToTunnel() {
+	query := &protocol.KontrolQuery{
 		Username:    k.Config.KontrolUser,
 		Environment: k.Config.Environment,
-		Name:        "proxy",
+		Name:        "tunnelproxy",
 	}
+
+	k.RegisterToProxy(nil, query)
+}
+
+// RegisterToProxy is just like RegisterForever but registers the given URL
+// to kontrol over a kite-proxy. A Kiteproxy is a reverseproxy that can be used
+// for SSL termination or handling hundreds of kites behind a single. This is a
+// blocking function.
+func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuery) {
+	go k.RegisterForever(nil)
 
 	for {
 		var proxyKite *Client
@@ -413,7 +421,7 @@ func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
 				Key:  k.Config.KiteKey,
 			}
 		} else {
-			kites, err := k.GetKites(query)
+			kites, err := k.GetKites(*query)
 			if err != nil {
 				k.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
 				time.Sleep(proxyRetryDuration)
@@ -434,17 +442,13 @@ func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
 			}
 		})
 
-		proxyURL, err := k.registerToProxyKite(proxyKite)
+		proxyURL, err := k.registerToProxyKite(proxyKite, registerURL)
 		if err != nil {
 			time.Sleep(proxyRetryDuration)
 			continue
 		}
 
-		if registerToKontrol {
-			k.kontrol.registerChan <- proxyURL
-		} else {
-			k.signalReady()
-		}
+		k.kontrol.registerChan <- proxyURL
 
 		// Block until disconnect from Proxy Kite.
 		<-disconnect
@@ -453,7 +457,7 @@ func (k *Kite) RegisterToProxy(registerToKontrol bool) *url.URL {
 
 // registerToProxyKite dials the proxy kite and calls register method then
 // returns the reverse-proxy URL.
-func (k *Kite) registerToProxyKite(c *Client) (*url.URL, error) {
+func (k *Kite) registerToProxyKite(c *Client, kiteURL *url.URL) (*url.URL, error) {
 	err := c.Dial()
 	if err != nil {
 		k.Log.Error("Cannot connect to Proxy kite: %s", err.Error())
@@ -467,7 +471,14 @@ func (k *Kite) registerToProxyKite(c *Client) (*url.URL, error) {
 		}
 	}()
 
-	result, err := c.TellWithTimeout("register", 4*time.Second)
+	// do not panic if we call Tell method below
+	if kiteURL == nil {
+		kiteURL = &url.URL{}
+	}
+
+	// this could be tunnelproxy or reverseproxy. Tunnelproxy doesn't need an
+	// URL however Reverseproxy needs one.
+	result, err := c.TellWithTimeout("register", 4*time.Second, kiteURL.String())
 	if err != nil {
 		k.Log.Error("Proxy register error: %s", err.Error())
 		return nil, err

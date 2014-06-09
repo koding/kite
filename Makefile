@@ -38,7 +38,8 @@ test:
 	@`which go` test $(VERBOSE) ./
 	@`which go` test $(VERBOSE) ./test
 	@`which go` test $(VERBOSE) ./kontrol
-	# @`which go` test $(VERBOSE) ./proxy
+	# @`which go` test $(VERBOSE) ./tunnelproxy
+	# @`which go` test $(VERBOSE) ./reverseproxy
 	# @`which go` test $(VERBOSE) ./pool
 
 doc:

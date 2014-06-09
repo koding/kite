@@ -83,7 +83,7 @@ type Kite struct {
 
 	name    string
 	version string
-	id      string // Unique kite instance id
+	Id      string // Unique kite instance id
 }
 
 // New creates, initialize and then returns a new Kite instance. Version must
@@ -121,7 +121,7 @@ func New(name, version string) *Kite {
 		kontrol:            kClient,
 		name:               name,
 		version:            version,
-		id:                 kiteID.String(),
+		Id:                 kiteID.String(),
 		readyC:             make(chan bool),
 		closeC:             make(chan bool),
 	}
@@ -154,7 +154,7 @@ func (k *Kite) Kite() *protocol.Kite {
 		Version:     k.version,
 		Region:      k.Config.Region,
 		Hostname:    hostname,
-		ID:          k.id,
+		ID:          k.Id,
 	}
 }
 
