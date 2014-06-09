@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -73,8 +72,8 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 	p.Kite.HandleFunc("register", p.handleRegister)
 
 	p.mux.Handle("/kite", p.Kite)
-	p.mux.Handle("/proxy", sockjs.NewHandler("/proxy", sockjs.DefaultOptions, p.handleProxy))   // Handler for clients outside
-	p.mux.Handle("/tunnel", sockjs.NewHandler("/proxy", sockjs.DefaultOptions, p.handleTunnel)) // Handler for kites behind
+	p.mux.Handle("/proxy", sockjsHandlerWithRequest("/proxy", sockjs.DefaultOptions, p.handleProxy))    // Handler for clients outside
+	p.mux.Handle("/tunnel", sockjsHandlerWithRequest("/tunnel", sockjs.DefaultOptions, p.handleTunnel)) // Handler for kites behind
 
 	// Remove URL from the map when PrivateKite disconnects.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -82,6 +81,14 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 	})
 
 	return p
+}
+
+func sockjsHandlerWithRequest(prefix string, opts sockjs.Options, handleFunc func(sockjs.Session, *http.Request)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sockjs.NewHandler(prefix, opts, func(session sockjs.Session) {
+			handleFunc(session, r)
+		}).ServeHTTP(w, r)
+	})
 }
 
 func (s *Proxy) CloseNotify() chan bool {
@@ -149,22 +156,13 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	return proxyURL.String(), nil
 }
 
-func kiteIDfromSessionID(sessionID string) string {
-	parts := strings.Split(sessionID, "-")
-	if len(parts) != 3 {
-		return ""
-	}
-	if parts[0] != "kite" {
-		return ""
-	}
-	return parts[1]
-}
-
 // handleProxy is the client side of the Tunnel (on public network).
-func (p *Proxy) handleProxy(session sockjs.Session) {
-	client, ok := p.kites[kiteIDfromSessionID(session.ID())]
+func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
+	kiteID := req.URL.Query().Get("kiteID")
+
+	client, ok := p.kites[kiteID]
 	if !ok {
-		p.Kite.Log.Error("Remote kite is not found for session: %s", session.ID())
+		p.Kite.Log.Error("Remote kite is not found: %s", req.URL.String())
 		return
 	}
 
@@ -209,8 +207,8 @@ func (p *Proxy) handleProxy(session sockjs.Session) {
 }
 
 // handleTunnel is the PrivateKite side of the Tunnel (on private network).
-func (p *Proxy) handleTunnel(session sockjs.Session) {
-	tokenString := ws.Request().URL.Query().Get("token")
+func (p *Proxy) handleTunnel(session sockjs.Session, req *http.Request) {
+	tokenString := req.URL.Query().Get("token")
 
 	getPublicKey := func(token *jwt.Token) ([]byte, error) {
 		return []byte(p.pubKey), nil
@@ -236,7 +234,7 @@ func (p *Proxy) handleTunnel(session sockjs.Session) {
 		p.Kite.Log.Error("Tunnel not found: %d", seq)
 	}
 
-	go tunnel.Run(ws)
+	go tunnel.Run(session)
 
 	<-tunnel.CloseNotify()
 
