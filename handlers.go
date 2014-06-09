@@ -120,7 +120,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	session := sockjsclient.NewWebsocketSession(remoteConn)
+	session := sockjsclient.NewWebsocketSessionWithID(remoteConn)
 
 	go r.LocalKite.sockjsHandler(session)
 	return nil, nil

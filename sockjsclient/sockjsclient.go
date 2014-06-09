@@ -19,6 +19,10 @@ import (
 )
 
 func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
+	return ConnectWebsocketSessionWithID(baseURL, randomStringLength(20))
+}
+
+func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession, error) {
 	config, err := websocket.NewConfig(baseURL, baseURL)
 	if err != nil {
 		return nil, err
@@ -33,10 +37,10 @@ func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 		return nil, err
 	}
 
-	id := threeDigits()
+	serverID := threeDigits()
 
 	// Add server_id and session_id to the path.
-	config.Location.Path += id + "/" + randomStringLength(20) + "/websocket"
+	config.Location.Path += serverID + "/" + sessionID + "/websocket"
 
 	conn, err := websocket.DialConfig(config)
 	if err != nil {
@@ -44,7 +48,7 @@ func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 	}
 
 	session := NewWebsocketSession(conn)
-	session.id = id
+	session.id = sessionID
 	return session, nil
 }
 

@@ -1,6 +1,8 @@
 package kite
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,7 +168,7 @@ func (c *Client) dial() (err error) {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
-	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
+	c.session, err = sockjsclient.ConnectWebsocketSessionWithID(c.URL, "kite-"+c.LocalKite.Kite().ID+"-"+randomStringLength(8))
 	if err != nil {
 		return err
 	}
@@ -176,6 +178,14 @@ func (c *Client) dial() (err error) {
 	go c.callOnConnectHandlers()
 
 	return nil
+}
+
+// randomStringLength is used to generate a session_id.
+func randomStringLength(length int) string {
+	size := (length * 6 / 8) + 1
+	r := make([]byte, size)
+	rand.Read(r)
+	return base64.URLEncoding.EncodeToString(r)[:length]
 }
 
 // run consumes incoming dnode messages. Reconnects if necessary.
