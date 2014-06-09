@@ -33,7 +33,7 @@ func TestProxy(t *testing.T) {
 		return "bar", nil
 	})
 
-	prxClt := kite1.NewClient("ws://localhost:3999/kite")
+	prxClt := kite1.NewClient("http://localhost:3999/kite")
 	err := prxClt.Dial()
 	if err != nil {
 		t.Fatal(err)
