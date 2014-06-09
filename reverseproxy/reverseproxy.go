@@ -2,10 +2,12 @@ package reverseproxy
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -61,6 +63,7 @@ func New(conf *config.Config) *Proxy {
 	p.Kite.HandleFunc("register", p.handleRegister)
 
 	// create our websocketproxy http.handler
+
 	proxy := &websocketproxy.WebsocketProxy{
 		Backend: p.backend,
 		Upgrader: &websocket.Upgrader{
@@ -73,8 +76,8 @@ func New(conf *config.Config) *Proxy {
 		},
 	}
 
-	p.mux.Handle("/kite", k)
-	p.mux.Handle("/proxy", proxy)
+	p.mux.Handle("/", k)
+	p.mux.Handle("/proxy/", proxy)
 
 	// OnDisconnect is called whenever a kite is disconnected from us.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -114,6 +117,17 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	return s, nil
 }
 
+func kiteIDfromSessionID(sessionID string) string {
+	parts := strings.Split(sessionID, "-")
+	if len(parts) != 3 {
+		return ""
+	}
+	if parts[0] != "kite" {
+		return ""
+	}
+	return parts[1]
+}
+
 func (p *Proxy) backend(req *http.Request) *url.URL {
 	kiteId := req.URL.Query().Get("kiteId")
 
@@ -126,16 +140,49 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 		return nil
 	}
 
-	p.Kite.Log.Info("Returning backend url: '%s' for kiteId: %s", backendURL.String(), kiteId)
+	// change "http" with "ws" because websocket procol expects a ws or wss as
+	// scheme
+	if err := replaceSchemeWithWS(backendURL); err != nil {
+		return nil
+	}
 
+	// change now the path for the backend kite. Kite register itself with
+	// something like "localhost:7777/kite" however we are going to
+	// dial/connect to a sockjs server and there is no sessionId/serverId in
+	// the path. This causes problem because the SockJS serve can't parse it.
+	// Therefore we as an intermediate client are getting the path as (ommited the query):
+	// "/proxy/795/kite-fba0954a-07c7-4d34-4215-6a88733cf65c-OjLnvABL/websocket"
+	// which will be converted to
+	// "localhost:7777/kite/795/kite-fba0954a-07c7-4d34-4215-6a88733cf65c-OjLnvABL/websocket"
+	backendURL.Path += strings.TrimPrefix(req.URL.Path, "/proxy")
+
+	// also change the Origin to the client's host name, like as if someone
+	// with the same backendUrl is trying to connect to the kite. Otherwise
+	// will get an "Origin not allowed"
+	req.Header.Set("Origin", "http://"+backendURL.Host)
+
+	p.Kite.Log.Info("Returning backend url: '%s' for kiteId: %s", backendURL.String(), kiteId)
 	return backendURL
+}
+
+// TODO: put this into a util package, is used by others too
+func replaceSchemeWithWS(u *url.URL) error {
+	switch u.Scheme {
+	case "http":
+		u.Scheme = "ws"
+	case "https":
+		u.Scheme = "wss"
+	default:
+		return fmt.Errorf("invalid scheme in url: %s", u.Scheme)
+	}
+	return nil
 }
 
 // ListenAndServe listens on the TCP network address addr and then calls Serve
 // with handler to handle requests on incoming connections.
 func (p *Proxy) ListenAndServe() error {
 	var err error
-	p.listener, err = net.Listen("tcp",
+	p.listener, err = net.Listen("tcp4",
 		net.JoinHostPort(p.Kite.Config.IP, strconv.Itoa(p.Kite.Config.Port)))
 	if err != nil {
 		return err

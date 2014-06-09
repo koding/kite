@@ -22,7 +22,7 @@ import (
 func TestProxy(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
@@ -41,7 +41,7 @@ func TestProxy(t *testing.T) {
 	proxyConf.Port = 3999
 	proxy := New(proxyConf)
 	proxy.PublicHost = "localhost"
-	proxy.Scheme = "ws"
+	proxy.Scheme = "http"
 	go proxy.Run()
 	<-proxy.ReadyNotify()
 
@@ -67,7 +67,7 @@ func TestProxy(t *testing.T) {
 	})
 
 	backendKite.Config.Port = 7777
-	kiteUrl := &url.URL{Scheme: "ws", Host: "localhost:7777"}
+	kiteUrl := &url.URL{Scheme: "http", Host: "localhost:7777", Path: "/kite"}
 
 	go backendKite.Run()
 	<-backendKite.ServerReadyNotify()
