@@ -48,6 +48,8 @@ type Client struct {
 	disconnect chan struct{}
 
 	// SockJS session
+	// TODO: replace this with a proper interface to support multiple
+	// transport/protocols
 	session sockjs.Session
 
 	// dnode scrubber for saving callbacks sent to remote.
@@ -168,7 +170,7 @@ func (c *Client) dial() (err error) {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
-	c.session, err = sockjsclient.ConnectWebsocketSessionWithID(c.URL, "kite-"+c.LocalKite.Kite().ID+"-"+randomStringLength(8))
+	c.session, err = sockjsclient.ConnectWebsocketSessionWithID(c.URL, c.LocalKite.Kite().ID)
 	if err != nil {
 		return err
 	}
@@ -178,6 +180,19 @@ func (c *Client) dial() (err error) {
 	go c.callOnConnectHandlers()
 
 	return nil
+}
+
+func (c *Client) RemoteAddr() string {
+	if c.session == nil {
+		return ""
+	}
+
+	websocketsession, ok := c.session.(*sockjsclient.WebsocketSession)
+	if !ok {
+		return ""
+	}
+
+	return websocketsession.RemoteAddr()
 }
 
 // randomStringLength is used to generate a session_id.

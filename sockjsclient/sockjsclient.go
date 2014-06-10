@@ -70,6 +70,10 @@ func NewWebsocketSession(conn *websocket.Conn) *WebsocketSession {
 	}
 }
 
+func (w *WebsocketSession) RemoteAddr() string {
+	return w.conn.RemoteAddr().String()
+}
+
 // ID returns a session id
 func (w *WebsocketSession) ID() string {
 	return w.id
