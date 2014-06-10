@@ -10,12 +10,13 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
@@ -23,29 +24,31 @@ func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 }
 
 func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession, error) {
-	config, err := websocket.NewConfig(baseURL, baseURL)
+	dialURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	// To avoid "Origin not allowed" errors
-	config.Origin.Path = ""
-	config.Origin.RawQuery = ""
+	// will be used to set the origin header
+	originalScheme := dialURL.Scheme
 
-	if err = replaceSchemeWithWS(config.Location); err != nil {
+	if err := replaceSchemeWithWS(dialURL); err != nil {
 		return nil, err
 	}
 
-	if err = addMissingPortAndSlash(config.Location); err != nil {
+	if err := addMissingPortAndSlash(dialURL); err != nil {
 		return nil, err
 	}
 
 	serverID := threeDigits()
 
 	// Add server_id and session_id to the path.
-	config.Location.Path += serverID + "/" + sessionID + "/websocket"
+	dialURL.Path += serverID + "/" + sessionID + "/websocket"
 
-	conn, err := websocket.DialConfig(config)
+	requestHeader := http.Header{}
+	requestHeader.Add("Origin", originalScheme+"://"+dialURL.Host)
+
+	conn, _, err := websocket.DefaultDialer.Dial(dialURL.String(), requestHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +60,6 @@ func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession
 
 type WebsocketSession struct {
 	conn     *websocket.Conn
-	config   *websocket.Config
 	id       string
 	messages []string
 }
@@ -69,32 +71,32 @@ func NewWebsocketSession(conn *websocket.Conn) *WebsocketSession {
 }
 
 // ID returns a session id
-func (s *WebsocketSession) ID() string {
-	return s.id
+func (w *WebsocketSession) ID() string {
+	return w.id
 }
 
 // Recv reads one text frame from session
-func (s *WebsocketSession) Recv() (string, error) {
+func (w *WebsocketSession) Recv() (string, error) {
 	// Return previously received messages if there is any.
-	if len(s.messages) > 0 {
-		msg := s.messages[0]
-		s.messages = s.messages[1:]
+	if len(w.messages) > 0 {
+		msg := w.messages[0]
+		w.messages = w.messages[1:]
 		return msg, nil
 	}
 
 read_frame:
 	// Read one SockJS frame.
-	var frame string
-	err := websocket.Message.Receive(s.conn, &frame)
+	_, buf, err := w.conn.ReadMessage()
 	if err != nil {
 		return "", err
 	}
-	if len(frame) == 0 {
+
+	if len(buf) == 0 {
 		return "", errors.New("unexpected empty message")
 	}
 
-	frameType := frame[0]
-	data := []byte(frame[1:])
+	frameType := buf[0]
+	data := buf[1:]
 
 	switch frameType {
 	case 'o':
@@ -106,14 +108,14 @@ read_frame:
 		if err != nil {
 			return "", err
 		}
-		s.messages = append(s.messages, messages...)
+		w.messages = append(w.messages, messages...)
 	case 'm':
 		var message string
 		err = json.Unmarshal(data, &message)
 		if err != nil {
 			return "", err
 		}
-		s.messages = append(s.messages, message)
+		w.messages = append(w.messages, message)
 	case 'c':
 		return "", errors.New("session closed")
 	case 'h':
@@ -124,23 +126,23 @@ read_frame:
 	}
 
 	// Return first message in slice.
-	if len(s.messages) == 0 {
+	if len(w.messages) == 0 {
 		return "", errors.New("no message")
 	}
-	msg := s.messages[0]
-	s.messages = s.messages[1:]
+	msg := w.messages[0]
+	w.messages = w.messages[1:]
 	return msg, nil
 }
 
 // Send sends one text frame to session
-func (s *WebsocketSession) Send(str string) error {
+func (w *WebsocketSession) Send(str string) error {
 	b, _ := json.Marshal([]string{str})
-	return websocket.Message.Send(s.conn, b)
+	return w.conn.WriteMessage(websocket.TextMessage, b)
 }
 
 // Close closes the session with provided code and reason.
-func (s *WebsocketSession) Close(status uint32, reason string) error {
-	return s.conn.Close()
+func (w *WebsocketSession) Close(status uint32, reason string) error {
+	return w.conn.Close()
 }
 
 var r = rand.New(rand.NewSource(time.Now().UnixNano()))

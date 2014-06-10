@@ -27,7 +27,6 @@ func TestProxy(t *testing.T) {
 	prx.Start()
 
 	// Proxy kite is ready.
-
 	kite1 := kite.New("kite1", "1.0.0")
 	kite1.Config = conf.Copy()
 	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
