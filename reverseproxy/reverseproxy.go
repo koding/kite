@@ -79,7 +79,7 @@ func New(conf *config.Config) *Proxy {
 	}
 
 	p.mux.Handle("/", k)
-	p.mux.HandleFunc("/proxy/", p.reverseProxy)
+	p.mux.Handle("/proxy/", p)
 
 	// OnDisconnect is called whenever a kite is disconnected from us.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -90,7 +90,7 @@ func New(conf *config.Config) *Proxy {
 	return p
 }
 
-func (p *Proxy) reverseProxy(rw http.ResponseWriter, req *http.Request) {
+func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	p.websocketProxy.ServeHTTP(rw, req)
 }
 
