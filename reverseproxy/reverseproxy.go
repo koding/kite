@@ -35,7 +35,9 @@ type Proxy struct {
 	kitesMu sync.Mutex
 
 	// muxer for proxy
-	mux *http.ServeMux
+	mux            *http.ServeMux
+	websocketProxy http.Handler
+	httpProxy      http.Handler
 
 	// Proxy properties used to give urls and bind the listener
 	Scheme     string
@@ -64,7 +66,7 @@ func New(conf *config.Config) *Proxy {
 
 	// create our websocketproxy http.handler
 
-	proxy := &websocketproxy.WebsocketProxy{
+	p.websocketProxy = &websocketproxy.WebsocketProxy{
 		Backend: p.backend,
 		Upgrader: &websocket.Upgrader{
 			ReadBufferSize:  4096,
@@ -77,7 +79,7 @@ func New(conf *config.Config) *Proxy {
 	}
 
 	p.mux.Handle("/", k)
-	p.mux.Handle("/proxy/", proxy)
+	p.mux.HandleFunc("/proxy/", p.reverseProxy)
 
 	// OnDisconnect is called whenever a kite is disconnected from us.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -86,6 +88,10 @@ func New(conf *config.Config) *Proxy {
 	})
 
 	return p
+}
+
+func (p *Proxy) reverseProxy(rw http.ResponseWriter, req *http.Request) {
+	p.websocketProxy.ServeHTTP(rw, req)
 }
 
 func (p *Proxy) CloseNotify() chan bool {
