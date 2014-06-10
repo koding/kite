@@ -170,7 +170,7 @@ func (c *Client) dial() (err error) {
 	// Reset the wait time.
 	defer c.redialBackOff.Reset()
 
-	c.session, err = sockjsclient.ConnectWebsocketSessionWithID(c.URL, c.LocalKite.Kite().ID)
+	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
 	if err != nil {
 		return err
 	}

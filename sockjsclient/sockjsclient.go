@@ -20,10 +20,6 @@ import (
 )
 
 func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
-	return ConnectWebsocketSessionWithID(baseURL, randomStringLength(20))
-}
-
-func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession, error) {
 	dialURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
@@ -41,6 +37,7 @@ func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession
 	}
 
 	serverID := threeDigits()
+	sessionID := randomStringLength(20)
 
 	// Add server_id and session_id to the path.
 	dialURL.Path += serverID + "/" + sessionID + "/websocket"

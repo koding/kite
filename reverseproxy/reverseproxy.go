@@ -117,17 +117,6 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	return s, nil
 }
 
-func kiteIDfromSessionID(sessionID string) string {
-	parts := strings.Split(sessionID, "-")
-	if len(parts) != 3 {
-		return ""
-	}
-	if parts[0] != "kite" {
-		return ""
-	}
-	return parts[1]
-}
-
 func (p *Proxy) backend(req *http.Request) *url.URL {
 	kiteId := req.URL.Query().Get("kiteId")
 
