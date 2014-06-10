@@ -42,7 +42,7 @@ func TestMultiple(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := New("exp"+strconv.Itoa(i), "0.0.1").NewClientString("ws://127.0.0.1:" + strconv.Itoa(port+i))
+		c := New("exp"+strconv.Itoa(i), "0.0.1").NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +114,7 @@ func TestKite(t *testing.T) {
 	})
 
 	// exp2 connects to mathworker
-	remote := exp2Kite.NewClientString("ws://127.0.0.1:3636")
+	remote := exp2Kite.NewClient("http://127.0.0.1:3636/kite")
 	err := remote.Dial()
 	if err != nil {
 		t.Fatal(err)

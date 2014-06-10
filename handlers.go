@@ -2,13 +2,15 @@ package kite
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os/exec"
 	"runtime"
 	"time"
 
 	"code.google.com/p/go.crypto/ssh/terminal"
-	"code.google.com/p/go.net/websocket"
+	"github.com/gorilla/websocket"
+	"github.com/koding/kite/sockjsclient"
 	"github.com/koding/kite/systeminfo"
 )
 
@@ -106,19 +108,16 @@ func handleTunnel(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	conf := &websocket.Config{
-		Location: parsed,
-		Version:  websocket.ProtocolVersionHybi13,
-		Origin:   &url.URL{Scheme: "http", Host: "localhost"},
-		// TODO enable TLSConfig field in handleTunnel
-		// TlsConfig: r.Client.TLSConfig,
-	}
+	requestHeader := http.Header{}
+	requestHeader.Add("Origin", "http://"+parsed.Host)
 
-	remoteConn, err := websocket.DialConfig(conf)
+	remoteConn, _, err := websocket.DefaultDialer.Dial(parsed.String(), requestHeader)
 	if err != nil {
 		return nil, err
 	}
 
-	go r.LocalKite.server.Handler(remoteConn)
+	session := sockjsclient.NewWebsocketSession(remoteConn)
+
+	go r.LocalKite.sockjsHandler(session)
 	return nil, nil
 }

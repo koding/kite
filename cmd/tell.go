@@ -3,7 +3,6 @@ package cmd
 import (
 	"flag"
 	"fmt"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -35,17 +34,12 @@ func (t *Tell) Exec(args []string) error {
 	flags.DurationVar(&timeout, "timeout", 4*time.Second, "timeout of tell method")
 	flags.Parse(args)
 
-	parsed, err := url.Parse(to)
-	if err != nil {
-		return err
-	}
-
 	key, err := kitekey.Read()
 	if err != nil {
 		return err
 	}
 
-	remote := t.client.NewClient(parsed)
+	remote := t.client.NewClient(to)
 	remote.Authentication = &kite.Authentication{
 		Type: "kiteKey",
 		Key:  key,

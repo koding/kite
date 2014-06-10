@@ -70,7 +70,7 @@ func (k *Kite) SetupKontrolClient() error {
 		return errors.New("no kontrol URL given in config")
 	}
 
-	client := k.NewClient(k.Config.KontrolURL)
+	client := k.NewClient(k.Config.KontrolURL.String())
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
 	client.Authentication = &Authentication{
 		Type: "kiteKey",
@@ -168,7 +168,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 			KiteEvent: protocol.KiteEvent{
 				Action: protocol.Register,
 				Kite:   client.Kite,
-				URL:    client.WSConfig.Location.String(),
+				URL:    client.URL,
 				Token:  client.Authentication.Key,
 			},
 			localKite: k,
@@ -229,14 +229,8 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 			Key:  currentKite.Token,
 		}
 
-		parsed, err := url.Parse(currentKite.URL)
-		if err != nil {
-			k.Log.Error("invalid url came from kontrol", currentKite.URL)
-		}
-
-		clients[i] = k.NewClientString(currentKite.URL)
+		clients[i] = k.NewClient(currentKite.URL)
 		clients[i].Kite = currentKite.Kite
-		clients[i].WSConfig.Location = parsed
 		clients[i].Authentication = auth
 	}
 
@@ -282,7 +276,7 @@ func (e *Event) Client() *Client {
 		panic("This method can only be called for 'Register' event.")
 	}
 
-	r := e.localKite.NewClientString(e.URL)
+	r := e.localKite.NewClient(e.URL)
 	r.Kite = e.Kite
 	r.Authentication = &Authentication{
 		Type: "token",
@@ -349,7 +343,6 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 	case err := <-errs:
 		return err
 	}
-
 }
 
 // Register registers current Kite to Kontrol. After registration other Kites
@@ -422,7 +415,7 @@ func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuer
 		// so be careful when using this feature.
 		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
 		if kiteProxyURL != "" {
-			proxyKite = k.NewClientString(kiteProxyURL)
+			proxyKite = k.NewClient(kiteProxyURL)
 			proxyKite.Authentication = &Authentication{
 				Type: "kiteKey",
 				Key:  k.Config.KiteKey,

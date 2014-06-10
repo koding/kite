@@ -37,7 +37,7 @@ Import it with:
 import "github.com/koding/kite"
 ```
 
-and use `kite` as the package name inside the code. 
+and use `kite` as the package name inside the code.
 
 What is *Kontrol*?
 ------------------
@@ -115,7 +115,7 @@ func main() {
 	k := kite.New("exp2", "1.0.0")
 
 	// Connect to our math kite
-	mathWorker := k.NewClientString("ws://localhost:3636")
+	mathWorker := k.NewClient("http://localhost:3636/kite")
 	mathWorker.Dial()
 
 	response, _ := mathWorker.Tell("square", 4) // call "square" method with argument 4

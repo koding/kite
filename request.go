@@ -9,6 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/sockjsclient"
 )
 
 // Request contains information about the incoming request.
@@ -83,7 +84,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	args.One().MustUnmarshal(&options)
 
 	// Notify the handlers registered with Kite.OnFirstRequest().
-	if c.RemoteAddr() != "" {
+	if _, ok := c.session.(*sockjsclient.WebsocketSession); !ok {
 		c.firstRequestHandlersNotified.Do(func() {
 			c.Kite = options.Kite
 			c.LocalKite.callOnFirstRequestHandlers(c)
@@ -122,8 +123,8 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 // authenticator function.
 func (r *Request) authenticate() *Error {
 	// Trust the Kite if we have initiated the connection.
-	// RemoteAddr() returns "" if this is an outgoing connection.
-	if r.Client.RemoteAddr() == "" {
+	// Following cast means, session is opened by the client.
+	if _, ok := r.Client.session.(*sockjsclient.WebsocketSession); ok {
 		return nil
 	}
 

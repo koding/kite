@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/igm/sockjs-go/sockjs"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 )
@@ -71,9 +72,9 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 
 	p.Kite.HandleFunc("register", p.handleRegister)
 
-	p.mux.Handle("/kite", p.Kite)
-	p.mux.Handle("/proxy", websocket.Server{Handler: p.handleProxy})   // Handler for clients outside
-	p.mux.Handle("/tunnel", websocket.Server{Handler: p.handleTunnel}) // Handler for kites behind
+	p.mux.Handle("/", p.Kite)
+	p.mux.Handle("/proxy/", sockjsHandlerWithRequest("/proxy", sockjs.DefaultOptions, p.handleProxy))    // Handler for clients outside
+	p.mux.Handle("/tunnel/", sockjsHandlerWithRequest("/tunnel", sockjs.DefaultOptions, p.handleTunnel)) // Handler for kites behind
 
 	// Remove URL from the map when PrivateKite disconnects.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -81,6 +82,20 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 	})
 
 	return p
+}
+
+// sockjsHandlerWithRequest is a wrapper around the sockjs.Handler that
+// includes a *http.Request context.
+func sockjsHandlerWithRequest(
+	prefix string,
+	opts sockjs.Options,
+	handleFunc func(sockjs.Session, *http.Request),
+) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sockjs.NewHandler(prefix, opts, func(session sockjs.Session) {
+			handleFunc(session, r)
+		}).ServeHTTP(w, r)
+	})
 }
 
 func (s *Proxy) CloseNotify() chan bool {
@@ -139,7 +154,7 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	p.kites[r.Client.ID] = newPrivateKite(r.Client)
 
 	proxyURL := url.URL{
-		Scheme:   p.url.Scheme,
+		Scheme:   "http",
 		Host:     p.url.Host,
 		Path:     "proxy",
 		RawQuery: "kiteID=" + r.Client.ID,
@@ -149,9 +164,7 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 }
 
 // handleProxy is the client side of the Tunnel (on public network).
-func (p *Proxy) handleProxy(ws *websocket.Conn) {
-	req := ws.Request()
-
+func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 	kiteID := req.URL.Query().Get("kiteID")
 
 	client, ok := p.kites[kiteID]
@@ -160,7 +173,7 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 		return
 	}
 
-	tunnel := client.newTunnel(ws)
+	tunnel := client.newTunnel(session)
 	defer tunnel.Close()
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
@@ -183,12 +196,13 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 	}
 
 	tunnelURL := *p.url
-	tunnelURL.Path = "/tunnel"
+	tunnelURL.Path = "/tunnel" + strings.TrimPrefix(req.URL.Path, "/proxy")
 	tunnelURL.RawQuery = "token=" + signed
 
-	_, err = client.TellWithTimeout("kite.tunnel", 4*time.Second, map[string]string{"url": tunnelURL.String()})
+	_, err = client.TellWithTimeout("kite.tunnel",
+		4*time.Second, map[string]string{"url": tunnelURL.String()})
 	if err != nil {
-		p.Kite.Log.Error("Cannot open tunnel to the kite: %s", client.Kite)
+		p.Kite.Log.Error("Cannot open tunnel to the kite: %s err: %s", client.Kite, err.Error())
 		return
 	}
 
@@ -201,8 +215,8 @@ func (p *Proxy) handleProxy(ws *websocket.Conn) {
 }
 
 // handleTunnel is the PrivateKite side of the Tunnel (on private network).
-func (p *Proxy) handleTunnel(ws *websocket.Conn) {
-	tokenString := ws.Request().URL.Query().Get("token")
+func (p *Proxy) handleTunnel(session sockjs.Session, req *http.Request) {
+	tokenString := req.URL.Query().Get("token")
 
 	getPublicKey := func(token *jwt.Token) ([]byte, error) {
 		return []byte(p.pubKey), nil
@@ -228,7 +242,7 @@ func (p *Proxy) handleTunnel(ws *websocket.Conn) {
 		p.Kite.Log.Error("Tunnel not found: %d", seq)
 	}
 
-	go tunnel.Run(ws)
+	go tunnel.Run(session)
 
 	<-tunnel.CloseNotify()
 
@@ -255,7 +269,7 @@ func newPrivateKite(r *kite.Client) *PrivateKite {
 	}
 }
 
-func (k *PrivateKite) newTunnel(local *websocket.Conn) *Tunnel {
+func (k *PrivateKite) newTunnel(local sockjs.Session) *Tunnel {
 	t := &Tunnel{
 		id:        atomic.AddUint64(&k.seq, 1),
 		localConn: local,

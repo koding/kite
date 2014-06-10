@@ -1,6 +1,7 @@
 package tunnelproxy
 
 import (
+	"log"
 	"net/url"
 	"strings"
 	"testing"
@@ -26,14 +27,13 @@ func TestProxy(t *testing.T) {
 	prx.Start()
 
 	// Proxy kite is ready.
-
 	kite1 := kite.New("kite1", "1.0.0")
 	kite1.Config = conf.Copy()
 	kite1.HandleFunc("foo", func(r *kite.Request) (interface{}, error) {
 		return "bar", nil
 	})
 
-	prxClt := kite1.NewClientString("ws://localhost:3999/kite")
+	prxClt := kite1.NewClient("http://localhost:3999/kite")
 	err := prxClt.Dial()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestProxy(t *testing.T) {
 
 	proxyURL := result.MustString()
 
-	t.Logf("Registered to proxy with URL: %s", proxyURL)
+	log.Printf("Registered to proxy with URL: %s", proxyURL)
 
 	if !strings.Contains(proxyURL, "/proxy") {
 		t.Fatalf("Invalid proxy URL: %s", proxyURL)
@@ -57,7 +57,7 @@ func TestProxy(t *testing.T) {
 	kite2 := kite.New("kite2", "1.0.0")
 	kite2.Config = conf.Copy()
 
-	kite1remote := kite2.NewClientString(proxyURL)
+	kite1remote := kite2.NewClient(proxyURL)
 
 	err = kite1remote.Dial()
 	if err != nil {

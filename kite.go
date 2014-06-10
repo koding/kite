@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/igm/sockjs-go/sockjs"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"
@@ -59,8 +59,7 @@ type Kite struct {
 	// Handlers added with Kite.HandleFunc().
 	handlers map[string]*Method // method map for exported methods
 
-	// Websocket server for handling incoming connections.
-	server *websocket.Server
+	httpHandler http.Handler
 
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
@@ -119,7 +118,6 @@ func New(name, version string) *Kite {
 		Authenticators:     make(map[string]func(*Request) error),
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]*Method),
-		server:             &websocket.Server{},
 		kontrol:            kClient,
 		name:               name,
 		version:            version,
@@ -128,11 +126,11 @@ func New(name, version string) *Kite {
 		closeC:             make(chan bool),
 	}
 
-	k.server.Handler = k.handleWS
+	k.httpHandler = sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler)
 
-	k.OnConnect(func(c *Client) { k.Log.Info("New connection from: %s", c.RemoteAddr()) })
-	k.OnFirstRequest(func(c *Client) { k.Log.Info("Connection %q is identified as %q", c.RemoteAddr(), c.Kite) })
-	k.OnDisconnect(func(c *Client) { k.Log.Info("Client has disconnected: %q", c.Kite) })
+	k.OnConnect(func(c *Client) { k.Log.Info("New session: %s", c.session.ID()) })
+	k.OnFirstRequest(func(c *Client) { k.Log.Info("Session %q is identified as %q", c.session.ID(), c.Kite) })
+	k.OnDisconnect(func(c *Client) { k.Log.Info("Kite has disconnected: %q", c.Kite) })
 
 	// Every kite should be able to authenticate the user from token.
 	// Tokens are granted by Kontrol Kite.
@@ -166,17 +164,16 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 }
 
 func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	k.server.ServeHTTP(w, req)
+	k.httpHandler.ServeHTTP(w, req)
 }
 
-// handleWS is the websocket connection handler.
-func (k *Kite) handleWS(ws *websocket.Conn) {
-	defer ws.Close()
+func (k *Kite) sockjsHandler(session sockjs.Session) {
+	defer session.Close(0, "")
 
 	// This Client also handles the connected client.
 	// Since both sides can send/receive messages the client code is reused here.
-	c := k.NewClient(nil)
-	c.conn = ws
+	c := k.NewClient("")
+	c.session = session
 
 	k.callOnConnectHandlers(c)
 

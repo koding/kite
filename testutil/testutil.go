@@ -36,13 +36,13 @@ func NewKiteKey() *jwt.Token {
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
-		"iss":        "testuser",              // Issuer
-		"sub":        username,                // Issued to
-		"aud":        hostname,                // Hostname of registered machine
-		"iat":        time.Now().UTC().Unix(), // Issued At
-		"jti":        tknID.String(),          // JWT ID
-		"kontrolURL": "ws://localhost:4000",   // Kontrol URL
-		"kontrolKey": testkeys.Public,         // Public key of kontrol
+		"iss":        "testuser",                   // Issuer
+		"sub":        username,                     // Issued to
+		"aud":        hostname,                     // Hostname of registered machine
+		"iat":        time.Now().UTC().Unix(),      // Issued At
+		"jti":        tknID.String(),               // JWT ID
+		"kontrolURL": "http://localhost:4000/kite", // Kontrol URL
+		"kontrolKey": testkeys.Public,              // Public key of kontrol
 	}
 
 	token.Raw, err = token.SignedString([]byte(testkeys.Private))
@@ -57,7 +57,7 @@ func NewKiteKey() *jwt.Token {
 func NewConfig() *config.Config {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = NewKiteKey().Raw

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -242,13 +241,6 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
 	}
 
-	// In case Kite.URL does not contain a hostname, the r.RemoteAddr is used.
-	host, port, _ := net.SplitHostPort(args.URL.Host)
-	if host == "0.0.0.0" || host == "" {
-		host, _, _ = net.SplitHostPort(r.Client.RemoteAddr())
-		args.URL.Host = net.JoinHostPort(host, port)
-	}
-
 	err := k.register(r.Client, args.URL)
 	if err != nil {
 		return nil, err
@@ -476,7 +468,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 		if whoClient == nil {
 			// TODO Enable code below after fix.
 			return nil, errors.New("target kite is not connected")
-			// whoClient = k.Kite.NewClientString(whoKite.URL)
+			// whoClient = k.Kite.NewClient(whoKite.URL)
 			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
 			// whoClient.Kite = whoKite.Kite
 
