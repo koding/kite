@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -78,6 +79,10 @@ func New(conf *config.Config) *Proxy {
 		},
 	}
 
+	p.httpProxy = &httputil.ReverseProxy{
+		Director: p.director,
+	}
+
 	p.mux.Handle("/", k)
 	p.mux.Handle("/proxy/", p)
 
@@ -90,10 +95,14 @@ func New(conf *config.Config) *Proxy {
 	return p
 }
 
+// ServeHTTP implements the http.Handler interface.
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if isWebsocket(req) {
 		p.websocketProxy.ServeHTTP(rw, req)
+		return
 	}
+
+	p.httpProxy.ServeHTTP(rw, req)
 }
 
 // isWebsocket checks wether the incoming request is a part of websocket
@@ -133,6 +142,13 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	p.Kite.Log.Info("Registering kite with url: '%s'. Can be reached now with: '%s'", kiteUrl, s)
 
 	return s, nil
+}
+
+func (p *Proxy) director(req *http.Request) {
+	u := p.backend(req)
+	req.URL.Scheme = u.Scheme
+	req.URL.Host = u.Host
+	req.URL.Path = u.Path
 }
 
 func (p *Proxy) backend(req *http.Request) *url.URL {

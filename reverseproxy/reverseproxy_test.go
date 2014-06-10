@@ -19,7 +19,8 @@ import (
 	"github.com/koding/kite/testutil"
 )
 
-func TestProxy(t *testing.T) {
+func TestWebSocketProxy(t *testing.T) {
+	color.Blue("====> Starting WebSocket test")
 	conf := config.New()
 	conf.Username = "testuser"
 	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
