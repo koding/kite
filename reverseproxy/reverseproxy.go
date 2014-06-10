@@ -91,7 +91,19 @@ func New(conf *config.Config) *Proxy {
 }
 
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	p.websocketProxy.ServeHTTP(rw, req)
+	if isWebsocket(req) {
+		p.websocketProxy.ServeHTTP(rw, req)
+	}
+}
+
+// isWebsocket checks wether the incoming request is a part of websocket
+// handshake
+func isWebsocket(req *http.Request) bool {
+	if strings.ToLower(req.Header.Get("Upgrade")) != "websocket" ||
+		!strings.Contains(strings.ToLower(req.Header.Get("Connection")), "upgrade") {
+		return false
+	}
+	return true
 }
 
 func (p *Proxy) CloseNotify() chan bool {
