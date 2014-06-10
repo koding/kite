@@ -1,6 +1,7 @@
 package tunnelproxy
 
 import (
+	"log"
 	"net/url"
 	"strings"
 	"testing"
@@ -48,7 +49,7 @@ func TestProxy(t *testing.T) {
 
 	proxyURL := result.MustString()
 
-	t.Logf("Registered to proxy with URL: %s", proxyURL)
+	log.Printf("Registered to proxy with URL: %s", proxyURL)
 
 	if !strings.Contains(proxyURL, "/proxy") {
 		t.Fatalf("Invalid proxy URL: %s", proxyURL)

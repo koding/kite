@@ -27,7 +27,10 @@ func ConnectWebsocketSessionWithID(baseURL, sessionID string) (*WebsocketSession
 	if err != nil {
 		return nil, err
 	}
+
+	// To avoid "Origin not allowed" errors
 	config.Origin.Path = ""
+	config.Origin.RawQuery = ""
 
 	if err = replaceSchemeWithWS(config.Location); err != nil {
 		return nil, err

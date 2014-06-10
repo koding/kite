@@ -110,7 +110,7 @@ func handleTunnel(r *Request) (interface{}, error) {
 	conf := &websocket.Config{
 		Location: parsed,
 		Version:  websocket.ProtocolVersionHybi13,
-		Origin:   &url.URL{Scheme: "http", Host: "localhost"},
+		Origin:   &url.URL{Scheme: "http", Host: parsed.Host},
 		// TODO enable TLSConfig field in handleTunnel
 		// TlsConfig: r.Client.TLSConfig,
 	}

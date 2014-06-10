@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -71,9 +72,9 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 
 	p.Kite.HandleFunc("register", p.handleRegister)
 
-	p.mux.Handle("/kite", p.Kite)
-	p.mux.Handle("/proxy", sockjsHandlerWithRequest("/proxy", sockjs.DefaultOptions, p.handleProxy))    // Handler for clients outside
-	p.mux.Handle("/tunnel", sockjsHandlerWithRequest("/tunnel", sockjs.DefaultOptions, p.handleTunnel)) // Handler for kites behind
+	p.mux.Handle("/", p.Kite)
+	p.mux.Handle("/proxy/", sockjsHandlerWithRequest("/proxy", sockjs.DefaultOptions, p.handleProxy))    // Handler for clients outside
+	p.mux.Handle("/tunnel/", sockjsHandlerWithRequest("/tunnel", sockjs.DefaultOptions, p.handleTunnel)) // Handler for kites behind
 
 	// Remove URL from the map when PrivateKite disconnects.
 	k.OnDisconnect(func(r *kite.Client) {
@@ -83,7 +84,13 @@ func New(conf *config.Config, version, pubKey, privKey string) *Proxy {
 	return p
 }
 
-func sockjsHandlerWithRequest(prefix string, opts sockjs.Options, handleFunc func(sockjs.Session, *http.Request)) http.Handler {
+// sockjsHandlerWithRequest is a wrapper around the sockjs.Handler that
+// includes a *http.Request context.
+func sockjsHandlerWithRequest(
+	prefix string,
+	opts sockjs.Options,
+	handleFunc func(sockjs.Session, *http.Request),
+) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sockjs.NewHandler(prefix, opts, func(session sockjs.Session) {
 			handleFunc(session, r)
@@ -189,12 +196,13 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 	}
 
 	tunnelURL := *p.url
-	tunnelURL.Path = "/tunnel"
+	tunnelURL.Path = "/tunnel" + strings.TrimPrefix(req.URL.Path, "/proxy")
 	tunnelURL.RawQuery = "token=" + signed
 
-	_, err = client.TellWithTimeout("kite.tunnel", 4*time.Second, map[string]string{"url": tunnelURL.String()})
+	_, err = client.TellWithTimeout("kite.tunnel",
+		4*time.Second, map[string]string{"url": tunnelURL.String()})
 	if err != nil {
-		p.Kite.Log.Error("Cannot open tunnel to the kite: %s", client.Kite)
+		p.Kite.Log.Error("Cannot open tunnel to the kite: %s err: %s", client.Kite, err.Error())
 		return
 	}
 
