@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/igm/sockjs-go/sockjs"
+	"github.com/humanchimp/sockjs-go/sockjs"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"

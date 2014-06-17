@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/igm/sockjs-go/sockjs"
+	"github.com/humanchimp/sockjs-go/sockjs"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 )
