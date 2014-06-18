@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/humanchimp/sockjs-go/sockjs"
+	"github.com/igm/sockjs-go/sockjs"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
