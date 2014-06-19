@@ -383,6 +383,8 @@ func validateKiteKey(k *protocol.Kite) error {
 	return nil
 }
 
+var keyOrder = []string{"username", "environment", "name", "version", "region", "hostname", "id"}
+
 // getQueryKey returns the etcd key for the query.
 func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 	fields := map[string]string{
@@ -404,10 +406,14 @@ func getQueryKey(q *protocol.KontrolQuery) (string, error) {
 
 	empty := false   // encountered with empty field?
 	empytField := "" // for error log
-	for k, v := range fields {
+
+	// http://golang.org/doc/go1.3#map, order is important and we can't rely on
+	// maps because the keys are not ordered :)
+	for _, key := range keyOrder {
+		v := fields[key]
 		if v == "" {
 			empty = true
-			empytField = k
+			empytField = key
 			continue
 		}
 
