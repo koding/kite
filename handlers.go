@@ -17,7 +17,7 @@ import (
 func (k *Kite) addDefaultHandlers() {
 	k.HandleFunc("kite.systemInfo", systemInfo)
 	k.HandleFunc("kite.heartbeat", k.handleHeartbeat)
-	k.HandleFunc("kite.ping", handlePing)
+	k.HandleFunc("kite.ping", handlePing).DisableAuthentication()
 	k.HandleFunc("kite.tunnel", handleTunnel)
 	k.HandleFunc("kite.log", k.handleLog)
 	k.HandleFunc("kite.print", handlePrint)
