@@ -16,11 +16,13 @@ import (
 func TestProxy(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:4000"}
+	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:5555"}
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
+	DefaultPort = 4999
+	DefaultPublicHost = "localhost:4999"
 	prxConf := conf.Copy()
 	prxConf.DisableAuthentication = true // no kontrol running in test
 	prx := New(prxConf, "0.1.0", testkeys.Public, testkeys.Private)
@@ -33,7 +35,7 @@ func TestProxy(t *testing.T) {
 		return "bar", nil
 	})
 
-	prxClt := kite1.NewClient("http://localhost:3999/kite")
+	prxClt := kite1.NewClient("http://localhost:4999/kite")
 	err := prxClt.Dial()
 	if err != nil {
 		t.Fatal(err)

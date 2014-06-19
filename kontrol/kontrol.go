@@ -26,7 +26,6 @@ import (
 
 const (
 	KontrolVersion    = "0.0.4"
-	DefaultPort       = 4000
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
@@ -34,8 +33,9 @@ const (
 )
 
 var (
-	log      kite.Logger
-	TokenTTL = 48 * time.Hour
+	log         kite.Logger
+	TokenTTL    = 48 * time.Hour
+	DefaultPort = 4000
 
 	tokenCache   = make(map[string]string)
 	tokenCacheMu sync.Mutex

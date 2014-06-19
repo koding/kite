@@ -28,11 +28,12 @@ var (
 func init() {
 	conf = config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
+	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:5555", Path: "/kite"}
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
 
+	DefaultPort = 5555
 	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
 	kon.DataDir, _ = ioutil.TempDir("", "")
 	go kon.Run()

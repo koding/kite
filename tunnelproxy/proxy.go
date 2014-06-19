@@ -18,7 +18,10 @@ import (
 )
 
 const (
-	ProxyVersion      = "0.0.2"
+	ProxyVersion = "0.0.2"
+)
+
+var (
 	DefaultPort       = 3999
 	DefaultPublicHost = "localhost:3999"
 )
