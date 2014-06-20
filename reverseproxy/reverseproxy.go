@@ -146,6 +146,10 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 
 func (p *Proxy) director(req *http.Request) {
 	u := p.backend(req)
+	if u == nil {
+		return
+	}
+
 	req.URL.Scheme = u.Scheme
 	req.URL.Host = u.Host
 	req.URL.Path = u.Path
