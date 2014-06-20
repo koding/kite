@@ -95,6 +95,8 @@ func New(conf *config.Config) *Proxy {
 // ServeHTTP implements the http.Handler interface.
 func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if isWebsocket(req) {
+		// we don't use https explicitly, ssl termination is done here
+		req.URL.Scheme = "ws"
 		p.websocketProxy.ServeHTTP(rw, req)
 		return
 	}
@@ -155,7 +157,8 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 	// get our kiteId and indiviudal paths
 	kiteId, rest := paths[0], path.Join(paths[1:]...)
 
-	p.Kite.Log.Info("[%s] Incoming proxy request for endpoint '/%s'", kiteId, rest)
+	p.Kite.Log.Info("[%s] Incoming proxy request for scheme: '%s', endpoint '/%s'",
+		kiteId, req.URL.Scheme, rest)
 
 	p.kitesMu.Lock()
 	defer p.kitesMu.Unlock()
@@ -166,18 +169,9 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 		return nil
 	}
 
-	oldScheme := backendURL.Scheme // for logging
-
-	// change "http" with "ws" because websocket procol expects a ws or wss as
-	// scheme.
-	if err := replaceSchemeWithWS(&backendURL); err != nil {
-		return nil
-	}
-
-	p.Kite.Log.Info("[%s] Changing scheme from '%s' to '%s' to make Websocket connection.", kiteId, oldScheme, backendURL.Scheme)
-
 	// backendURL.Path contains the baseURL, like "/kite" and rest contains
 	// SockJS related endpoints, like /info or /123/kjasd213/websocket
+	backendURL.Scheme = req.URL.Scheme
 	backendURL.Path += "/" + rest
 
 	// also change the Origin to the client's host name, like as if someone
@@ -198,25 +192,10 @@ func (p *Proxy) director(req *http.Request) {
 	// we don't need this for http proxy
 	req.Header.Del("Origin")
 
-	newScheme := "http"
-	if u.Scheme == "wss" {
-		newScheme = "https"
-	}
-
-	req.URL.Scheme = newScheme
+	// we don't use https explicitly, ssl termination is done here
+	req.URL.Scheme = "http"
 	req.URL.Host = u.Host
 	req.URL.Path = u.Path
-}
-
-// TODO: put this into a util package, is used by others too
-func replaceSchemeWithWS(u *url.URL) error {
-	switch u.Scheme {
-	case "http":
-		u.Scheme = "ws"
-	case "https":
-		u.Scheme = "wss"
-	}
-	return nil
 }
 
 // ListenAndServe listens on the TCP network address addr and then calls Serve
