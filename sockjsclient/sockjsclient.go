@@ -137,11 +137,7 @@ read_frame:
 
 // Send sends one text frame to session
 func (w *WebsocketSession) Send(str string) error {
-	b, err := json.Marshal([]string{str})
-	if err != nil {
-		return err
-	}
-
+	b, _ := json.Marshal([]string{str})
 	return w.conn.WriteMessage(websocket.TextMessage, b)
 }
 
