@@ -172,6 +172,8 @@ func (c *Client) dial() (err error) {
 
 	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
 	if err != nil {
+		c.session = nil // explicitly set nil to avoid panicing when used the inside data.
+		c.LocalKite.Log.Error(err.Error())
 		return err
 	}
 
