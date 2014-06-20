@@ -35,9 +35,9 @@ func main() {
 		log.Fatal("Please specify envrionment via -env and region via -region. Aborting.")
 	}
 
-	scheme := "ws"
+	scheme := "http"
 	if *flagCertFile != "" && *flagKeyFile != "" {
-		scheme = "wss"
+		scheme = "https"
 	}
 
 	conf := config.MustGet()
