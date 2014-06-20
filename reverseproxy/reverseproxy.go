@@ -144,17 +144,6 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 	return s, nil
 }
 
-func (p *Proxy) director(req *http.Request) {
-	u := p.backend(req)
-	if u == nil {
-		return
-	}
-
-	req.URL.Scheme = u.Scheme
-	req.URL.Host = u.Host
-	req.URL.Path = u.Path
-}
-
 func (p *Proxy) backend(req *http.Request) *url.URL {
 	kiteId := req.URL.Query().Get("kiteId")
 	p.Kite.Log.Info("[%s] Incoming proxy request", kiteId)
@@ -195,6 +184,25 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 
 	p.Kite.Log.Info("[%s] Proxying to backend url: '%s'.", kiteId, backendURL.String())
 	return backendURL
+}
+
+func (p *Proxy) director(req *http.Request) {
+	u := p.backend(req)
+	if u == nil {
+		return
+	}
+
+	// we don't need this for http proxy
+	req.Header.Del("Origin")
+
+	newScheme := "http"
+	if u.Scheme == "wss" {
+		newScheme = "https"
+	}
+
+	req.URL.Scheme = newScheme
+	req.URL.Host = u.Host
+	req.URL.Path = u.Path
 }
 
 // TODO: put this into a util package, is used by others too
