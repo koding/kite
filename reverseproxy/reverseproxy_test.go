@@ -43,13 +43,14 @@ func TestWebSocketProxy(t *testing.T) {
 	proxyConf.Port = 4999
 	proxy := New(proxyConf)
 	proxy.PublicHost = "localhost"
+	proxy.PublicPort = proxyConf.Port
 	proxy.Scheme = "http"
 	go proxy.Run()
 	<-proxy.ReadyNotify()
 
 	proxyRegisterURL := &url.URL{
 		Scheme: proxy.Scheme,
-		Host:   proxy.PublicHost + ":" + strconv.Itoa(proxy.Port),
+		Host:   proxy.PublicHost + ":" + strconv.Itoa(proxy.PublicPort),
 		Path:   "/kite",
 	}
 

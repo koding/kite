@@ -16,8 +16,9 @@ var (
 	flagCertFile    = flag.String("cert", "", "Cert file to be used for HTTPS")
 	flagKeyFile     = flag.String("key", "", "Key file to be used for HTTPS")
 	flagIp          = flag.String("ip", "0.0.0.0", "Listening IP")
-	flagPort        = flag.Int("port", 3999, "Server port")
-	flagPublicHost  = flag.String("host", "127.0.0.1", "Public host of Proxy.")
+	flagPort        = flag.Int("port", 3999, "Server port to bind")
+	flagPublicHost  = flag.String("publicHost", "127.0.0.1", "Public register host of Proxy.")
+	flagPublicPort  = flag.Int("publicPort", 0, "Public register port of Proxy.")
 	flagRegion      = flag.String("region", "", "Change region")
 	flagEnvironment = flag.String("env", "development", "Change development")
 	flagVersion     = flag.Bool("version", false, "Show version and exit")
@@ -50,9 +51,15 @@ func main() {
 	r.PublicHost = *flagPublicHost
 	r.Scheme = scheme
 
+	// Use server port if the public port is not defined
+	if *flagPublicPort == 0 {
+		*flagPublicPort = *flagPort
+	}
+	r.PublicPort = *flagPublicPort
+
 	registerURL := &url.URL{
 		Scheme: scheme,
-		Host:   *flagPublicHost + ":" + strconv.Itoa(*flagPort),
+		Host:   *flagPublicHost + ":" + strconv.Itoa(*flagPublicPort),
 		Path:   "/kite",
 	}
 
