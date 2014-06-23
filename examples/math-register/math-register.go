@@ -23,7 +23,7 @@ func main() {
 	k.Id = config.Id
 
 	// Register to kite with this url
-	kiteURL := &url.URL{Scheme: "ws", Host: "localhost:6667"}
+	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6667", Path: "/kite"}
 
 	// Register us ...
 	_, err := k.Register(kiteURL)
