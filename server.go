@@ -15,7 +15,7 @@ import (
 )
 
 // Run is a blocking method. It runs the kite server and then accepts requests
-// asynchronously.
+// asynchronously. It supports graceful restart via SIGUSR2.
 func (k *Kite) Run() {
 	if os.Getenv("KITE_VERSION") != "" {
 		fmt.Println(k.Kite().Version)
