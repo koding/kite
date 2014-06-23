@@ -14,6 +14,21 @@ format:
 	@gofmt -s -w *.go
 	@goimports -w *.go
 
+kontrol:
+	@echo "$(OK_COLOR)==> Preparing kontrol test environment $(NO_COLOR)"
+	@rm -rf $(KITE_HOME)
+	@rm -rf /tmp/kontrol-data
+
+	@echo "$(OK_COLOR)==> Creating openssl keys $(NO_COLOR)"
+	@openssl genrsa -out /tmp/privateKey.pem 2048
+	@openssl rsa -in /tmp/privateKey.pem -pubout > /tmp/publicKey.pem
+
+	@echo "$(OK_COLOR)==> Creating test kite key $(NO_COLOR)"
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4000/kite"
+
+	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data
+
 install:
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
 	@`which go` install -v ./cmd/kite
@@ -56,4 +71,4 @@ lint:
 ctags:
 	@ctags -R --languages=c,go
 
-.PHONY: all install format test doc vet lint ctags
+.PHONY: all install format test doc vet lint ctags kontrol
