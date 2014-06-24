@@ -24,10 +24,10 @@ kontrol:
 	@openssl rsa -in /tmp/privateKey.pem -pubout > /tmp/publicKey.pem
 
 	@echo "$(OK_COLOR)==> Creating test kite key $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4000/kite"
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data -port 4444
 
 install:
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
