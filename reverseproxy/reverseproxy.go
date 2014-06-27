@@ -174,11 +174,6 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 	backendURL.Scheme = req.URL.Scheme
 	backendURL.Path += "/" + rest
 
-	// also change the Origin to the client's host name, like as if someone
-	// with the same backendUrl is trying to connect to the kite. Otherwise
-	// will get an "Origin not allowed"
-	req.Header.Set("Origin", "http://"+backendURL.Host)
-
 	p.Kite.Log.Info("[%s] Proxying to backend url: '%s'.", kiteId, backendURL.String())
 	return &backendURL
 }
@@ -188,9 +183,6 @@ func (p *Proxy) director(req *http.Request) {
 	if u == nil {
 		return
 	}
-
-	// we don't need this for http proxy
-	req.Header.Del("Origin")
 
 	// we don't use https explicitly, ssl termination is done here
 	req.URL.Scheme = "http"
