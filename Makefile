@@ -43,9 +43,6 @@ test:
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
 
-	@echo "$(OK_COLOR)==> Building packages $(NO_COLOR)"
-	@`which go` build -v ./...
-
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test $(VERBOSE) ./dnode
 	@`which go` test $(VERBOSE) ./cmd/cli
