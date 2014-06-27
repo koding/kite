@@ -10,8 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/rcrowley/goagain"
 )
 
 // Run is a blocking method. It runs the kite server and then accepts requests
@@ -61,47 +59,27 @@ func (k *Kite) Addr() string {
 func (k *Kite) listenAndServe() error {
 	var err error
 
-	// inerhit a net.Listener from the parent process
-	k.listener, err = goagain.Listener()
+	// create a new one if there doesn't exist
+	k.listener, err = net.Listen("tcp4", k.Addr())
 	if err != nil {
-		// create a new one if there doesn't exist
-		k.listener, err = net.Listen("tcp4", k.Addr())
-		if err != nil {
-			return err
-		}
+		return err
+	}
 
-		k.Log.Info("New listening: %s", k.listener.Addr().String())
+	k.Log.Info("New listening: %s", k.listener.Addr().String())
 
-		if k.TLSConfig != nil {
-			if k.TLSConfig.NextProtos == nil {
-				k.TLSConfig.NextProtos = []string{"http/1.1"}
-			}
-			k.listener = tls.NewListener(k.listener, k.TLSConfig)
+	if k.TLSConfig != nil {
+		if k.TLSConfig.NextProtos == nil {
+			k.TLSConfig.NextProtos = []string{"http/1.1"}
 		}
-	} else {
-		k.Log.Info("Resuming listening on: %s", k.listener.Addr().String())
-
-		// Kill the parent, now that the child has started successfully.
-		if err := goagain.Kill(); nil != err {
-			k.Log.Fatal(err.Error())
-		}
+		k.listener = tls.NewListener(k.listener, k.TLSConfig)
 	}
 
 	// listener is ready, notify waiters.
 	close(k.readyC)
 
-	go func() {
-		defer close(k.closeC) // serving is finished, notify waiters.
-		k.Log.Info("Serving...")
-		http.Serve(k.listener, k)
-	}()
-
-	// Block the main goroutine awaiting signals. For a graceful restart we neeed SIGUSR2.
-	if _, err := goagain.Wait(k.listener); nil != err {
-		return err
-	}
-
-	return nil
+	defer close(k.closeC) // serving is finished, notify waiters.
+	k.Log.Info("Serving...")
+	return http.Serve(k.listener, k)
 }
 
 func (k *Kite) UseTLS(certPEM, keyPEM string) {
