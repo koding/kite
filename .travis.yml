@@ -3,6 +3,5 @@ go: 1.3
 install:
   - go get -d -v ./...
   - go get github.com/fatih/color
-  - go build -v ./...
 script:
   - make test
