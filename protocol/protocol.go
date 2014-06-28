@@ -44,7 +44,26 @@ type Kite struct {
 }
 
 func (k Kite) String() string {
-	return "/" + k.Username + "/" + k.Environment + "/" + k.Name + "/" + k.Version + "/" + k.Region + "/" + k.Hostname + "/" + k.ID
+	return "/" + k.Username +
+		"/" + k.Environment +
+		"/" + k.Name +
+		"/" + k.Version +
+		"/" + k.Region +
+		"/" + k.Hostname +
+		"/" + k.ID
+}
+
+// Query() returns a KontrolQuery struct.
+func (k *Kite) Query() KontrolQuery {
+	return KontrolQuery{
+		Username:    k.Username,
+		Environment: k.Environment,
+		Name:        k.Name,
+		Version:     k.Version,
+		Region:      k.Region,
+		Hostname:    k.Hostname,
+		ID:          k.ID,
+	}
 }
 
 func (k *Kite) Validate() error {
