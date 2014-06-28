@@ -72,7 +72,7 @@ func (k *Kite) SetupKontrolClient() error {
 
 	client := k.NewClient(k.Config.KontrolURL.String())
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
-	client.Authentication = &Authentication{
+	client.Auth = &Auth{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
@@ -169,7 +169,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 				Action: protocol.Register,
 				Kite:   client.Kite,
 				URL:    client.URL,
-				Token:  client.Authentication.Key,
+				Token:  client.Auth.Key,
 			},
 			localKite: k,
 		}
@@ -224,14 +224,14 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 		}
 
 		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-		auth := &Authentication{
+		auth := &Auth{
 			Type: "token",
 			Key:  currentKite.Token,
 		}
 
 		clients[i] = k.NewClient(currentKite.URL)
 		clients[i].Kite = currentKite.Kite
-		clients[i].Authentication = auth
+		clients[i].Auth = auth
 	}
 
 	// Renew tokens
@@ -278,7 +278,7 @@ func (e *Event) Client() *Client {
 
 	r := e.localKite.NewClient(e.URL)
 	r.Kite = e.Kite
-	r.Authentication = &Authentication{
+	r.Auth = &Auth{
 		Type: "token",
 		Key:  e.Token,
 	}
@@ -416,7 +416,7 @@ func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuer
 		kiteProxyURL := os.Getenv("KITE_PROXY_URL")
 		if kiteProxyURL != "" {
 			proxyKite = k.NewClient(kiteProxyURL)
-			proxyKite.Authentication = &Authentication{
+			proxyKite.Auth = &Auth{
 				Type: "kiteKey",
 				Key:  k.Config.KiteKey,
 			}

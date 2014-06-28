@@ -29,7 +29,7 @@ func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 		signalRenewToken: make(chan struct{}, 1),
 		disconnect:       make(chan struct{}),
 	}
-	return t, t.parse(r.Authentication.Key)
+	return t, t.parse(r.Auth.Key)
 }
 
 // parse the token string and set
@@ -103,6 +103,6 @@ func (t *TokenRenewer) renewToken() error {
 		return err
 	}
 
-	t.client.Authentication.Key = tokenString
+	t.client.Auth.Key = tokenString
 	return nil
 }

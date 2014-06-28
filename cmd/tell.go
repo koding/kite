@@ -40,7 +40,7 @@ func (t *Tell) Exec(args []string) error {
 	}
 
 	remote := t.client.NewClient(to)
-	remote.Authentication = &kite.Authentication{
+	remote.Auth = &kite.Auth{
 		Type: "kiteKey",
 		Key:  key,
 	}

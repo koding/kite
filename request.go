@@ -14,12 +14,12 @@ import (
 
 // Request contains information about the incoming request.
 type Request struct {
-	Method         string
-	Args           *dnode.Partial
-	LocalKite      *Kite
-	Client         *Client
-	Username       string
-	Authentication *Authentication
+	Method    string
+	Args      *dnode.Partial
+	LocalKite *Kite
+	Client    *Client
+	Username  string
+	Auth      *Auth
 }
 
 // Response is the type of the object that is returned from request handlers
@@ -92,11 +92,11 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	}
 
 	request := &Request{
-		Method:         method,
-		Args:           options.WithArgs,
-		LocalKite:      c.LocalKite,
-		Client:         c,
-		Authentication: options.Authentication,
+		Method:    method,
+		Args:      options.WithArgs,
+		LocalKite: c.LocalKite,
+		Client:    c,
+		Auth:      options.Auth,
 	}
 
 	// Call response callback function, send back our response
@@ -128,7 +128,7 @@ func (r *Request) authenticate() *Error {
 		return nil
 	}
 
-	if r.Authentication == nil {
+	if r.Auth == nil {
 		return &Error{
 			Type:    "authenticationError",
 			Message: "No authentication information is provided",
@@ -136,11 +136,11 @@ func (r *Request) authenticate() *Error {
 	}
 
 	// Select authenticator function.
-	f := r.LocalKite.Authenticators[r.Authentication.Type]
+	f := r.LocalKite.Authenticators[r.Auth.Type]
 	if f == nil {
 		return &Error{
 			Type:    "authenticationError",
-			Message: fmt.Sprintf("Unknown authentication type: %s", r.Authentication.Type),
+			Message: fmt.Sprintf("Unknown authentication type: %s", r.Auth.Type),
 		}
 	}
 
@@ -161,7 +161,7 @@ func (r *Request) authenticate() *Error {
 
 // AuthenticateFromToken is the default Authenticator for Kite.
 func (k *Kite) AuthenticateFromToken(r *Request) error {
-	token, err := jwt.Parse(r.Authentication.Key, r.LocalKite.RSAKey)
+	token, err := jwt.Parse(r.Auth.Key, r.LocalKite.RSAKey)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 
 // AuthenticateFromKiteKey authenticates user from kite key.
 func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
-	token, err := jwt.Parse(r.Authentication.Key, kitekey.GetKontrolKey)
+	token, err := jwt.Parse(r.Auth.Key, kitekey.GetKontrolKey)
 	if err != nil {
 		return err
 	}

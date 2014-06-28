@@ -237,8 +237,8 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// Only accept requests with kiteKey because we need this info
 	// for generating tokens for this kite.
-	if r.Authentication.Type != "kiteKey" {
-		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Authentication.Type)
+	if r.Auth.Type != "kiteKey" {
+		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
 	}
 
 	err := k.register(r.Client, args.URL)

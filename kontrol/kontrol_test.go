@@ -332,7 +332,7 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
-	t.Logf("oldToken: %s", remoteMathWorker.Authentication.Key)
+	t.Logf("oldToken: %s", remoteMathWorker.Auth.Key)
 	newToken, err := exp2Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)

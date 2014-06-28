@@ -33,7 +33,7 @@ type Client struct {
 	LocalKite *Kite
 
 	// Credentials that we sent in each request.
-	Authentication *Authentication
+	Auth *Auth
 
 	// Should we reconnect if disconnected?
 	Reconnect bool
@@ -73,10 +73,10 @@ type Client struct {
 // It is used when unmarshalling a dnode message.
 type callOptions struct {
 	// Arguments to the method
-	Kite             protocol.Kite   `json:"kite" dnode:"-"`
-	Authentication   *Authentication `json:"authentication"`
-	WithArgs         *dnode.Partial  `json:"withArgs" dnode:"-"`
-	ResponseCallback dnode.Function  `json:"responseCallback"`
+	Kite             protocol.Kite  `json:"kite" dnode:"-"`
+	Auth             *Auth          `json:"authentication"`
+	WithArgs         *dnode.Partial `json:"withArgs" dnode:"-"`
+	ResponseCallback dnode.Function `json:"responseCallback"`
 }
 
 // callOptionsOut is the same structure with callOptions.
@@ -89,7 +89,7 @@ type callOptionsOut struct {
 }
 
 // Authentication is used when connecting a Client.
-type Authentication struct {
+type Auth struct {
 	// Type can be "kiteKey", "token" or "sessionID" for now.
 	Type string `json:"type"`
 	Key  string `json:"key"`
@@ -366,7 +366,7 @@ func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Funct
 		WithArgs: args,
 		callOptions: callOptions{
 			Kite:             *c.LocalKite.Kite(),
-			Authentication:   c.Authentication,
+			Auth:             c.Auth,
 			ResponseCallback: responseCallback,
 		},
 	}
