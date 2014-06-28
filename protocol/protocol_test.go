@@ -2,8 +2,8 @@ package protocol
 
 import "testing"
 
-func TestKite(t *testing.T) {
-	k := Kite{
+var (
+	k = Kite{
 		Name:        "name",
 		Username:    "username",
 		ID:          "id",
@@ -12,7 +12,9 @@ func TestKite(t *testing.T) {
 		Version:     "version",
 		Hostname:    "hostname",
 	}
+)
 
+func TestKiteString(t *testing.T) {
 	s := k.String()
 
 	if err := k.Validate(); err != nil {
@@ -41,4 +43,21 @@ func TestKite(t *testing.T) {
 	expect(d.Region, "region")
 	expect(d.Version, "version")
 	expect(d.Hostname, "hostname")
+}
+
+func TestKiteQuery(t *testing.T) {
+	q := k.Query()
+	expect := func(expecting, got string) {
+		if expecting != got {
+			t.Errorf("expecting: '%s',  got: '%s'", expecting, got)
+		}
+	}
+
+	expect(q.Name, "name")
+	expect(q.Username, "username")
+	expect(q.ID, "id")
+	expect(q.Environment, "environment")
+	expect(q.Region, "region")
+	expect(q.Version, "version")
+	expect(q.Hostname, "hostname")
 }
