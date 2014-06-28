@@ -41,14 +41,14 @@ func TestFindCommand(t *testing.T) {
 	}
 
 	cases := []TestCase{
-		TestCase{"notExist", true, "", ""},
-		TestCase{"hello", false, hello.Definition(), ""}, // test first level command
-		TestCase{"hello asdf", false, hello.Definition(), "asdf"},
-		TestCase{"sub", false, "Run to see sub-commands", ""},
-		TestCase{"sub notExist", true, "", ""},
-		TestCase{"sub hello2", false, hello2.Definition(), ""}, // second level
-		TestCase{"sub hello2 asdf", false, hello2.Definition(), "asdf"},
-		TestCase{"sub sub2 hello3 asdf", false, hello3.Definition(), "asdf"}, // third level
+		{"notExist", true, "", ""},
+		{"hello", false, hello.Definition(), ""}, // test first level command
+		{"hello asdf", false, hello.Definition(), "asdf"},
+		{"sub", false, "Run to see sub-commands", ""},
+		{"sub notExist", true, "", ""},
+		{"sub hello2", false, hello2.Definition(), ""}, // second level
+		{"sub hello2 asdf", false, hello2.Definition(), "asdf"},
+		{"sub sub2 hello3 asdf", false, hello3.Definition(), "asdf"}, // third level
 	}
 
 	for _, c := range cases {

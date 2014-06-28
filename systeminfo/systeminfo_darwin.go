@@ -36,9 +36,9 @@ func vm_stat() (bytesFree, bytesInactive uint64, err error) {
 	}
 
 	stats := map[string]*memStat{
-		"pageSize":      &memStat{regex: regexp.MustCompile("page size of (\\d+) bytes")},
-		"pagesFree":     &memStat{regex: regexp.MustCompile("Pages free: *(\\d+).")},
-		"pagesInactive": &memStat{regex: regexp.MustCompile("Pages inactive: *(\\d+).")},
+		"pageSize":      {regex: regexp.MustCompile("page size of (\\d+) bytes")},
+		"pagesFree":     {regex: regexp.MustCompile("Pages free: *(\\d+).")},
+		"pagesInactive": {regex: regexp.MustCompile("Pages inactive: *(\\d+).")},
 	}
 
 	cmd := exec.Command("vm_stat")

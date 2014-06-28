@@ -14,24 +14,24 @@ func TestScrub(t *testing.T) {
 	cb := Callback(func(*Partial) {})
 
 	cases := []Case{
-		Case{nil, nil},
-		Case{"foo", nil},
-		Case{[]interface{}{"foo", "bar"}, nil},
-		Case{[]interface{}{cb}, map[string]Path{"0": Path{0}}},
-		Case{[]interface{}{"foo", "bar", cb}, map[string]Path{"0": Path{2}}},
-		Case{[]interface{}{"foo", []interface{}{"bar", cb}}, map[string]Path{"0": Path{1, 1}}},
-		Case{map[string]interface{}{"foo": 1, "bar": 2}, nil},
-		Case{map[string]interface{}{"foo": 1, "bar": 2, "cb": cb}, map[string]Path{"0": Path{"cb"}}},
-		Case{T{1, 2, cb, cb, nil}, map[string]Path{
-			"0": Path{"c"},
-			"1": Path{"f1"},
+		{nil, nil},
+		{"foo", nil},
+		{[]interface{}{"foo", "bar"}, nil},
+		{[]interface{}{cb}, map[string]Path{"0": {0}}},
+		{[]interface{}{"foo", "bar", cb}, map[string]Path{"0": {2}}},
+		{[]interface{}{"foo", []interface{}{"bar", cb}}, map[string]Path{"0": {1, 1}}},
+		{map[string]interface{}{"foo": 1, "bar": 2}, nil},
+		{map[string]interface{}{"foo": 1, "bar": 2, "cb": cb}, map[string]Path{"0": {"cb"}}},
+		{T{1, 2, cb, cb, nil}, map[string]Path{
+			"0": {"c"},
+			"1": {"f1"},
 		}},
-		Case{T{1, 2, cb, cb, &T{C: cb, d: cb}}, map[string]Path{
-			"0": Path{"c"},
-			"1": Path{"E", "c"},
-			"2": Path{"E", "f1"},
-			"3": Path{"E", "f3"},
-			"4": Path{"f1"},
+		{T{1, 2, cb, cb, &T{C: cb, d: cb}}, map[string]Path{
+			"0": {"c"},
+			"1": {"E", "c"},
+			"2": {"E", "f1"},
+			"3": {"E", "f3"},
+			"4": {"f1"},
 		}},
 	}
 
