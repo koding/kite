@@ -48,7 +48,7 @@ type Kite struct {
 	SetLogLevel func(Level)
 
 	// Contains different functions for authenticating user from request.
-	// Keys are the authentication types (options.authentication.type).
+	// Keys are the authentication types (options.auth.type).
 	Authenticators map[string]func(*Request) error
 
 	// Kontrol keys to trust. Kontrol will issue access tokens for kites
