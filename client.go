@@ -167,15 +167,15 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 }
 
 func (c *Client) dial() (err error) {
-	// Reset the wait time.
-	defer c.redialBackOff.Reset()
-
 	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
 	if err != nil {
 		c.session = nil // explicitly set nil to avoid panicing when used the inside data.
 		c.LocalKite.Log.Error(err.Error())
 		return err
 	}
+
+	// Reset the wait time.
+	c.redialBackOff.Reset()
 
 	// Must be run in a goroutine because a handler may wait a response from
 	// server.
