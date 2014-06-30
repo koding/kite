@@ -74,7 +74,7 @@ type Client struct {
 type callOptions struct {
 	// Arguments to the method
 	Kite             protocol.Kite  `json:"kite" dnode:"-"`
-	Auth             *Auth          `json:"auth"`
+	Auth             *Auth          `json:"authentication"`
 	WithArgs         *dnode.Partial `json:"withArgs" dnode:"-"`
 	ResponseCallback dnode.Function `json:"responseCallback"`
 }
