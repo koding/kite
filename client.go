@@ -127,7 +127,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (c *Client) Dial() (err error) {
-	c.LocalKite.Log.Info("Dialing remote kite: [%s %s]", c.Kite.Name, c.URL)
+	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 
 	if err := c.dial(); err != nil {
 		return err
@@ -141,7 +141,7 @@ func (c *Client) Dial() (err error) {
 // Dial connects to the remote Kite. If it can't connect, it retries
 // indefinitely. It returns a channel to check if it's connected or not.
 func (c *Client) DialForever() (connected chan bool, err error) {
-	c.LocalKite.Log.Info("Dialing remote kite: [%s %s]", c.Kite.Name, c.URL)
+	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 
 	c.Reconnect = true
 	connected = make(chan bool, 1) // This will be closed on first connection.
