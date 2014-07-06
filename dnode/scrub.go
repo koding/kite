@@ -149,7 +149,9 @@ func (s *Scrubber) registerCallback(val reflect.Value, path Path, callbackMap ma
 	seq := strconv.FormatUint(next, 10)
 
 	// Save in scubber callbacks
+	s.Lock()
 	s.callbacks[next] = cb
+	s.Unlock()
 
 	// Add to callback map to be sent to remote.
 	// Make a copy of path because it is reused in caller.
