@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/dnode"
@@ -20,6 +21,8 @@ type Request struct {
 	Client    *Client
 	Username  string
 	Auth      *Auth
+
+	mu sync.Mutex // protects the fields above
 }
 
 // Response is the type of the object that is returned from request handlers
@@ -155,7 +158,9 @@ func (r *Request) authenticate() *Error {
 
 	// Replace username of the remote Kite with the username that client send
 	// us. This prevents a Kite to impersonate someone else's Kite.
+	r.mu.Lock()
 	r.Client.Kite.Username = r.Username
+	r.mu.Unlock()
 	return nil
 }
 
