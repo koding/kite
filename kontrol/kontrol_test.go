@@ -117,7 +117,6 @@ func TestTokenInvalidation(t *testing.T) {
 }
 
 func TestMultiple(t *testing.T) {
-	t.Skip("Run it manually")
 	testDuration := time.Second * 10
 
 	// number of available example kites to be queried
