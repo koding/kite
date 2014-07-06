@@ -119,8 +119,18 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
 
-	k.OnFirstRequest(func(c *kite.Client) { kontrol.clients[c.ID] = c })
-	k.OnDisconnect(func(c *kite.Client) { delete(kontrol.clients, c.ID) })
+	var mu sync.Mutex
+	k.OnFirstRequest(func(c *kite.Client) {
+		mu.Lock()
+		kontrol.clients[c.ID] = c
+		mu.Unlock()
+	})
+
+	k.OnDisconnect(func(c *kite.Client) {
+		mu.Lock()
+		delete(kontrol.clients, c.ID)
+		mu.Unlock()
+	})
 
 	return kontrol
 }
