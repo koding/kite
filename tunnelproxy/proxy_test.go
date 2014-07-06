@@ -2,7 +2,6 @@ package tunnelproxy
 
 import (
 	"log"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +15,7 @@ import (
 func TestProxy(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "ws", Host: "localhost:5555"}
+	conf.KontrolURL = "ws://localhost:5555/kite"
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
