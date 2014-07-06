@@ -244,9 +244,8 @@ func (c *Client) readLoop() error {
 }
 
 // processMessage processes a single message and calls a handler or callback.
-func (c *Client) processMessage(data []byte) error {
+func (c *Client) processMessage(data []byte) (err error) {
 	var (
-		err error
 		ok  bool
 		msg dnode.Message
 		m   *Method
@@ -259,17 +258,19 @@ func (c *Client) processMessage(data []byte) error {
 		}
 	}()
 
-	if err = json.Unmarshal(data, &msg); err != nil {
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return err
 	}
 
 	sender := func(id uint64, args []interface{}) error {
-		_, err = c.marshalAndSend(id, args)
-		return err
+		// do not name the error variable to "err" here, it's a trap for
+		// shadowing variables
+		_, errc := c.marshalAndSend(id, args)
+		return errc
 	}
 
 	// Replace function placeholders with real functions.
-	if err = dnode.ParseCallbacks(&msg, sender); err != nil {
+	if err := dnode.ParseCallbacks(&msg, sender); err != nil {
 		return err
 	}
 
