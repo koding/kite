@@ -107,11 +107,12 @@ func initialKey(publicKey, privateKey []byte) {
 	}
 	conf.Username = *username
 
-	parsed, err := url.Parse(*kontrolURL)
+	_, err := url.Parse(*kontrolURL)
 	if err != nil {
 		log.Fatalln("cannot parse kontrol URL")
 	}
-	conf.KontrolURL = parsed
+
+	conf.KontrolURL = *kontrolURL
 
 	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
 	err = k.RegisterSelf()

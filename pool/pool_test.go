@@ -20,7 +20,7 @@ import (
 func TestPool(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:5555", Path: "/kite"}
+	conf.KontrolURL = "http://localhost:5555/kite"
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
@@ -65,7 +65,7 @@ func TestPool(t *testing.T) {
 	// We must wait for a until the pool receives events from kontrol.
 	time.Sleep(2 * time.Second)
 
-	if len(p.Kites) != 2 {
-		t.Fatalf("expected 2 kited, found: %d", len(p.Kites))
+	if p.Len() != 2 {
+		t.Fatalf("expected 2 kited, found: %d", p.Len())
 	}
 }

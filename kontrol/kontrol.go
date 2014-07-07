@@ -119,8 +119,18 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
 
-	k.OnFirstRequest(func(c *kite.Client) { kontrol.clients[c.ID] = c })
-	k.OnDisconnect(func(c *kite.Client) { delete(kontrol.clients, c.ID) })
+	var mu sync.Mutex
+	k.OnFirstRequest(func(c *kite.Client) {
+		mu.Lock()
+		kontrol.clients[c.ID] = c
+		mu.Unlock()
+	})
+
+	k.OnDisconnect(func(c *kite.Client) {
+		mu.Lock()
+		delete(kontrol.clients, c.ID)
+		mu.Unlock()
+	})
 
 	return kontrol
 }
@@ -202,12 +212,12 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
-		"iss":        k.Kite.Kite().Username,            // Issuer
-		"sub":        username,                          // Subject
-		"iat":        time.Now().UTC().Unix(),           // Issued At
-		"jti":        tknID.String(),                    // JWT ID
-		"kontrolURL": k.Kite.Config.KontrolURL.String(), // Kontrol URL
-		"kontrolKey": strings.TrimSpace(k.publicKey),    // Public key of kontrol
+		"iss":        k.Kite.Kite().Username,         // Issuer
+		"sub":        username,                       // Subject
+		"iat":        time.Now().UTC().Unix(),        // Issued At
+		"jti":        tknID.String(),                 // JWT ID
+		"kontrolURL": k.Kite.Config.KontrolURL,       // Kontrol URL
+		"kontrolKey": strings.TrimSpace(k.publicKey), // Public key of kontrol
 	}
 
 	k.Kite.Log.Info("Registered machine on user: %s", username)
@@ -217,7 +227,7 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
-	URL *protocol.KiteURL `json:"url"`
+	URL string `json:"url"`
 }
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -228,10 +238,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	var args struct {
-		URL *protocol.KiteURL `json:"url"`
+		URL string `json:"url"`
 	}
 	r.Args.One().MustUnmarshal(&args)
-	if args.URL == nil {
+	if args.URL == "" {
 		return nil, errors.New("empty url")
 	}
 
@@ -247,10 +257,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	// send response back to the kite, also identify him with the new name
-	return &protocol.RegisterResult{URL: args.URL.String()}, nil
+	return &protocol.RegisterResult{URL: args.URL}, nil
 }
 
-func (k *Kontrol) register(r *kite.Client, kiteURL *protocol.KiteURL) error {
+func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	err := validateKiteKey(&r.Kite)
 	if err != nil {
 		return err
@@ -302,7 +312,7 @@ func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
 // registerSelf adds Kontrol itself to etcd as a kite.
 func (k *Kontrol) registerSelf() {
 	value := &registerValue{
-		URL: &protocol.KiteURL{*k.Kite.Config.KontrolURL},
+		URL: k.Kite.Config.KontrolURL,
 	}
 	setter, _ := k.makeSetter(k.Kite.Kite(), value)
 	for {
@@ -797,7 +807,7 @@ func kitesFromNodes(nodes store.NodeExterns) ([]*protocol.KiteWithToken, error) 
 
 		kites[i] = &protocol.KiteWithToken{
 			Kite: *kite,
-			URL:  rv.URL.String(),
+			URL:  rv.URL,
 		}
 	}
 
@@ -818,7 +828,7 @@ func kiteWithTokenFromEtcdNode(node *store.NodeExtern, token string) (*protocol.
 
 	return &protocol.KiteWithToken{
 		Kite:  *kite,
-		URL:   rv.URL.String(),
+		URL:   rv.URL,
 		Token: token,
 	}, nil
 }

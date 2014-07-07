@@ -66,11 +66,11 @@ func (k *Kite) SetupKontrolClient() error {
 		return nil // already prepared
 	}
 
-	if k.Config.KontrolURL == nil {
+	if k.Config.KontrolURL == "" {
 		return errors.New("no kontrol URL given in config")
 	}
 
-	client := k.NewClient(k.Config.KontrolURL.String())
+	client := k.NewClient(k.Config.KontrolURL)
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
 	client.Auth = &Auth{
 		Type: "kiteKey",

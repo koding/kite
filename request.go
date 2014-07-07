@@ -155,7 +155,7 @@ func (r *Request) authenticate() *Error {
 
 	// Replace username of the remote Kite with the username that client send
 	// us. This prevents a Kite to impersonate someone else's Kite.
-	r.Client.Kite.Username = r.Username
+	r.Client.SetUsername(r.Username)
 	return nil
 }
 

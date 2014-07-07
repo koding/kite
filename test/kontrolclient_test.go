@@ -26,7 +26,7 @@ var (
 func init() {
 	conf = config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4099", Path: "/kite"}
+	conf.KontrolURL = "http://localhost:4099/kite"
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw

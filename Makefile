@@ -44,15 +44,15 @@ test:
 	@`which go` run ./testutil/writekey/main.go
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
-	@`which go` test $(VERBOSE) ./dnode
-	@`which go` test $(VERBOSE) ./cmd/cli
-	@`which go` test $(VERBOSE) ./systeminfo
-	@`which go` test $(VERBOSE) ./
-	@`which go` test $(VERBOSE) ./test
-	@`which go` test $(VERBOSE) ./kontrol
-	@`which go` test $(VERBOSE) ./tunnelproxy
-	@`which go` test $(VERBOSE) ./reverseproxy
-	@`which go` test $(VERBOSE) ./pool
+	@`which go` test -race $(VERBOSE) ./dnode
+	@`which go` test -race $(VERBOSE) ./cmd/cli
+	@`which go` test -race $(VERBOSE) ./systeminfo
+	@`which go` test -race $(VERBOSE) ./
+	@`which go` test -race $(VERBOSE) ./test
+	@`which go` test -race $(VERBOSE) ./kontrol
+	@`which go` test -race $(VERBOSE) ./tunnelproxy
+	@`which go` test -race $(VERBOSE) ./reverseproxy
+	@`which go` test -race $(VERBOSE) ./pool
 
 doc:
 	@`which godoc` github.com/koding/kite | less

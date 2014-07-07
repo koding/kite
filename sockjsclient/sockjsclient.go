@@ -14,10 +14,19 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+// Rand is a threaSafe rand.Rand type
+type Rand struct {
+	r *rand.Rand
+	sync.Mutex
+}
+
+var r = Rand{r: rand.New(rand.NewSource(time.Now().UnixNano()))}
 
 func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 	dialURL, err := url.Parse(baseURL)
@@ -146,12 +155,13 @@ func (w *WebsocketSession) Close(status uint32, reason string) error {
 	return w.conn.Close()
 }
 
-var r = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 // threeDigits is used to generate a server_id.
 func threeDigits() string {
 	var i uint64
-	i = uint64(r.Int31())
+
+	r.Lock()
+	i = uint64(r.r.Int31())
+	r.Unlock()
 	if i < 100 {
 		i += 100
 	}

@@ -2,7 +2,6 @@
 package testutil
 
 import (
-	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -57,7 +56,7 @@ func NewKiteKey() *jwt.Token {
 func NewConfig() *config.Config {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = &url.URL{Scheme: "http", Host: "localhost:4000", Path: "/kite"}
+	conf.KontrolURL = "http://localhost:4000/kite"
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = NewKiteKey().Raw

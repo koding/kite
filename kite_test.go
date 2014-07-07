@@ -14,7 +14,6 @@ import (
 )
 
 func TestMultiple(t *testing.T) {
-	t.Skip("Run it manually")
 	testDuration := time.Second * 10
 
 	// number of available mathworker kites to be called
@@ -29,9 +28,9 @@ func TestMultiple(t *testing.T) {
 	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)
 	for i := 0; i < kiteNumber; i++ {
 		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
+		m.Config.DisableAuthentication = true
 
 		m.HandleFunc("square", Square)
-		m.Config.DisableAuthentication = true
 
 		go http.ListenAndServe("127.0.0.1:"+strconv.Itoa(port+i), m)
 	}
@@ -77,7 +76,7 @@ func TestMultiple(t *testing.T) {
 
 					number := result.MustFloat64()
 
-					fmt.Printf("rpc result: %f elapsedTime %f sec\n", number, elapsedTime.Seconds())
+					t.Log("rpc result: %f elapsedTime %f sec\n", number, elapsedTime.Seconds())
 				}(i)
 			}
 		case <-timeout:
