@@ -28,6 +28,7 @@ func init() {
 type Client struct {
 	// The information about the kite that we are connecting to.
 	protocol.Kite
+	muProt sync.Mutex // protects protocol.Kite access
 
 	// A reference to the current Kite running.
 	LocalKite *Kite
@@ -127,6 +128,12 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 	})
 
 	return r
+}
+
+func (c *Client) SetUsername(username string) {
+	c.muProt.Lock()
+	c.Kite.Username = username
+	c.muProt.Unlock()
 }
 
 // Dial connects to the remote Kite. Returns error if it can't.
