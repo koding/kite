@@ -119,16 +119,13 @@ func TestTokenInvalidation(t *testing.T) {
 func TestMultiple(t *testing.T) {
 	testDuration := time.Second * 10
 
-	// number of available example kites to be queried
-	kiteNumber := 50
-
-	// number of clients that will query example kites
-	clientNumber := 100
-
 	// number of kites that will be queried. Means if there are 50 example
 	// kites available only 10 of them will be queried. Increasing this number
 	// makes the test fail.
-	queryNumber := 1
+	kiteNumber := 5
+
+	// number of clients that will query example kites
+	clientNumber := 10
 
 	fmt.Printf("Creating %d example kites\n", kiteNumber)
 	for i := 0; i < kiteNumber; i++ {
@@ -136,7 +133,7 @@ func TestMultiple(t *testing.T) {
 		m.Config = conf.Copy()
 
 		kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
-		_, err := m.Register(kiteURL)
+		err := m.RegisterForever(kiteURL)
 		if err != nil {
 			t.Error(err)
 		}
@@ -172,7 +169,7 @@ func TestMultiple(t *testing.T) {
 					query := protocol.KontrolQuery{
 						Username:    conf.Username,
 						Environment: conf.Environment,
-						Name:        "example" + strconv.Itoa(rand.Intn(queryNumber)),
+						Name:        "example" + strconv.Itoa(rand.Intn(kiteNumber)),
 					}
 
 					start := time.Now()
@@ -184,7 +181,6 @@ func TestMultiple(t *testing.T) {
 							i, elapsedTime.Seconds(), err)
 					} else {
 						fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
-
 					}
 				}(i)
 			}
