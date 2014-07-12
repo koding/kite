@@ -36,14 +36,11 @@ func (p *Partial) Unmarshal(v interface{}) error {
 		return fmt.Errorf("Cannot unmarshal nil argument")
 	}
 
-	value := reflect.ValueOf(v)
-	if value.Kind() != reflect.Ptr {
-		panic("v must be a pointer")
-	}
-
 	if err := json.Unmarshal(p.Raw, &v); err != nil {
 		return fmt.Errorf("%s. Data: %s", err.Error(), string(p.Raw))
 	}
+
+	value := reflect.ValueOf(v)
 
 	for _, spec := range p.CallbackSpecs {
 		if err := setCallback(value, spec.Path, spec.Function.Caller.(functionReceived)); err != nil {
