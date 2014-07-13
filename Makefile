@@ -43,6 +43,10 @@ test:
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
 
+	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
+	@`which go` get -d -v ./...
+	@`which go` get github.com/fatih/color
+
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./dnode
 	@`which go` test -race $(VERBOSE) ./cmd/cli
