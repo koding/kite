@@ -33,7 +33,8 @@ install:
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
 	@`which go` install -v ./cmd/kite
 	@`which go` install -v ./kontrol/kontrol
-	@`which go` install -v ./proxy/proxy
+	@`which go` install -v ./reverseproxy/reverseproxy
+	@`which go` install -v ./tunnelproxy/tunnelproxy
 
 test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
