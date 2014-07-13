@@ -1,6 +1,8 @@
 NO_COLOR=\033[0m
 OK_COLOR=\033[0;32m
 KITE_HOME=/tmp/test_kite_home
+ULIMIT=9000
+
 
 DEBUG?=0
 ifeq ($(DEBUG), 1)
@@ -40,6 +42,8 @@ test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
+	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
+	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
