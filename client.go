@@ -17,7 +17,7 @@ import (
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
-var forever = backoff.NewExponentialBackoff()
+var forever = backoff.NewExponentialBackOff()
 
 func init() {
 	forever.MaxElapsedTime = 365 * 24 * time.Hour // 1 year
@@ -58,7 +58,7 @@ type Client struct {
 	scrubber *dnode.Scrubber
 
 	// Time to wait before redial connection.
-	redialBackOff backoff.ExponentialBackoff
+	redialBackOff backoff.ExponentialBackOff
 
 	// on connect/disconnect handlers are invoked after every
 	// connect/disconnect.
