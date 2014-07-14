@@ -32,6 +32,10 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data -port 4444
 
 install:
+	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
+	@`which go` get -d -v ./...
+	@`which go` get github.com/fatih/color
+
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
 	@`which go` install -v ./cmd/kite
 	@`which go` install -v ./kontrol/kontrol
