@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	KontrolVersion    = "0.0.4"
+	KontrolVersion    = "0.0.5"
 	HeartbeatInterval = 5 * time.Second
 	HeartbeatDelay    = 10 * time.Second
 	KitesPrefix       = "/kites"
