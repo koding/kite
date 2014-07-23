@@ -18,7 +18,7 @@ func (h HandlerFunc) ServeKite(r *Request) (interface{}, error) {
 
 // Method defines a method and the Handler it is bind to.
 type Method struct {
-	// name is the method name
+	// name is the method name. Unnamed methods can exist
 	name string
 
 	// handler contains the related Handler
@@ -63,4 +63,44 @@ func (k *Kite) addHandle(method string, handler Handler) *Method {
 
 	k.handlers[method] = m
 	return m
+}
+
+// PreHandle registers an handler which is executed before a kite.Handler for a
+// method is executed. Calling PreHandle multiple times registers multiple
+// handlers. The execution order is FIFO.
+func (k *Kite) PreHandle(handler Handler) {
+	k.preHandlers = append(k.preHandlers, handler)
+}
+
+func (k *Kite) PreHandleFunc(handler HandlerFunc) {
+	k.PreHandle(handler)
+}
+
+// PostHandle registers an handler which is executed after a kite.Handler for a
+// method is executed. Calling PostHandler multiple times registers multiple
+// handlers. The execution order is FIFO.
+func (k *Kite) PostHandle(handler Handler) {
+	k.postHandlers = append(k.postHandlers, handler)
+}
+
+func (k *Kite) PostHandleFunc(handler HandlerFunc) {
+	k.PostHandle(handler)
+}
+
+// multiHandler is a type that satisifes the kite.Handler interface
+type multiHandler []Handler
+
+func (m multiHandler) ServeKite(r *Request) (interface{}, error) {
+	for _, handler := range m {
+		resp, err := handler.ServeKite(r)
+		if err != nil {
+			// exit only if there is a problem
+			return nil, err
+		}
+
+		// save for next iteration
+		r.Response = resp
+	}
+
+	return r.Response, nil
 }
