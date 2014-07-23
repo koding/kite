@@ -78,7 +78,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// Call the handler functions.
 	handlers := []Handler{}
 	handlers = append(handlers, c.LocalKite.preHandlers...)
-	handlers = append(handlers, method.handler)
+	handlers = append(handlers, method.handlers...)
 	handlers = append(handlers, c.LocalKite.postHandlers...)
 
 	result, err := multiHandler(handlers).ServeKite(request)

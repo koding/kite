@@ -28,7 +28,10 @@ func main() {
 	})
 
 	// Add our handler method, authentication is disabled for this example
-	k.HandleFunc("square", Square).DisableAuthentication()
+	k.HandleFunc("square", Square).DisableAuthentication().PreHandleFunc(func(r *kite.Request) (interface{}, error) {
+		fmt.Println("This pre handler is only valid for this individual method")
+		return nil, nil
+	})
 
 	// Attach to a server and run it
 	k.Config.Port = 3636
