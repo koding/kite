@@ -99,22 +99,26 @@ func (k *Kite) addHandle(method string, handler Handler) *Method {
 
 // PreHandle registers an handler which is executed before a kite.Handler
 // method is executed. Calling PreHandle multiple times registers multiple
-// handlers. The execution order is FIFO.
+// handlers. A non-error return triggers the execution of the next handler. The
+// execution order is FIFO.
 func (k *Kite) PreHandle(handler Handler) {
 	k.preHandlers = append(k.preHandlers, handler)
 }
 
+// PreHandleFunc is the same as PreHandle. It accepts a HandlerFunc.
 func (k *Kite) PreHandleFunc(handler HandlerFunc) {
 	k.PreHandle(handler)
 }
 
 // PostHandle registers an handler which is executed after a kite.Handler
 // method is executed. Calling PostHandler multiple times registers multiple
-// handlers. The execution order is FIFO.
+// handlers. A non-error return triggers the execution of the next handler. The
+// execution order is FIFO.
 func (k *Kite) PostHandle(handler Handler) {
 	k.postHandlers = append(k.postHandlers, handler)
 }
 
+// PostHandleFunc is the same as PostHandle. It accepts a HandlerFunc.
 func (k *Kite) PostHandleFunc(handler HandlerFunc) {
 	k.PostHandle(handler)
 }
