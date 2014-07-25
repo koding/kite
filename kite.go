@@ -57,7 +57,9 @@ type Kite struct {
 	trustedKontrolKeys map[string]string
 
 	// Handlers added with Kite.HandleFunc().
-	handlers map[string]*Method // method map for exported methods
+	handlers     map[string]*Method // method map for exported methods
+	preHandlers  []Handler          // a list of handlers that are executed before any handler
+	postHandlers []Handler          // a list of handlers that are executed after any handler
 
 	httpHandler http.Handler
 
@@ -118,6 +120,8 @@ func New(name, version string) *Kite {
 		Authenticators:     make(map[string]func(*Request) error),
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]*Method),
+		preHandlers:        make([]Handler, 0),
+		postHandlers:       make([]Handler, 0),
 		kontrol:            kClient,
 		name:               name,
 		version:            version,

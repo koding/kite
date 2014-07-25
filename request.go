@@ -14,12 +14,29 @@ import (
 
 // Request contains information about the incoming request.
 type Request struct {
-	Method    string
-	Args      *dnode.Partial
+	// Method defines the method name which is invoked by the incoming request
+	Method string
+
+	// Args defines the incoming arguments for the given method
+	Args *dnode.Partial
+
+	// LocalKite defines a context for the local kite
 	LocalKite *Kite
-	Client    *Client
-	Username  string
-	Auth      *Auth
+
+	// Client defines a context for the remote kite
+	Client *Client
+
+	// Username defines the username which the incoming request is bound to.
+	// This is authenticated and validated if authentication is enabled.
+	Username string
+
+	// Auth stores the authentication information for the incoming request and
+	// the type of authentication. This is not used when authentication is disabled
+	Auth *Auth
+
+	// Response contains the response from the previous middleware handler (if
+	// any). This is populated only if PreHandle or PostHandle is being used.
+	Response interface{}
 }
 
 // Response is the type of the object that is returned from request handlers
@@ -58,8 +75,13 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 		request.Username = request.Client.Kite.Username
 	}
 
-	// Call the handler function.
-	result, err := method.handler.ServeKite(request)
+	// Call the handler functions.
+	handlers := []Handler{}
+	handlers = append(handlers, c.LocalKite.preHandlers...)
+	handlers = append(handlers, method.handlers...)
+	handlers = append(handlers, c.LocalKite.postHandlers...)
+
+	result, err := multiHandler(handlers).ServeKite(request)
 
 	callFunc(result, createError(err))
 }
