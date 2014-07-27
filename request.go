@@ -78,6 +78,9 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 		request.Username = request.Client.Kite.Username
 	}
 
+	method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
+	method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+
 	// Call the handler functions.
 	result, err := method.ServeKite(request)
 

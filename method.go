@@ -153,7 +153,7 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 			return nil, err
 		}
 
-		if m.handling == ReturnFirst && resp != nil {
+		if m.handling == ReturnFirst && resp != nil && firstResp == nil {
 			firstResp = resp
 		}
 	}
@@ -167,18 +167,18 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	// also save it dependent on the handling mechanism
 	methodResp := resp
 
-	if m.handling == ReturnFirst && resp != nil {
+	if m.handling == ReturnFirst && resp != nil && firstResp == nil {
 		firstResp = resp
 	}
 
 	// and finally return our postHandlers
-	for _, handler := range m.preHandlers {
+	for _, handler := range m.postHandlers {
 		resp, err = handler.ServeKite(r)
 		if err != nil {
 			return nil, err
 		}
 
-		if m.handling == ReturnFirst && resp != nil {
+		if m.handling == ReturnFirst && resp != nil && firstResp == nil {
 			firstResp = resp
 		}
 	}
