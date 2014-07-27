@@ -38,7 +38,7 @@ type Request struct {
 	// Context holds a context that used by the current ServeKite handler. Any
 	// items added to the Context can be fetched from other handlers in the
 	// chain. This is useful with PreHandle and PostHandle handlers to pass
-	// data between handlers. The State is purged once a request is finished.
+	// data between handlers. The Context is purged once a request is finished.
 	Context cache.Cache
 }
 
@@ -61,7 +61,9 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	defer func() {
 		if r := recover(); r != nil {
 			debug.PrintStack()
-			callFunc(nil, createError(r))
+			kiteErr := createError(r)
+			c.LocalKite.Log.Error(kiteErr.Error())
+			callFunc(nil, kiteErr)
 		}
 	}()
 
@@ -78,8 +80,10 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 		request.Username = request.Client.Kite.Username
 	}
 
+	method.mu.Lock()
 	method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
 	method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+	method.mu.Unlock()
 
 	// Call the handler functions.
 	result, err := method.ServeKite(request)

@@ -1,7 +1,9 @@
 package kite
 
+import "sync"
+
 // MethodHandling defines how to handle chaining of kite.Handler middlewares.
-// An error braks the chain regardless of what handling is used. Note that all
+// An error breaks the chain regardless of what handling is used. Note that all
 // Pre and Post handlers are executed regardless the handling logic, only the
 // return paramater is defined by the handling mode.
 type MethodHandling int
@@ -50,6 +52,8 @@ type Method struct {
 
 	// handling defines how to handle chaining of kite.Handler middlewares.
 	handling MethodHandling
+
+	mu sync.Mutex // protects handler slices
 }
 
 // addHandle is an internal method to add a handler
@@ -145,6 +149,9 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	var firstResp interface{}
 	var resp interface{}
 	var err error
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// first execute preHandlers
 	for _, handler := range m.preHandlers {
