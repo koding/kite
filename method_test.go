@@ -12,12 +12,14 @@ func TestMethod_Error(t *testing.T) {
 	k.Config.Port = 9999
 
 	var testError = errors.New("an error")
+
 	k.PreHandleFunc(func(r *Request) (interface{}, error) { return nil, testError })
 
 	// the following shouldn't do anything because the previous error breaks the chain
 	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		return "handle", nil
 	})
+
 	k.PostHandleFunc(func(r *Request) (interface{}, error) { return "post1", nil })
 	k.PostHandleFunc(func(r *Request) (interface{}, error) { return "post2", nil })
 
@@ -46,47 +48,55 @@ func TestMethod_Base(t *testing.T) {
 	k.Config.Port = 9999
 
 	k.PreHandleFunc(func(r *Request) (interface{}, error) {
-		return "pre1", nil
+		r.Context.Set("pre1", "pre1")
+		return nil, nil
 	})
 
 	k.PreHandleFunc(func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "pre1" {
-			t.Errorf("Response from previous pre handler should be pre1, got: %v", r.Response)
+		res, _ := r.Context.Get("pre1")
+		if res != "pre1" {
+			t.Errorf("Context response from previous pre handler should be pre1, got: %v", res)
 		}
 
-		return "pre2", nil
+		r.Context.Set("pre2", "pre2")
+		return nil, nil
 	})
 
 	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "funcPre1" {
-			t.Errorf("Response from previous pre handler should be funcPre1, got: %v", r.Response)
-		}
-		return "handle", nil
-	}).PreHandleFunc(func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "pre2" {
-			t.Errorf("Response from previous pre handler should be pre2, got: %v", r.Response)
+		res, _ := r.Context.Get("funcPre1")
+		if res != "funcPre1" {
+			t.Errorf("Context response from previous pre handler should be funcPre1, got: %v", res)
 		}
 
+		r.Context.Set("handle", "handle")
+		return "main-response", nil
+	}).PreHandleFunc(func(r *Request) (interface{}, error) {
+		r.Context.Set("funcPre1", "funcPre1")
 		return "funcPre1", nil
 	}).PostHandleFunc(func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "handle" {
-			t.Errorf("Response from previous pre handler should be handle, got: %v", r.Response)
+		res, _ := r.Context.Get("handle")
+		if res != "handle" {
+			t.Errorf("Context response from previous pre handler should be handle, got: %v", res)
 		}
 
+		r.Context.Set("funcPost1", "funcPost1")
 		return "funcPost1", nil
 	})
 
 	k.PostHandleFunc(func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "funcPost1" {
-			t.Errorf("Response from previous pre handler should be funcPost1, got: %v", r.Response)
+		res, _ := r.Context.Get("funcPost1")
+		if res != "funcPost1" {
+			t.Errorf("Context response from previous pre handler should be funcPost1, got: %v", res)
 		}
 
+		r.Context.Set("post1", "post1")
 		return "post1", nil
 	})
 
 	k.PostHandleFunc(func(r *Request) (interface{}, error) {
-		if r.Response.(string) != "post1" {
-			t.Errorf("Response from previous pre handler should be post1, got: %v", r.Response)
+		res, _ := r.Context.Get("post1")
+		if res != "post1" {
+			t.Errorf("Context response from previous pre handler should be post1, got: %v", res)
 		}
 
 		return "post2", nil
@@ -106,8 +116,8 @@ func TestMethod_Base(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if result.MustString() != "post2" {
-		t.Errorf("Latest repsonse should be post2, got %s", result.MustString())
+	if result.MustString() != "main-response" {
+		t.Errorf("Latest repsonse should be main-response, got %s", result.MustString())
 	}
 
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/cache"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/sockjsclient"
@@ -34,9 +35,11 @@ type Request struct {
 	// the type of authentication. This is not used when authentication is disabled
 	Auth *Auth
 
-	// Response contains the response from the previous middleware handler (if
-	// any). This is populated only if PreHandle or PostHandle is being used.
-	Response interface{}
+	// Context holds a context that used by the current ServeKite handler. Any
+	// items added to the Context can be fetched from other handlers in the
+	// chain. This is useful with PreHandle and PostHandle handlers to pass
+	// data between handlers. The State is purged once a request is finished.
+	Context cache.Cache
 }
 
 // Response is the type of the object that is returned from request handlers
@@ -76,12 +79,10 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	}
 
 	// Call the handler functions.
-	handlers := []Handler{}
-	handlers = append(handlers, c.LocalKite.preHandlers...)
-	handlers = append(handlers, method.handlers...)
-	handlers = append(handlers, c.LocalKite.postHandlers...)
+	result, err := method.ServeKite(request)
 
-	result, err := multiHandler(handlers).ServeKite(request)
+	// garbage collect it
+	request.Context = nil
 
 	callFunc(result, createError(err))
 }
@@ -119,6 +120,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 		LocalKite: c.LocalKite,
 		Client:    c,
 		Auth:      options.Auth,
+		Context:   cache.NewMemory(),
 	}
 
 	// Call response callback function, send back our response

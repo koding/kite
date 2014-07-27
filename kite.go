@@ -61,6 +61,10 @@ type Kite struct {
 	preHandlers  []Handler          // a list of handlers that are executed before any handler
 	postHandlers []Handler          // a list of handlers that are executed after any handler
 
+	// MethodHandling defines how the kite is returning the response for
+	// multiple handlers
+	MethodHandling MethodHandling
+
 	httpHandler http.Handler
 
 	// kontrolclient is used to register to kontrol and query third party kites
