@@ -3,18 +3,17 @@ package kite
 // MethodHandling defines how to handle chaining of kite.Handler middlewares.
 // An error braks the chain regardless of what handling is used. Note that all
 // Pre and Post handlers are executed regardless the handling logic, only the
-// return paramater is defined by.
+// return paramater is defined by the handling mode.
 type MethodHandling int
 
 const (
-	// ReturnMethod returns main method reston. This is the standard default.
+	// ReturnMethod returns main method's response. This is the standard default.
 	ReturnMethod MethodHandling = iota
 
-	// ReturnFirst returns with first non-nil response
+	// ReturnFirst returns the first non-nil response.
 	ReturnFirst
 
-	// ReturnLatest executes all handlers in order and return the latest
-	// handlers return value
+	// ReturnLatest returns the latest response (waterfall behaviour)
 	ReturnLatest
 )
 
@@ -35,7 +34,7 @@ func (h HandlerFunc) ServeKite(r *Request) (interface{}, error) {
 }
 
 // Method defines a method and the Handler it is bind to. By default
-// "ExitOnMethod" handling is used.
+// "ReturnMethod" handling is used.
 type Method struct {
 	// name is the method name. Unnamed methods can exist
 	name string
