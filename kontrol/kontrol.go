@@ -362,10 +362,10 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 
 		// Also store the the kite.Key Id for easy lookup
 		_, err = k.etcd.Store.Set(
-			etcdIDKey,   // path
-			false,       // dir
-			valueString, // value
-			expireAt,    // expire time
+			etcdIDKey,     // path
+			false,         // dir
+			kite.String(), // value
+			expireAt,      // expire time
 		)
 		if err != nil {
 			log.Error("etcd error: %s", err)
@@ -387,89 +387,6 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 	}
 
 	return
-}
-
-// validateKiteKey returns a string representing the kite uniquely
-// that is suitable to use as a key for etcd.
-func validateKiteKey(k *protocol.Kite) error {
-	// Order is important.
-	fields := map[string]string{
-		"username":    k.Username,
-		"environment": k.Environment,
-		"name":        k.Name,
-		"version":     k.Version,
-		"region":      k.Region,
-		"hostname":    k.Hostname,
-		"id":          k.ID,
-	}
-
-	// Validate fields.
-	for k, v := range fields {
-		if v == "" {
-			return fmt.Errorf("Empty Kite field: %s", k)
-		}
-		if strings.ContainsRune(v, '/') {
-			return fmt.Errorf("Field \"%s\" must not contain '/'", k)
-		}
-	}
-
-	return nil
-}
-
-var keyOrder = []string{"username", "environment", "name", "version", "region", "hostname", "id"}
-
-// getQueryKey returns the etcd key for the query.
-func getQueryKey(q *protocol.KontrolQuery) (string, error) {
-	fields := map[string]string{
-		"username":    q.Username,
-		"environment": q.Environment,
-		"name":        q.Name,
-		"version":     q.Version,
-		"region":      q.Region,
-		"hostname":    q.Hostname,
-		"id":          q.ID,
-	}
-
-	if q.Username == "" {
-		return "", errors.New("Empty username field")
-	}
-
-	// Validate query and build key.
-	path := "/"
-
-	empty := false   // encountered with empty field?
-	empytField := "" // for error log
-
-	// http://golang.org/doc/go1.3#map, order is important and we can't rely on
-	// maps because the keys are not ordered :)
-	for _, key := range keyOrder {
-		v := fields[key]
-		if v == "" {
-			empty = true
-			empytField = key
-			continue
-		}
-
-		if empty && v != "" {
-			return "", fmt.Errorf("Invalid query. Query option is not set: %s", empytField)
-		}
-
-		path = path + v + "/"
-	}
-
-	path = strings.TrimSuffix(path, "/")
-
-	return path, nil
-}
-
-func getAudience(q protocol.KontrolQuery) string {
-	if q.Name != "" {
-		return "/" + q.Username + "/" + q.Environment + "/" + q.Name
-	} else if q.Environment != "" {
-		return "/" + q.Username + "/" + q.Environment
-	} else {
-		return "/" + q.Username
-	}
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
@@ -537,10 +454,12 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	var keyRest string            // query key after the version field (not including version)
 
 	// We will make a get request to etcd store with this key.
-	etcdKey, err := getQueryKey(&query)
+	etcdKey, err := k.getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("====> searching for etcdKey %+v\n", etcdKey)
 
 	// audience will go into the token as "aud" claim.
 	audience := getAudience(query)
@@ -549,6 +468,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// up to "name" field and filter the results after getting all versions.
 	versionConstraint, err := version.NewConstraint(query.Version)
 	if err == nil {
+		fmt.Printf("versionConst %+v\n", versionConstraint)
 		hasVersionConstraint = true
 		nameQuery := &protocol.KontrolQuery{
 			Username:    query.Username,
@@ -557,7 +477,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		}
 		// We will make a get request to all nodes under this name
 		// and filter the result later.
-		etcdKey, _ = getQueryKey(nameQuery)
+		etcdKey, _ = k.getQueryKey(nameQuery)
 
 		// Rest of the key after version field
 		keyRest = "/" + strings.TrimRight(query.Region+"/"+query.Hostname+"/"+query.ID, "/")
@@ -615,6 +535,8 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		go k.watchAndSendKiteEvents(watcher, result.WatcherID, disconnect, etcdKey, watchCallback, token, hasVersionConstraint, versionConstraint, keyRest)
 	}
 
+	fmt.Printf("querying ----->> etcdKey %+v\n", KitesPrefix+etcdKey)
+
 	// Get kites from etcd
 	event, err := k.etcd.Store.Get(
 		KitesPrefix+etcdKey, // path
@@ -643,6 +565,8 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 			return nil, err
 		}
 	}
+
+	fmt.Printf("kites %+v\n", kites)
 
 	// Filter kites by version constraint
 	var filtered []*protocol.KiteWithToken
@@ -805,57 +729,6 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 	}
 }
 
-// flatten converts the recursive etcd directory structure to flat one that contains Kites.
-func flatten(in store.NodeExterns) (out store.NodeExterns) {
-	for _, node := range in {
-		if node.Dir {
-			out = append(out, flatten(node.Nodes)...)
-			continue
-		}
-
-		out = append(out, node)
-	}
-
-	return
-}
-
-func kitesFromNodes(nodes store.NodeExterns) ([]*protocol.KiteWithToken, error) {
-	kites := make([]*protocol.KiteWithToken, len(nodes))
-
-	for i, node := range nodes {
-		var rv registerValue
-		json.Unmarshal([]byte(*node.Value), &rv)
-
-		kite, _ := kiteFromEtcdKey(node.Key)
-
-		kites[i] = &protocol.KiteWithToken{
-			Kite: *kite,
-			URL:  rv.URL,
-		}
-	}
-
-	return kites, nil
-}
-
-func kiteWithTokenFromEtcdNode(node *store.NodeExtern, token string) (*protocol.KiteWithToken, error) {
-	kite, err := kiteFromEtcdKey(node.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	var rv registerValue
-	err = json.Unmarshal([]byte(*node.Value), &rv)
-	if err != nil {
-		return nil, err
-	}
-
-	return &protocol.KiteWithToken{
-		Kite:  *kite,
-		URL:   rv.URL,
-		Token: token,
-	}, nil
-}
-
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
 func generateToken(queryKey, username, issuer, privateKey string) (string, error) {
@@ -911,26 +784,6 @@ func generateToken(queryKey, username, issuer, privateKey string) (string, error
 	return signed, nil
 }
 
-// kiteFromEtcdKey returns a *protocol.Kite from an etcd key.
-// etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
-func kiteFromEtcdKey(key string) (*protocol.Kite, error) {
-	// TODO replace "kites" with KitesPrefix constant
-	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
-	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, fmt.Errorf("Invalid Kite: %s", key)
-	}
-
-	return &protocol.Kite{
-		Username:    fields[1],
-		Environment: fields[2],
-		Name:        fields[3],
-		Version:     fields[4],
-		Region:      fields[5],
-		Hostname:    fields[6],
-		ID:          fields[7],
-	}, nil
-}
-
 func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	var query protocol.KontrolQuery
 	err := r.Args.One().Unmarshal(&query)
@@ -938,7 +791,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("Invalid query")
 	}
 
-	kiteKey, err := getQueryKey(&query)
+	kiteKey, err := k.getQueryKey(&query)
 	if err != nil {
 		return nil, err
 	}
