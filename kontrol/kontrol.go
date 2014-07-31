@@ -566,6 +566,30 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 
+	// means a query with all fields were made or a query with an ID was made,
+	// in which case also returns a full path
+	if event.Node.Value != nil {
+		kite, err := kiteFromEtcdKey(event.Node.Key)
+		if err != nil {
+			return nil, err
+		}
+
+		var rv registerValue
+		err = json.Unmarshal([]byte(*event.Node.Value), &rv)
+		if err != nil {
+			return nil, err
+		}
+
+		kiteWithToken := &protocol.KiteWithToken{
+			Kite:  *kite,
+			URL:   rv.URL,
+			Token: token,
+		}
+
+		result.Kites = []*protocol.KiteWithToken{kiteWithToken}
+		return result, nil
+	}
+
 	fmt.Printf("1 event %+v\n", event)
 	fmt.Printf("2 event %+v\n", event.Node)
 	fmt.Printf("3 event %+v\n", event.Node.Nodes)
