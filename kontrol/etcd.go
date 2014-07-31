@@ -13,6 +13,107 @@ import (
 
 var keyOrder = []string{"username", "environment", "name", "version", "region", "hostname", "id"}
 
+// registerValue is the type of the value that is saved to etcd.
+type registerValue struct {
+	URL string `json:"url"`
+}
+
+type KontrolNode struct {
+	node *store.NodeExtern
+}
+
+func NewKontrolNode(node *store.NodeExtern) *KontrolNode {
+	return &KontrolNode{
+		node: node,
+	}
+}
+
+// HasValue returns true if the give node has a non-nil value
+func (k *KontrolNode) HasValue() bool {
+	return k.node.Value != nil
+}
+
+// Flatten converts the recursive etcd directory structure to a flat one that
+// contains all kontrolNodes
+func (k *KontrolNode) Flatten() []*KontrolNode {
+	nodes := make([]*KontrolNode, 0)
+	for _, node := range k.node.Nodes {
+		if node.Dir {
+			nodes = append(nodes, NewKontrolNode(node).Flatten()...)
+			continue
+		}
+
+		nodes = append(nodes, NewKontrolNode(node))
+	}
+
+	return nodes
+}
+
+// KiteFromKey returns a *protocol.Kite from an etcd key. etcd key is like:
+// "/kites/devrim/env/mathworker/1/localhost/tardis.local/id"
+func (k *KontrolNode) KiteFromKey() (*protocol.Kite, error) {
+	// TODO replace "kites" with KitesPrefix constant
+	fields := strings.Split(strings.TrimPrefix(k.node.Key, "/"), "/")
+	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
+		return nil, fmt.Errorf("Invalid Kite: %s", k.node.Key)
+	}
+
+	return &protocol.Kite{
+		Username:    fields[1],
+		Environment: fields[2],
+		Name:        fields[3],
+		Version:     fields[4],
+		Region:      fields[5],
+		Hostname:    fields[6],
+		ID:          fields[7],
+	}, nil
+}
+
+func (k *KontrolNode) Value() (string, error) {
+	var rv registerValue
+	err := json.Unmarshal([]byte(*k.node.Value), &rv)
+	if err != nil {
+		return "", err
+	}
+
+	return rv.URL, nil
+}
+
+func (k *KontrolNode) MultipleKiteWithToken(token string) ([]*protocol.KiteWithToken, error) {
+	// Get all nodes recursively.
+	nodes := k.Flatten()
+
+	// Convert etcd nodes to kites.
+	var err error
+	kites := make([]*protocol.KiteWithToken, len(nodes))
+	for i, n := range nodes {
+		kites[i], err = n.KiteWithToken(token)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return kites, nil
+}
+
+func (k *KontrolNode) KiteWithToken(token string) (*protocol.KiteWithToken, error) {
+	kite, err := k.KiteFromKey()
+	if err != nil {
+		return nil, err
+	}
+
+	url, err := k.Value()
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.KiteWithToken{
+		Kite:  *kite,
+		URL:   url,
+		Token: token,
+	}, nil
+}
+
 // validateKiteKey returns a string representing the kite uniquely
 // that is suitable to use as a key for etcd.
 func validateKiteKey(k *protocol.Kite) error {
@@ -48,9 +149,6 @@ func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 		log.Error("etcd error: %s", err)
 		return "", fmt.Errorf("internal error - getKites")
 	}
-
-	fmt.Printf("event %+v\n", event)
-	fmt.Printf("event node %+v\n", event.Node)
 
 	return *event.Node.Value, nil
 }
@@ -130,57 +228,4 @@ func getAudience(q protocol.KontrolQuery) string {
 	} else {
 		return "/" + q.Username
 	}
-}
-
-// flatten converts the recursive etcd directory structure to flat one that contains Kites.
-func flatten(in store.NodeExterns) (out store.NodeExterns) {
-	for _, node := range in {
-		if node.Dir {
-			out = append(out, flatten(node.Nodes)...)
-			continue
-		}
-
-		out = append(out, node)
-	}
-
-	return
-}
-
-func kiteWithTokenFromEtcdNode(node *store.NodeExtern, token string) (*protocol.KiteWithToken, error) {
-	kite, err := kiteFromEtcdKey(node.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	var rv registerValue
-	err = json.Unmarshal([]byte(*node.Value), &rv)
-	if err != nil {
-		return nil, err
-	}
-
-	return &protocol.KiteWithToken{
-		Kite:  *kite,
-		URL:   rv.URL,
-		Token: token,
-	}, nil
-}
-
-// kiteFromEtcdKey returns a *protocol.Kite from an etcd key.
-// etcd key is like: /kites/devrim/development/mathworker/1/localhost/tardis.local/662ed473-351f-4c9f-786b-99cf02cdaadb
-func kiteFromEtcdKey(key string) (*protocol.Kite, error) {
-	// TODO replace "kites" with KitesPrefix constant
-	fields := strings.Split(strings.TrimPrefix(key, "/"), "/")
-	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, fmt.Errorf("Invalid Kite: %s", key)
-	}
-
-	return &protocol.Kite{
-		Username:    fields[1],
-		Environment: fields[2],
-		Name:        fields[3],
-		Version:     fields[4],
-		Region:      fields[5],
-		Hostname:    fields[6],
-		ID:          fields[7],
-	}, nil
 }

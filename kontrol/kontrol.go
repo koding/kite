@@ -225,11 +225,6 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	return token.SignedString([]byte(k.privateKey))
 }
 
-// registerValue is the type of the value that is saved to etcd.
-type registerValue struct {
-	URL string `json:"url"`
-}
-
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	log.Info("Register request from: %s", r.Client.Kite)
 
@@ -547,8 +542,6 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		go k.watchAndSendKiteEvents(watcher, result.WatcherID, disconnect, etcdKey, watchCallback, token, hasVersionConstraint, versionConstraint, keyRest)
 	}
 
-	fmt.Printf("querying ----->> etcdKey %+v\n", KitesPrefix+etcdKey)
-
 	// Get kites from etcd
 	event, err := k.etcd.Store.Get(
 		KitesPrefix+etcdKey, // path
@@ -566,47 +559,24 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 
+	kontrolNode := NewKontrolNode(event.Node)
+
 	// means a query with all fields were made or a query with an ID was made,
-	// in which case also returns a full path
-	if event.Node.Value != nil {
-		kite, err := kiteFromEtcdKey(event.Node.Key)
+	// in which case also returns a full path. This path has a value
+	if kontrolNode.HasValue() {
+		kiteWithToken, err := kontrolNode.KiteWithToken(token)
 		if err != nil {
 			return nil, err
-		}
-
-		var rv registerValue
-		err = json.Unmarshal([]byte(*event.Node.Value), &rv)
-		if err != nil {
-			return nil, err
-		}
-
-		kiteWithToken := &protocol.KiteWithToken{
-			Kite:  *kite,
-			URL:   rv.URL,
-			Token: token,
 		}
 
 		result.Kites = []*protocol.KiteWithToken{kiteWithToken}
 		return result, nil
 	}
 
-	fmt.Printf("1 event %+v\n", event)
-	fmt.Printf("2 event %+v\n", event.Node)
-	fmt.Printf("3 event %+v\n", event.Node.Nodes)
-
-	// Get all nodes recursively.
-	nodes := flatten(event.Node.Nodes)
-
-	// Convert etcd nodes to kites.
-	kites := make([]*protocol.KiteWithToken, len(nodes))
-	for i, n := range nodes {
-		kites[i], err = kiteWithTokenFromEtcdNode(n, token)
-		if err != nil {
-			return nil, err
-		}
+	kites, err := kontrolNode.MultipleKiteWithToken(token)
+	if err != nil {
+		return nil, err
 	}
-
-	fmt.Printf("kites %+v\n", kites)
 
 	// Filter kites by version constraint
 	var filtered []*protocol.KiteWithToken
@@ -730,7 +700,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				otherKite, err := kiteWithTokenFromEtcdNode(etcdEvent.Node, token)
+				otherKite, err := NewKontrolNode(etcdEvent.Node).KiteWithToken(token)
 				if err != nil {
 					continue
 				}
@@ -750,7 +720,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 			// Delete happens when we detect that otherKite is disconnected.
 			// Expire happens when we don't get heartbeat from otherKite.
 			case store.Delete, store.Expire:
-				otherKite, err := kiteFromEtcdKey(etcdEvent.Node.Key)
+				otherKite, err := NewKontrolNode(etcdEvent.Node).KiteFromKey()
 				if err != nil {
 					continue
 				}
