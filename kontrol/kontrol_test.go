@@ -442,7 +442,7 @@ func TestGetQueryKey(t *testing.T) {
 		Username:    "cenk",
 		Environment: "production",
 	}
-	key, err := getQueryKey(q)
+	key, err := kon.getQueryKey(q)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -456,7 +456,7 @@ func TestGetQueryKey(t *testing.T) {
 		Username: "cenk",
 		Name:     "fs",
 	}
-	key, err = getQueryKey(q)
+	key, err = kon.getQueryKey(q)
 	if err == nil {
 		t.Errorf("Error is expected")
 	}
@@ -469,7 +469,7 @@ func TestGetQueryKey(t *testing.T) {
 		Environment: "production",
 		Name:        "fs",
 	}
-	key, err = getQueryKey(q)
+	key, err = kon.getQueryKey(q)
 	if err == nil {
 		t.Errorf("Error is expected")
 	}
