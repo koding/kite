@@ -32,7 +32,7 @@ func validateKiteKey(k *protocol.Kite) error {
 }
 
 func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
-	log.Info("Searching for %s", KitesPrefix+"/"+id)
+	log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
 
 	event, err := k.etcd.Store.Get(
 		KitesPrefix+"/"+id, // path
@@ -144,24 +144,6 @@ func flatten(in store.NodeExterns) (out store.NodeExterns) {
 	}
 
 	return
-}
-
-func kitesFromNodes(nodes store.NodeExterns) ([]*protocol.KiteWithToken, error) {
-	kites := make([]*protocol.KiteWithToken, len(nodes))
-
-	for i, node := range nodes {
-		var rv registerValue
-		json.Unmarshal([]byte(*node.Value), &rv)
-
-		kite, _ := kiteFromEtcdKey(node.Key)
-
-		kites[i] = &protocol.KiteWithToken{
-			Kite: *kite,
-			URL:  rv.URL,
-		}
-	}
-
-	return kites, nil
 }
 
 func kiteWithTokenFromEtcdNode(node *store.NodeExtern, token string) (*protocol.KiteWithToken, error) {

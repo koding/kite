@@ -464,11 +464,23 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// audience will go into the token as "aud" claim.
 	audience := getAudience(query)
 
-	// If version field contains a constraint we need no make a new query
-	// up to "name" field and filter the results after getting all versions.
-	versionConstraint, err := version.NewConstraint(query.Version)
-	if err == nil {
-		fmt.Printf("versionConst %+v\n", versionConstraint)
+	fmt.Printf("query %+v\n", query)
+
+	// If version field contains a constraint we need no make a new query up to
+	// "name" field and filter the results after getting all versions.
+	// NewVersion returns an error if it's a constraint, like: ">= 1.0, < 1.4"
+	// Because NewConstraint doesn't return an error for version's like "0.0.1"
+	// we check it with the NewVersion function.
+	var versionConstraint version.Constraints
+	_, err = version.NewVersion(query.Version)
+	if err != nil && query.Version != "" {
+		// now parse our constraint
+		versionConstraint, err = version.NewConstraint(query.Version)
+		if err != nil {
+			// version is a malformed, just return the error
+			return nil, err
+		}
+
 		hasVersionConstraint = true
 		nameQuery := &protocol.KontrolQuery{
 			Username:    query.Username,
@@ -553,6 +565,10 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		log.Error("etcd error: %s", err)
 		return nil, fmt.Errorf("internal error - getKites")
 	}
+
+	fmt.Printf("1 event %+v\n", event)
+	fmt.Printf("2 event %+v\n", event.Node)
+	fmt.Printf("3 event %+v\n", event.Node.Nodes)
 
 	// Get all nodes recursively.
 	nodes := flatten(event.Node.Nodes)
