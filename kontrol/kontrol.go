@@ -271,7 +271,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	}
 
 	// setKey sets the value of the Kite in etcd.
-	setKey, etcdKey := k.makeSetter(&r.Kite, value)
+	setKey, etcdKey, etcdIDKey := k.makeSetter(&r.Kite, value)
 
 	// Register to etcd.
 	err = setKey()
@@ -294,6 +294,13 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 			false,   // recursive
 			false,   // dir
 		)
+
+		// And the Id
+		k.etcd.Store.Delete(
+			etcdIDKey, // path
+			false,     // recursive
+			false,     // dir
+		)
 	})
 
 	return nil
@@ -314,7 +321,7 @@ func (k *Kontrol) registerSelf() {
 	value := &registerValue{
 		URL: k.Kite.Config.KontrolURL,
 	}
-	setter, _ := k.makeSetter(k.Kite.Kite(), value)
+	setter, _, _ := k.makeSetter(k.Kite.Kite(), value)
 	for {
 		if err := setter(); err != nil {
 			log.Error(err.Error())
@@ -327,8 +334,12 @@ func (k *Kontrol) registerSelf() {
 }
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter func() error, etcdKey string) {
+func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter func() error, etcdKey, etcdIDKey string) {
 	etcdKey = KitesPrefix + kite.String()
+	etcdIDKey = KitesPrefix + "/" + kite.ID
+
+	fmt.Printf("etcdKey %+v\n", etcdKey)
+	fmt.Printf("etcdIDKey %+v\n", etcdIDKey)
 
 	valueBytes, _ := json.Marshal(value)
 	valueString := string(valueBytes)
@@ -340,6 +351,18 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 		_, err := k.etcd.Store.Set(
 			etcdKey,     // path
+			false,       // dir
+			valueString, // value
+			expireAt,    // expire time
+		)
+		if err != nil {
+			log.Error("etcd error: %s", err)
+			return err
+		}
+
+		// Also store the the kite.Key Id for easy lookup
+		_, err = k.etcd.Store.Set(
+			etcdIDKey,   // path
 			false,       // dir
 			valueString, // value
 			expireAt,    // expire time
