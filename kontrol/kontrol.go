@@ -559,12 +559,12 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, fmt.Errorf("internal error - getKites")
 	}
 
-	kontrolNode := NewKontrolNode(event.Node)
+	node := NewNode(event.Node)
 
 	// means a query with all fields were made or a query with an ID was made,
 	// in which case also returns a full path. This path has a value
-	if kontrolNode.HasValue() {
-		kiteWithToken, err := kontrolNode.KiteWithToken(token)
+	if node.HasValue() {
+		kiteWithToken, err := node.Kite(token)
 		if err != nil {
 			return nil, err
 		}
@@ -573,7 +573,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return result, nil
 	}
 
-	kites, err := kontrolNode.MultipleKiteWithToken(token)
+	kites, err := node.Kites(token)
 	if err != nil {
 		return nil, err
 	}
@@ -700,7 +700,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				otherKite, err := NewKontrolNode(etcdEvent.Node).KiteWithToken(token)
+				otherKite, err := NewNode(etcdEvent.Node).Kite(token)
 				if err != nil {
 					continue
 				}
@@ -720,7 +720,7 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 			// Delete happens when we detect that otherKite is disconnected.
 			// Expire happens when we don't get heartbeat from otherKite.
 			case store.Delete, store.Expire:
-				otherKite, err := NewKontrolNode(etcdEvent.Node).KiteFromKey()
+				otherKite, err := NewNode(etcdEvent.Node).KiteFromKey()
 				if err != nil {
 					continue
 				}
