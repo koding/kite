@@ -10,6 +10,8 @@ import (
 
 type Storage interface {
 	Get(key string) (*Node, error)
+	Set(key, value string) error
+	Delete(key string) error
 }
 
 type Etcd struct {
@@ -28,6 +30,21 @@ func NewEtcd() (*Etcd, error) {
 	return &Etcd{
 		client: client,
 	}, nil
+}
+
+func (e *Etcd) Delete(key string) error {
+	_, err := e.client.Delete(key, true)
+	return err
+}
+
+func (e *Etcd) Set(key, value string) error {
+	_, err := e.client.Set(key, value, uint64(HeartbeatDelay))
+	return err
+}
+
+func (e *Etcd) Update(key, value string) error {
+	_, err := e.client.Update(key, value, uint64(HeartbeatDelay))
+	return err
 }
 
 func (e *Etcd) Get(key string) (*Node, error) {
