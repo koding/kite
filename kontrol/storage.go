@@ -8,6 +8,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+// Storage is an interface to a kite storage.
 type Storage interface {
 	Get(key string) (*Node, error)
 	Set(key, value string) error

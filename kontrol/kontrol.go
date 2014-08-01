@@ -71,6 +71,9 @@ type Kontrol struct {
 	clients map[string]*kite.Client
 
 	etcd *etcd.Etcd
+
+	// storage defines the storage of the kites.
+	storage Storage
 }
 
 // New creates a new kontrol instance with the given verson and config
@@ -95,6 +98,11 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 
 	hostname := k.Kite().Hostname
 
+	etcdClient, err := NewEtcd()
+	if err != nil {
+		panic("could not connect to etcd: " + err.Error())
+	}
+
 	kontrol := &Kontrol{
 		Kite:         k,
 		Name:         hostname,
@@ -109,6 +117,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		watchers:     make(map[string]*store.Watcher),
 		clients:      make(map[string]*kite.Client),
 		etcd:         etcd.New(nil), // create with default config, we'll update it when running kontrol.
+		storage:      etcdClient,
 	}
 
 	log = k.Log
@@ -140,45 +149,23 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 }
 
 func (k *Kontrol) Run() {
-	k.init()
+	rand.Seed(time.Now().UnixNano())
+	go k.registerSelf()
 	k.Kite.Run()
 }
 
 // Close stops kontrol and closes all connections
 func (k *Kontrol) Close() {
-	k.etcd.Stop()
 	k.Kite.Close()
-}
-
-// init does common operations of Run() and Start().
-func (k *Kontrol) init() {
-	rand.Seed(time.Now().UnixNano())
-
-	// Update etcd config before running
-	k.etcd.Config.Name = k.Name
-	k.etcd.Config.DataDir = k.DataDir
-	k.etcd.Config.Addr = k.EtcdAddr
-	k.etcd.Config.BindAddr = k.EtcdBindAddr
-	k.etcd.Config.Peer.Addr = k.PeerAddr
-	k.etcd.Config.Peer.BindAddr = k.PeerBindAddr
-	k.etcd.Config.Peers = k.Peers
-
-	go k.etcd.Run()
-	<-k.etcd.ReadyNotify()
-
-	go k.registerSelf()
 }
 
 // ClearKites removes everything under "/kites" from etcd.
 func (k *Kontrol) ClearKites() error {
-	_, err := k.etcd.Store.Delete(
-		KitesPrefix, // path
-		true,        // recursive
-		true,        // dir
-	)
+	err := k.storage.Delete(KitesPrefix)
 	if err != nil && err.(*etcdErr.Error).ErrorCode != etcdErr.EcodeKeyNotFound {
 		return fmt.Errorf("Cannot clear etcd: %s", err)
 	}
+
 	return nil
 }
 
@@ -284,18 +271,9 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.etcd.Store.Delete(
-			etcdKey, // path
-			false,   // recursive
-			false,   // dir
-		)
-
+		k.storage.Delete(etcdKey)
 		// And the Id
-		k.etcd.Store.Delete(
-			etcdIDKey, // path
-			false,     // recursive
-			false,     // dir
-		)
+		k.storage.Delete(etcdIDKey)
 	})
 
 	return nil
@@ -337,40 +315,15 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 	valueString := string(valueBytes)
 
 	setter = func() error {
-		expireAt := time.Now().Add(HeartbeatDelay)
-
 		// Set the kite key.
 		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-		_, err := k.etcd.Store.Set(
-			etcdKey,     // path
-			false,       // dir
-			valueString, // value
-			expireAt,    // expire time
-		)
-		if err != nil {
+		if err := k.storage.Set(etcdKey, valueString); err != nil {
 			log.Error("etcd error: %s", err)
 			return err
 		}
 
 		// Also store the the kite.Key Id for easy lookup
-		_, err = k.etcd.Store.Set(
-			etcdIDKey,     // path
-			false,         // dir
-			kite.String(), // value
-			expireAt,      // expire time
-		)
-		if err != nil {
-			log.Error("etcd error: %s", err)
-			return err
-		}
-
-		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		_, err = k.etcd.Store.Update(
-			KitesPrefix+"/"+kite.Username, // path
-			"",       // new value
-			expireAt, // expire time
-		)
-		if err != nil {
+		if err := k.storage.Set(etcdIDKey, kite.String()); err != nil {
 			log.Error("etcd error: %s", err)
 			return err
 		}
@@ -536,12 +489,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Get kites from etcd
-	event, err := k.etcd.Store.Get(
-		KitesPrefix+etcdKey, // path
-		true,  // recursive, return all child directories too
-		false, // sorting flag, we don't care about sorting for now
-	)
-
+	node, err := k.storage.Get(KitesPrefix + etcdKey)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			result.Kites = make([]*protocol.KiteWithToken, 0) // do not send null
@@ -551,8 +499,6 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		log.Error("etcd error: %s", err)
 		return nil, fmt.Errorf("internal error - getKites")
 	}
-
-	node := NewNode(event.Node)
 
 	// means a query with all fields were made or a query with an ID was made,
 	// in which case also returns a full path. This path has a value that
