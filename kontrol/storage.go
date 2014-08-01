@@ -13,10 +13,20 @@ type Storage interface {
 	Get(key string) (*Node, error)
 	Set(key, value string) error
 	Delete(key string) error
+	Watch(key string, index uint64) (*Watcher, error)
 }
 
 type Etcd struct {
 	client *etcd.Client
+}
+
+type Watcher struct {
+	recv chan *etcd.Response
+	stop chan bool
+}
+
+func (w *Watcher) Stop() {
+	w.stop <- true
 }
 
 func NewEtcd() (*Etcd, error) {
@@ -46,6 +56,23 @@ func (e *Etcd) Set(key, value string) error {
 func (e *Etcd) Update(key, value string) error {
 	_, err := e.client.Update(key, value, uint64(HeartbeatDelay))
 	return err
+}
+
+func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
+	// TODO: make the buffer configurable
+	responses := make(chan *etcd.Response, 1000)
+	stopChan := make(chan bool, 1)
+
+	// TODO: pass a stop channel for further customization
+	_, err := e.client.Watch(key, index, true, responses, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Watcher{
+		recv: responses,
+		stop: stopChan,
+	}, nil
 }
 
 func (e *Etcd) Get(key string) (*Node, error) {

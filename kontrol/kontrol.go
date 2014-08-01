@@ -12,8 +12,7 @@ import (
 	"time"
 
 	etcdErr "github.com/coreos/etcd/error"
-	"github.com/coreos/etcd/etcd"
-	"github.com/coreos/etcd/store"
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
@@ -44,15 +43,6 @@ var (
 type Kontrol struct {
 	Kite *kite.Kite
 
-	// etcd options
-	Name         string   // Name of the etcd instance
-	DataDir      string   // etcd data dir
-	EtcdAddr     string   // The public host:port used for etcd server.
-	EtcdBindAddr string   // The listening host:port used for etcd server.
-	PeerAddr     string   // The public host:port used for peer communication.
-	PeerBindAddr string   // The listening host:port used for peer communication.
-	Peers        []string // other peers in cluster (must be peer address of other instances)
-
 	// MachineAuthenticate is used to authenticate the request in the
 	// "handleMachine" method.  The reason for a separate auth function is, the
 	// request must not be authenticated because clients do not have a kite.key
@@ -64,16 +54,17 @@ type Kontrol struct {
 	privateKey string // for signing tokens
 
 	// To cancel running watchers, we must store the references
-	watchers      map[string]*store.Watcher
+	watchers      map[string]*Watcher
 	watchersMutex sync.Mutex
 
 	// Holds refence to all connected clients (key is ID of kite)
 	clients map[string]*kite.Client
 
-	etcd *etcd.Etcd
-
 	// storage defines the storage of the kites.
 	storage Storage
+
+	// a list of etcd machintes to connect
+	etcdMachines []string
 }
 
 // New creates a new kontrol instance with the given verson and config
@@ -96,8 +87,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		k.Config.Port = DefaultPort
 	}
 
-	hostname := k.Kite().Hostname
-
 	etcdClient, err := NewEtcd()
 	if err != nil {
 		panic("could not connect to etcd: " + err.Error())
@@ -105,19 +94,12 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 
 	kontrol := &Kontrol{
 		Kite:         k,
-		Name:         hostname,
-		DataDir:      "kontrol-data." + hostname,
-		EtcdAddr:     "localhost:4001",
-		EtcdBindAddr: "0.0.0.0:4001",
-		PeerAddr:     "localhost:7001",
-		PeerBindAddr: "0.0.0.0:7001",
-		Peers:        nil,
 		publicKey:    publicKey,
 		privateKey:   privateKey,
-		watchers:     make(map[string]*store.Watcher),
+		watchers:     make(map[string]*Watcher),
 		clients:      make(map[string]*kite.Client),
-		etcd:         etcd.New(nil), // create with default config, we'll update it when running kontrol.
 		storage:      etcdClient,
+		etcdMachines: []string{"http://127.0.0.1:4001"},
 	}
 
 	log = k.Log
@@ -451,12 +433,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// Registering watcher should be done before making etcd.Get() because
 	// Get() may return an empty result.
 	if watchCallback.Caller != nil {
-		watcher, err := k.etcd.Store.Watch(
-			KitesPrefix+etcdKey, // prefix
-			true, // recursive
-			true, // stream
-			0,    // since index
-		)
+		watcher, err := k.storage.Watch(KitesPrefix+etcdKey, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -481,7 +458,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 
 			// Notify disconnection and stop watching.
 			close(disconnect)
-			watcher.Remove()
+			watcher.Stop()
 		})
 		k.watchersMutex.Unlock()
 
@@ -566,19 +543,40 @@ func (k *Kontrol) cancelWatcher(watcherID string) error {
 	if !ok {
 		return errors.New("Watcher not found")
 	}
-	watcher.Remove()
+	watcher.Stop()
 	delete(k.watchers, watcherID)
 	return nil
 }
 
+type Event struct {
+	Action   string     `json:"action"`
+	Node     *etcd.Node `json:"node,omitempty"`
+	PrevNode *etcd.Node `json:"prevNode,omitempty"`
+}
+
 // TODO watchAndSendKiteEvents takes too many arguments. Refactor it.
-func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID string, disconnect chan bool, etcdKey string, callback dnode.Function, token string, hasConstraint bool, constraint version.Constraints, keyRest string) {
+func (k *Kontrol) watchAndSendKiteEvents(
+	watcher *Watcher,
+	watcherID string,
+	disconnect chan bool,
+	etcdKey string,
+	callback dnode.Function,
+	token string,
+	hasConstraint bool,
+	constraint version.Constraints,
+	keyRest string,
+) {
 	var index uint64 = 0
 	for {
 		select {
 		case <-disconnect:
 			return
-		case etcdEvent, ok := <-watcher.EventChan:
+		case resp, ok := <-watcher.recv:
+			etcdEvent := &Event{
+				Action:   resp.Action,
+				Node:     resp.Node,
+				PrevNode: resp.PrevNode,
+			}
 			// Channel is closed. This happens in 3 cases:
 			//   1. Remote kite called "cancelWatcher" method and removed the watcher.
 			//   2. Remote kite has disconnected and the watcher is removed.
@@ -603,12 +601,8 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 				// If we are here that means we did not consume fast enough and etcd
 				// has canceled our watcher. We need to create a new watcher with the same key.
 				var err error
-				watcher, err = k.etcd.Store.Watch(
-					KitesPrefix+etcdKey, // prefix
-					true,  // recursive
-					true,  // stream
-					index, // since index
-				)
+
+				watcher, err = k.storage.Watch(KitesPrefix+etcdKey, index)
 				if err != nil {
 					log.Error("Cannot re-watch query: %s", err.Error())
 					callback.Call(kite.Response{
@@ -626,14 +620,14 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 			index = etcdEvent.Node.ModifiedIndex
 
 			switch etcdEvent.Action {
-			case store.Set:
+			case "set":
 				// Do not send Register events for heartbeat messages.
 				// PrevNode must be empty if the kite has registered for the first time.
 				if etcdEvent.PrevNode != nil {
 					continue
 				}
 
-				otherKite, err := NewNode(etcdEvent.Node).Kite()
+				otherKite, err := NewNode(convertNodeToNodeExtern(etcdEvent.Node)).Kite()
 				if err != nil {
 					continue
 				}
@@ -653,8 +647,8 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 
 			// Delete happens when we detect that otherKite is disconnected.
 			// Expire happens when we don't get heartbeat from otherKite.
-			case store.Delete, store.Expire:
-				otherKite, err := NewNode(etcdEvent.Node).KiteFromKey()
+			case "delete", "expire":
+				otherKite, err := NewNode(convertNodeToNodeExtern(etcdEvent.Node)).KiteFromKey()
 				if err != nil {
 					continue
 				}
@@ -740,12 +734,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	_, err = k.etcd.Store.Get(
-		KitesPrefix+kiteKey, // path
-		false, // recursive
-		false, // sorted
-	)
-
+	_, err = k.storage.Get(KitesPrefix + kiteKey)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return nil, errors.New("Kite not found")
