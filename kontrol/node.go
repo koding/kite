@@ -43,6 +43,25 @@ func (n *Node) Flatten() []*Node {
 	return nodes
 }
 
+// Kite returns a single kite gathered from the key and the value for the
+// current node.
+func (n *Node) Kite() (*protocol.KiteWithToken, error) {
+	kite, err := n.KiteFromKey()
+	if err != nil {
+		return nil, err
+	}
+
+	url, err := n.Value()
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.KiteWithToken{
+		Kite: *kite,
+		URL:  url,
+	}, nil
+}
+
 // KiteFromKey returns a *protocol.Kite from an etcd key. etcd key is like:
 // "/kites/devrim/env/mathworker/1/localhost/tardis.local/id"
 func (n *Node) KiteFromKey() (*protocol.Kite, error) {
@@ -75,8 +94,8 @@ func (n *Node) Value() (string, error) {
 }
 
 // Kites returns a list of kites that are gathered by collecting recursively
-// all nodes under the current node. Token is attached to each Kite.
-func (n *Node) Kites(token string) (Kites, error) {
+// all nodes under the current node.
+func (n *Node) Kites() (Kites, error) {
 	// Get all nodes recursively.
 	nodes := n.Flatten()
 
@@ -84,31 +103,11 @@ func (n *Node) Kites(token string) (Kites, error) {
 	var err error
 	kites := make(Kites, len(nodes))
 	for i, n := range nodes {
-		kites[i], err = n.Kite(token)
+		kites[i], err = n.Kite()
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return kites, nil
-}
-
-// Kite returns a single kite gathered from the key and the value for the
-// current node. Token is attached to the kite.
-func (n *Node) Kite(token string) (*protocol.KiteWithToken, error) {
-	kite, err := n.KiteFromKey()
-	if err != nil {
-		return nil, err
-	}
-
-	url, err := n.Value()
-	if err != nil {
-		return nil, err
-	}
-
-	return &protocol.KiteWithToken{
-		Kite:  *kite,
-		URL:   url,
-		Token: token,
-	}, nil
 }

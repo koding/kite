@@ -559,16 +559,20 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// contains the final kite URL. Therefore this is a single kite result,
 	// create it and pass it back.
 	if node.HasValue() {
-		kiteWithToken, err := node.Kite(token)
+		kiteWithToken, err := node.Kite()
 		if err != nil {
 			return nil, err
 		}
+
+		// attach our generated token
+		kiteWithToken.Token = token
 
 		result.Kites = []*protocol.KiteWithToken{kiteWithToken}
 		return result, nil
 	}
 
-	kites, err := node.Kites(token)
+	// we have a tree of nodes. Get all the kites under the current tree
+	kites, err := node.Kites()
 	if err != nil {
 		return nil, err
 	}
@@ -578,11 +582,11 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		kites.Filter(versionConstraint, keyRest)
 	}
 
-	// Attach tokens to kites
-	kites.Attach(token)
-
 	// Shuffle the list
 	kites.Shuffle()
+
+	// Attach tokens to kites
+	kites.Attach(token)
 
 	result.Kites = kites
 	return result, nil
@@ -683,10 +687,11 @@ func (k *Kontrol) watchAndSendKiteEvents(watcher *store.Watcher, watcherID strin
 					continue
 				}
 
-				otherKite, err := NewNode(etcdEvent.Node).Kite(token)
+				otherKite, err := NewNode(etcdEvent.Node).Kite()
 				if err != nil {
 					continue
 				}
+				otherKite.Token = token
 
 				if hasConstraint && !isValid(&otherKite.Kite, constraint, keyRest) {
 					continue

@@ -9,7 +9,16 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-var keyOrder = []string{"username", "environment", "name", "version", "region", "hostname", "id"}
+// keyOrder defines the order of the query paramaters.
+var keyOrder = []string{
+	"username",
+	"environment",
+	"name",
+	"version",
+	"region",
+	"hostname",
+	"id",
+}
 
 // registerValue is the type of the value that is saved to etcd.
 type registerValue struct {
@@ -34,6 +43,7 @@ func validateKiteKey(k *protocol.Kite) error {
 	return nil
 }
 
+// etcdKeyFromId returns the value for a single full ID path
 func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 	log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
 
