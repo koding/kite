@@ -333,9 +333,6 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *registerValue) (setter 
 	etcdKey = KitesPrefix + kite.String()
 	etcdIDKey = KitesPrefix + "/" + kite.ID
 
-	fmt.Printf("etcdKey %+v\n", etcdKey)
-	fmt.Printf("etcdIDKey %+v\n", etcdIDKey)
-
 	valueBytes, _ := json.Marshal(value)
 	valueString := string(valueBytes)
 
@@ -454,12 +451,8 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		return nil, err
 	}
 
-	fmt.Printf("====> searching for etcdKey %+v\n", etcdKey)
-
 	// audience will go into the token as "aud" claim.
 	audience := getAudience(query)
-
-	fmt.Printf("query %+v\n", query)
 
 	// If version field contains a constraint we need no make a new query up to
 	// "name" field and filter the results after getting all versions.
@@ -562,7 +555,9 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	node := NewNode(event.Node)
 
 	// means a query with all fields were made or a query with an ID was made,
-	// in which case also returns a full path. This path has a value
+	// in which case also returns a full path. This path has a value that
+	// contains the final kite URL. Therefore this is a single kite result,
+	// create it and pass it back.
 	if node.HasValue() {
 		kiteWithToken, err := node.Kite(token)
 		if err != nil {
@@ -579,29 +574,17 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	}
 
 	// Filter kites by version constraint
-	var filtered []*protocol.KiteWithToken
 	if hasVersionConstraint {
-		for _, k := range kites {
-			if isValid(&k.Kite, versionConstraint, keyRest) {
-				filtered = append(filtered, k)
-			}
-		}
-	} else {
-		filtered = kites
+		kites.Filter(versionConstraint, keyRest)
 	}
 
 	// Attach tokens to kites
-	for _, k := range filtered {
-		k.Token = token
-	}
+	kites.Attach(token)
 
 	// Shuffle the list
-	shuffled := make([]*protocol.KiteWithToken, len(filtered))
-	for i, v := range rand.Perm(len(filtered)) {
-		shuffled[v] = filtered[i]
-	}
+	kites.Shuffle()
 
-	result.Kites = shuffled
+	result.Kites = kites
 	return result, nil
 }
 

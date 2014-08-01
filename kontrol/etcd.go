@@ -80,8 +80,6 @@ func onlyIDQuery(q *protocol.KontrolQuery) bool {
 // getQueryKey returns the etcd key for the query.
 func (k *Kontrol) getQueryKey(q *protocol.KontrolQuery) (string, error) {
 	// check first if it's an ID search
-	a := q.Fields()
-	fmt.Printf("a %+v\n", a)
 	if onlyIDQuery(q) {
 		return k.etcdKeyFromId(q.ID)
 	}
@@ -116,8 +114,6 @@ func (k *Kontrol) getQueryKey(q *protocol.KontrolQuery) (string, error) {
 	}
 
 	path = strings.TrimSuffix(path, "/")
-
-	fmt.Printf("returning path %+v\n", path)
 
 	return path, nil
 }
