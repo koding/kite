@@ -373,7 +373,8 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	k.Log.Info("Registered to kontrol with URL: %s", rr.URL)
+	k.Log.Info("Registered to kontrol with URL: %s and Kite query: %s",
+		rr.URL, k.Kite())
 
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {

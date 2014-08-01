@@ -162,3 +162,15 @@ type KontrolQuery struct {
 	Hostname    string `json:"hostname"`
 	ID          string `json:"id"`
 }
+
+func (k KontrolQuery) Fields() map[string]string {
+	return map[string]string{
+		"username":    k.Username,
+		"environment": k.Environment,
+		"name":        k.Name,
+		"version":     k.Version,
+		"region":      k.Region,
+		"hostname":    k.Hostname,
+		"id":          k.ID,
+	}
+}
