@@ -87,7 +87,8 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		k.Config.Port = DefaultPort
 	}
 
-	etcdClient, err := NewEtcd()
+	machines := []string{"http://127.0.0.1:4001"}
+	etcdClient, err := NewEtcd(machines)
 	if err != nil {
 		panic("could not connect to etcd: " + err.Error())
 	}

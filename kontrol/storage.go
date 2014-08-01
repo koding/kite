@@ -29,10 +29,8 @@ func (w *Watcher) Stop() {
 	w.stop <- true
 }
 
-func NewEtcd() (*Etcd, error) {
-	machines := []string{"http://127.0.0.1:4001"}
+func NewEtcd(machines []string) (*Etcd, error) {
 	client := etcd.NewClient(machines)
-
 	ok := client.SetCluster(machines)
 	if !ok {
 		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
