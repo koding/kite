@@ -88,9 +88,18 @@ func (e *Etcd) Get(key string) (*Node, error) {
 }
 
 func convertNodeToNodeExtern(node *etcd.Node) *store.NodeExtern {
+	// this is just an hack for backward compability with etcd.Store. We are
+	// going to change it
+	var nodeValue *string
+	if node.Value == "" {
+		nodeValue = nil
+	} else {
+		nodeValue = &node.Value
+	}
+
 	s := &store.NodeExtern{
 		Key:           node.Key,
-		Value:         &node.Value,
+		Value:         nodeValue,
 		Dir:           node.Dir,
 		Expiration:    node.Expiration,
 		TTL:           node.TTL,

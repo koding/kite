@@ -68,7 +68,7 @@ func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 	// TODO replace "kites" with KitesPrefix constant
 	fields := strings.Split(strings.TrimPrefix(n.node.Key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, fmt.Errorf("Invalid Kite: %s", n.node.Key)
+		return nil, fmt.Errorf("kontrol: invalid kite %s", n.node.Key)
 	}
 
 	return &protocol.Kite{
