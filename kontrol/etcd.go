@@ -57,7 +57,7 @@ func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 		return "", fmt.Errorf("internal error - getKites")
 	}
 
-	return *node.node.Value, nil
+	return node.node.Value, nil
 }
 
 // onlyIDQuery returns true if the query contains only a non-empty ID and all

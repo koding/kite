@@ -4,7 +4,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/coreos/etcd/store"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -82,35 +81,5 @@ func (e *Etcd) Get(key string) (*Node, error) {
 		return nil, err
 	}
 
-	nodeExtern := convertNodeToNodeExtern(resp.Node)
-
-	return NewNode(nodeExtern), nil
-}
-
-func convertNodeToNodeExtern(node *etcd.Node) *store.NodeExtern {
-	// this is just an hack for backward compability with etcd.Store. We are
-	// going to change it
-	var nodeValue *string
-	if node.Value == "" {
-		nodeValue = nil
-	} else {
-		nodeValue = &node.Value
-	}
-
-	s := &store.NodeExtern{
-		Key:           node.Key,
-		Value:         nodeValue,
-		Dir:           node.Dir,
-		Expiration:    node.Expiration,
-		TTL:           node.TTL,
-		ModifiedIndex: node.ModifiedIndex,
-		CreatedIndex:  node.CreatedIndex,
-		Nodes:         make(store.NodeExterns, len(node.Nodes)),
-	}
-
-	for i, n := range node.Nodes {
-		s.Nodes[i] = convertNodeToNodeExtern(n)
-	}
-
-	return s
+	return NewNode(resp.Node), nil
 }
