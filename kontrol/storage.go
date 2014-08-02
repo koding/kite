@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/koding/kite"
 )
 
 // Storage is an interface to a kite storage.
@@ -17,6 +18,7 @@ type Storage interface {
 
 type Etcd struct {
 	client *etcd.Client
+	log    kite.Logger
 }
 
 type Watcher struct {
@@ -64,10 +66,13 @@ func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
 	responses := make(chan *etcd.Response, 1000)
 	stopChan := make(chan bool, 1)
 
-	_, err := e.client.Watch(key, index, true, responses, stopChan)
-	if err != nil {
-		return nil, err
-	}
+	// Watch is blocking
+	go func() {
+		_, err := e.client.Watch(key, index, true, responses, stopChan)
+		if err != nil {
+			e.log.Warning("Remote client closed the watcher explicitly. Etcd client error: %s", err)
+		}
+	}()
 
 	return &Watcher{
 		recv: responses,

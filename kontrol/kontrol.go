@@ -136,6 +136,7 @@ func (k *Kontrol) Run() {
 	if err != nil {
 		panic("could not connect to etcd: " + err.Error())
 	}
+	etcdClient.log = k.Kite.Log
 
 	k.storage = etcdClient
 
@@ -442,6 +443,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// Registering watcher should be done before making etcd.Get() because
 	// Get() may return an empty result.
 	if watchCallback.Caller != nil {
+		k.Kite.Log.Info("Watcher enabled for query: %s", query)
 		watcher, err := k.storage.Watch(KitesPrefix+etcdKey, 0)
 		if err != nil {
 			return nil, err
@@ -460,6 +462,7 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 		// Stop watching on disconnect.
 		disconnect := make(chan bool)
 		r.Client.OnDisconnect(func() {
+			k.Kite.Log.Info("Watcher client disconnected, closing the watcher")
 			// Remove watcher from the map
 			k.watchersMutex.Lock()
 			defer k.watchersMutex.Unlock()
@@ -589,7 +592,8 @@ func (k *Kontrol) watchAndSendKiteEvents(
 			// Channel is closed. This happens in 3 cases:
 			//   1. Remote kite called "cancelWatcher" method and removed the watcher.
 			//   2. Remote kite has disconnected and the watcher is removed.
-			//   3. Remote kite couldn't consume messages fast enough, buffer has filled up and etcd cancelled the watcher.
+			//   3. Remote kite couldn't consume messages fast enough, buffer
+			//      has filled up and etcd cancelled the watcher.
 			if !ok {
 				// Do not try again if watcher is cancelled.
 				k.watchersMutex.Lock()
