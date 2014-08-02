@@ -64,7 +64,7 @@ type Kontrol struct {
 	storage Storage
 
 	// a list of etcd machintes to connect
-	etcdMachines []string
+	Machines []string
 }
 
 // New creates a new kontrol instance with the given verson and config
@@ -87,20 +87,12 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		k.Config.Port = DefaultPort
 	}
 
-	machines := []string{"http://127.0.0.1:4001"}
-	etcdClient, err := NewEtcd(machines)
-	if err != nil {
-		panic("could not connect to etcd: " + err.Error())
-	}
-
 	kontrol := &Kontrol{
-		Kite:         k,
-		publicKey:    publicKey,
-		privateKey:   privateKey,
-		watchers:     make(map[string]*Watcher),
-		clients:      make(map[string]*kite.Client),
-		storage:      etcdClient,
-		etcdMachines: []string{"http://127.0.0.1:4001"},
+		Kite:       k,
+		publicKey:  publicKey,
+		privateKey: privateKey,
+		watchers:   make(map[string]*Watcher),
+		clients:    make(map[string]*kite.Client),
 	}
 
 	log = k.Log
@@ -133,7 +125,23 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 
 func (k *Kontrol) Run() {
 	rand.Seed(time.Now().UnixNano())
+
+	// assume we are going to work locally instead of panicing
+	if k.Machines == nil || len(k.Machines) == 0 {
+		k.Machines = []string{"127.0.0.1:4001"}
+	}
+
+	k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
+	etcdClient, err := NewEtcd(k.Machines)
+	if err != nil {
+		panic("could not connect to etcd: " + err.Error())
+	}
+
+	k.storage = etcdClient
+
+	// now go and register ourself
 	go k.registerSelf()
+
 	k.Kite.Run()
 }
 

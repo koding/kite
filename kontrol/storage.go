@@ -30,6 +30,10 @@ func (w *Watcher) Stop() {
 }
 
 func NewEtcd(machines []string) (*Etcd, error) {
+	if machines == nil || len(machines) == 0 {
+		return nil, errors.New("machines is empty")
+	}
+
 	client := etcd.NewClient(machines)
 	ok := client.SetCluster(machines)
 	if !ok {
