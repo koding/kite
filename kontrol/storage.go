@@ -65,8 +65,7 @@ func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
 	responses := make(chan *etcd.Response, 1000)
 	stopChan := make(chan bool, 1)
 
-	// TODO: pass a stop channel for further customization
-	_, err := e.client.Watch(key, index, true, responses, nil)
+	_, err := e.client.Watch(key, index, true, responses, stopChan)
 	if err != nil {
 		return nil, err
 	}
