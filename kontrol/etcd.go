@@ -45,7 +45,7 @@ func validateKiteKey(k *protocol.Kite) error {
 
 // etcdKeyFromId returns the value for a single full ID path
 func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
-	log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
+	k.Kite.Log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
 
 	node, err := k.storage.Get(KitesPrefix + "/" + id)
 	if err != nil {
@@ -53,7 +53,7 @@ func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 			return "", nil
 		}
 
-		log.Error("etcd error: %s", err)
+		k.Kite.Log.Error("etcd error: %s", err)
 		return "", fmt.Errorf("internal error - getKites")
 	}
 
