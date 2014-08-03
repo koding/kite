@@ -51,11 +51,6 @@ func (k *Kontrol) watchAndSendKiteEvents(
 		case <-disconnect:
 			return
 		case resp, ok := <-watcher.recv:
-			etcdEvent := &Event{
-				Action:   resp.Action,
-				Node:     resp.Node,
-				PrevNode: resp.PrevNode,
-			}
 			// Channel is closed. This happens in 3 cases:
 			//   1. Remote kite called "cancelWatcher" method and removed the watcher.
 			//   2. Remote kite has disconnected and the watcher is removed.
@@ -95,6 +90,12 @@ func (k *Kontrol) watchAndSendKiteEvents(
 				}
 
 				continue
+			}
+
+			etcdEvent := &Event{
+				Action:   resp.Action,
+				Node:     resp.Node,
+				PrevNode: resp.PrevNode,
 			}
 
 			index = etcdEvent.Node.ModifiedIndex
