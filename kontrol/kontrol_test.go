@@ -2,10 +2,8 @@ package kontrol
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
-	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -35,7 +33,6 @@ func init() {
 
 	DefaultPort = 5555
 	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
-	kon.DataDir, _ = ioutil.TempDir("", "")
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
@@ -476,9 +473,4 @@ func TestGetQueryKey(t *testing.T) {
 	if key != "" {
 		t.Errorf("Key is not expected: %s", key)
 	}
-}
-
-// Cleanup function, is executed as last function
-func TestZCleanup(t *testing.T) {
-	os.RemoveAll(kon.DataDir)
 }

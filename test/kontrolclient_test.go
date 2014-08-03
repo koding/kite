@@ -1,7 +1,6 @@
 package kontrolclient_test
 
 import (
-	"io/ioutil"
 	"net/url"
 	// "os"
 	// "strings"
@@ -33,8 +32,6 @@ func init() {
 
 	kontrol.DefaultPort = 4099
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	kon.DataDir, _ = ioutil.TempDir("", "")
-	// defer os.RemoveAll(kon.DataDir)
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
@@ -63,6 +60,7 @@ func TestRegisterToKontrol(t *testing.T) {
 		if len(kites) != 1 {
 			t.Fatalf("unexpected result: %+v", kites)
 		}
+
 		first := kites[0]
 		if first.Kite != *k.Kite() {
 			t.Errorf("unexpected kite key: %s", first.Kite)

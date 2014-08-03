@@ -45,8 +45,14 @@ test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
+
 	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
+
+	@echo "Installing etcd"
+	@killall etcd ||:
+	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	@cd _etcd; ./build; ./bin/etcd &
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
