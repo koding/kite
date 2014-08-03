@@ -3,6 +3,7 @@ package kontrol
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/koding/kite"
@@ -52,12 +53,12 @@ func (e *Etcd) Delete(key string) error {
 }
 
 func (e *Etcd) Set(key, value string) error {
-	_, err := e.client.Set(key, value, uint64(HeartbeatDelay))
+	_, err := e.client.Set(key, value, uint64(HeartbeatDelay/time.Second))
 	return err
 }
 
 func (e *Etcd) Update(key, value string) error {
-	_, err := e.client.Update(key, value, uint64(HeartbeatDelay))
+	_, err := e.client.Update(key, value, uint64(HeartbeatDelay/time.Second))
 	return err
 }
 
