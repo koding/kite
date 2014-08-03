@@ -2,9 +2,7 @@ package reverseproxy
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -32,8 +30,6 @@ func TestWebSocketProxy(t *testing.T) {
 	color.Green("Starting kontrol")
 	kontrol.DefaultPort = 5555
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	kon.DataDir, _ = ioutil.TempDir("", "")
-	defer os.RemoveAll(kon.DataDir)
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 

@@ -1,9 +1,7 @@
 package pool
 
 import (
-	"io/ioutil"
 	"net/url"
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -27,8 +25,6 @@ func TestPool(t *testing.T) {
 
 	kontrol.DefaultPort = 5555
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	kon.DataDir, _ = ioutil.TempDir("", "")
-	defer os.RemoveAll(kon.DataDir)
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 	// defer kon.Close()
