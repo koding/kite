@@ -239,7 +239,10 @@ func (c *Client) readLoop() error {
 		processed := make(chan bool)
 		go func(msg []byte, processed chan bool) {
 			if err := c.processMessage(msg); err != nil {
-				c.LocalKite.Log.Warning("error processing message err: %s message: %q", err.Error(), string(msg))
+				// don't log callback not found errors
+				if _, ok := err.(dnode.CallbackNotFoundError); !ok {
+					c.LocalKite.Log.Warning("error processing message err: %s message: %q", err.Error(), string(msg))
+				}
 			}
 			close(processed)
 		}(msg, processed)
