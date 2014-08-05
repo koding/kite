@@ -45,24 +45,19 @@ func validateKiteKey(k *protocol.Kite) error {
 
 // etcdKeyFromId returns the value for a single full ID path
 func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
-	log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
+	k.Kite.Log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
 
-	event, err := k.etcd.Store.Get(
-		KitesPrefix+"/"+id, // path
-		false, // recursive, return all child directories too
-		false, // sorting flag, we don't care about sorting for now
-	)
-
+	node, err := k.storage.Get(KitesPrefix + "/" + id)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return "", nil
 		}
 
-		log.Error("etcd error: %s", err)
+		k.Kite.Log.Error("etcd error: %s", err)
 		return "", fmt.Errorf("internal error - getKites")
 	}
 
-	return *event.Node.Value, nil
+	return node.node.Value, nil
 }
 
 // onlyIDQuery returns true if the query contains only a non-empty ID and all

@@ -5,26 +5,26 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/etcd/store"
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/koding/kite/protocol"
 )
 
 // Node is a wrapper around an etcd node to provide additional
 // functionality around kites.
 type Node struct {
-	node *store.NodeExtern
+	node *etcd.Node
 }
 
 // NewNode returns a new initialized node with the given etcd node.
-func NewNode(node *store.NodeExtern) *Node {
+func NewNode(node *etcd.Node) *Node {
 	return &Node{
 		node: node,
 	}
 }
 
-// HasValue returns true if the give node has a non-nil value
+// HasValue returns true if the give node has a non-empty value
 func (n *Node) HasValue() bool {
-	return n.node.Value != nil
+	return n.node.Value != ""
 }
 
 // Flatten converts the recursive etcd directory structure to a flat one that
@@ -68,7 +68,7 @@ func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 	// TODO replace "kites" with KitesPrefix constant
 	fields := strings.Split(strings.TrimPrefix(n.node.Key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, fmt.Errorf("Invalid Kite: %s", n.node.Key)
+		return nil, fmt.Errorf("kontrol: invalid kite %s", n.node.Key)
 	}
 
 	return &protocol.Kite{
@@ -85,7 +85,7 @@ func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 // Value returns the value associated with the current node.
 func (n *Node) Value() (string, error) {
 	var rv registerValue
-	err := json.Unmarshal([]byte(*n.node.Value), &rv)
+	err := json.Unmarshal([]byte(n.node.Value), &rv)
 	if err != nil {
 		return "", err
 	}

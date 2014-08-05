@@ -19,7 +19,6 @@ format:
 kontrol:
 	@echo "$(OK_COLOR)==> Preparing kontrol test environment $(NO_COLOR)"
 	@rm -rf $(KITE_HOME)
-	@rm -rf /tmp/kontrol-data
 
 	@echo "$(OK_COLOR)==> Creating openssl keys $(NO_COLOR)"
 	@openssl genrsa -out /tmp/privateKey.pem 2048
@@ -29,7 +28,7 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -data-dir /tmp/kontrol-data -port 4444
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
@@ -46,8 +45,17 @@ test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
+
 	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
+
+	@echo "Killing previous etcd instance"
+	@killall etcd ||:
+
+	@echo "Installing etcd"
+	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	@rm -rf _etcd/kontrol_test ||: #remove previous folder
+	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go

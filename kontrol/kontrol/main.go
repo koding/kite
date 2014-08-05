@@ -31,14 +31,9 @@ var (
 	privateKeyFile = flag.String("private-key", "", "Private RSA key")
 
 	// etcd instance options
-	name         = flag.String("name", "", "name of the instance")
-	dataDir      = flag.String("data-dir", "", "directory to store data")
-	etcdAddr     = flag.String("etcd-addr", "127.0.0.1:4001", "The public host:port used for etcd server.")
-	etcdBindAddr = flag.String("etcd-bind-addr", "0.0.0.0:4001", "The listening host:port used for etcd server.")
-	peerAddr     = flag.String("peer-addr", "127.0.0.1:7001", "The public host:port used for peer communication.")
-	peerBindAddr = flag.String("peer-bind-addr", "0.0.0.0:7001", "The listening host:port used for peer communication.")
-	peers        = flag.String("peers", "", "comma seperated peer addresses")
-	version      = flag.String("version", "0.0.1", "version of kontrol")
+	machines = flag.String("machines", "", "comma seperated peer addresses")
+
+	version = flag.String("version", "0.0.1", "version of kontrol")
 )
 
 func main() {
@@ -72,10 +67,6 @@ func main() {
 	conf.Port = *port
 
 	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
-	k.EtcdAddr = *etcdAddr
-	k.EtcdBindAddr = *etcdBindAddr
-	k.PeerAddr = *peerAddr
-	k.PeerBindAddr = *peerBindAddr
 
 	if *tlsCertFile != "" || *tlsKeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(*tlsCertFile, *tlsKeyFile)
@@ -86,14 +77,8 @@ func main() {
 		k.Kite.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
 
-	if *name != "" {
-		k.Name = *name
-	}
-	if *dataDir != "" {
-		k.DataDir = *dataDir
-	}
-	if *peers != "" {
-		k.Peers = strings.Split(*peers, ",")
+	if *machines != "" {
+		k.Machines = strings.Split(*machines, ",")
 	}
 
 	k.Run()
