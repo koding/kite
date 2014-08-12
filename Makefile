@@ -66,7 +66,7 @@ test:
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./dnode
-	@`which go` test -race $(VERBOSE) ./cmd/cli
+	@`which go` test -race $(VERBOSE) ./kitectl/cli
 	@`which go` test -race $(VERBOSE) ./systeminfo
 	@`which go` test -race $(VERBOSE) ./
 	@`which go` test -race $(VERBOSE) ./test
