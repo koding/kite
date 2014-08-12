@@ -63,6 +63,10 @@ type Kontrol struct {
 	// storage defines the storage of the kites.
 	storage Storage
 
+	// RegisterURL defines the URL that is used to self register when adding
+	// itself to the storage backend
+	RegisterURL string
+
 	// a list of etcd machintes to connect
 	Machines []string
 }
@@ -286,6 +290,12 @@ func (k *Kontrol) registerSelf() {
 	value := &kontrolprotocol.RegisterValue{
 		URL: k.Kite.Config.KontrolURL,
 	}
+
+	// change if the user wants something different
+	if k.RegisterURL != "" {
+		value.URL = k.RegisterURL
+	}
+
 	setter, _, _ := k.makeSetter(k.Kite.Kite(), value)
 	for {
 		if err := setter(); err != nil {
