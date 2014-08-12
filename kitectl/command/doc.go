@@ -1,2 +1,2 @@
-// Package cmd implements sub-commands of the "kite" command.
-package cmd
+// Package command implements sub-commands of the "kite" command.
+package command

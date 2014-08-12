@@ -12,16 +12,16 @@ const Version = "0.0.8"
 func main() {
 	client := kite.New("kite-cli", Version)
 
-	root := cli.NewCLI()
-	root.AddCommand("version", cmd.Version(Version))
-	root.AddCommand("register", cmd.NewRegister(client))
-	root.AddCommand("install", cmd.NewInstall())
-	root.AddCommand("list", cmd.NewList())
-	root.AddCommand("run", cmd.NewRun())
-	root.AddCommand("tell", cmd.NewTell(client))
-	root.AddCommand("uninstall", cmd.NewUninstall())
-	root.AddCommand("showkey", cmd.NewShowKey())
-	root.AddCommand("query", cmd.NewQuery(client))
+	c := cli.NewCLI()
+	c.AddCommand("version", command.Version(Version))
+	c.AddCommand("register", command.NewRegister(client))
+	c.AddCommand("install", command.NewInstall())
+	c.AddCommand("list", command.NewList())
+	c.AddCommand("run", command.NewRun())
+	c.AddCommand("tell", command.NewTell(client))
+	c.AddCommand("uninstall", command.NewUninstall())
+	c.AddCommand("showkey", command.NewShowKey())
+	c.AddCommand("query", command.NewQuery(client))
 
-	root.Run()
+	c.Run()
 }
