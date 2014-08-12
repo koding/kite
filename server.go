@@ -40,9 +40,11 @@ func (k *Kite) Run() {
 func (k *Kite) Close() {
 	k.Log.Info("Closing kite...")
 
+	k.kontrol.Lock()
 	if k.kontrol != nil && k.kontrol.Client != nil {
 		k.kontrol.Close()
 	}
+	k.kontrol.Unlock()
 
 	if k.listener != nil {
 		k.listener.Close()

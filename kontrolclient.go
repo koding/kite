@@ -26,6 +26,7 @@ var ErrNoKitesAvailable = errors.New("no kites availabile")
 // kontrolClient is a kite for registering and querying Kites from Kontrol.
 type kontrolClient struct {
 	*Client
+	sync.Mutex // protects Client
 
 	// used for synchronizing methods that needs to be called after
 	// successful connection or/and registiration to kontrol.
@@ -77,7 +78,10 @@ func (k *Kite) SetupKontrolClient() error {
 		Key:  k.Config.KiteKey,
 	}
 
+	k.kontrol.Lock()
 	k.kontrol.Client = client
+	k.kontrol.Unlock()
+
 	k.kontrol.watchers = list.New()
 
 	k.kontrol.OnConnect(func() {

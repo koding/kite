@@ -1,4 +1,4 @@
-package kontrol
+package node
 
 import (
 	"encoding/json"
@@ -6,38 +6,39 @@ import (
 	"strings"
 
 	"github.com/coreos/go-etcd/etcd"
+	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
 
 // Node is a wrapper around an etcd node to provide additional
 // functionality around kites.
 type Node struct {
-	node *etcd.Node
+	Node *etcd.Node
 }
 
-// NewNode returns a new initialized node with the given etcd node.
-func NewNode(node *etcd.Node) *Node {
+// New returns a new initialized node with the given etcd node.
+func New(node *etcd.Node) *Node {
 	return &Node{
-		node: node,
+		Node: node,
 	}
 }
 
 // HasValue returns true if the give node has a non-empty value
 func (n *Node) HasValue() bool {
-	return n.node.Value != ""
+	return n.Node.Value != ""
 }
 
 // Flatten converts the recursive etcd directory structure to a flat one that
 // contains all kontrolNodes
 func (n *Node) Flatten() []*Node {
 	nodes := make([]*Node, 0)
-	for _, node := range n.node.Nodes {
+	for _, node := range n.Node.Nodes {
 		if node.Dir {
-			nodes = append(nodes, NewNode(node).Flatten()...)
+			nodes = append(nodes, New(node).Flatten()...)
 			continue
 		}
 
-		nodes = append(nodes, NewNode(node))
+		nodes = append(nodes, New(node))
 	}
 
 	return nodes
@@ -66,9 +67,9 @@ func (n *Node) Kite() (*protocol.KiteWithToken, error) {
 // "/kites/devrim/env/mathworker/1/localhost/tardis.local/id"
 func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 	// TODO replace "kites" with KitesPrefix constant
-	fields := strings.Split(strings.TrimPrefix(n.node.Key, "/"), "/")
+	fields := strings.Split(strings.TrimPrefix(n.Node.Key, "/"), "/")
 	if len(fields) != 8 || (len(fields) > 0 && fields[0] != "kites") {
-		return nil, fmt.Errorf("kontrol: invalid kite %s", n.node.Key)
+		return nil, fmt.Errorf("kontrol: invalid kite %s", n.Node.Key)
 	}
 
 	return &protocol.Kite{
@@ -84,8 +85,8 @@ func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 
 // Value returns the value associated with the current node.
 func (n *Node) Value() (string, error) {
-	var rv registerValue
-	err := json.Unmarshal([]byte(n.node.Value), &rv)
+	var rv kontrolprotocol.RegisterValue
+	err := json.Unmarshal([]byte(n.Node.Value), &rv)
 	if err != nil {
 		return "", err
 	}
