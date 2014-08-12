@@ -1,29 +1,38 @@
 package command
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type Run struct{}
-
-func NewRun() *Run {
-	return &Run{}
+type RunCommand struct {
+	Ui cli.Ui
 }
 
-func (*Run) Definition() string {
-	return "Run a kite"
+func (c *RunCommand) Synopsis() string {
+	return "Runs a kite"
 }
 
-func (*Run) Exec(args []string) error {
+func (c *RunCommand) Help() string {
+	helpText := `
+Usage: kitectl run kitename
+
+  Runs the given kite.
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *RunCommand) Run(args []string) int {
+
 	// Parse kite name
 	if len(args) == 0 {
-		return errors.New("You should give a kite name")
+		c.Ui.Output(c.Help())
+		return 1
 	}
 
 	// User is allowed to enter kite name in these forms: "fs" or "github.com/koding/fs.kite/1.0.0"
@@ -31,7 +40,8 @@ func (*Run) Exec(args []string) error {
 
 	installedKites, err := getInstalledKites(suppliedName)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	var matched []*InstalledKite
@@ -51,18 +61,27 @@ func (*Run) Exec(args []string) error {
 	}
 
 	if len(matched) == 0 {
-		return errors.New("Kite not found")
+		c.Ui.Error("Kite not found")
+		return 1
 	}
 
 	if len(matched) > 1 {
-		return errors.New("More than one version is installed. Please give a full kite name as: domain/user/repo/version")
+		c.Ui.Error("More than one version is installed. Please give a full kite name as: domain/user/repo/version")
+		return 1
 	}
 
 	kiteHome, err := kitekey.KiteHome()
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	binPath := filepath.Join(kiteHome, "kites", matched[0].BinPath())
-	return syscall.Exec(binPath, args, os.Environ())
+	err = syscall.Exec(binPath, args, os.Environ())
+	if err != nil {
+		c.Ui.Error(err.Error())
+		return 1
+	}
+
+	return 0
 }

@@ -3,33 +3,50 @@ package command
 import (
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
+	"github.com/mitchellh/cli"
 )
 
-type Query struct {
-	client *kite.Kite
+type QueryCommand struct {
+	KiteClient *kite.Kite
+	Ui         cli.Ui
 }
 
-func NewQuery(client *kite.Kite) *Query {
-	return &Query{
-		client: client,
-	}
+func (c *QueryCommand) Synopsis() string {
+	return "Queries kontrol based on the given criterias"
 }
 
-func (r *Query) Definition() string {
-	return "Query kontrol"
+func (c *QueryCommand) Help() string {
+	helpText := `
+Usage: kitectl query [options]
+
+  Queries Kontrol based on the given criterias.
+
+Options:
+
+  -username=koding      Username of the kite.
+  -environment=staging  Environment of the kite.
+  -name=naber           Name of the kite.
+  -version=0.0.1        Version of the kite.
+  -region=Asia          Region of the kite.
+  -hostname=caprica     Hostname of the kite.
+  -id=<UUID>            Unique ID of the kite.
+`
+	return strings.TrimSpace(helpText)
 }
 
-func (r *Query) Exec(args []string) error {
-	r.client.Config = config.MustGet()
+func (c *QueryCommand) Run(args []string) int {
+
+	c.KiteClient.Config = config.MustGet()
 
 	var query protocol.KontrolQuery
 
 	flags := flag.NewFlagSet("query", flag.ExitOnError)
-	flags.StringVar(&query.Username, "username", r.client.Kite().Username, "")
+	flags.StringVar(&query.Username, "username", c.KiteClient.Kite().Username, "")
 	flags.StringVar(&query.Environment, "environment", "", "")
 	flags.StringVar(&query.Name, "name", "", "")
 	flags.StringVar(&query.Version, "version", "", "")
@@ -38,15 +55,27 @@ func (r *Query) Exec(args []string) error {
 	flags.StringVar(&query.ID, "id", "", "")
 	flags.Parse(args)
 
-	result, err := r.client.GetKites(query)
+	result, err := c.KiteClient.GetKites(query)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	for i, client := range result {
 		var k *protocol.Kite = &client.Kite
-		fmt.Printf("%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n", i+1, k.Username, k.Environment, k.Name, k.Version, k.Region, k.Hostname, k.ID, client.URL)
+		c.Ui.Output(fmt.Sprintf(
+			"%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n",
+			i+1,
+			k.Username,
+			k.Environment,
+			k.Name,
+			k.Version,
+			k.Region,
+			k.Hostname,
+			k.ID,
+			client.URL,
+		))
 	}
 
-	return nil
+	return 0
 }

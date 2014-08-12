@@ -1,14 +1,31 @@
 package command
 
-import "fmt"
+import (
+	"strings"
 
-type Version string
+	"github.com/mitchellh/cli"
+)
 
-func (v Version) Definition() string {
-	return "Show version of this command"
+type VersionCommand struct {
+	Version string
+	Ui      cli.Ui
 }
 
-func (v Version) Exec(args []string) error {
-	fmt.Println(v)
-	return nil
+func (c *VersionCommand) Synopsis() string {
+	return "Shows kitectl version"
+}
+
+func (c *VersionCommand) Help() string {
+	helpText := `
+Usage: kitectl version
+
+  Shows kitectl version.
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *VersionCommand) Run(_ []string) int {
+	c.Ui.Output(c.Version)
+
+	return 0
 }

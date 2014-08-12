@@ -2,60 +2,72 @@ package command
 
 import (
 	"flag"
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type Register struct {
-	client *kite.Kite
+type RegisterCommand struct {
+	KiteClient *kite.Kite
+	Ui         cli.Ui
 }
 
-func NewRegister(client *kite.Kite) *Register {
-	return &Register{
-		client: client,
-	}
+func (c *RegisterCommand) Synopsis() string {
+	return "Registers this host to a kite authority"
 }
 
-func (r *Register) Definition() string {
-	return "Register this host to a kite authority"
+func (c *RegisterCommand) Help() string {
+	helpText := `
+Usage: kitectl register [options]
+
+  Registers this host to a kite authority.
+
+Options:
+
+  -to=http://127.0.0.1  Kontrol URL.
+  -username=koding
+`
+	return strings.TrimSpace(helpText)
 }
 
-func (r *Register) Exec(args []string) error {
+func (c *RegisterCommand) Run(args []string) int {
 	flags := flag.NewFlagSet("register", flag.ExitOnError)
 	to := flags.String("to", "", "target registration server")
 	username := flags.String("username", "", "pick a username")
 	flags.Parse(args)
 
-	if *to == "" {
-		r.client.Log.Fatal("No URL given in -to flag")
+	if *to == "" || *username == "" {
+		c.Ui.Output(c.Help())
+		return 1
 	}
 
-	if *username == "" {
-		r.client.Log.Fatal("You must give a username with -username flag")
-	}
-	r.client.Config.Username = *username
+	c.KiteClient.Config.Username = *username
 
 	if _, err := kitekey.Read(); err == nil {
-		r.client.Log.Warning("Already registered. Registering again...")
+		c.Ui.Info("Already registered. Registering again...")
 	}
 
-	kontrol := r.client.NewClient(*to)
+	kontrol := c.KiteClient.NewClient(*to)
 	if err := kontrol.Dial(); err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	result, err := kontrol.TellWithTimeout("registerMachine", 5*time.Minute, *username)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	if err := kitekey.Write(result.MustString()); err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
-	fmt.Println("Registered successfully")
-	return nil
+	c.Ui.Info("Registered successfully")
+
+	return 0
 }

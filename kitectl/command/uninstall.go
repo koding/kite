@@ -1,44 +1,64 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type Uninstall struct{}
-
-func NewUninstall() *Uninstall {
-	return &Uninstall{}
+type UninstallCommand struct {
+	Ui cli.Ui
 }
 
-func (*Uninstall) Definition() string {
-	return "Uninstall a kite"
+func (c *UninstallCommand) Synopsis() string {
+	return "Uninstalls a kite"
 }
 
-func (*Uninstall) Exec(args []string) error {
+func (c *UninstallCommand) Help() string {
+	helpText := `
+Usage: kitectl uninstall kitename
+
+  Uninstall the given kite. Example kitename: github.com/koding/fs.kite/1.0.0
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *UninstallCommand) Run(args []string) int {
+
 	if len(args) != 1 {
-		return errors.New("You should give a full kite name. Exampe: github.com/koding/fs.kite/1.0.0")
+		c.Ui.Output(c.Help())
+		return 1
 	}
 	fullName := args[0]
 
 	installed, err := isInstalled(fullName)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
+
 	if !installed {
-		return fmt.Errorf("%s is not installed", fullName)
+		c.Ui.Error(fmt.Sprintf("%s is not installed", fullName))
+		return 1
 	}
 
 	bundlePath, err := getBundlePath(fullName)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
-	return os.RemoveAll(bundlePath)
+	err = os.RemoveAll(bundlePath)
+	if err != nil {
+		c.Ui.Error(err.Error())
+		return 1
+	}
+
+	return 0
 }
 
 // getBundlePath returns the bundle path of a given kite.

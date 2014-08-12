@@ -2,29 +2,39 @@ package command
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type ShowKey struct{}
-
-func NewShowKey() *ShowKey {
-	return &ShowKey{}
+type ShowkeyCommand struct {
+	Ui cli.Ui
 }
 
-func (v *ShowKey) Definition() string {
-	return "Show registration key info"
+func (c *ShowkeyCommand) Synopsis() string {
+	return "Shows the registration key"
 }
 
-func (v *ShowKey) Exec(args []string) error {
+func (c *ShowkeyCommand) Help() string {
+	helpText := `
+Usage: kitectl showkey
+
+  Shows the registration key.
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *ShowkeyCommand) Run(_ []string) int {
 	token, err := kitekey.Parse()
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	for k, v := range token.Claims {
-		fmt.Printf("%-15s%+v\n", k, v)
+		c.Ui.Output(fmt.Sprintf("%-15s%+v", k, v))
 	}
 
-	return nil
+	return 0
 }
