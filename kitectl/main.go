@@ -3,8 +3,8 @@ package main
 
 import (
 	"github.com/koding/kite"
-	"github.com/koding/kite/cmd"
-	"github.com/koding/kite/cmd/cli"
+	"github.com/koding/kite/kitectl/cli"
+	"github.com/koding/kite/kitectl/command"
 )
 
 const Version = "0.0.8"
