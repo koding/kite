@@ -20,8 +20,8 @@ var keyOrder = []string{
 	"id",
 }
 
-// registerValue is the type of the value that is saved to etcd.
-type registerValue struct {
+// RegisterValue is the type of the value that is saved to etcd.
+type RegisterValue struct {
 	URL string `json:"url"`
 }
 
@@ -47,7 +47,7 @@ func validateKiteKey(k *protocol.Kite) error {
 func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 	k.Kite.Log.Info("Searching etcd key from id %s", KitesPrefix+"/"+id)
 
-	node, err := k.storage.Get(KitesPrefix + "/" + id)
+	n, err := k.storage.Get(KitesPrefix + "/" + id)
 	if err != nil {
 		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
 			return "", nil
@@ -57,7 +57,7 @@ func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 		return "", fmt.Errorf("internal error - getKites")
 	}
 
-	return node.node.Value, nil
+	return n.Node.Value, nil
 }
 
 // onlyIDQuery returns true if the query contains only a non-empty ID and all

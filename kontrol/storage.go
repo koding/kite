@@ -2,16 +2,16 @@ package kontrol
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/koding/kite"
+	"github.com/koding/kite/kontrol/node"
 )
 
 // Storage is an interface to a kite storage.
 type Storage interface {
-	Get(key string) (*Node, error)
+	Get(key string) (*node.Node, error)
 	Set(key, value string) error
 	Delete(key string) error
 	Watch(key string, index uint64) (*Watcher, error)
@@ -37,10 +37,10 @@ func NewEtcd(machines []string) (*Etcd, error) {
 	}
 
 	client := etcd.NewClient(machines)
-	ok := client.SetCluster(machines)
-	if !ok {
-		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
-	}
+	// ok := client.SetCluster(machines)
+	// if !ok {
+	// 	return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
+	// }
 
 	return &Etcd{
 		client: client,
@@ -81,11 +81,11 @@ func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
 	}, nil
 }
 
-func (e *Etcd) Get(key string) (*Node, error) {
+func (e *Etcd) Get(key string) (*node.Node, error) {
 	resp, err := e.client.Get(key, false, true)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewNode(resp.Node), nil
+	return node.New(resp.Node), nil
 }

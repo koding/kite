@@ -1,7 +1,8 @@
-package kontrol
+package node
 
 import (
 	"math/rand"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite/protocol"
@@ -39,4 +40,20 @@ func (k Kites) Filter(constraint version.Constraints, keyRest string) {
 	}
 
 	k = filtered
+}
+
+func isValid(k *protocol.Kite, c version.Constraints, keyRest string) bool {
+	// Check the version constraint.
+	v, _ := version.NewVersion(k.Version)
+	if !c.Check(v) {
+		return false
+	}
+
+	// Check the fields after version field.
+	kiteKeyAfterVersion := "/" + strings.TrimRight(k.Region+"/"+k.Hostname+"/"+k.ID, "/")
+	if !strings.HasPrefix(kiteKeyAfterVersion, keyRest) {
+		return false
+	}
+
+	return true
 }
