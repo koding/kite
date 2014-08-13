@@ -2,7 +2,6 @@ package kontrol
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -14,6 +13,7 @@ import (
 type Storage interface {
 	Get(key string) (*node.Node, error)
 	Set(key, value string) error
+	Update(key string, value string) error
 	Delete(key string) error
 	Watch(key string, index uint64) (*Watcher, error)
 }
@@ -38,10 +38,10 @@ func NewEtcd(machines []string) (*Etcd, error) {
 	}
 
 	client := etcd.NewClient(machines)
-	ok := client.SetCluster(machines)
-	if !ok {
-		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
-	}
+	// ok := client.SetCluster(machines)
+	// if !ok {
+	// 	return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
+	// }
 
 	return &Etcd{
 		client: client,

@@ -58,6 +58,47 @@ type registerResult struct {
 	URL *url.URL
 }
 
+// isDiscovery returns true if the kite.key is contains discovery related
+// information.
+func (k *Kite) isDiscovery() bool {
+	return k.Config.DiscoveryURL != ""
+}
+
+// discoveryKontrolURL returns a single kontrol url received from the discovery
+// endpoint.
+func (k *Kite) discoveryKontrolURL() (string, error) {
+	client := k.NewClient(k.Config.DiscoveryURL)
+	client.Kite = protocol.Kite{Name: "discovery"} // for logging purposes
+	client.Auth = &Auth{
+		Type: "kiteKey",
+		Key:  k.Config.KiteKey,
+	}
+
+	if err := client.Dial(); err != nil {
+		return "", err
+	}
+
+	query := protocol.GetKitesArgs{
+		Query: protocol.KontrolQuery{ID: k.Config.DiscoveryID},
+	}
+
+	var result = new(protocol.GetKitesResult)
+	response, err := client.TellWithTimeout("getKites", 4*time.Second, query)
+	if err != nil {
+		return "", err
+	}
+
+	if err := response.Unmarshal(&result); err != nil {
+		return "", err
+	}
+
+	index := rand.Intn(len(result.Kites))
+	return result.Kites[index].URL, nil // pick up a random kontrol
+}
+
+func (k *Kite) getKontrolURL() (string, error) {
+}
+
 // SetupKontrolClient setups and prepares a the kontrol instance. It connects
 // to kontrol and reconnects again if there is any disconnections. This method
 // is called internally whenever a kontrol client specific action is taking.
@@ -67,11 +108,24 @@ func (k *Kite) SetupKontrolClient() error {
 		return nil // already prepared
 	}
 
-	if k.Config.KontrolURL == "" {
-		return errors.New("no kontrol URL given in config")
+	var kontrolURL string
+	var err error
+
+	if k.isDiscovery() {
+		k.Log.Info("Discovery enabled. Searching for a kontrol with ID %s at endpoint %s",
+			k.Config.DiscoveryID, k.Config.DiscoveryURL)
+
+		kontrolURL, err = k.discoveryKontrolURL()
+		if err != nil {
+			k.Log.Error("Discovery searching failed: %s", err)
+		}
+	} else if k.Config.KontrolURL != "" {
+		kontrolURL = k.Config.KontrolURL
+	} else {
+		return errors.New("no kontrolURL and discoveryURL given in config")
 	}
 
-	client := k.NewClient(k.Config.KontrolURL)
+	client := k.NewClient(kontrolURL)
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
 	client.Auth = &Auth{
 		Type: "kiteKey",
