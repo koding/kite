@@ -18,15 +18,21 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type InstallCommand struct {
+type Install struct {
 	Ui cli.Ui
 }
 
-func (c *InstallCommand) Synopsis() string {
+func NewInstall() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Install{Ui: DefaultUi}, nil
+	}
+}
+
+func (c *Install) Synopsis() string {
 	return "Installs a kite from a repository"
 }
 
-func (c *InstallCommand) Help() string {
+func (c *Install) Help() string {
 	helpText := `
 Usage: kitectl install URL
 
@@ -36,7 +42,7 @@ Usage: kitectl install URL
 	return strings.TrimSpace(helpText)
 }
 
-func (c *InstallCommand) Run(args []string) int {
+func (c *Install) Run(args []string) int {
 	if len(args) != 1 {
 		c.Ui.Error("You should give a URL. Example: github.com/cenkalti/math.kite")
 		return 1

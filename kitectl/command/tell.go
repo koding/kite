@@ -11,16 +11,25 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type TellCommand struct {
+type Tell struct {
 	KiteClient *kite.Kite
 	Ui         cli.Ui
 }
 
-func (c *TellCommand) Synopsis() string {
+func NewTell() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Tell{
+			KiteClient: DefaultKiteClient,
+			Ui:         DefaultUi,
+		}, nil
+	}
+}
+
+func (c *Tell) Synopsis() string {
 	return "Calls a method on a kite"
 }
 
-func (c *TellCommand) Help() string {
+func (c *Tell) Help() string {
 	helpText := `
 Usage: kitectl tell [options]
 
@@ -35,7 +44,7 @@ Options:
 	return strings.TrimSpace(helpText)
 }
 
-func (c *TellCommand) Run(args []string) int {
+func (c *Tell) Run(args []string) int {
 
 	var to, method string
 	var timeout time.Duration

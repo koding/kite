@@ -11,15 +11,21 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type ListCommand struct {
+type List struct {
 	Ui cli.Ui
 }
 
-func (c *ListCommand) Synopsis() string {
+func NewList() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &List{Ui: DefaultUi}, nil
+	}
+}
+
+func (c *List) Synopsis() string {
 	return "Lists installed kites"
 }
 
-func (c *ListCommand) Help() string {
+func (c *List) Help() string {
 	helpText := `
 Usage: kitectl list
 
@@ -28,7 +34,7 @@ Usage: kitectl list
 	return strings.TrimSpace(helpText)
 }
 
-func (c *ListCommand) Run(_ []string) int {
+func (c *List) Run(_ []string) int {
 	kites, err := getInstalledKites("")
 	if err != nil {
 		c.Ui.Error(err.Error())

@@ -10,15 +10,23 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type UninstallCommand struct {
+type Uninstall struct {
 	Ui cli.Ui
 }
 
-func (c *UninstallCommand) Synopsis() string {
+func NewUninstall() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Uninstall{
+			Ui: DefaultUi,
+		}, nil
+	}
+}
+
+func (c *Uninstall) Synopsis() string {
 	return "Uninstalls a kite"
 }
 
-func (c *UninstallCommand) Help() string {
+func (c *Uninstall) Help() string {
 	helpText := `
 Usage: kitectl uninstall kitename
 
@@ -27,7 +35,7 @@ Usage: kitectl uninstall kitename
 	return strings.TrimSpace(helpText)
 }
 
-func (c *UninstallCommand) Run(args []string) int {
+func (c *Uninstall) Run(args []string) int {
 
 	if len(args) != 1 {
 		c.Ui.Output(c.Help())

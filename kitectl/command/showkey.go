@@ -8,15 +8,23 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type ShowkeyCommand struct {
+type Showkey struct {
 	Ui cli.Ui
 }
 
-func (c *ShowkeyCommand) Synopsis() string {
+func NewShowkey() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Showkey{
+			Ui: DefaultUi,
+		}, nil
+	}
+}
+
+func (c *Showkey) Synopsis() string {
 	return "Shows the registration key"
 }
 
-func (c *ShowkeyCommand) Help() string {
+func (c *Showkey) Help() string {
 	helpText := `
 Usage: kitectl showkey
 
@@ -25,7 +33,7 @@ Usage: kitectl showkey
 	return strings.TrimSpace(helpText)
 }
 
-func (c *ShowkeyCommand) Run(_ []string) int {
+func (c *Showkey) Run(_ []string) int {
 	token, err := kitekey.Parse()
 	if err != nil {
 		c.Ui.Error(err.Error())

@@ -10,16 +10,25 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type RegisterCommand struct {
+type Register struct {
 	KiteClient *kite.Kite
 	Ui         cli.Ui
 }
 
-func (c *RegisterCommand) Synopsis() string {
+func NewRegister() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Register{
+			KiteClient: DefaultKiteClient,
+			Ui:         DefaultUi,
+		}, nil
+	}
+}
+
+func (c *Register) Synopsis() string {
 	return "Registers this host to a kite authority"
 }
 
-func (c *RegisterCommand) Help() string {
+func (c *Register) Help() string {
 	helpText := `
 Usage: kitectl register [options]
 
@@ -33,7 +42,7 @@ Options:
 	return strings.TrimSpace(helpText)
 }
 
-func (c *RegisterCommand) Run(args []string) int {
+func (c *Register) Run(args []string) int {
 	flags := flag.NewFlagSet("register", flag.ExitOnError)
 	to := flags.String("to", "", "target registration server")
 	username := flags.String("username", "", "pick a username")

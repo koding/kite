@@ -36,7 +36,7 @@ install:
 	@`which go` get github.com/fatih/color
 
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
-	@`which go` install -v ./cmd/kite
+	@`which go` install -v ./kitectl
 	@`which go` install -v ./kontrol/kontrol
 	@`which go` install -v ./reverseproxy/reverseproxy
 	@`which go` install -v ./tunnelproxy/tunnelproxy
@@ -45,9 +45,6 @@ test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
-
-	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
-	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
@@ -66,6 +63,7 @@ test:
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./dnode
+	@`which go` test -race $(VERBOSE) ./kitectl
 	@`which go` test -race $(VERBOSE) ./systeminfo
 	@`which go` test -race $(VERBOSE) ./
 	@`which go` test -race $(VERBOSE) ./test

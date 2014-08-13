@@ -10,15 +10,21 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type RunCommand struct {
+type Run struct {
 	Ui cli.Ui
 }
 
-func (c *RunCommand) Synopsis() string {
+func NewRun() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Run{Ui: DefaultUi}, nil
+	}
+}
+
+func (c *Run) Synopsis() string {
 	return "Runs a kite"
 }
 
-func (c *RunCommand) Help() string {
+func (c *Run) Help() string {
 	helpText := `
 Usage: kitectl run kitename
 
@@ -27,7 +33,7 @@ Usage: kitectl run kitename
 	return strings.TrimSpace(helpText)
 }
 
-func (c *RunCommand) Run(args []string) int {
+func (c *Run) Run(args []string) int {
 
 	// Parse kite name
 	if len(args) == 0 {

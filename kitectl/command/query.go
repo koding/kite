@@ -11,16 +11,25 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-type QueryCommand struct {
+type Query struct {
 	KiteClient *kite.Kite
 	Ui         cli.Ui
 }
 
-func (c *QueryCommand) Synopsis() string {
+func NewQuery() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Query{
+			KiteClient: DefaultKiteClient,
+			Ui:         DefaultUi,
+		}, nil
+	}
+}
+
+func (c *Query) Synopsis() string {
 	return "Queries kontrol based on the given criterias"
 }
 
-func (c *QueryCommand) Help() string {
+func (c *Query) Help() string {
 	helpText := `
 Usage: kitectl query [options]
 
@@ -39,7 +48,7 @@ Options:
 	return strings.TrimSpace(helpText)
 }
 
-func (c *QueryCommand) Run(args []string) int {
+func (c *Query) Run(args []string) int {
 
 	c.KiteClient.Config = config.MustGet()
 
