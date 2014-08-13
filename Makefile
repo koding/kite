@@ -46,6 +46,9 @@ test:
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
 
+	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
+	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
+
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
 
