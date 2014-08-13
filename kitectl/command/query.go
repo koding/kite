@@ -49,7 +49,6 @@ Options:
 }
 
 func (c *Query) Run(args []string) int {
-
 	c.KiteClient.Config = config.MustGet()
 
 	var query protocol.KontrolQuery
@@ -72,6 +71,7 @@ func (c *Query) Run(args []string) int {
 
 	for i, client := range result {
 		var k *protocol.Kite = &client.Kite
+
 		c.Ui.Output(fmt.Sprintf(
 			"%d\t%s/%s/%s/%s/%s/%s/%s\t%s",
 			i+1,
@@ -82,7 +82,7 @@ func (c *Query) Run(args []string) int {
 			k.Region,
 			k.Hostname,
 			k.ID,
-			client.URL,
+			client.URL(),
 		))
 	}
 

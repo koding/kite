@@ -39,8 +39,12 @@ type Client struct {
 	// Should we reconnect if disconnected?
 	Reconnect bool
 
-	// SockJS base URL
-	URL string
+	// SockJS base URL to dial to remote client
+	url string
+
+	// URLFunc is used to return a final SockJS base URL which is used to dial
+	// to remote client. This overrides the URL field if set.
+	URLFunc func() string
 
 	// Should we process incoming messages concurrently or not? Default: true
 	Concurrent bool
@@ -109,7 +113,7 @@ type response struct {
 func (k *Kite) NewClient(remoteURL string) *Client {
 	r := &Client{
 		LocalKite:     k,
-		URL:           remoteURL,
+		url:           remoteURL,
 		disconnect:    make(chan struct{}),
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
@@ -138,8 +142,6 @@ func (c *Client) SetUsername(username string) {
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (c *Client) Dial() (err error) {
-	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-
 	if err := c.dial(); err != nil {
 		return err
 	}
@@ -152,8 +154,6 @@ func (c *Client) Dial() (err error) {
 // Dial connects to the remote Kite. If it can't connect, it retries
 // indefinitely. It returns a channel to check if it's connected or not.
 func (c *Client) DialForever() (connected chan bool, err error) {
-	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-
 	c.Reconnect = true
 	connected = make(chan bool, 1) // This will be closed on first connection.
 	go c.dialForever(connected)
@@ -177,8 +177,19 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 	go c.run()
 }
 
-func (c *Client) dial() (err error) {
-	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
+// URL returns the current client URL. It returns the result of URLFunc() is set.
+func (c *Client) URL() string {
+	if c.URLFunc != nil {
+		return c.URLFunc()
+	}
+
+	return c.url
+}
+
+func (c *Client) dial() error {
+	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL())
+	var err error
+	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL())
 	if err != nil {
 		c.session = nil // explicitly set nil to avoid panicing when used the inside data.
 		c.LocalKite.Log.Error(err.Error())

@@ -2,6 +2,7 @@ package kontrol
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -38,10 +39,10 @@ func NewEtcd(machines []string) (*Etcd, error) {
 	}
 
 	client := etcd.NewClient(machines)
-	// ok := client.SetCluster(machines)
-	// if !ok {
-	// 	return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
-	// }
+	ok := client.SetCluster(machines)
+	if !ok {
+		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
+	}
 
 	return &Etcd{
 		client: client,
