@@ -1,4 +1,4 @@
-package cmd
+package command
 
 import (
 	"fmt"
@@ -8,29 +8,44 @@ import (
 	"strings"
 
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type List struct{}
-
-func NewList() *List {
-	return &List{}
+type List struct {
+	Ui cli.Ui
 }
 
-func (*List) Definition() string {
-	return "List installed kites"
+func NewList() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &List{Ui: DefaultUi}, nil
+	}
 }
 
-func (*List) Exec(args []string) error {
+func (c *List) Synopsis() string {
+	return "Lists installed kites"
+}
+
+func (c *List) Help() string {
+	helpText := `
+Usage: kitectl list
+
+  Lists installed kites.
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *List) Run(_ []string) int {
 	kites, err := getInstalledKites("")
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	for _, k := range kites {
-		fmt.Println(k)
+		c.Ui.Output(k.String())
 	}
 
-	return nil
+	return 0
 }
 
 // getIntalledKites returns installed kites in .kd/kites folder.

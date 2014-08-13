@@ -1,30 +1,51 @@
-package cmd
+package command
 
 import (
 	"flag"
-	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
 type Tell struct {
-	client *kite.Kite
+	KiteClient *kite.Kite
+	Ui         cli.Ui
 }
 
-func NewTell(client *kite.Kite) *Tell {
-	return &Tell{
-		client: client,
+func NewTell() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Tell{
+			KiteClient: DefaultKiteClient,
+			Ui:         DefaultUi,
+		}, nil
 	}
 }
 
-func (t *Tell) Definition() string {
-	return "Call a method on a kite"
+func (c *Tell) Synopsis() string {
+	return "Calls a method on a kite"
 }
 
-func (t *Tell) Exec(args []string) error {
+func (c *Tell) Help() string {
+	helpText := `
+Usage: kitectl tell [options]
+
+  Calls a method on a kite.
+
+Options:
+
+  -to=URL          URL of the remote kite
+  -method=divide   Method name to be invoked
+  -timeout=4       Timeout in seconds.
+`
+	return strings.TrimSpace(helpText)
+}
+
+func (c *Tell) Run(args []string) int {
+
 	var to, method string
 	var timeout time.Duration
 
@@ -34,19 +55,26 @@ func (t *Tell) Exec(args []string) error {
 	flags.DurationVar(&timeout, "timeout", 4*time.Second, "timeout of tell method")
 	flags.Parse(args)
 
-	key, err := kitekey.Read()
-	if err != nil {
-		return err
+	if to == "" || method == "" {
+		c.Ui.Output(c.Help())
+		return 1
 	}
 
-	remote := t.client.NewClient(to)
+	key, err := kitekey.Read()
+	if err != nil {
+		c.Ui.Error(err.Error())
+		return 1
+	}
+
+	remote := c.KiteClient.NewClient(to)
 	remote.Auth = &kite.Auth{
 		Type: "kiteKey",
 		Key:  key,
 	}
 
 	if err = remote.Dial(); err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	// Convert args to []interface{} in order to pass it to Tell() method.
@@ -62,14 +90,15 @@ func (t *Tell) Exec(args []string) error {
 
 	result, err := remote.TellWithTimeout(method, timeout, params...)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	if result == nil {
-		fmt.Println("nil")
+		c.Ui.Info("nil")
 	} else {
-		fmt.Println(string(result.Raw))
+		c.Ui.Info(string(result.Raw))
 	}
 
-	return nil
+	return 0
 }

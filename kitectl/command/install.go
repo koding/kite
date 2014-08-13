@@ -1,4 +1,4 @@
-package cmd
+package command
 
 import (
 	"archive/tar"
@@ -15,83 +15,108 @@ import (
 	"strings"
 
 	"github.com/koding/kite/kitekey"
+	"github.com/mitchellh/cli"
 )
 
-type Install struct{}
-
-func NewInstall() *Install {
-	return &Install{}
+type Install struct {
+	Ui cli.Ui
 }
 
-func (*Install) Definition() string {
-	return "Install a kite from repository. Example: github.com/cenkalti/math.kite"
+func NewInstall() cli.CommandFactory {
+	return func() (cli.Command, error) {
+		return &Install{Ui: DefaultUi}, nil
+	}
 }
 
-func (*Install) Exec(args []string) error {
+func (c *Install) Synopsis() string {
+	return "Installs a kite from a repository"
+}
+
+func (c *Install) Help() string {
+	helpText := `
+Usage: kitectl install URL
+
+  Installs a kite from the given URL. Example: github.com/cenkalti/math.kite
+`
+
+	return strings.TrimSpace(helpText)
+}
+
+func (c *Install) Run(args []string) int {
 	if len(args) != 1 {
-		return errors.New("You should give a URL. Example: github.com/cenkalti/math.kite")
+		c.Ui.Error("You should give a URL. Example: github.com/cenkalti/math.kite")
+		return 1
 	}
 
 	repoName := args[0]
 
 	// Download manifest
-	fmt.Println("Downloading manifest file...")
+	c.Ui.Output("Downloading manifest file...")
 	manifest, err := getManifest(repoName)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	version, err := getVersion(manifest)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
-	fmt.Printf("Found version: %s\n", version)
+	c.Ui.Output(fmt.Sprintf("Found version: %s\n", version))
 
 	binaryURL, err := getBinaryURL(manifest)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	// Make download request to the kite binary
 	fmt.Println("Downloading kite...")
 	targz, err := http.Get(binaryURL)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 	defer targz.Body.Close()
 
 	// Extract gzip
 	gz, err := gzip.NewReader(targz.Body)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 	defer gz.Close()
 
 	// Extract tar
 	tempKitePath, err := ioutil.TempDir("", "kite-install-")
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 	defer os.RemoveAll(tempKitePath)
 
 	err = extractTar(gz, tempKitePath)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	bundlePath, err := validatePackage(tempKitePath, repoName)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	err = installKite(bundlePath, repoName, version)
 	if err != nil {
-		return err
+		c.Ui.Error(err.Error())
+		return 1
 	}
 
 	fmt.Println("Installed successfully:", filepath.Join(repoName, version))
-	return nil
+	return 0
 }
 
 func getManifest(repoName string) (map[string]interface{}, error) {

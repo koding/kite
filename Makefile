@@ -36,7 +36,7 @@ install:
 	@`which go` get github.com/fatih/color
 
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
-	@`which go` install -v ./cmd/kite
+	@`which go` install -v ./kitectl
 	@`which go` install -v ./kontrol/kontrol
 	@`which go` install -v ./reverseproxy/reverseproxy
 	@`which go` install -v ./tunnelproxy/tunnelproxy
@@ -66,7 +66,7 @@ test:
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./dnode
-	@`which go` test -race $(VERBOSE) ./cmd/cli
+	@`which go` test -race $(VERBOSE) ./kitectl
 	@`which go` test -race $(VERBOSE) ./systeminfo
 	@`which go` test -race $(VERBOSE) ./
 	@`which go` test -race $(VERBOSE) ./test
