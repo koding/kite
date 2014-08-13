@@ -73,7 +73,7 @@ func (c *Query) Run(args []string) int {
 	for i, client := range result {
 		var k *protocol.Kite = &client.Kite
 		c.Ui.Output(fmt.Sprintf(
-			"%d\t%s/%s/%s/%s/%s/%s/%s\t%s\n",
+			"%d\t%s/%s/%s/%s/%s/%s/%s\t%s",
 			i+1,
 			k.Username,
 			k.Environment,
