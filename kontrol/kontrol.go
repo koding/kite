@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +67,19 @@ type Kontrol struct {
 	// RegisterURL defines the URL that is used to self register when adding
 	// itself to the storage backend
 	RegisterURL string
+
+	// DiscoveryURL is used if the Kontrol's URL is dynamic and changing.
+	// Therefore Kontrol's registers itself to another fixed Kontrol (probably
+	// behind a domain). Any kite that registers itself to this Kontrol gets a
+	// new "kontrolDiscovery" claim in their token in which they can search for
+	// a kontrolURL before connecting or querying kites. Discovery
+	DiscoveryURL string
+
+	// DiscoveryID is a single unique ID that defines the current running
+	// kontrol. This is should be not changed during restarts of a kontrol. By
+	// default it's the "KiteId" + "Port" which allows it to run multiple
+	// kontrols on the same machine.
+	DiscoveryID string
 
 	// a list of etcd machintes to connect
 	Machines []string
@@ -165,8 +179,10 @@ func (k *Kontrol) ClearKites() error {
 	return nil
 }
 
-// RegisterSelf registers this host and writes a key to ~/.kite/kite.key
-func (k *Kontrol) RegisterSelf() error {
+// InitializeSelf initializes this host by writing a key to ~/.kite/kite.key
+// with the username passed to kite.Config.Username and url to
+// kite.Config.KontrolURL
+func (k *Kontrol) InitializeSelf() error {
 	key, err := k.registerUser(k.Kite.Config.Username)
 	if err != nil {
 		return err
@@ -201,6 +217,17 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 		"jti":        tknID.String(),                 // JWT ID
 		"kontrolURL": k.Kite.Config.KontrolURL,       // Kontrol URL
 		"kontrolKey": strings.TrimSpace(k.publicKey), // Public key of kontrol
+	}
+
+	// let the kite find us via discoveryURL
+	if k.DiscoveryURL != "" {
+		token.Claims["discoveryURL"] = k.DiscoveryURL
+		token.Claims["discoveryID"] = k.Kite.Config.Id + strconv.Itoa(k.Kite.Config.Port)
+
+		// override if the user passed us a custom one
+		if k.DiscoveryID != "" {
+			token.Claims["discoveryID"] = k.DiscoveryID
+		}
 	}
 
 	k.Kite.Log.Info("Registered machine on user: %s", username)
@@ -320,13 +347,19 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *kontrolprotocol.Registe
 		// Set the kite key.
 		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 		if err := k.storage.Set(etcdKey, valueString); err != nil {
-			log.Error("etcd error: %s", err)
+			log.Error("etcd error(1): %s", err)
 			return err
 		}
 
 		// Also store the the kite.Key Id for easy lookup
 		if err := k.storage.Set(etcdIDKey, kite.String()); err != nil {
-			log.Error("etcd error: %s", err)
+			log.Error("etcd error(2): %s", err)
+			return err
+		}
+
+		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
+		if err := k.storage.Update(KitesPrefix+"/"+kite.Username, ""); err != nil {
+			log.Error("etcd error (3): %s", err)
 			return err
 		}
 

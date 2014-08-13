@@ -24,9 +24,13 @@ type Config struct {
 	IP   string
 	Port int
 
+	// Kontrol related options
 	KontrolURL  string
 	KontrolKey  string
 	KontrolUser string
+
+	DiscoveryURL string
+	DiscoveryID  string
 }
 
 // DefaultConfig contains the default settings.
@@ -85,6 +89,7 @@ func (c *Config) ReadKiteKey() error {
 		return err
 	}
 
+	// TODO: use mapstructure for decoding into struct - arslan
 	c.KiteKey = key.Raw
 
 	if username, ok := key.Claims["sub"].(string); ok {
@@ -106,6 +111,18 @@ func (c *Config) ReadKiteKey() error {
 
 	if kontrolKey, ok := key.Claims["kontrolKey"].(string); ok {
 		c.KontrolKey = kontrolKey
+	}
+
+	if kontrolUser, ok := key.Claims["kontrolUser"].(string); ok {
+		c.KontrolUser = kontrolUser
+	}
+
+	if discoveryURL, ok := key.Claims["discoveryURL"].(string); ok {
+		c.DiscoveryURL = discoveryURL
+	}
+
+	if discoveryID, ok := key.Claims["discoveryID"].(string); ok {
+		c.DiscoveryID = discoveryID
 	}
 
 	return nil

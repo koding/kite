@@ -58,6 +58,69 @@ type registerResult struct {
 	URL *url.URL
 }
 
+// isDiscovery returns true if the kite.key is contains discovery related
+// information.
+func (k *Kite) isDiscovery() bool {
+	return k.Config.DiscoveryURL != ""
+}
+
+// discoveryKontrolURL returns a single kontrol url received from the discovery
+// endpoint.
+func (k *Kite) discoveryKontrolURL() (string, error) {
+	client := k.NewClient(k.Config.DiscoveryURL)
+	client.Kite = protocol.Kite{Name: "discovery"} // for logging purposes
+	client.Auth = &Auth{
+		Type: "kiteKey",
+		Key:  k.Config.KiteKey,
+	}
+
+	if err := client.Dial(); err != nil {
+		return "", err
+	}
+
+	query := protocol.GetKitesArgs{
+		Query: protocol.KontrolQuery{ID: k.Config.DiscoveryID},
+	}
+
+	var result = new(protocol.GetKitesResult)
+	response, err := client.TellWithTimeout("getKites", 4*time.Second, query)
+	if err != nil {
+		return "", err
+	}
+
+	if err := response.Unmarshal(&result); err != nil {
+		return "", err
+	}
+
+	index := rand.Intn(len(result.Kites))
+	return result.Kites[index].URL, nil // pick up a random kontrol
+}
+
+// kontrolDialFunc returns a helper urlFunc to use in conjunction with
+// client.URLFunc()
+func (k *Kite) kontrolURLFunc() string {
+	if k.Config.DiscoveryURL == "" && k.Config.KontrolURL == "" {
+		return ""
+	}
+
+	// if there is any discovery url just use it. It means this kontrol wants
+	// to be discovered via a fixed endpoint, we should prefer this instead of
+	// using a direct kontrolURL
+	if k.Config.DiscoveryURL != "" {
+		k.Log.Info("Discovery enabled. Searching for a kontrol with ID %s at endpoint %s",
+			k.Config.DiscoveryID, k.Config.DiscoveryURL)
+
+		kontrolURL, err := k.discoveryKontrolURL()
+		if err == nil {
+			return kontrolURL
+		}
+
+		k.Log.Error("Discovery searching failed: %s", err)
+	}
+
+	return k.Config.KontrolURL
+}
+
 // SetupKontrolClient setups and prepares a the kontrol instance. It connects
 // to kontrol and reconnects again if there is any disconnections. This method
 // is called internally whenever a kontrol client specific action is taking.
@@ -67,16 +130,25 @@ func (k *Kite) SetupKontrolClient() error {
 		return nil // already prepared
 	}
 
-	if k.Config.KontrolURL == "" {
-		return errors.New("no kontrol URL given in config")
+	// check if there is any error in our config firsthand before we start the
+	// process of creating our kontrol client
+	initialURL := k.kontrolURLFunc()
+	if initialURL == "" {
+		return errors.New("no kontrolURL and discoveryURL given in config")
 	}
 
-	client := k.NewClient(k.Config.KontrolURL)
+	client := k.NewClient(initialURL)
 	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
 	client.Auth = &Auth{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
 	}
+
+	// now this is very handy here, because even if we disconnect and use
+	// discovery for retrieving the URL for kontrol to connect, it will always
+	// be dynamic. Because the Dial() and DialForever() in client is going to
+	// call our urlFunc which is going to return the correct URL.
+	client.URLFunc = k.kontrolURLFunc
 
 	k.kontrol.Lock()
 	k.kontrol.Client = client
@@ -156,11 +228,12 @@ func (k *Kite) eventCallbackHandler(onEvent EventHandler) dnode.Function {
 	})
 }
 
-func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
+func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (string, error) {
 	args := protocol.GetKitesArgs{
 		Query:         query,
 		WatchCallback: k.eventCallbackHandler(onEvent),
 	}
+
 	clients, watcherID, err := k.getKites(args)
 	if err != nil && err != ErrNoKitesAvailable {
 		return "", err // return only when something really happened
@@ -172,7 +245,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 			KiteEvent: protocol.KiteEvent{
 				Action: protocol.Register,
 				Kite:   client.Kite,
-				URL:    client.URL,
+				URL:    client.URL(),
 				Token:  client.Auth.Key,
 			},
 			localKite: k,
