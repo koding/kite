@@ -10,7 +10,7 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const defaultKontrolURL = "https://discovery.koding.io/kite"
+const defaultKontrolURL = "https://discovery.koding.com/kite"
 
 type Register struct {
 	KiteClient *kite.Kite
