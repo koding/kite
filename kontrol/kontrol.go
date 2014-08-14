@@ -165,8 +165,8 @@ func (k *Kontrol) ClearKites() error {
 	return nil
 }
 
-// RegisterSelf registers this host and writes a key to ~/.kite/kite.key
-func (k *Kontrol) RegisterSelf() error {
+// InitializeSelf registers his host by writing a key to ~/.kite/kite.key
+func (k *Kontrol) InitializeSelf() error {
 	key, err := k.registerUser(k.Kite.Config.Username)
 	if err != nil {
 		return err
@@ -327,6 +327,12 @@ func (k *Kontrol) makeSetter(kite *protocol.Kite, value *kontrolprotocol.Registe
 		// Also store the the kite.Key Id for easy lookup
 		if err := k.storage.Set(etcdIDKey, kite.String()); err != nil {
 			log.Error("etcd error: %s", err)
+			return err
+		}
+
+		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
+		if err := k.storage.Update(KitesPrefix+"/"+kite.Username, ""); err != nil {
+			log.Error("etcd error (3): %s", err)
 			return err
 		}
 

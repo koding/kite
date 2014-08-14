@@ -14,6 +14,7 @@ import (
 type Storage interface {
 	Get(key string) (*node.Node, error)
 	Set(key, value string) error
+	Update(key, value string) error
 	Delete(key string) error
 	Watch(key string, index uint64) (*Watcher, error)
 }

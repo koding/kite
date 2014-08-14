@@ -105,7 +105,7 @@ func initialKey(publicKey, privateKey []byte) {
 	conf.KontrolURL = *kontrolURL
 
 	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
-	err = k.RegisterSelf()
+	err = k.InitializeSelf()
 	if err != nil {
 		log.Fatal(err)
 	}
