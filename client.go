@@ -138,7 +138,7 @@ func (c *Client) SetUsername(username string) {
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (c *Client) Dial() (err error) {
-	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+	c.LocalKite.Log.Debug("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 
 	if err := c.dial(); err != nil {
 		return err
