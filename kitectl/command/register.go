@@ -2,7 +2,6 @@ package command
 
 import (
 	"flag"
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,10 +10,7 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const (
-	defaultKontrolURL = "https://discovery.koding.io/kite"
-	defaultUsername   = "koding"
-)
+const defaultKontrolURL = "https://discovery.koding.io/kite"
 
 type Register struct {
 	KiteClient *kite.Kite
@@ -60,14 +56,15 @@ func (c *Register) Run(args []string) int {
 
 	// Open up a prompt
 	if username == "" {
-		username, err = c.Ui.Ask(fmt.Sprintf("Username (%s):", defaultUsername))
+		username, err = c.Ui.Ask("Username:")
 		if err != nil {
 			c.Ui.Error(err.Error())
 			return 1
 		}
 		// User can just press enter to use the default on the prompt
 		if username == "" {
-			username = defaultUsername
+			c.Ui.Error("Username can not be empty.")
+			return 1
 		}
 	}
 
