@@ -2,12 +2,18 @@ package command
 
 import (
 	"flag"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
 	"github.com/mitchellh/cli"
+)
+
+const (
+	defaultKontrolURL = "https://discover.koding.io/kite"
+	defaultUsername   = "koding"
 )
 
 type Register struct {
@@ -32,40 +38,52 @@ func (c *Register) Help() string {
 	helpText := `
 Usage: kitectl register [options]
 
-  Registers this host to a kite authority.
+  Registers your host to a kite authority.
+  If no server is specified, "https://discovery.koding.io/kite" is the default.
 
 Options:
 
-  -to=http://127.0.0.1  Kontrol URL.
-  -username=koding
+  -to=https://discovery.koding.io/kite  Kontrol URL
+  -username=koding                      Username
 `
 	return strings.TrimSpace(helpText)
 }
 
 func (c *Register) Run(args []string) int {
+	var kontrolURL, username string
+	var err error
+
 	flags := flag.NewFlagSet("register", flag.ExitOnError)
-	to := flags.String("to", "", "target registration server")
-	username := flags.String("username", "", "pick a username")
+	flags.StringVar(&kontrolURL, "to", defaultKontrolURL, "Kontrol URL")
+	flags.StringVar(&username, "username", "", "Username")
 	flags.Parse(args)
 
-	if *to == "" || *username == "" {
-		c.Ui.Output(c.Help())
-		return 1
+	// Open up a prompt
+	if username == "" {
+		username, err = c.Ui.Ask(fmt.Sprintf("Username (%s):", defaultUsername))
+		if err != nil {
+			c.Ui.Error(err.Error())
+			return 1
+		}
+		// User can just press enter to use the default on the prompt
+		if username == "" {
+			username = defaultUsername
+		}
 	}
 
-	c.KiteClient.Config.Username = *username
+	c.KiteClient.Config.Username = username
 
 	if _, err := kitekey.Read(); err == nil {
 		c.Ui.Info("Already registered. Registering again...")
 	}
 
-	kontrol := c.KiteClient.NewClient(*to)
+	kontrol := c.KiteClient.NewClient(kontrolURL)
 	if err := kontrol.Dial(); err != nil {
 		c.Ui.Error(err.Error())
 		return 1
 	}
 
-	result, err := kontrol.TellWithTimeout("registerMachine", 5*time.Minute, *username)
+	result, err := kontrol.TellWithTimeout("registerMachine", 5*time.Minute, username)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
