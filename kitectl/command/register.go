@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultKontrolURL = "https://discover.koding.io/kite"
+	defaultKontrolURL = "https://discovery.koding.io/kite"
 	defaultUsername   = "koding"
 )
 
