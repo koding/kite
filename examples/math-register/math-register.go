@@ -20,7 +20,6 @@ func main() {
 	config := config.MustGet()
 	k.Config = config
 	k.Config.Port = 6667
-	k.Id = config.Id
 
 	// Register to kite with this url
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6667", Path: "/kite"}
