@@ -243,8 +243,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 		return err
 	}
 
-	kontrolQuery := r.Query()
-	queryKey, err := GetQueryKey(&kontrolQuery)
+	queryKey, err := GetQueryKey(r.Query())
 	if err != nil {
 		return err
 	}

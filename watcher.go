@@ -61,7 +61,7 @@ func (w *Watcher) rewatch() error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	id, err := w.localKite.watchKites(*w.query, w.handler)
+	id, err := w.localKite.watchKites(w.query, w.handler)
 	if err != nil {
 		return err
 	}

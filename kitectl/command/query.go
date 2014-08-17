@@ -64,7 +64,7 @@ func (c *Query) Run(args []string) int {
 	flags.StringVar(&query.ID, "id", "", "")
 	flags.Parse(args)
 
-	result, err := c.KiteClient.GetKites(query)
+	result, err := c.KiteClient.GetKites(&query)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1

@@ -15,12 +15,12 @@ var ErrNotFound = errors.New("not found")
 // Pool is helper for staying connected to every kite in a query.
 type Pool struct {
 	localKite  *kite.Kite
-	query      protocol.KontrolQuery
+	query      *protocol.KontrolQuery
 	kites      map[string]*kite.Client
 	sync.Mutex // protects Kites map
 }
 
-func New(k *kite.Kite, q protocol.KontrolQuery) *Pool {
+func New(k *kite.Kite, q *protocol.KontrolQuery) *Pool {
 	return &Pool{
 		localKite: k,
 		query:     q,

@@ -163,7 +163,7 @@ func TestMultiple(t *testing.T) {
 
 					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
-					query := protocol.KontrolQuery{
+					query := &protocol.KontrolQuery{
 						Username:    conf.Username,
 						Environment: conf.Environment,
 						Name:        "example" + strconv.Itoa(rand.Intn(kiteNumber)),
@@ -207,7 +207,7 @@ func TestGetKites(t *testing.T) {
 	}
 	defer m.Close()
 
-	query := protocol.KontrolQuery{
+	query := &protocol.KontrolQuery{
 		Username:    conf.Username,
 		Environment: conf.Environment,
 		Name:        testName,
@@ -298,7 +298,7 @@ func TestKontrol(t *testing.T) {
 	exp2Kite := kite.New("exp2", "0.0.1")
 	exp2Kite.Config = conf.Copy()
 
-	query := protocol.KontrolQuery{
+	query := &protocol.KontrolQuery{
 		Username:    exp2Kite.Kite().Username,
 		Environment: exp2Kite.Kite().Environment,
 		Name:        "mathworker",

@@ -124,7 +124,7 @@ func (k *Kite) SetupKontrolClient() error {
 
 // WatchKites watches for Kites that matches the query. The onEvent functions
 // is called for current kites and every nekite event.
-func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
+func (k *Kite) WatchKites(query *protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
 	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (k *Kite) WatchKites(query protocol.KontrolQuery, onEvent EventHandler) (*W
 		return nil, err
 	}
 
-	return k.newWatcher(watcherID, &query, onEvent), nil
+	return k.newWatcher(watcherID, query, onEvent), nil
 }
 
 func (k *Kite) eventCallbackHandler(onEvent EventHandler) dnode.Function {
@@ -156,7 +156,7 @@ func (k *Kite) eventCallbackHandler(onEvent EventHandler) dnode.Function {
 	})
 }
 
-func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
+func (k *Kite) watchKites(query *protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
 	args := protocol.GetKitesArgs{
 		Query:         query,
 		WatchCallback: k.eventCallbackHandler(onEvent),
@@ -188,7 +188,7 @@ func (k *Kite) watchKites(query protocol.KontrolQuery, onEvent EventHandler) (wa
 // contains Ready to connect Client instances. The caller must connect
 // with Client.Dial() before using each Kite. An error is returned when no
 // kites are available.
-func (k *Kite) GetKites(query protocol.KontrolQuery) ([]*Client, error) {
+func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
@@ -426,7 +426,7 @@ func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuer
 				Key:  k.Config.KiteKey,
 			}
 		} else {
-			kites, err := k.GetKites(*query)
+			kites, err := k.GetKites(query)
 			if err != nil {
 				k.Log.Error("Cannot get Proxy kites from Kontrol: %s", err.Error())
 				time.Sleep(proxyRetryDuration)
