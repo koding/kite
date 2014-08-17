@@ -73,7 +73,7 @@ func TestWebSocketProxy(t *testing.T) {
 
 	// now search for a proxy from kontrol
 	color.Green("BackendKite is searching proxy from kontrol")
-	kites, err := backendKite.GetKites(protocol.KontrolQuery{
+	kites, err := backendKite.GetKites(&protocol.KontrolQuery{
 		Username:    "testuser",
 		Environment: config.DefaultConfig.Environment,
 		Name:        Name,
@@ -118,7 +118,7 @@ func TestWebSocketProxy(t *testing.T) {
 	foreignKite.Config = conf.Copy()
 
 	color.Green("Querying backendKite now")
-	backendKites, err := foreignKite.GetKites(protocol.KontrolQuery{
+	backendKites, err := foreignKite.GetKites(&protocol.KontrolQuery{
 		Username:    "testuser",
 		Environment: config.DefaultConfig.Environment,
 		Name:        "backendKite",

@@ -53,9 +53,9 @@ func (k Kite) String() string {
 		"/" + k.ID
 }
 
-// Query() returns a KontrolQuery struct.
-func (k *Kite) Query() KontrolQuery {
-	return KontrolQuery{
+// Query() returns a pointer to KontrolQuery struct.
+func (k *Kite) Query() *KontrolQuery {
+	return &KontrolQuery{
 		Username:    k.Username,
 		Environment: k.Environment,
 		Name:        k.Name,
@@ -110,7 +110,7 @@ type RegisterResult struct {
 }
 
 type GetKitesArgs struct {
-	Query         KontrolQuery    `json:"query"`
+	Query         *KontrolQuery   `json:"query"`
 	WatchCallback dnode.Function  `json:"watchCallback"`
 	Who           json.RawMessage `json:"who"`
 }

@@ -49,7 +49,7 @@ func TestRegisterToKontrol(t *testing.T) {
 
 	select {
 	case <-k.KontrolReadyNotify():
-		kites, err := k.GetKites(protocol.KontrolQuery{
+		kites, err := k.GetKites(&protocol.KontrolQuery{
 			Username:    k.Kite().Username,
 			Environment: k.Kite().Environment,
 			Name:        k.Kite().Name,

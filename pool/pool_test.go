@@ -36,7 +36,7 @@ func TestPool(t *testing.T) {
 	foo := kite.New("foo", "1.0.0")
 	foo.Config = conf.Copy()
 
-	query := protocol.KontrolQuery{
+	query := &protocol.KontrolQuery{
 		Username:    conf.Username,
 		Environment: conf.Environment,
 		Name:        "bar",
