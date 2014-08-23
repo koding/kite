@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	etcdErr "github.com/coreos/etcd/error"
 	"github.com/koding/kite/protocol"
 )
 
@@ -49,12 +48,7 @@ func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
 
 	n, err := k.storage.Get(KitesPrefix + "/" + id)
 	if err != nil {
-		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
-			return "", nil
-		}
-
-		k.Kite.Log.Error("etcd error: %s", err)
-		return "", fmt.Errorf("internal error - getKites")
+		return "", err
 	}
 
 	return n.Node.Value, nil

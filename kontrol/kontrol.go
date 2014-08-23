@@ -413,13 +413,20 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCallback dnode.Function) (*protocol.GetKitesResult, error) {
-	var hasVersionConstraint bool // does query contains a constraint on version?
-	var keyRest string            // query key after the version field (not including version)
+	var hasVersionConstraint bool           // does query contains a constraint on version?
+	var keyRest string                      // query key after the version field (not including version)
+	var result = &protocol.GetKitesResult{} // to be returned
 
 	// We will make a get request to etcd store with this key. Check first if
 	etcdKey, err := k.getEtcdKey(&query)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "Key not found") {
+			result.Kites = make([]*protocol.KiteWithToken, 0) // do not send null
+			return result, nil
+		}
+
+		log.Error("etcd error: %s", err)
+		return nil, fmt.Errorf("internal error - getKites (1)")
 	}
 
 	// audience will go into the token as "aud" claim.
@@ -460,8 +467,6 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	if err != nil {
 		return nil, err
 	}
-
-	var result = new(protocol.GetKitesResult) // to be returned
 
 	// Create e watcher on query.
 	// The callback is going to be called when a Kite registered/unregistered
@@ -506,13 +511,13 @@ func (k *Kontrol) getKites(r *kite.Request, query protocol.KontrolQuery, watchCa
 	// Get kites from etcd
 	node, err := k.storage.Get(KitesPrefix + etcdKey)
 	if err != nil {
-		if err2, ok := err.(*etcdErr.Error); ok && err2.ErrorCode == etcdErr.EcodeKeyNotFound {
+		if strings.Contains(err.Error(), "Key not found") {
 			result.Kites = make([]*protocol.KiteWithToken, 0) // do not send null
 			return result, nil
 		}
 
 		log.Error("etcd error: %s", err)
-		return nil, fmt.Errorf("internal error - getKites")
+		return nil, fmt.Errorf("internal error - getKites (2)")
 	}
 
 	// means a query with all fields were made or a query with an ID was made,
