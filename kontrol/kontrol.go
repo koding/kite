@@ -243,17 +243,22 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 		return err
 	}
 
-	queryKey, err := GetQueryKey(r.Query())
-	if err != nil {
-		return err
-	}
+	// TODO: Somehow kontrol returns "There is a kite already registered" error
+	// even if there is one single kite trying to register. I think there is an
+	// incosistency problem and needs a better evaluation. For now I'm just
+	// disabling it and going to fix it later again. That means
+
+	// queryKey, err := GetQueryKey(r.Query())
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Register only if this kite is not already registered.
 	// err == nil means there is no error, so there is a key. there shouldn't be.
-	_, err = k.storage.Get(KitesPrefix + queryKey)
-	if err == nil {
-		return errors.New(fmt.Sprintf("There is a kite already registered with the same settings: %s", queryKey))
-	}
+	// _, err = k.storage.Get(KitesPrefix + queryKey)
+	// if err == nil {
+	// 	return errors.New(fmt.Sprintf("There is a kite already registered with the same settings: %s", queryKey))
+	// }
 
 	value := &kontrolprotocol.RegisterValue{
 		URL: kiteURL,
@@ -263,7 +268,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	setKey, etcdKey, etcdIDKey := k.makeSetter(&r.Kite, value)
 
 	// Register to etcd.
-	if err = setKey(); err != nil {
+	if err := setKey(); err != nil {
 		log.Error("etcd setKey error: %s", err)
 		return errors.New("internal error - register")
 	}
