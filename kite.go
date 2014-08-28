@@ -136,9 +136,10 @@ func New(name, version string) *Kite {
 
 	k.httpHandler = sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler)
 
-	k.OnConnect(func(c *Client) { k.Log.Info("New session: %s", c.session.ID()) })
-	k.OnFirstRequest(func(c *Client) { k.Log.Info("Session %q is identified as %q", c.session.ID(), c.Kite) })
-	k.OnDisconnect(func(c *Client) { k.Log.Info("Kite has disconnected: %q", c.Kite) })
+	// Add useful debug logs
+	k.OnConnect(func(c *Client) { k.Log.Debug("New session: %s", c.session.ID()) })
+	k.OnFirstRequest(func(c *Client) { k.Log.Debug("Session %q is identified as %q", c.session.ID(), c.Kite) })
+	k.OnDisconnect(func(c *Client) { k.Log.Debug("Kite has disconnected: %q", c.Kite) })
 
 	// Every kite should be able to authenticate the user from token.
 	// Tokens are granted by Kontrol Kite.
