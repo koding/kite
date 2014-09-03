@@ -150,11 +150,17 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	var resp interface{}
 	var err error
 
+	// first execute preHandlers. make a copy of the handler to avoid race
+	// conditions
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	preHandlers := make([]Handler, len(m.preHandlers))
+	for i, handler := range m.preHandlers {
+		preHandlers[i] = handler
 
-	// first execute preHandlers
-	for _, handler := range m.preHandlers {
+	}
+	m.mu.Unlock()
+
+	for _, handler := range preHandlers {
 		resp, err = handler.ServeKite(r)
 		if err != nil {
 			return nil, err
@@ -164,6 +170,8 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 			firstResp = resp
 		}
 	}
+
+	preHandlers = nil // garbage collect it
 
 	// now call our base handler
 	resp, err = m.handler.ServeKite(r)
@@ -179,7 +187,14 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	}
 
 	// and finally return our postHandlers
-	for _, handler := range m.postHandlers {
+	m.mu.Lock()
+	postHandlers := make([]Handler, len(m.postHandlers))
+	for i, handler := range m.postHandlers {
+		postHandlers[i] = handler
+	}
+	m.mu.Unlock()
+
+	for _, handler := range postHandlers {
 		resp, err = handler.ServeKite(r)
 		if err != nil {
 			return nil, err
@@ -189,6 +204,8 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 			firstResp = resp
 		}
 	}
+
+	postHandlers = nil // garbage collect it
 
 	switch m.handling {
 	case ReturnMethod:

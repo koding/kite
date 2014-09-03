@@ -89,6 +89,55 @@ func TestMultiple(t *testing.T) {
 	wg.Wait()
 }
 
+// Call a single method with multiple clients. This test is implemented to be
+// sure the method is calling back with in the same time and not timing out.
+func TestConcurrency(t *testing.T) {
+	// Create a mathworker kite
+	mathKite := New("mathworker", "0.0.1")
+	mathKite.Config.DisableAuthentication = true
+	mathKite.HandleFunc("ping", func(r *Request) (interface{}, error) {
+		time.Sleep(time.Second)
+		return "pong", nil
+	})
+	go http.ListenAndServe("127.0.0.1:3636", mathKite)
+
+	// Wait until it's started
+	time.Sleep(time.Second)
+
+	// number of exp kites that will call mathworker kite
+	clientNumber := 30
+
+	fmt.Printf("Creating %d exp clients\n", clientNumber)
+	clients := make([]*Client, clientNumber)
+	for i := 0; i < clientNumber; i++ {
+		c := New("exp", "0.0.1").NewClient("http://127.0.0.1:3636/kite")
+		if err := c.Dial(); err != nil {
+			t.Fatal(err)
+		}
+
+		clients[i] = c
+	}
+
+	var wg sync.WaitGroup
+
+	for i := range clients {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			result, err := clients[i].TellWithTimeout("ping", 4*time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if result.MustString() != "pong" {
+				t.Errorf("Got %s want: pong", result.MustString())
+			}
+		}(i)
+	}
+
+	wg.Wait()
+}
+
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
 	// Create a mathworker kite
