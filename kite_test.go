@@ -99,7 +99,7 @@ func TestConcurrency(t *testing.T) {
 		time.Sleep(time.Second)
 		return "pong", nil
 	})
-	go http.ListenAndServe("127.0.0.1:3636", mathKite)
+	go http.ListenAndServe("127.0.0.1:3637", mathKite)
 
 	// Wait until it's started
 	time.Sleep(time.Second)
@@ -110,7 +110,7 @@ func TestConcurrency(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := New("exp", "0.0.1").NewClient("http://127.0.0.1:3636/kite")
+		c := New("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
