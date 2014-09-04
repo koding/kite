@@ -81,8 +81,11 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	}
 
 	method.mu.Lock()
-	method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
-	method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+	if !method.initialized {
+		method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
+		method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+		method.initialized = true
+	}
 	method.mu.Unlock()
 
 	// Call the handler functions.

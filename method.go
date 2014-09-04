@@ -53,6 +53,10 @@ type Method struct {
 	// handling defines how to handle chaining of kite.Handler middlewares.
 	handling MethodHandling
 
+	// initialized is used to indicate whether all pre and post handlers are
+	// initialized.
+	initialized bool
+
 	mu sync.Mutex // protects handler slices
 }
 
@@ -66,8 +70,8 @@ func (k *Kite) addHandle(method string, handler Handler) *Method {
 	m := &Method{
 		name:         method,
 		handler:      handler,
-		preHandlers:  k.preHandlers,
-		postHandlers: k.postHandlers,
+		preHandlers:  make([]Handler, 0),
+		postHandlers: make([]Handler, 0),
 		authenticate: authenticate,
 		handling:     k.MethodHandling,
 	}
