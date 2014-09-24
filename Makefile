@@ -32,8 +32,7 @@ kontrol:
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
-	@`which go` get -d -v ./...
-	@`which go` get github.com/fatih/color
+	@`which go` get -d -v -t ./...
 
 	@echo "$(OK_COLOR)==> Installing test binaries $(NO_COLOR)"
 	@`which go` install -v ./kitectl
@@ -61,8 +60,7 @@ test:
 	@`which go` run ./testutil/writekey/main.go
 
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
-	@`which go` get -d -v ./...
-	@`which go` get github.com/fatih/color
+	@`which go` get -d -v -t ./...
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./dnode
