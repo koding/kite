@@ -1,9 +1,10 @@
 package kontrol
 
-type Redis struct {
-}
+import "github.com/koding/kite/protocol"
 
-func (r *Redis) Get(key string) (Kites, error) {
+type Redis struct{}
+
+func (r *Redis) Get(query *protocol.KontrolQuery) (Kites, error) {
 	return nil, nil
 }
 
