@@ -1,4 +1,4 @@
-package node
+package kontrol
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ type Node struct {
 }
 
 // New returns a new initialized node with the given etcd node.
-func New(node *etcd.Node) *Node {
+func NewNode(node *etcd.Node) *Node {
 	return &Node{
 		Node: node,
 	}
@@ -34,11 +34,11 @@ func (n *Node) Flatten() []*Node {
 	nodes := make([]*Node, 0)
 	for _, node := range n.Node.Nodes {
 		if node.Dir {
-			nodes = append(nodes, New(node).Flatten()...)
+			nodes = append(nodes, NewNode(node).Flatten()...)
 			continue
 		}
 
-		nodes = append(nodes, New(node))
+		nodes = append(nodes, NewNode(node))
 	}
 
 	return nodes

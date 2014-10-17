@@ -7,12 +7,11 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/koding/kite"
-	"github.com/koding/kite/kontrol/node"
 )
 
 // Storage is an interface to a kite storage.
 type Storage interface {
-	Get(key string) (*node.Node, error)
+	Get(key string) (*Node, error)
 	Set(key, value string) error
 	Update(key, value string) error
 	Delete(key string) error
@@ -83,11 +82,11 @@ func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
 	}, nil
 }
 
-func (e *Etcd) Get(key string) (*node.Node, error) {
+func (e *Etcd) Get(key string) (*Node, error) {
 	resp, err := e.client.Get(key, false, true)
 	if err != nil {
 		return nil, err
 	}
 
-	return node.New(resp.Node), nil
+	return NewNode(resp.Node), nil
 }

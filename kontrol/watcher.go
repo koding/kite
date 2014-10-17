@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/kontrol/node"
 	"github.com/koding/kite/protocol"
 )
 
@@ -109,7 +108,7 @@ func (k *Kontrol) watchAndSendKiteEvents(
 					continue
 				}
 
-				otherKite, err := node.New(etcdEvent.Node).Kite()
+				otherKite, err := NewNode(etcdEvent.Node).Kite()
 				if err != nil {
 					continue
 				}
@@ -130,7 +129,7 @@ func (k *Kontrol) watchAndSendKiteEvents(
 			// Delete happens when we detect that otherKite is disconnected.
 			// Expire happens when we don't get heartbeat from otherKite.
 			case "delete", "expire":
-				otherKite, err := node.New(etcdEvent.Node).KiteFromKey()
+				otherKite, err := NewNode(etcdEvent.Node).KiteFromKey()
 				if err != nil {
 					continue
 				}
