@@ -3,7 +3,7 @@ package kontrol
 type Redis struct {
 }
 
-func (r *Redis) Get(key string) (*Node, error) {
+func (r *Redis) Get(key string) (Kites, error) {
 	return nil, nil
 }
 

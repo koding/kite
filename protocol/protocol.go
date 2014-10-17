@@ -116,7 +116,7 @@ type GetKitesArgs struct {
 }
 
 type WhoResult struct {
-	Query KontrolQuery `json:"query"`
+	Query *KontrolQuery `json:"query"`
 }
 
 type GetKitesResult struct {

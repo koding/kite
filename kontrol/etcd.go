@@ -42,24 +42,6 @@ func validateKiteKey(k *protocol.Kite) error {
 	return nil
 }
 
-// etcdKeyFromId returns the value for a single full ID path
-func (k *Kontrol) etcdKeyFromId(id string) (string, error) {
-	n, err := k.storage.Get(KitesPrefix + "/" + id)
-	if err != nil {
-		return "", err
-	}
-
-	return n.Node.Value, nil
-}
-
-func (k *Kontrol) getEtcdKey(q *protocol.KontrolQuery) (string, error) {
-	if onlyIDQuery(q) {
-		return k.etcdKeyFromId(q.ID)
-	}
-
-	return GetQueryKey(q)
-}
-
 // onlyIDQuery returns true if the query contains only a non-empty ID and all
 // others keys are empty
 func onlyIDQuery(q *protocol.KontrolQuery) bool {
@@ -118,7 +100,7 @@ func GetQueryKey(q *protocol.KontrolQuery) (string, error) {
 	return path, nil
 }
 
-func getAudience(q protocol.KontrolQuery) string {
+func getAudience(q *protocol.KontrolQuery) string {
 	if q.Name != "" {
 		return "/" + q.Username + "/" + q.Environment + "/" + q.Name
 	} else if q.Environment != "" {
