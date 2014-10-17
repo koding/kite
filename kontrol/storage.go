@@ -19,22 +19,12 @@ type Storage interface {
 	Set(key, value string) error
 	Update(key, value string) error
 	Delete(key string) error
-	Watch(key string, index uint64) (*Watcher, error)
 }
 
 // Etcd implements the Storage interface
 type Etcd struct {
 	client *etcd.Client
 	log    kite.Logger
-}
-
-type Watcher struct {
-	recv chan *etcd.Response
-	stop chan bool
-}
-
-func (w *Watcher) Stop() {
-	w.stop <- true
 }
 
 func NewEtcd(machines []string) (*Etcd, error) {
@@ -66,38 +56,6 @@ func (e *Etcd) Set(key, value string) error {
 func (e *Etcd) Update(key, value string) error {
 	_, err := e.client.Update(key, value, uint64(HeartbeatDelay/time.Second))
 	return err
-}
-
-func (e *Etcd) Watch(key string, index uint64) (*Watcher, error) {
-	// TODO: make the buffer configurable
-	responses := make(chan *etcd.Response, 1000)
-	stopChan := make(chan bool, 1)
-
-	// Watch is blocking
-	go func() {
-		_, err := e.client.Watch(key, 0, true, responses, stopChan)
-		if err != nil {
-			e.log.Warning("Remote client closed the watcher explicitly. Etcd client error: %s", err)
-		}
-	}()
-
-	return &Watcher{
-		recv: responses,
-		stop: stopChan,
-	}, nil
-}
-
-func (e *Etcd) etcdKey(query *protocol.KontrolQuery) (string, error) {
-	if onlyIDQuery(query) {
-		resp, err := e.client.Get(KitesPrefix+"/"+query.ID, false, true)
-		if err != nil {
-			return "", err
-		}
-
-		return resp.Node.Value, nil
-	}
-
-	return GetQueryKey(query)
 }
 
 func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
@@ -177,4 +135,17 @@ func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
 	kites.Shuffle()
 
 	return kites, nil
+}
+
+func (e *Etcd) etcdKey(query *protocol.KontrolQuery) (string, error) {
+	if onlyIDQuery(query) {
+		resp, err := e.client.Get(KitesPrefix+"/"+query.ID, false, true)
+		if err != nil {
+			return "", err
+		}
+
+		return resp.Node.Value, nil
+	}
+
+	return GetQueryKey(query)
 }

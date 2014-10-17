@@ -18,7 +18,3 @@ func (r *Redis) Update(key, value string) error {
 func (r *Redis) Delete(key string) error {
 	return nil
 }
-
-func (r *Redis) Watch(key string, index uint64) (*Watcher, error) {
-	return nil, nil
-}

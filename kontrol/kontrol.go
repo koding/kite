@@ -53,10 +53,6 @@ type Kontrol struct {
 	publicKey  string // for validating tokens
 	privateKey string // for signing tokens
 
-	// To cancel running watchers, we must store the references
-	watchers      map[string]*Watcher
-	watchersMutex sync.Mutex
-
 	// Holds refence to all connected clients (key is ID of kite)
 	clients map[string]*kite.Client
 
@@ -95,7 +91,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		Kite:       k,
 		publicKey:  publicKey,
 		privateKey: privateKey,
-		watchers:   make(map[string]*Watcher),
 		clients:    make(map[string]*kite.Client),
 	}
 
@@ -105,7 +100,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
-	k.HandleFunc("cancelWatcher", kontrol.handleCancelWatcher)
 
 	var mu sync.Mutex
 	k.OnFirstRequest(func(c *kite.Client) {
