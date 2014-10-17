@@ -71,7 +71,6 @@ test:
 	@`which go` test -race $(VERBOSE) ./kontrol
 	@`which go` test -race $(VERBOSE) ./tunnelproxy
 	@`which go` test -race $(VERBOSE) ./reverseproxy
-	@`which go` test -race $(VERBOSE) ./pool
 
 doc:
 	@`which godoc` github.com/koding/kite | less
