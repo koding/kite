@@ -2,6 +2,7 @@ package kontrol
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -42,6 +43,10 @@ func NewEtcd(machines []string) (*Etcd, error) {
 	ok := client.SetCluster(machines)
 	if !ok {
 		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
+	}
+
+	client.CheckRetry = func(c *etcd.Cluster, n int, resp http.Response, err error) error {
+		return err
 	}
 
 	return &Etcd{
