@@ -123,20 +123,25 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 
 func (k *Kontrol) Run() {
 	rand.Seed(time.Now().UnixNano())
+	//
+	// // assume we are going to work locally instead of panicing
+	// if k.Machines == nil || len(k.Machines) == 0 {
+	// 	k.Machines = []string{"127.0.0.1:4001"}
+	// }
+	//
+	// k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
+	// etcdClient, err := NewEtcd(k.Machines)
+	// if err != nil {
+	// 	panic("could not connect to etcd: " + err.Error())
+	// }
+	// etcdClient.log = k.Kite.Log
 
-	// assume we are going to work locally instead of panicing
-	if k.Machines == nil || len(k.Machines) == 0 {
-		k.Machines = []string{"127.0.0.1:4001"}
+	conf := &PostgresConfig{
+		Username: "fatih",
+		DBName:   "mydb",
 	}
 
-	k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
-	etcdClient, err := NewEtcd(k.Machines)
-	if err != nil {
-		panic("could not connect to etcd: " + err.Error())
-	}
-	etcdClient.log = k.Kite.Log
-
-	k.storage = etcdClient
+	k.storage = NewPostgres(conf, log)
 
 	// now go and register ourself
 	go k.registerSelf()
