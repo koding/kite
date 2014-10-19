@@ -11,7 +11,7 @@ endif
 
 # Default to etcd
 ifndef KONTROL_STORAGE
-	KONTROL_STORAGE="etcd"
+	KONTROL_STORAGE=etcd
 endif
 
 
@@ -80,9 +80,9 @@ test: guard-KONTROL_STORAGE
 	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
-	@echo "$(OK_COLOR)==> Using kontrol storage: $(KONTROL_STORAGE)$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Using kontrol storage: '$(KONTROL_STORAGE)'$(NO_COLOR)"
 
-ifeq ($(KONTROL_STORAGE), "etcd")
+ifeq ($(KONTROL_STORAGE), etcd)
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
 
@@ -90,7 +90,9 @@ ifeq ($(KONTROL_STORAGE), "etcd")
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/kontrol_test ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd &
-else
+endif
+
+ifeq ($(KONTROL_STORAGE), postgres)
 	@#Be sure these are set
 	@make guard-KONTROL_POSTGRES_USERNAME
 	@make guard-KONTROL_POSTGRES_DBNAME
