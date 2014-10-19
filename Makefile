@@ -54,7 +54,7 @@ test:
 	@echo "Installing etcd"
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/kontrol_test ||: #remove previous folder
-	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+	@cd _etcd; ./build; ./bin/etcd &
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
