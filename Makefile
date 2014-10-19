@@ -131,4 +131,4 @@ guard-%:
                 exit 1; \
         fi
 
-.PHONY: all install format test doc vet lint ctags kontrol
+.PHONY: all install format test doc vet lint ctags kontrol kontroltest

@@ -65,7 +65,7 @@ func TestRegisterToKontrol(t *testing.T) {
 		}
 
 		first := kites[0]
-		if first.Kite != *k.Kite() {
+		if first.Username != k.Kite().Username {
 			t.Errorf("unexpected kite. got: %s, want: %s", first.Kite, *k.Kite())
 		}
 		if first.URL != "http://zubuzaretta:16500/kite" {
