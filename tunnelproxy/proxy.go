@@ -221,7 +221,7 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 func (p *Proxy) handleTunnel(session sockjs.Session, req *http.Request) {
 	tokenString := req.URL.Query().Get("token")
 
-	getPublicKey := func(token *jwt.Token) ([]byte, error) {
+	getPublicKey := func(token *jwt.Token) (interface{}, error) {
 		return []byte(p.pubKey), nil
 	}
 
