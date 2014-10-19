@@ -4,3 +4,11 @@ install:
   - go get -d -v -t ./...
 script:
   - make test
+addons:
+  postgresql: "9.3"
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+env: 
+  - KONTROL_STORAGE=postgres
+  - KONTROL_POSTGRES_USERNAME=postgres
+  - KONTROL_POSTGRES_DBNAME=travis_ci_test
