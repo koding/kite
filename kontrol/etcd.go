@@ -57,7 +57,7 @@ func (e *Etcd) Delete(k *protocol.Kite) error {
 	return err
 }
 
-func (e *Etcd) Set(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
 
@@ -66,13 +66,36 @@ func (e *Etcd) Set(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 
 	// Set the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err := e.client.Set(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err := e.client.Create(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
 	if err != nil {
 		return err
 	}
 
 	// Also store the the kite.Key Id for easy lookup
-	_, err = e.client.Set(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err = e.client.Create(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	etcdKey := KitesPrefix + k.String()
+	etcdIDKey := KitesPrefix + "/" + k.ID
+
+	valueBytes, _ := json.Marshal(value)
+	valueString := string(valueBytes)
+
+	// update the kite key.
+	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
+	_, err := e.client.Update(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	if err != nil {
+		return err
+	}
+
+	// Also update the the kite.Key Id for easy lookup
+	_, err = e.client.Update(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
 	if err != nil {
 		return err
 	}

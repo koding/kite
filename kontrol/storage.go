@@ -10,8 +10,11 @@ type Storage interface {
 	// Get retrieves the Kites with the given query
 	Get(query *protocol.KontrolQuery) (Kites, error)
 
-	// Set stores the given kite with the given value
-	Set(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
+	// Add inserts the given kite with the given value
+	Add(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
+
+	// Update updates the value for the given kite
+	Update(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 
 	// Delete deletes the given kite from the storage
 	Delete(kite *protocol.Kite) error

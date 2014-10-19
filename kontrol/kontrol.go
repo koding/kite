@@ -222,16 +222,19 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 		URL: kiteURL,
 	}
 
-	// setKey sets the value of the Kite in etcd.
-	setKey := k.makeSetter(&r.Kite, value)
-
-	// Register to etcd.
-	if err := setKey(); err != nil {
+	// Register first by adding the value to the storage. Return if there is
+	// any error.
+	if err := k.storage.Add(&r.Kite, value); err != nil {
 		log.Error("etcd setKey error: %s", err)
 		return errors.New("internal error - register")
 	}
 
-	if err := requestHeartbeat(r, setKey); err != nil {
+	// updater updates the value of the Kite in etcd. We are going to update
+	// the value periodically so if we don't get any update we are going to
+	// assume that the klient is disconnected.
+	updater := k.makeUpdater(&r.Kite, value)
+
+	if err := requestHeartbeat(r, updater); err != nil {
 		return err
 	}
 
@@ -247,10 +250,13 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	return nil
 }
 
-func requestHeartbeat(r *kite.Client, setterFunc func() error) error {
+// requestHeartbeat is calling the remote kite's kite.heartbeat method with the
+// given updaterFunc callback. The remote kite is calling this updaterFunc
+// every 4 seconds
+func requestHeartbeat(r *kite.Client, updaterFunc func() error) error {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
-		dnode.Callback(func(args *dnode.Partial) { setterFunc() }),
+		dnode.Callback(func(args *dnode.Partial) { updaterFunc() }),
 	}
 
 	_, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
@@ -268,9 +274,15 @@ func (k *Kontrol) registerSelf() {
 		value.URL = k.RegisterURL
 	}
 
-	setter := k.makeSetter(k.Kite.Kite(), value)
+	// Register first by adding the value to the storage. We don't return any
+	// error because we need to know why kontrol doesn't register itself
+	if err := k.storage.Add(k.Kite.Kite(), value); err != nil {
+		log.Error(err.Error())
+	}
+
+	updater := k.makeUpdater(k.Kite.Kite(), value)
 	for {
-		if err := setter(); err != nil {
+		if err := updater(); err != nil {
 			log.Error(err.Error())
 			time.Sleep(time.Second)
 			continue
@@ -280,11 +292,11 @@ func (k *Kontrol) registerSelf() {
 	}
 }
 
-//  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
+//  makeUpdater returns a func for updating the value for the given kite key with value.
+func (k *Kontrol) makeUpdater(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
 
 	return func() error {
-		if err := k.storage.Set(kiteProt, value); err != nil {
+		if err := k.storage.Update(kiteProt, value); err != nil {
 			log.Error("etcd error: %s", err)
 			return err
 		}
