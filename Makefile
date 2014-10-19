@@ -81,6 +81,7 @@ test: guard-KONTROL_STORAGE
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
 	@echo "$(OK_COLOR)==> Using kontrol storage: $(KONTROL_STORAGE)$(NO_COLOR)"
+
 ifeq ($(KONTROL_STORAGE), "etcd")
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
@@ -91,7 +92,7 @@ ifeq ($(KONTROL_STORAGE), "etcd")
 	@cd _etcd; ./build; ./bin/etcd &
 else
 	@#Be sure these are set
-	@make guard-KONTROL_POSTGRES_USER
+	@make guard-KONTROL_POSTGRES_USERNAME
 	@make guard-KONTROL_POSTGRES_DBNAME
 endif
 
