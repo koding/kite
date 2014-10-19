@@ -3,7 +3,6 @@
 package kontrol
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -11,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	etcdErr "github.com/coreos/etcd/error"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
@@ -124,24 +122,24 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 func (k *Kontrol) Run() {
 	rand.Seed(time.Now().UnixNano())
 	//
-	// // assume we are going to work locally instead of panicing
-	// if k.Machines == nil || len(k.Machines) == 0 {
-	// 	k.Machines = []string{"127.0.0.1:4001"}
-	// }
-	//
-	// k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
-	// etcdClient, err := NewEtcd(k.Machines)
-	// if err != nil {
-	// 	panic("could not connect to etcd: " + err.Error())
-	// }
-	// etcdClient.log = k.Kite.Log
-
-	conf := &PostgresConfig{
-		Username: "fatih",
-		DBName:   "mydb",
+	// assume we are going to work locally instead of panicing
+	if k.Machines == nil || len(k.Machines) == 0 {
+		k.Machines = []string{"127.0.0.1:4001"}
 	}
 
-	k.storage = NewPostgres(conf, log)
+	k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
+	etcdClient, err := NewEtcd(k.Machines)
+	if err != nil {
+		panic("could not connect to etcd: " + err.Error())
+	}
+	etcdClient.log = k.Kite.Log
+
+	// conf := &PostgresConfig{
+	// 	DBName: "mydb",
+	// }
+	//
+	// k.storage = NewPostgres(conf, log)
+	k.storage = etcdClient
 
 	// now go and register ourself
 	go k.registerSelf()
@@ -152,16 +150,6 @@ func (k *Kontrol) Run() {
 // Close stops kontrol and closes all connections
 func (k *Kontrol) Close() {
 	k.Kite.Close()
-}
-
-// ClearKites removes everything under "/kites" from etcd.
-func (k *Kontrol) ClearKites() error {
-	err := k.storage.Delete(KitesPrefix)
-	if err != nil && err.(*etcdErr.Error).ErrorCode != etcdErr.EcodeKeyNotFound {
-		return fmt.Errorf("Cannot clear etcd: %s", err)
-	}
-
-	return nil
 }
 
 // InitializeSelf registers his host by writing a key to ~/.kite/kite.key
@@ -242,29 +230,12 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 		return err
 	}
 
-	// TODO: Somehow kontrol returns "There is a kite already registered" error
-	// even if there is one single kite trying to register. I think there is an
-	// incosistency problem and needs a better evaluation. For now I'm just
-	// disabling it and going to fix it later again. That means
-
-	// queryKey, err := GetQueryKey(r.Query())
-	// if err != nil {
-	// 	return err
-	// }
-
-	// Register only if this kite is not already registered.
-	// err == nil means there is no error, so there is a key. there shouldn't be.
-	// _, err = k.storage.Get(KitesPrefix + queryKey)
-	// if err == nil {
-	// 	return errors.New(fmt.Sprintf("There is a kite already registered with the same settings: %s", queryKey))
-	// }
-
 	value := &kontrolprotocol.RegisterValue{
 		URL: kiteURL,
 	}
 
 	// setKey sets the value of the Kite in etcd.
-	setKey, etcdKey, etcdIDKey := k.makeSetter(&r.Kite, value)
+	setKey := k.makeSetter(&r.Kite, value)
 
 	// Register to etcd.
 	if err := setKey(); err != nil {
@@ -281,9 +252,8 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	r.OnDisconnect(func() {
 		// Delete from etcd, WatchEtcd() will get the event
 		// and will notify watchers of this Kite for deregistration.
-		k.storage.Delete(etcdKey)
 		// And the Id
-		k.storage.Delete(etcdIDKey)
+		k.storage.Delete(&r.Kite)
 	})
 
 	return nil
@@ -310,7 +280,7 @@ func (k *Kontrol) registerSelf() {
 		value.URL = k.RegisterURL
 	}
 
-	setter, _, _ := k.makeSetter(k.Kite.Kite(), value)
+	setter := k.makeSetter(k.Kite.Kite(), value)
 	for {
 		if err := setter(); err != nil {
 			log.Error(err.Error())
@@ -323,37 +293,16 @@ func (k *Kontrol) registerSelf() {
 }
 
 //  makeSetter returns a func for setting the kite key with value in etcd.
-func (k *Kontrol) makeSetter(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) (setter func() error, etcdKey, etcdIDKey string) {
-	etcdKey = KitesPrefix + kite.String()
-	etcdIDKey = KitesPrefix + "/" + kite.ID
+func (k *Kontrol) makeSetter(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
 
-	valueBytes, _ := json.Marshal(value)
-	valueString := string(valueBytes)
-
-	setter = func() error {
-		// Set the kite key.
-		// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-		if err := k.storage.Set(etcdKey, valueString); err != nil {
+	return func() error {
+		if err := k.storage.Set(kiteProt, value); err != nil {
 			log.Error("etcd error: %s", err)
-			return err
-		}
-
-		// Also store the the kite.Key Id for easy lookup
-		if err := k.storage.Set(etcdIDKey, kite.String()); err != nil {
-			log.Error("etcd error: %s", err)
-			return err
-		}
-
-		// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-		if err := k.storage.Update(KitesPrefix+"/"+kite.Username, ""); err != nil {
-			log.Error("etcd error (3): %s", err)
 			return err
 		}
 
 		return nil
 	}
-
-	return
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {

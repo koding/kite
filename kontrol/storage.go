@@ -1,6 +1,7 @@
 package kontrol
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
+
+	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
 
@@ -15,10 +18,14 @@ var ErrKiteNotFound = errors.New("no kite is available")
 
 // Storage is an interface to a kite storage.
 type Storage interface {
+	// Get retrieves the Kites with the given query
 	Get(query *protocol.KontrolQuery) (Kites, error)
-	Set(key, value string) error
-	Update(key, value string) error
-	Delete(key string) error
+
+	// Set stores the given kite with the given value
+	Set(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
+
+	// Delete deletes the given kite from the storage
+	Delete(kite *protocol.Kite) error
 }
 
 // Etcd implements the Storage interface
@@ -43,19 +50,43 @@ func NewEtcd(machines []string) (*Etcd, error) {
 	}, nil
 }
 
-func (e *Etcd) Delete(key string) error {
-	_, err := e.client.Delete(key, true)
+func (e *Etcd) Delete(k *protocol.Kite) error {
+	etcdKey := KitesPrefix + k.String()
+	etcdIDKey := KitesPrefix + "/" + k.ID
+
+	_, err := e.client.Delete(etcdKey, true)
+	_, err = e.client.Delete(etcdIDKey, true)
 	return err
 }
 
-func (e *Etcd) Set(key, value string) error {
-	_, err := e.client.Set(key, value, uint64(HeartbeatDelay/time.Second))
-	return err
-}
+func (e *Etcd) Set(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	etcdKey := KitesPrefix + k.String()
+	etcdIDKey := KitesPrefix + "/" + k.ID
 
-func (e *Etcd) Update(key, value string) error {
-	_, err := e.client.Update(key, value, uint64(HeartbeatDelay/time.Second))
-	return err
+	valueBytes, _ := json.Marshal(value)
+	valueString := string(valueBytes)
+
+	// Set the kite key.
+	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
+	_, err := e.client.Set(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	if err != nil {
+		return err
+	}
+
+	// Also store the the kite.Key Id for easy lookup
+	_, err = e.client.Set(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	if err != nil {
+		return err
+	}
+
+	// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
+	_, err = e.client.Update(KitesPrefix+"/"+k.Username,
+		"", uint64(HeartbeatDelay/time.Second))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {

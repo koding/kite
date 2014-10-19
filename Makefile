@@ -40,6 +40,28 @@ install:
 	@`which go` install -v ./reverseproxy/reverseproxy
 	@`which go` install -v ./tunnelproxy/tunnelproxy
 
+kontroltest:
+	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
+	@echo "Cleaning $(KITE_HOME) directory"
+	@rm -rf $(KITE_HOME)
+
+	@echo "Killing previous etcd instance"
+	@killall etcd ||:
+
+	@echo "Installing etcd"
+	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	@rm -rf _etcd/kontrol_test ||: #remove previous folder
+	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+
+	@echo "Creating test key"
+	@`which go` run ./testutil/writekey/main.go
+
+	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
+	@`which go` get -d -v -t ./...
+
+	@echo "$(OK_COLOR)==> Starting kontrol test $(NO_COLOR)"
+	@`which go` test -race $(VERBOSE) ./kontrol
+
 test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"

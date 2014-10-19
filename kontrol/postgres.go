@@ -8,6 +8,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/koding/kite"
+	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/logging"
 )
@@ -27,10 +28,32 @@ type Postgres struct {
 }
 
 func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
+	if conf.Port == 0 {
+		conf.Port = 5432
+	}
+
+	if conf.Host == "" {
+		conf.Host = "localhost"
+	}
+
+	if conf.DBName == "" {
+		conf.DBName = "test"
+	}
+
 	connString := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		conf.Host, conf.Port, conf.Username, conf.Password, conf.DBName,
+		"host=%s port=%d dbname=%s sslmode=disable",
+		conf.Host, conf.Port, conf.DBName,
 	)
+
+	if conf.Password != "" {
+		connString += " password=" + conf.Password
+	}
+
+	if conf.Username != "" {
+		connString += " user=" + conf.Username
+	}
+
+	fmt.Printf("connString %+v\n", connString)
 
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
@@ -78,14 +101,10 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	return nil, errors.New("GET is not implemented")
 }
 
-func (p *Postgres) Set(key, value string) error {
+func (p *Postgres) Set(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	return errors.New("SET is not implemented")
 }
 
-func (p *Postgres) Update(key, value string) error {
-	return nil
-}
-
-func (p *Postgres) Delete(key string) error {
+func (p *Postgres) Delete(kite *protocol.Kite) error {
 	return errors.New("DELETE is not implemented")
 }
