@@ -126,13 +126,37 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 		return nil, errors.New("username is not specified in query")
 	}
 
+	path := ltreePath(query)
+
+	var hasVersionConstraint bool // does query contains a constraint on version?
+	var keyRest string            // query key after the version field
+	var versionConstraint version.Constraints
 	// NewVersion returns an error if it's a constraint, like: ">= 1.0, < 1.4"
 	_, err := version.NewVersion(query.Version)
 	if err != nil && query.Version != "" {
-		return nil, errors.New("version constraint is not implemented")
-	}
+		// now parse our constraint
+		versionConstraint, err = version.NewConstraint(query.Version)
+		if err != nil {
+			// version is a malformed, just return the error
+			return nil, err
+		}
 
-	path := ltreePath(query)
+		hasVersionConstraint = true
+		nameQuery := &protocol.KontrolQuery{
+			Username:    query.Username,
+			Environment: query.Environment,
+			Name:        query.Name,
+		}
+
+		// We will make a get request to all nodes under this name
+		// and filter the result later.
+		path = ltreePath(nameQuery)
+
+		// Rest of the key after version field
+		keyRest = "/" + strings.TrimRight(
+			query.Region+"/"+query.Hostname+"/"+query.ID, "/")
+
+	}
 
 	rows, err := p.DB.Query(`SELECT kite, url FROM kites WHERE kite <@ $1`, path)
 	if err != nil {
@@ -164,6 +188,17 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	// if it's just single result there is no need to shuffle or filter
+	// according to the version constraint
+	if len(kites) == 1 {
+		return kites, nil
+	}
+
+	// Filter kites by version constraint
+	if hasVersionConstraint {
+		kites.Filter(versionConstraint, keyRest)
 	}
 
 	// randomize the result
@@ -205,6 +240,10 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 
 func (p *Postgres) Delete(kite *protocol.Kite) error {
 	return errors.New("DELETE is not implemented")
+}
+
+func (p *Postgres) Clear() error {
+	return errors.New("CLEAR is not implemented")
 }
 
 // ltreeLabel satisfies a invalid ltree definition of a label in path.

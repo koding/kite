@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
@@ -394,22 +393,6 @@ func (k *Kontrol) getKites(r *kite.Request, query *protocol.KontrolQuery, watchC
 	return &protocol.GetKitesResult{
 		Kites: kites,
 	}, nil
-}
-
-func isValid(k *protocol.Kite, c version.Constraints, keyRest string) bool {
-	// Check the version constraint.
-	v, _ := version.NewVersion(k.Version)
-	if !c.Check(v) {
-		return false
-	}
-
-	// Check the fields after version field.
-	kiteKeyAfterVersion := "/" + strings.TrimRight(k.Region+"/"+k.Hostname+"/"+k.ID, "/")
-	if !strings.HasPrefix(kiteKeyAfterVersion, keyRest) {
-		return false
-	}
-
-	return true
 }
 
 // generateToken returns a JWT token string. Please see the URL for details:

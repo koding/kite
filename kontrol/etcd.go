@@ -57,6 +57,11 @@ func (e *Etcd) Delete(k *protocol.Kite) error {
 	return err
 }
 
+func (e *Etcd) Clear() error {
+	_, err := e.client.Delete(KitesPrefix, true)
+	return err
+}
+
 func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID

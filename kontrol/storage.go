@@ -5,7 +5,8 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-// Storage is an interface to a kite storage.
+// Storage is an interface to a kite storage. A storage should be safe to
+// concurrent access.
 type Storage interface {
 	// Get retrieves the Kites with the given query
 	Get(query *protocol.KontrolQuery) (Kites, error)
@@ -18,4 +19,7 @@ type Storage interface {
 
 	// Delete deletes the given kite from the storage
 	Delete(kite *protocol.Kite) error
+
+	// Clear clears the storage. This removes all the data in storage.
+	Clear() error
 }
