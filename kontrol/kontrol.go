@@ -60,9 +60,6 @@ type Kontrol struct {
 	// RegisterURL defines the URL that is used to self register when adding
 	// itself to the storage backend
 	RegisterURL string
-
-	// a list of etcd machintes to connect
-	Machines []string
 }
 
 // New creates a new kontrol instance with the given verson and config

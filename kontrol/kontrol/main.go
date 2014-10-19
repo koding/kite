@@ -78,13 +78,16 @@ func main() {
 		k.Kite.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
 
+	var etcdMachines []string
 	if *machines != "" {
-		k.Machines = strings.Split(*machines, ",")
+		etcdMachines = strings.Split(*machines, ",")
 	}
 
 	if *registerURL != "" {
 		k.RegisterURL = *registerURL
 	}
+
+	k.SetStorage(kontrol.NewEtcd(etcdMachines, k.Kite.Log))
 
 	k.Run()
 }
