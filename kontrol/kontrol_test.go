@@ -200,7 +200,7 @@ func TestMultiple(t *testing.T) {
 func TestGetKites(t *testing.T) {
 	t.Log("Setting up mathworker4")
 
-	testName := "mathwork4"
+	testName := "mathworker4"
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
 	m.Config = conf.Copy()
@@ -217,7 +217,7 @@ func TestGetKites(t *testing.T) {
 		Username:    conf.Username,
 		Environment: conf.Environment,
 		Name:        testName,
-		Version:     "~> 1.1",
+		Version:     "1.1.1",
 	}
 
 	// exp2 queries for mathkite
@@ -234,15 +234,15 @@ func TestGetKites(t *testing.T) {
 	}
 
 	if len(kites) != 1 {
-		t.Fatal("Only one kite is registerd, we have %d", len(kites))
+		t.Fatalf("Only one kite is registerd, we have %d", len(kites))
 	}
 
 	if kites[0].Name != testName {
-		t.Error("getkites got %s exptected %", kites[0].Name, testName)
+		t.Errorf("getkites got %s exptected %", kites[0].Name, testName)
 	}
 
 	if kites[0].Version != testVersion {
-		t.Error("getkites got %s exptected %", kites[0].Version, testVersion)
+		t.Errorf("getkites got %s exptected %", kites[0].Version, testVersion)
 	}
 }
 

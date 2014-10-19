@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	_ "github.com/lib/pq"
 
 	"github.com/koding/kite"
@@ -104,6 +105,12 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	// which is not good for us
 	if query.Username == "" {
 		return nil, errors.New("username is not specified in query")
+	}
+
+	// NewVersion returns an error if it's a constraint, like: ">= 1.0, < 1.4"
+	_, err := version.NewVersion(query.Version)
+	if err != nil && query.Version != "" {
+		return nil, errors.New("version constraint is not implemented")
 	}
 
 	path := ltreePath(query)
