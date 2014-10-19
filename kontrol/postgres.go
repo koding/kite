@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -56,7 +57,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		connString += " user=" + conf.Username
 	}
 
-	fmt.Printf("connString %+v\n", connString)
+	log.Info("connString %+v\n", connString)
 
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
@@ -129,8 +130,13 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 	path := ltreePath(query)
 
-	// TODO: see how a prepared statements perfoms out
-	rows, err := p.DB.Query(`SELECT kite, url FROM kites WHERE kite <@ $1`, path)
+	stmt, err := p.DB.Prepare(`SELECT kite, url FROM kites WHERE kite <@ $1`)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(path)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +177,13 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 }
 
 func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
-	_, err := p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
+	// check that the incoming url is valid to prevent malformed input
+	_, err := url.Parse(value.URL)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
 		ltreePath(kiteProt.Query()),
 		value.URL,
 		kiteProt.ID,
@@ -180,9 +192,15 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 }
 
 func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	// check that the incoming url is valid to prevent malformed input
+	_, err := url.Parse(value.URL)
+	if err != nil {
+		return err
+	}
+
 	// TODO: also consider just usting WHERE id = kiteProt.ID, see how it's
 	// perfoms out
-	_, err := p.DB.Exec(`UPDATE kites SET url = $1, updated_at = (now() at time zone 'utc') 
+	_, err = p.DB.Exec(`UPDATE kites SET url = $1, updated_at = (now() at time zone 'utc') 
 	WHERE kite ~ $2`,
 		value.URL, ltreePath(kiteProt.Query()))
 
