@@ -48,7 +48,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	if conf.DBName == "" {
 		conf.DBName = os.Getenv("KONTROL_POSTGRES_DBNAME")
 		if conf.DBName == "" {
-			panic("db name is not set for postgre storage")
+			panic("db name is not set for postgres kontrol storage")
 		}
 	}
 
@@ -62,9 +62,9 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	}
 
 	if conf.Username == "" {
-		conf.Username = os.Getenv("KONTROL_POSTGRES_USER")
+		conf.Username = os.Getenv("KONTROL_POSTGRES_USERNAME")
 		if conf.Username == "" {
-			panic("username is not set for postgre storage")
+			panic("username is not set for postgres kontrol storage")
 		}
 	}
 

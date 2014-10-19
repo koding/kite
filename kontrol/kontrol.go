@@ -119,7 +119,7 @@ func (k *Kontrol) Run() {
 	rand.Seed(time.Now().UnixNano())
 
 	if k.storage == nil {
-		panic("storage is not set")
+		panic("kontrol storage is not set")
 	}
 
 	// now go and register ourself
