@@ -33,7 +33,11 @@ func init() {
 
 	DefaultPort = 5555
 	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
-	kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
+	// kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
+	kon.SetStorage(NewPostgres(&PostgresConfig{
+		Username: "fatih",
+		DBName:   "mydb",
+	}, kon.Kite.Log))
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()

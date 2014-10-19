@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	_ "github.com/lib/pq"
 
@@ -76,7 +78,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	// * created_at and updated_at are updated at creation and updating (like
 	//  if the URL has changed)
 	// Some notes:
-	// *  path label can only contain a sequence of alphanumeric characters
+	// * path label can only contain a sequence of alphanumeric characters
 	//   and underscores. So for example a version string of "1.0.4" needs to
 	//   be converted to "1_0_4" or uuid of 1111-2222-3333-4444 needs to be
 	//   converted to 1111_2222_3333_4444.
@@ -99,6 +101,51 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 
 func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	return nil, errors.New("GET is not implemented")
+}
+
+// ltreeLabel satisfies a valid ltree definition of a label in path. According
+// to the definition it is: "A label is a sequence of alphanumeric characters
+// and underscores (for example, in C locale the characters A-Za-z0-9_ are
+// allowed). Labels must be less than 256 bytes long."
+// We could express one character with "[A-Za-z0-9_]", a word with
+// "[A-Za-z0-9_]+". However we want to catch words that are not valid labels so
+// we negate them with the "^" character, so it will be : "[^[A-Za-z0-9_]]+".
+// Finally we cann use the POSIX character class: [:word:] which is:
+// "Alphanumeric characters plus "_"", so the final regexp will be
+// "[^[:word]]+"
+var invalidLabelRe = regexp.MustCompile("[^[:word:]]+")
+
+// ltreePath returns a query path to be used with the ltree module in postgress
+// in the form of "username.environment.kitename.version.region.hostname.id"
+func ltreePath(query *protocol.KontrolQuery) string {
+	// username should exist because it's the first parent in the ltree path
+	if query.Username == "" {
+		return ""
+	}
+
+	path := ""
+	fields := query.Fields()
+
+	// we stop for the first empty value
+	for _, key := range keyOrder {
+		v := fields[key]
+		if v == "" {
+			break
+		}
+
+		// replace anything that doesn't match the definition for a ltree path
+		// label with a underscore, so the version "0.0.1" will be "0_0_1", or
+		// uuid of "1111-2222-3333-4444" will be converted to
+		// 1111_2222_3333_4444.
+		v = invalidLabelRe.ReplaceAllLiteralString(v, "_")
+
+		path = path + v + "."
+	}
+
+	// remove the latest dot which causes an invalid query
+	path = strings.TrimSuffix(path, ".")
+
+	return path
 }
 
 func (p *Postgres) Set(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
