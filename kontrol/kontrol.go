@@ -121,30 +121,21 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 
 func (k *Kontrol) Run() {
 	rand.Seed(time.Now().UnixNano())
-	//
-	// assume we are going to work locally instead of panicing
-	if k.Machines == nil || len(k.Machines) == 0 {
-		k.Machines = []string{"127.0.0.1:4001"}
-	}
 
-	k.Kite.Log.Info("Connecting to Etcd with machines: %v", k.Machines)
-	etcdClient, err := NewEtcd(k.Machines)
-	if err != nil {
-		panic("could not connect to etcd: " + err.Error())
+	if k.storage == nil {
+		panic("storage is not set")
 	}
-	etcdClient.log = k.Kite.Log
-
-	// conf := &PostgresConfig{
-	// 	DBName: "mydb",
-	// }
-	//
-	// k.storage = NewPostgres(conf, log)
-	k.storage = etcdClient
 
 	// now go and register ourself
 	go k.registerSelf()
 
 	k.Kite.Run()
+}
+
+// SetStorage sets the backend storage that kontrol is going to use to store
+// kites
+func (k *Kontrol) SetStorage(storage Storage) {
+	k.storage = storage
 }
 
 // Close stops kontrol and closes all connections

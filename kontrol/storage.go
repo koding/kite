@@ -34,20 +34,21 @@ type Etcd struct {
 	log    kite.Logger
 }
 
-func NewEtcd(machines []string) (*Etcd, error) {
+func NewEtcd(machines []string, log kite.Logger) *Etcd {
 	if machines == nil || len(machines) == 0 {
-		return nil, errors.New("machines is empty")
+		machines = []string{"127.0.0.1:4001"}
 	}
 
 	client := etcd.NewClient(machines)
 	ok := client.SetCluster(machines)
 	if !ok {
-		return nil, errors.New("cannot connect to etcd cluster: " + strings.Join(machines, ","))
+		panic("cannot connect to etcd cluster: " + strings.Join(machines, ","))
 	}
 
 	return &Etcd{
 		client: client,
-	}, nil
+		log:    log,
+	}
 }
 
 func (e *Etcd) Delete(k *protocol.Kite) error {
