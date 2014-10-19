@@ -156,12 +156,22 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	return kites, nil
 }
 
-func (p *Postgres) Set(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	_, err := p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
 		ltreePath(kiteProt.Query()),
 		value.URL,
 		kiteProt.ID,
 	)
+	return err
+}
+
+func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	// TODO: also consider just usting WHERE id = kiteProt.ID, see how it's
+	// perfoms out
+	_, err := p.DB.Exec(`UPDATE kites SET url = $1, updated_at = (now() at time zone 'utc') 
+	WHERE kite ~ $2`,
+		value.URL, ltreePath(kiteProt.Query()))
+
 	return err
 }
 
