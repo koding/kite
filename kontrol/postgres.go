@@ -100,7 +100,66 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 }
 
 func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
-	return nil, errors.New("GET is not implemented")
+	// only let query with usernames, otherwise the whole tree will be fetched
+	// which is not good for us
+	if query.Username == "" {
+		return nil, errors.New("username is not specified in query")
+	}
+
+	path := ltreePath(query)
+
+	// TODO: see how a prepared statements perfoms out
+	rows, err := p.DB.Query(`SELECT kite, url FROM kites WHERE kite <@ $1`, path)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var kitePath string
+	var url string
+
+	kites := make(Kites, 0)
+
+	for rows.Next() {
+		err := rows.Scan(&kitePath, &url)
+		if err != nil {
+			return nil, err
+		}
+
+		kiteProt, err := kiteFromPath(kitePath)
+		if err != nil {
+			return nil, err
+		}
+
+		kites = append(kites, &protocol.KiteWithToken{
+			Kite: *kiteProt,
+			URL:  url,
+		})
+
+		fmt.Printf("kitePath %+v\n", kitePath)
+		fmt.Printf("url %+v\n", url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	kites.Shuffle()
+
+	return kites, nil
+}
+
+func (p *Postgres) Set(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	_, err := p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
+		ltreePath(kiteProt.Query()),
+		value.URL,
+		kiteProt.ID,
+	)
+	return err
+}
+
+func (p *Postgres) Delete(kite *protocol.Kite) error {
+	return errors.New("DELETE is not implemented")
 }
 
 // ltreeLabel satisfies a invalid ltree definition of a label in path.
@@ -119,11 +178,6 @@ var invalidLabelRe = regexp.MustCompile("[^[:word:]]+")
 // ltreePath returns a query path to be used with the ltree module in postgress
 // in the form of "username.environment.kitename.version.region.hostname.id"
 func ltreePath(query *protocol.KontrolQuery) string {
-	// username should exist because it's the first parent in the ltree path
-	if query.Username == "" {
-		return ""
-	}
-
 	path := ""
 	fields := query.Fields()
 
@@ -146,19 +200,29 @@ func ltreePath(query *protocol.KontrolQuery) string {
 
 	// remove the latest dot which causes an invalid query
 	path = strings.TrimSuffix(path, ".")
-
 	return path
 }
 
-func (p *Postgres) Set(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
-	_, err := p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
-		ltreePath(kiteProt.Query()),
-		value.URL,
-		kiteProt.ID,
-	)
-	return err
-}
+// kiteFromPath returns a Query from the given ltree path label
+func kiteFromPath(path string) (*protocol.Kite, error) {
+	fields := strings.Split(path, ".")
 
-func (p *Postgres) Delete(kite *protocol.Kite) error {
-	return errors.New("DELETE is not implemented")
+	if len(fields) != 7 {
+		return nil, fmt.Errorf("invalid ltree path: %s", path)
+	}
+
+	// those labels were converted by us, therefore convert them back
+	version := strings.Replace(fields[3], "_", ".", -1)
+	id := strings.Replace(fields[6], "_", "-", -1)
+
+	return &protocol.Kite{
+		Username:    fields[0],
+		Environment: fields[1],
+		Name:        fields[2],
+		Version:     version,
+		Region:      fields[4],
+		Hostname:    fields[5],
+		ID:          id,
+	}, nil
+
 }
