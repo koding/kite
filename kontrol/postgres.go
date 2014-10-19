@@ -57,12 +57,16 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		connString += " user=" + conf.Username
 	}
 
-	log.Info("connString %+v\n", connString)
-
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
 		panic(err)
 	}
+
+	// add a limit so we don't hit a "too many open connections" errors. We
+	// might change this in the future to tweak according to the machine and
+	// usage behaviour
+	db.SetMaxIdleConns(100)
+	db.SetMaxOpenConns(100)
 
 	// enable the ltree module which we are going to use, any error means it's
 	// failed so there is no sense to continue, panic!
@@ -73,7 +77,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 
 	// create our initial kites table
 	// * kite is going to be our ltree
-	// * url is cointaining the kite's register url
+	// * url is containing the kite's register url
 	// * id is going to be kites' unique id (which also exists in the ltree
 	//   path). We are adding it as a primary key so each kite with the full
 	//   path can only exist once.
@@ -130,6 +134,8 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 	path := ltreePath(query)
 
+	// TODO: cache the statement or throttle it in a safe way, for example we
+	// could cache it for every incoming 10 Get call
 	stmt, err := p.DB.Prepare(`SELECT kite, url FROM kites WHERE kite <@ $1`)
 	if err != nil {
 		return nil, err
@@ -177,7 +183,7 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 }
 
 func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
-	// check that the incoming url is valid to prevent malformed input
+	// check that the incoming URL is valid to prevent malformed input
 	_, err := url.Parse(value.URL)
 	if err != nil {
 		return err
@@ -198,8 +204,8 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return err
 	}
 
-	// TODO: also consider just usting WHERE id = kiteProt.ID, see how it's
-	// perfoms out
+	// TODO: also consider just using WHERE id = kiteProt.ID, see how it's
+	// performs out
 	_, err = p.DB.Exec(`UPDATE kites SET url = $1, updated_at = (now() at time zone 'utc') 
 	WHERE kite ~ $2`,
 		value.URL, ltreePath(kiteProt.Query()))
@@ -240,7 +246,7 @@ func ltreePath(query *protocol.KontrolQuery) string {
 		// replace anything that doesn't match the definition for a ltree path
 		// label with a underscore, so the version "0.0.1" will be "0_0_1", or
 		// uuid of "1111-2222-3333-4444" will be converted to
-		// 1111_2222_3333_4444. Strings that satisifies the requirement are
+		// 1111_2222_3333_4444. Strings that satisfies the requirement are
 		// untouched.
 		v = invalidLabelRe.ReplaceAllLiteralString(v, "_")
 
