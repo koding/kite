@@ -243,7 +243,8 @@ func (p *Postgres) Delete(kite *protocol.Kite) error {
 }
 
 func (p *Postgres) Clear() error {
-	return errors.New("CLEAR is not implemented")
+	_, err := p.DB.Exec(`DROP TABLE kites`)
+	return err
 }
 
 // ltreeLabel satisfies a invalid ltree definition of a label in path.
