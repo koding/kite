@@ -9,6 +9,9 @@ ifeq ($(DEBUG), 1)
 	VERBOSE="-v"
 endif
 
+# Default to etcd
+KONTROL_STORAGE?="etcd"
+
 all: test
 
 format:
@@ -28,7 +31,7 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444 -storage $(KONTROL_STORAGE) -postgres-username $(KONTROL_POSTGRES_USERNAME) -postgres-db $(KONTROL_POSTGRES_DB)
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"

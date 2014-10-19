@@ -20,7 +20,7 @@ func main() {
 	k := kite.New("exp2", "1.0.0")
 	k.Config = config.MustGet()
 
-	kites, err := k.GetKites(protocol.KontrolQuery{
+	kites, err := k.GetKites(&protocol.KontrolQuery{
 		Username:    k.Config.Username,
 		Environment: k.Config.Environment,
 		Name:        "math",

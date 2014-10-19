@@ -27,12 +27,20 @@ var (
 	username   = flag.String("username", "", "")
 	kontrolURL = flag.String("kontrol-url", "", "")
 
+	storage = flag.String("storage", "etcd", "Define backend storage for kites")
+
 	// For signing/validating tokens
 	publicKeyFile  = flag.String("public-key", "", "Public RSA key")
 	privateKeyFile = flag.String("private-key", "", "Private RSA key")
 
 	// etcd instance options
 	machines = flag.String("machines", "", "comma seperated peer addresses")
+
+	postgresHost     = flag.String("postgres-host", "localhost", "Host of Postgres DB")
+	postgresPort     = flag.Int("postgres-port", 5432, "Port of Postgres DB")
+	postgresUsername = flag.String("postgres-username", "", "Username of Postgres DB")
+	postgresDB       = flag.String("postgres-db", "", "DB Name of Postgres DB")
+	postgresPassword = flag.String("postgres-password", "", "Password Name of Postgres DB")
 
 	version = flag.String("version", "0.0.1", "version of kontrol")
 )
@@ -87,7 +95,21 @@ func main() {
 		k.RegisterURL = *registerURL
 	}
 
-	k.SetStorage(kontrol.NewEtcd(etcdMachines, k.Kite.Log))
+	var kontrolStorage kontrol.Storage
+	switch *storage {
+	case "etcd":
+		kontrolStorage = kontrol.NewEtcd(etcdMachines, k.Kite.Log)
+	case "postgres":
+		kontrolStorage = kontrol.NewPostgres(&kontrol.PostgresConfig{
+			Host:     *postgresHost,
+			Port:     *postgresPort,
+			DBName:   *postgresDB,
+			Username: *postgresUsername,
+			Password: *postgresPassword,
+		}, k.Kite.Log)
+	}
+
+	k.SetStorage(kontrolStorage)
 
 	k.Run()
 }

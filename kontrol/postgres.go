@@ -107,11 +107,11 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	enableBtreeIndex := `CREATE INDEX kite_path_btree_idx ON kites USING BTREE(kite)`
 
 	if _, err := db.Exec(enableGistIndex); err != nil {
-		log.Warning("postgres: enable gist index: ", err)
+		log.Warning("postgres: enable gist index: %s", err)
 	}
 
 	if _, err := db.Exec(enableBtreeIndex); err != nil {
-		log.Warning("postgres: enable btree index: ", err)
+		log.Warning("postgres: enable btree index: %s", err)
 	}
 
 	return &Postgres{
@@ -238,8 +238,10 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 	return err
 }
 
-func (p *Postgres) Delete(kite *protocol.Kite) error {
-	return errors.New("DELETE is not implemented")
+func (p *Postgres) Delete(kiteProt *protocol.Kite) error {
+	deleteKite := `DELETE FROM kites WHERE kite ~ $1`
+	_, err := p.DB.Exec(deleteKite, ltreePath(kiteProt.Query()))
+	return err
 }
 
 func (p *Postgres) Clear() error {
