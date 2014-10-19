@@ -160,15 +160,13 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 			Kite: *kiteProt,
 			URL:  url,
 		})
-
-		fmt.Printf("kitePath %+v\n", kitePath)
-		fmt.Printf("url %+v\n", url)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
+	// randomize the result
 	kites.Shuffle()
 
 	return kites, nil
