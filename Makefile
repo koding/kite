@@ -10,7 +10,10 @@ ifeq ($(DEBUG), 1)
 endif
 
 # Default to etcd
-KONTROL_STORAGE?="etcd"
+ifndef KONTROL_STORAGE
+	KONTROL_STORAGE="etcd"
+endif
+
 
 all: test
 
@@ -31,7 +34,7 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444 -storage $(KONTROL_STORAGE) -postgres-username $(KONTROL_POSTGRES_USERNAME) -postgres-db $(KONTROL_POSTGRES_DB)
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444 
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
@@ -48,13 +51,17 @@ kontroltest:
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
 
-	@echo "Killing previous etcd instance"
-	@killall etcd ||:
 
-	@echo "Installing etcd"
-	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
-	@rm -rf _etcd/kontrol_test ||: #remove previous folder
-	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+	@echo "Using as storage: $(KONTROL_STORAGE)"
+	ifeq ($(KONTROL_STORAGE), "etcd")
+		@echo "Killing previous etcd instance"
+		@killall etcd ||:
+
+		@echo "Installing etcd"
+		test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+		@rm -rf _etcd/kontrol_test ||: #remove previous folder
+		@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+	endif
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
@@ -65,7 +72,7 @@ kontroltest:
 	@echo "$(OK_COLOR)==> Starting kontrol test $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./kontrol
 
-test:
+test: guard-KONTROL_STORAGE
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
@@ -73,6 +80,8 @@ test:
 	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
+	@echo "$(OK_COLOR)==> Using kontrol storage: $(KONTROL_STORAGE)$(NO_COLOR)"
+ifeq ($(KONTROL_STORAGE), "etcd")
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
 
@@ -80,6 +89,11 @@ test:
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/kontrol_test ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+else
+	@#Be sure these are set
+	@make guard-KONTROL_POSTGRES_USER
+	@make guard-KONTROL_POSTGRES_DBNAME
+endif
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
@@ -110,5 +124,11 @@ lint:
 
 ctags:
 	@ctags -R --languages=c,go
+
+guard-%:
+	@ if [ "${${*}}" == "" ]; then \
+                echo "Environment variable $* not set"; \
+                exit 1; \
+        fi
 
 .PHONY: all install format test doc vet lint ctags kontrol

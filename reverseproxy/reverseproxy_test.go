@@ -3,6 +3,7 @@ package reverseproxy
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -30,6 +31,16 @@ func TestWebSocketProxy(t *testing.T) {
 	color.Green("Starting kontrol")
 	kontrol.DefaultPort = 5555
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+
+	switch os.Getenv("KONTROL_STORAGE") {
+	case "etcd":
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	case "postgres":
+		kon.SetStorage(kontrol.NewPostgres(nil, kon.Kite.Log))
+	default:
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	}
+
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 

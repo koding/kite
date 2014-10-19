@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -32,6 +33,10 @@ type Postgres struct {
 }
 
 func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
+	if conf == nil {
+		conf = &PostgresConfig{}
+	}
+
 	if conf.Port == 0 {
 		conf.Port = 5432
 	}
@@ -41,7 +46,10 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	}
 
 	if conf.DBName == "" {
-		conf.DBName = "test"
+		conf.DBName = os.Getenv("KONTROL_POSTGRES_DBNAME")
+		if conf.DBName == "" {
+			panic("db name is not set for postgre storage")
+		}
 	}
 
 	connString := fmt.Sprintf(
@@ -53,9 +61,14 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		connString += " password=" + conf.Password
 	}
 
-	if conf.Username != "" {
-		connString += " user=" + conf.Username
+	if conf.Username == "" {
+		conf.Username = os.Getenv("KONTROL_POSTGRES_USER")
+		if conf.Username == "" {
+			panic("username is not set for postgre storage")
+		}
 	}
+
+	connString += " user=" + conf.Username
 
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
