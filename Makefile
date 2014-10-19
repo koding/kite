@@ -72,7 +72,7 @@ kontroltest:
 	@echo "$(OK_COLOR)==> Starting kontrol test $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./kontrol
 
-test: guard-KONTROL_STORAGE
+test: 
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
@@ -93,9 +93,15 @@ ifeq ($(KONTROL_STORAGE), etcd)
 endif
 
 ifeq ($(KONTROL_STORAGE), postgres)
-	@#Be sure these are set
-	@make guard-KONTROL_POSTGRES_USERNAME
-	@make guard-KONTROL_POSTGRES_DBNAME
+
+ifndef KONTROL_POSTGRES_USERNAME
+    $(error KONTROL_POSTGRES_USERNAME is not set)
+endif
+
+ifndef KONTROL_POSTGRES_DBNAME
+    $(error KONTROL_POSTGRES_DBNAME is not set)
+endif
+
 endif
 
 	@echo "Creating test key"
@@ -127,11 +133,5 @@ lint:
 
 ctags:
 	@ctags -R --languages=c,go
-
-guard-%:
-	@ if [ "${${*}}" == "" ]; then \
-                echo "Environment variable $* not set"; \
-                exit 1; \
-        fi
 
 .PHONY: all install format test doc vet lint ctags kontrol kontroltest
