@@ -22,8 +22,8 @@ import (
 
 const (
 	KontrolVersion    = "0.0.4"
-	HeartbeatInterval = 5 * time.Second
-	HeartbeatDelay    = 10 * time.Second
+	HeartbeatInterval = 10 * time.Second
+	HeartbeatDelay    = 20 * time.Second
 	KitesPrefix       = "/kites"
 	TokenLeeway       = 1 * time.Minute
 )
