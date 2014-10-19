@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-version"
 	_ "github.com/lib/pq"
@@ -14,7 +15,6 @@ import (
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/logging"
 )
 
 // Postgres holds Postgresql database related configuration
@@ -28,7 +28,7 @@ type PostgresConfig struct {
 
 type Postgres struct {
 	DB  *sql.DB
-	Log logging.Logger
+	Log kite.Logger
 }
 
 func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
@@ -114,9 +114,54 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		log.Warning("postgres: enable btree index: %s", err)
 	}
 
-	return &Postgres{
-		DB: db,
+	p := &Postgres{
+		DB:  db,
+		Log: log,
 	}
+
+	cleanInterval := 5 * time.Second   // clean every 5 second
+	expireInterval := 10 * time.Second // clean rows that are 10 second old
+	go p.RunCleaner(cleanInterval, expireInterval)
+
+	return p
+}
+
+func (p *Postgres) RunCleaner(interval, expire time.Duration) {
+	// run for the first time
+	affectedRows, err := p.CleanExpiredRows(expire)
+	if err != nil {
+		p.Log.Warning("postgres: cleaning old rows failed: %s", err)
+	} else {
+		p.Log.Info("postgres: cleaned up %d rows", affectedRows)
+	}
+
+	for _ = range time.Tick(interval) {
+		affectedRows, err := p.CleanExpiredRows(expire)
+		if err != nil {
+			p.Log.Warning("postgres: cleaning old rows failed: %s", err)
+		} else {
+			p.Log.Info("postgres: cleaned up %d rows", affectedRows)
+		}
+	}
+}
+
+// CleanExpiredRows deletes rows that are at least "expire" duration old. So if
+// say an expire duration of 10 second is given, it will delete all rows that
+// were updated 10 seconds ago
+func (p *Postgres) CleanExpiredRows(expire time.Duration) (int64, error) {
+	// http://stackoverflow.com/questions/14465727/how-to-insert-things-like-now-interval-2-minutes-into-php-pdo-query
+	// basically by passing an integer to INTERVAL is not possible, we need to
+	// cast it. However there is a more simpler way, we can multiply INTERVAL
+	// with an integer so we just declare a one second INTERVAL and multiply it
+	// with the amount we want.
+	cleanOldRows := `DELETE FROM kites WHERE updated_at < (now() at time zone 'utc') - ((INTERVAL '1 second') * $1)`
+
+	rows, err := p.DB.Exec(cleanOldRows, int64(expire/time.Second))
+	if err != nil {
+		return 0, err
+	}
+
+	return rows.RowsAffected()
 }
 
 func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
