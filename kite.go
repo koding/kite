@@ -227,7 +227,7 @@ func (k *Kite) callOnDisconnectHandlers(c *Client) {
 
 // RSAKey returns the corresponding public key for the issuer of the token.
 // It is called by jwt-go package when validating the signature in the token.
-func (k *Kite) RSAKey(token *jwt.Token) ([]byte, error) {
+func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 	if k.Config.KontrolKey == "" {
 		panic("kontrol key is not set in config")
 	}

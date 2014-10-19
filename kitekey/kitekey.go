@@ -76,10 +76,11 @@ func Parse() (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return jwt.Parse(kiteKey, GetKontrolKey)
 }
 
 // GetKontrolKey is used as key getter func for jwt.Parse() function.
-func GetKontrolKey(token *jwt.Token) ([]byte, error) {
+func GetKontrolKey(token *jwt.Token) (interface{}, error) {
 	return []byte(token.Claims["kontrolKey"].(string)), nil
 }
