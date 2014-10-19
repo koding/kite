@@ -126,22 +126,22 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	return p
 }
 
+// RunCleaner delets every "interval" duration rows which are older than
+// "expire" duration based on the "updated_at" field. For more info check
+// CleanExpireRows which is used to delete old rows.
 func (p *Postgres) RunCleaner(interval, expire time.Duration) {
-	// run for the first time
-	affectedRows, err := p.CleanExpiredRows(expire)
-	if err != nil {
-		p.Log.Warning("postgres: cleaning old rows failed: %s", err)
-	} else {
-		p.Log.Info("postgres: cleaned up %d rows", affectedRows)
-	}
-
-	for _ = range time.Tick(interval) {
+	cleanFunc := func() {
 		affectedRows, err := p.CleanExpiredRows(expire)
 		if err != nil {
 			p.Log.Warning("postgres: cleaning old rows failed: %s", err)
-		} else {
+		} else if affectedRows != 0 {
 			p.Log.Info("postgres: cleaned up %d rows", affectedRows)
 		}
+	}
+
+	cleanFunc() // run for the first time
+	for _ = range time.Tick(interval) {
+		cleanFunc()
 	}
 }
 
@@ -149,7 +149,7 @@ func (p *Postgres) RunCleaner(interval, expire time.Duration) {
 // say an expire duration of 10 second is given, it will delete all rows that
 // were updated 10 seconds ago
 func (p *Postgres) CleanExpiredRows(expire time.Duration) (int64, error) {
-	// http://stackoverflow.com/questions/14465727/how-to-insert-things-like-now-interval-2-minutes-into-php-pdo-query
+	// See: http://stackoverflow.com/questions/14465727/how-to-insert-things-like-now-interval-2-minutes-into-php-pdo-query
 	// basically by passing an integer to INTERVAL is not possible, we need to
 	// cast it. However there is a more simpler way, we can multiply INTERVAL
 	// with an integer so we just declare a one second INTERVAL and multiply it

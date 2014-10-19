@@ -26,12 +26,13 @@ func main() {
 	config := config.MustGet()
 	k.Config = config
 	k.Config.Port = *flagPort
+	k.Id = config.Id
 
 	// Register to kite with this url
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(*flagPort), Path: "/kite"}
 
 	// Register us ...
-	_, err := k.Register(kiteURL)
+	err := k.RegisterForever(kiteURL)
 	if err != nil {
 		log.Fatal(err)
 	}

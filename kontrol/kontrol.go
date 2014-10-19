@@ -224,11 +224,11 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	// Register first by adding the value to the storage. Return if there is
 	// any error.
 	if err := k.storage.Add(&r.Kite, value); err != nil {
-		log.Error("etcd setKey error: %s", err)
+		log.Error("storage add '%s' error: %s", r.Kite, err)
 		return errors.New("internal error - register")
 	}
 
-	// updater updates the value of the Kite in etcd. We are going to update
+	// updater updates the value of the Kite in storage. We are going to update
 	// the value periodically so if we don't get any update we are going to
 	// assume that the klient is disconnected.
 	updater := k.makeUpdater(&r.Kite, value)
@@ -240,9 +240,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	log.Info("Kite registered: %s", r.Kite)
 
 	r.OnDisconnect(func() {
-		// Delete from etcd, WatchEtcd() will get the event
-		// and will notify watchers of this Kite for deregistration.
-		// And the Id
+		// Delete from storage once the remote kite is disconnected.
 		k.storage.Delete(&r.Kite)
 	})
 
@@ -262,7 +260,7 @@ func requestHeartbeat(r *kite.Client, updaterFunc func() error) error {
 	return err
 }
 
-// registerSelf adds Kontrol itself to etcd as a kite.
+// registerSelf adds Kontrol itself to the storage as a kite.
 func (k *Kontrol) registerSelf() {
 	value := &kontrolprotocol.RegisterValue{
 		URL: k.Kite.Config.KontrolURL,
@@ -293,10 +291,9 @@ func (k *Kontrol) registerSelf() {
 
 //  makeUpdater returns a func for updating the value for the given kite key with value.
 func (k *Kontrol) makeUpdater(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
-
 	return func() error {
 		if err := k.storage.Update(kiteProt, value); err != nil {
-			log.Error("etcd error: %s", err)
+			log.Error("storage update error: %s", err)
 			return err
 		}
 
