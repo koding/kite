@@ -134,15 +134,7 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 	path := ltreePath(query)
 
-	// TODO: cache the statement or throttle it in a safe way, for example we
-	// could cache it for every incoming 10 Get call
-	stmt, err := p.DB.Prepare(`SELECT kite, url FROM kites WHERE kite <@ $1`)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(path)
+	rows, err := p.DB.Query(`SELECT kite, url FROM kites WHERE kite <@ $1`, path)
 	if err != nil {
 		return nil, err
 	}
