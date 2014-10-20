@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-version"
+	sq "github.com/lann/squirrel"
 	_ "github.com/lib/pq"
 
 	"github.com/koding/kite"
@@ -75,30 +75,21 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		panic(err)
 	}
 
-	// enable the ltree module which we are going to use, any error means it's
-	// failed so there is no sense to continue, panic!
-	enableTree := `CREATE EXTENSION IF NOT EXISTS ltree`
-	if _, err := db.Exec(enableTree); err != nil {
-		panic(err)
-	}
-
-	// create our initial kites table
-	// * kite is going to be our ltree
+	// create our initial kite table
 	// * url is containing the kite's register url
-	// * id is going to be kites' unique id (which also exists in the ltree
-	//   path). We are adding it as a primary key so each kite with the full
-	//   path can only exist once.
+	// * id is going to be kites' unique id. We are adding it as a primary key
+	// so each kite with the full path can only exist once.
 	// * created_at and updated_at are updated at creation and updating (like
 	//  if the URL has changed)
-	// Some notes:
-	// * path label can only contain a sequence of alphanumeric characters
-	//   and underscores. So for example a version string of "1.0.4" needs to
-	//   be converted to "1_0_4" or uuid of 1111-2222-3333-4444 needs to be
-	//   converted to 1111_2222_3333_4444.
 	table := `CREATE TABLE IF NOT EXISTS kite (
-		path ltree NOT NULL,
-		url text NOT NULL,
+		username text NOT NULL,
+		environment text NOT NULL,
+		kitename text NOT NULL,
+		version text NOT NULL,
+		region text NOT NULL,
+		hostname text NOT NULL,
 		id uuid PRIMARY KEY,
+		url text NOT NULL,
 		created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
 		updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 	);`
@@ -107,27 +98,14 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		panic(err)
 	}
 
-	// We enable index on the kite and updated_at columns. We don't return on
-	// errors because the operator `IF NOT EXISTS` doesn't work for index
-	// creation, therefore we assume the indexes might be already created.
-	enableGistIndex := `CREATE INDEX kite_path_gist_idx ON kite USING GIST(path)`
-	if _, err := db.Exec(enableGistIndex); err != nil {
-		log.Warning("postgres: enable gist index: %s", err)
-	}
-
-	enableBtreeIndex := `CREATE INDEX kite_updated_at_btree_idx ON kite USING BTREE(updated_at DESC)`
-	if _, err := db.Exec(enableBtreeIndex); err != nil {
-		log.Warning("postgres: enable btree index: %s", err)
-	}
-
 	p := &Postgres{
 		DB:  db,
 		Log: log,
 	}
 
-	cleanInterval := 30 * time.Second  // clean every 30 second
-	expireInterval := 10 * time.Second // clean rows that are 10 second old
-	go p.RunCleaner(cleanInterval, expireInterval)
+	// cleanInterval := 30 * time.Second  // clean every 30 second
+	// expireInterval := 20 * time.Second // clean rows that are 20 second old
+	// go p.RunCleaner(cleanInterval, expireInterval)
 
 	return p
 }
@@ -173,17 +151,16 @@ func (p *Postgres) CleanExpiredRows(expire time.Duration) (int64, error) {
 func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	// only let query with usernames, otherwise the whole tree will be fetched
 	// which is not good for us
-	if query.Username == "" {
-		return nil, errors.New("username is not specified in query")
+	sqlQuery, args, err := selectQuery(query)
+	if err != nil {
+		return nil, err
 	}
-
-	path := ltreePath(query)
 
 	var hasVersionConstraint bool // does query contains a constraint on version?
 	var keyRest string            // query key after the version field
 	var versionConstraint version.Constraints
 	// NewVersion returns an error if it's a constraint, like: ">= 1.0, < 1.4"
-	_, err := version.NewVersion(query.Version)
+	_, err = version.NewVersion(query.Version)
 	if err != nil && query.Version != "" {
 		// now parse our constraint
 		versionConstraint, err = version.NewConstraint(query.Version)
@@ -201,39 +178,65 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 		// We will make a get request to all nodes under this name
 		// and filter the result later.
-		path = ltreePath(nameQuery)
+		sqlQuery, args, err = selectQuery(nameQuery)
+		if err != nil {
+			return nil, err
+		}
 
 		// Rest of the key after version field
 		keyRest = "/" + strings.TrimRight(
 			query.Region+"/"+query.Hostname+"/"+query.ID, "/")
-
 	}
 
-	rows, err := p.DB.Query(`SELECT path, url FROM kite WHERE path <@ $1`, path)
+	rows, err := p.DB.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var kitePath string
-	var url string
+	var (
+		username    string
+		environment string
+		kitename    string
+		version     string
+		region      string
+		hostname    string
+		id          string
+		url         string
+		updated_at  time.Time
+		created_at  time.Time
+	)
 
 	kites := make(Kites, 0)
 
 	for rows.Next() {
-		err := rows.Scan(&kitePath, &url)
-		if err != nil {
-			return nil, err
-		}
-
-		kiteProt, err := kiteFromPath(kitePath)
+		err := rows.Scan(
+			&username,
+			&environment,
+			&kitename,
+			&version,
+			&region,
+			&hostname,
+			&id,
+			&url,
+			&updated_at,
+			&created_at,
+		)
 		if err != nil {
 			return nil, err
 		}
 
 		kites = append(kites, &protocol.KiteWithToken{
-			Kite: *kiteProt,
-			URL:  url,
+			Kite: protocol.Kite{
+				Username:    username,
+				Environment: environment,
+				Name:        kitename,
+				Version:     version,
+				Region:      region,
+				Hostname:    hostname,
+				ID:          id,
+			},
+			URL: url,
 		})
 	}
 
@@ -265,11 +268,12 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 		return err
 	}
 
-	_, err = p.DB.Exec("INSERT into kite(path, url, id) VALUES($1, $2, $3)",
-		ltreePath(kiteProt.Query()),
-		value.URL,
-		kiteProt.ID,
-	)
+	sqlQuery, args, err := insertQuery(kiteProt, value.URL)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.DB.Exec(sqlQuery, args...)
 	return err
 }
 
@@ -283,15 +287,15 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 	// TODO: also consider just using WHERE id = kiteProt.ID, see how it's
 	// performs out
 	_, err = p.DB.Exec(`UPDATE kite SET url = $1, updated_at = (now() at time zone 'utc') 
-	WHERE path ~ $2`,
-		value.URL, ltreePath(kiteProt.Query()))
+	WHERE id = $2`,
+		value.URL, kiteProt.ID)
 
 	return err
 }
 
 func (p *Postgres) Delete(kiteProt *protocol.Kite) error {
-	deleteKite := `DELETE FROM kite WHERE path ~ $1`
-	_, err := p.DB.Exec(deleteKite, ltreePath(kiteProt.Query()))
+	deleteKite := `DELETE FROM kite WHERE id = $1`
+	_, err := p.DB.Exec(deleteKite, kiteProt.ID)
 	return err
 }
 
@@ -300,67 +304,57 @@ func (p *Postgres) Clear() error {
 	return err
 }
 
-// ltreeLabel satisfies a invalid ltree definition of a label in path.
-// According to the definition it is: "A label is a sequence of alphanumeric
-// characters and underscores (for example, in C locale the characters
-// A-Za-z0-9_ are allowed). Labels must be less than 256 bytes long."
-//
-// We could express one character with "[A-Za-z0-9_]", a word with
-// "[A-Za-z0-9_]+". However we want to catch words that are not valid labels so
-// we negate them with the "^" character, so it will be : "[^[A-Za-z0-9_]]+".
-// Finally we cann use the POSIX character class: [:word:] which is:
-// "Alphanumeric characters plus "_"", so the final regexp will be
-// "[^[:word]]+"
-var invalidLabelRe = regexp.MustCompile("[^[:word:]]+")
+// selectQuery returns a SQL query for the given query
+func selectQuery(query *protocol.KontrolQuery) (string, []interface{}, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-// ltreePath returns a query path to be used with the ltree module in postgress
-// in the form of "username.environment.kitename.version.region.hostname.id"
-func ltreePath(query *protocol.KontrolQuery) string {
-	path := ""
+	kites := psql.Select("*").From("kite")
 	fields := query.Fields()
+	andQuery := sq.And{}
 
 	// we stop for the first empty value
 	for _, key := range keyOrder {
 		v := fields[key]
 		if v == "" {
-			break
+			continue
 		}
 
-		// replace anything that doesn't match the definition for a ltree path
-		// label with a underscore, so the version "0.0.1" will be "0_0_1", or
-		// uuid of "1111-2222-3333-4444" will be converted to
-		// 1111_2222_3333_4444. Strings that satisfies the requirement are
-		// untouched.
-		v = invalidLabelRe.ReplaceAllLiteralString(v, "_")
+		// we are using "kitename" as the columname
+		if key == "name" {
+			key = "kitename"
+		}
 
-		path = path + v + "."
+		andQuery = append(andQuery, sq.Eq{key: v})
 	}
 
-	// remove the latest dot which causes an invalid query
-	path = strings.TrimSuffix(path, ".")
-	return path
+	if len(andQuery) == 0 {
+		return "", nil, errors.New("all query fields are empty")
+	}
+
+	return kites.Where(andQuery).ToSql()
 }
 
-// kiteFromPath returns a Query from the given ltree path label
-func kiteFromPath(path string) (*protocol.Kite, error) {
-	fields := strings.Split(path, ".")
+// inseryQuery
+func insertQuery(kiteProt *protocol.Kite, url string) (string, []interface{}, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-	if len(fields) != 7 {
-		return nil, fmt.Errorf("invalid ltree path: %s", path)
+	kiteValues := kiteProt.Values()
+	values := make([]interface{}, len(kiteValues))
+
+	for i, kiteVal := range kiteValues {
+		values[i] = kiteVal
 	}
 
-	// those labels were converted by us, therefore convert them back
-	version := strings.Replace(fields[3], "_", ".", -1)
-	id := strings.Replace(fields[6], "_", "-", -1)
+	values = append(values, url)
 
-	return &protocol.Kite{
-		Username:    fields[0],
-		Environment: fields[1],
-		Name:        fields[2],
-		Version:     version,
-		Region:      fields[4],
-		Hostname:    fields[5],
-		ID:          id,
-	}, nil
-
+	return psql.Insert("kite").Columns(
+		"username",
+		"environment",
+		"kitename",
+		"version",
+		"region",
+		"hostname",
+		"id",
+		"url",
+	).Values(values...).ToSql()
 }

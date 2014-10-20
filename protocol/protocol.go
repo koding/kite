@@ -66,6 +66,19 @@ func (k *Kite) Query() *KontrolQuery {
 	}
 }
 
+// Values returns the values of each field in order
+func (k *Kite) Values() []string {
+	return []string{
+		k.Username,
+		k.Environment,
+		k.Name,
+		k.Version,
+		k.Region,
+		k.Hostname,
+		k.ID,
+	}
+}
+
 func (k *Kite) Validate() error {
 	s := k.String()
 	if strings.Contains(s, "//") {
