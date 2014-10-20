@@ -126,7 +126,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		Log: log,
 	}
 
-	cleanInterval := 5 * time.Second   // clean every 5 second
+	cleanInterval := 30 * time.Second  // clean every 30 second
 	expireInterval := 10 * time.Second // clean rows that are 10 second old
 	go p.RunCleaner(cleanInterval, expireInterval)
 
