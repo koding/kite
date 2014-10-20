@@ -75,12 +75,6 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		panic(err)
 	}
 
-	// add a limit so we don't hit a "too many open connections" errors. We
-	// might change this in the future to tweak according to the machine and
-	// usage behaviour
-	db.SetMaxIdleConns(100)
-	db.SetMaxOpenConns(100)
-
 	// enable the ltree module which we are going to use, any error means it's
 	// failed so there is no sense to continue, panic!
 	enableTree := `CREATE EXTENSION IF NOT EXISTS ltree`
