@@ -115,7 +115,7 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		log.Warning("postgres: enable gist index: %s", err)
 	}
 
-	enableBtreeIndex := `CREATE INDEX kite_updated_at_btree_idx ON kite USING BTREE(updated_at)`
+	enableBtreeIndex := `CREATE INDEX kite_updated_at_btree_idx ON kite USING BTREE(updated_at DESC)`
 	if _, err := db.Exec(enableBtreeIndex); err != nil {
 		log.Warning("postgres: enable btree index: %s", err)
 	}
