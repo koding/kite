@@ -98,6 +98,14 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		panic(err)
 	}
 
+	// We enable index on the kite and updated_at columns. We don't return on
+	// errors because the operator `IF NOT EXISTS` doesn't work for index
+	// creation, therefore we assume the indexes might be already created.
+	enableBtreeIndex := `CREATE INDEX kite_updated_at_btree_idx ON kite USING BTREE(updated_at)`
+	if _, err := db.Exec(enableBtreeIndex); err != nil {
+		log.Warning("postgres: enable btree index: %s", err)
+	}
+
 	p := &Postgres{
 		DB:  db,
 		Log: log,
