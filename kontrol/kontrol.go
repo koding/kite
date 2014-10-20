@@ -223,7 +223,7 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 
 	// Register first by adding the value to the storage. Return if there is
 	// any error.
-	if err := k.storage.Add(&r.Kite, value); err != nil {
+	if err := k.storage.Upsert(&r.Kite, value); err != nil {
 		log.Error("storage add '%s' error: %s", r.Kite, err)
 		return errors.New("internal error - register")
 	}

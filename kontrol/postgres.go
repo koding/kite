@@ -261,6 +261,54 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 	return kites, nil
 }
 
+func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) (err error) {
+	// check that the incoming URL is valid to prevent malformed input
+	_, err = url.Parse(value.URL)
+	if err != nil {
+		return err
+	}
+
+	// we are going to try an UPDATE, if it's not successfull we are going to
+	// INSERT the document, all ine one single transaction
+	tx, err := p.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			err = tx.Rollback()
+		} else {
+			// it calls Rollback inside if it fails again :)
+			err = tx.Commit()
+		}
+	}()
+
+	res, err := tx.Exec(`UPDATE kite SET url = $1, updated_at = (now() at time zone 'utc') 
+	WHERE id = $2`, value.URL, kiteProt.ID)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// we got an update! so this was successfull, just return without an error
+	if rowAffected != 0 {
+		return nil
+	}
+
+	insertSQL, args, err := insertQuery(kiteProt, value.URL)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(insertSQL, args...)
+	return err
+}
+
 func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	// check that the incoming URL is valid to prevent malformed input
 	_, err := url.Parse(value.URL)
@@ -296,11 +344,6 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 func (p *Postgres) Delete(kiteProt *protocol.Kite) error {
 	deleteKite := `DELETE FROM kite WHERE id = $1`
 	_, err := p.DB.Exec(deleteKite, kiteProt.ID)
-	return err
-}
-
-func (p *Postgres) Clear() error {
-	_, err := p.DB.Exec(`DROP TABLE kite`)
 	return err
 }
 

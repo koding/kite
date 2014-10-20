@@ -62,6 +62,10 @@ func (e *Etcd) Clear() error {
 	return err
 }
 
+func (e *Etcd) Upsert(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+	return e.Add(k, value)
+}
+
 func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
@@ -71,13 +75,13 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 
 	// Set the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err := e.client.Create(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err := e.client.Set(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
 	if err != nil {
 		return err
 	}
 
 	// Also store the the kite.Key Id for easy lookup
-	_, err = e.client.Create(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err = e.client.Set(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
 	if err != nil {
 		return err
 	}

@@ -20,6 +20,6 @@ type Storage interface {
 	// Delete deletes the given kite from the storage
 	Delete(kite *protocol.Kite) error
 
-	// Clear clears the storage. This removes all the data in storage.
-	Clear() error
+	// Upsert inserts or updates the value for the given kite
+	Upsert(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 }
