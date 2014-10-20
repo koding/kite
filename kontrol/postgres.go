@@ -95,8 +95,8 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	//   and underscores. So for example a version string of "1.0.4" needs to
 	//   be converted to "1_0_4" or uuid of 1111-2222-3333-4444 needs to be
 	//   converted to 1111_2222_3333_4444.
-	table := `CREATE TABLE IF NOT EXISTS kites (
-		kite ltree NOT NULL,
+	table := `CREATE TABLE IF NOT EXISTS kite (
+		path ltree NOT NULL,
 		url text NOT NULL,
 		id uuid PRIMARY KEY,
 		created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
@@ -110,12 +110,12 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	// We enable index on the kite and updated_at columns. We don't return on
 	// errors because the operator `IF NOT EXISTS` doesn't work for index
 	// creation, therefore we assume the indexes might be already created.
-	enableGistIndex := `CREATE INDEX kite_path_gist_idx ON kites USING GIST(kite)`
+	enableGistIndex := `CREATE INDEX kite_path_gist_idx ON kite USING GIST(path)`
 	if _, err := db.Exec(enableGistIndex); err != nil {
 		log.Warning("postgres: enable gist index: %s", err)
 	}
 
-	enableBtreeIndex := `CREATE INDEX kite_path_btree_idx ON kites USING BTREE(updated_at)`
+	enableBtreeIndex := `CREATE INDEX kite_path_btree_idx ON kite USING BTREE(updated_at)`
 	if _, err := db.Exec(enableBtreeIndex); err != nil {
 		log.Warning("postgres: enable btree index: %s", err)
 	}
@@ -160,7 +160,7 @@ func (p *Postgres) CleanExpiredRows(expire time.Duration) (int64, error) {
 	// cast it. However there is a more simpler way, we can multiply INTERVAL
 	// with an integer so we just declare a one second INTERVAL and multiply it
 	// with the amount we want.
-	cleanOldRows := `DELETE FROM kites WHERE updated_at < (now() at time zone 'utc') - ((INTERVAL '1 second') * $1)`
+	cleanOldRows := `DELETE FROM kite WHERE updated_at < (now() at time zone 'utc') - ((INTERVAL '1 second') * $1)`
 
 	rows, err := p.DB.Exec(cleanOldRows, int64(expire/time.Second))
 	if err != nil {
@@ -209,7 +209,7 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 	}
 
-	rows, err := p.DB.Query(`SELECT kite, url FROM kites WHERE kite <@ $1`, path)
+	rows, err := p.DB.Query(`SELECT path, url FROM kite WHERE path <@ $1`, path)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 		return err
 	}
 
-	_, err = p.DB.Exec("INSERT into kites(kite, url, id) VALUES($1, $2, $3)",
+	_, err = p.DB.Exec("INSERT into kite(path, url, id) VALUES($1, $2, $3)",
 		ltreePath(kiteProt.Query()),
 		value.URL,
 		kiteProt.ID,
@@ -282,21 +282,21 @@ func (p *Postgres) Update(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 
 	// TODO: also consider just using WHERE id = kiteProt.ID, see how it's
 	// performs out
-	_, err = p.DB.Exec(`UPDATE kites SET url = $1, updated_at = (now() at time zone 'utc') 
-	WHERE kite ~ $2`,
+	_, err = p.DB.Exec(`UPDATE kite SET url = $1, updated_at = (now() at time zone 'utc') 
+	WHERE path ~ $2`,
 		value.URL, ltreePath(kiteProt.Query()))
 
 	return err
 }
 
 func (p *Postgres) Delete(kiteProt *protocol.Kite) error {
-	deleteKite := `DELETE FROM kites WHERE kite ~ $1`
+	deleteKite := `DELETE FROM kite WHERE path ~ $1`
 	_, err := p.DB.Exec(deleteKite, ltreePath(kiteProt.Query()))
 	return err
 }
 
 func (p *Postgres) Clear() error {
-	_, err := p.DB.Exec(`DROP TABLE kites`)
+	_, err := p.DB.Exec(`DROP TABLE kite`)
 	return err
 }
 
