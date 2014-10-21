@@ -12,7 +12,7 @@
 -- DROP USER IF EXISTS kontrol;
 
 -- drop the table
--- DROP TABLE IF EXISTS kite.kite;
+-- DROP TABLE IF EXISTS "kite"."kite";
 
 -- create role
 CREATE ROLE kontrol;
@@ -33,28 +33,27 @@ GRANT USAGE ON SCHEMA kite TO kontrol;
 -- add our schema to search path
 -- with this way we can use our table name directly without the schema name.
 SELECT
-	set_config (
-		'search_path',
-		current_setting ('search_path') || ',kite',
-		FALSE
-	);
+    set_config (
+        'search_path',
+        current_setting ('search_path') || ',kite',
+        FALSE
+    );
 
 -- create the table
-CREATE TABLE kite (
-	username TEXT NOT NULL,
-	environment TEXT NOT NULL,
-	kitename TEXT NOT NULL,
-	version TEXT NOT NULL,
-	region TEXT NOT NULL,
-	hostname TEXT NOT NULL,
-	id uuid PRIMARY KEY,
-	url TEXT NOT NULL,
-	created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'), -- you may set a global timezone
-	updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
+CREATE TABLE "kite"."kite" (
+    username TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    kitename TEXT NOT NULL,
+    version TEXT NOT NULL,
+    region TEXT NOT NULL,
+    hostname TEXT NOT NULL,
+    id uuid PRIMARY KEY,
+    url TEXT NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'), -- you may set a global timezone
+    updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
 
 -- create the index
-DROP INDEX IF EXISTS kite.kite_updated_at_btree_idx;
+DROP INDEX IF EXISTS kite_updated_at_btree_idx;
 
-CREATE INDEX kite.kite_updated_at_btree_idx ON kite.kite USING BTREE (updated_at DESC);
-
+CREATE INDEX kite_updated_at_btree_idx ON "kite"."kite" USING BTREE (updated_at DESC);
