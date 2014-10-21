@@ -53,6 +53,10 @@ CREATE TABLE "kite"."kite" (
     updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
 
+-- add proper permissions for table
+GRANT SELECT, INSERT, UPDATE, DELETE ON "kite"."kite" TO "kontrol";
+
+
 -- create the index
 DROP INDEX IF EXISTS kite_updated_at_btree_idx;
 
