@@ -31,10 +31,10 @@ kontrol:
 	@openssl rsa -in /tmp/privateKey.pem -pubout > /tmp/publicKey.pem
 
 	@echo "$(OK_COLOR)==> Creating test kite key $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
+	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -initial -username kite -kontrolurl "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444 
+	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -port 4444 
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
