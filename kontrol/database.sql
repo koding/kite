@@ -8,8 +8,11 @@
 -- drop the role
 -- DROP ROLE IF EXISTS kontrol;
 
--- Drop the user
+-- drop the user
 -- DROP USER IF EXISTS kontrol;
+
+-- drop the table
+-- DROP TABLE IF EXISTS kite.kite;
 
 -- create role
 CREATE ROLE kontrol;
@@ -37,8 +40,7 @@ SELECT
 	);
 
 -- create the table
-CREATE TABLE
-IF NOT EXISTS kite (
+CREATE TABLE kite (
 	username TEXT NOT NULL,
 	environment TEXT NOT NULL,
 	kitename TEXT NOT NULL,
@@ -47,12 +49,12 @@ IF NOT EXISTS kite (
 	hostname TEXT NOT NULL,
 	ID uuid PRIMARY KEY,
 	url TEXT NOT NULL,
-	created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
+	created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'), -- you may set a global timezone
 	updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
 
 -- create the index
 DROP INDEX IF EXISTS kite.kite_updated_at_btree_idx;
 
-CREATE INDEX kite.kite_updated_at_btree_idx ON kite.kite USING BTREE (updated_at);
+CREATE INDEX kite.kite_updated_at_btree_idx ON kite.kite USING BTREE (updated_at DESC);
 
