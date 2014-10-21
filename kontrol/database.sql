@@ -47,7 +47,7 @@ CREATE TABLE kite (
 	version TEXT NOT NULL,
 	region TEXT NOT NULL,
 	hostname TEXT NOT NULL,
-	ID uuid PRIMARY KEY,
+	id uuid PRIMARY KEY,
 	url TEXT NOT NULL,
 	created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'), -- you may set a global timezone
 	updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
