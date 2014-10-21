@@ -90,6 +90,7 @@ func newLogger(name string) (Logger, func(Level)) {
 
 	setLevel := func(l Level) {
 		logger.SetLevel(convertLevel(l))
+		logging.DefaultHandler.SetLevel(convertLevel(l))
 	}
 
 	return logger, setLevel
