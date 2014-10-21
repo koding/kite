@@ -44,7 +44,7 @@ CREATE TABLE kite (
 	username TEXT NOT NULL,
 	environment TEXT NOT NULL,
 	kitename TEXT NOT NULL,
-	VERSION TEXT NOT NULL,
+	version TEXT NOT NULL,
 	region TEXT NOT NULL,
 	hostname TEXT NOT NULL,
 	ID uuid PRIMARY KEY,
