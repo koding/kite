@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -25,11 +24,11 @@ type Kontrol struct {
 	Username   string
 	KontrolURL string
 
-	PublicKeyFile  string `required:"true"`
-	PrivateKeyFile string `required:"true"`
+	PublicKeyFile  string
+	PrivateKeyFile string
 
 	Machines []string
-	Version  string
+	Version  string `default:"0.0.1"`
 
 	Postgres struct {
 		Host     string `default:"localhost"`
@@ -39,29 +38,6 @@ type Kontrol struct {
 		DBName   string `required:"true" `
 	}
 }
-
-var (
-	// Kite server options
-	ip          = flag.String("ip", "0.0.0.0", "")
-	port        = flag.Int("port", 4000, "")
-	tlsCertFile = flag.String("tls-cert", "", "TLS certificate file")
-	tlsKeyFile  = flag.String("tls-key", "", "TLS key file")
-	registerURL = flag.String("register-url", "", "Change self register URL")
-
-	// For self register and initial first key on a machine
-	initial    = flag.Bool("init", false, "create a new kite.key")
-	username   = flag.String("username", "", "")
-	kontrolURL = flag.String("kontrol-url", "", "")
-
-	// For signing/validating tokens
-	publicKeyFile  = flag.String("public-key", "", "Public RSA key")
-	privateKeyFile = flag.String("private-key", "", "Private RSA key")
-
-	// etcd instance options
-	machines = flag.String("machines", "", "comma seperated peer addresses")
-
-	version = flag.String("version", "0.0.1", "version of kontrol")
-)
 
 func main() {
 	conf := new(Kontrol)
@@ -79,7 +55,7 @@ func main() {
 	}
 
 	if conf.Initial {
-		initialKey(publicKey, privateKey)
+		initialKey(conf, publicKey, privateKey)
 		os.Exit(0)
 	}
 
@@ -120,22 +96,22 @@ func main() {
 	k.Run()
 }
 
-func initialKey(publicKey, privateKey []byte) {
+func initialKey(kontrolConf *Kontrol, publicKey, privateKey []byte) {
 	conf := config.New()
 
-	if *username == "" {
+	if kontrolConf.Username == "" {
 		log.Fatalln("empty username")
 	}
-	conf.Username = *username
+	conf.Username = kontrolConf.Username
 
-	_, err := url.Parse(*kontrolURL)
+	_, err := url.Parse(kontrolConf.KontrolURL)
 	if err != nil {
 		log.Fatalln("cannot parse kontrol URL")
 	}
 
-	conf.KontrolURL = *kontrolURL
+	conf.KontrolURL = kontrolConf.KontrolURL
 
-	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
+	k := kontrol.New(conf, kontrolConf.Version, string(publicKey), string(privateKey))
 	err = k.InitializeSelf()
 	if err != nil {
 		log.Fatal(err)
