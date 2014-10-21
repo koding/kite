@@ -8,11 +8,37 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
+	"github.com/koding/multiconfig"
 )
+
+type Kontrol struct {
+	Ip          string
+	Port        int
+	TLSCertFile string
+	TLSKeyFile  string
+	RegisterUrl string
+
+	Initial    bool
+	Username   string
+	KontrolURL string
+
+	PublicKeyFile  string `required:"true"`
+	PrivateKeyFile string `required:"true"`
+
+	Machines []string
+	Version  string
+
+	Postgres struct {
+		Host     string `default:"localhost"`
+		Port     int    `default:"5432"`
+		Username string `required:"true"`
+		Password string
+		DBName   string `required:"true" `
+	}
+}
 
 var (
 	// Kite server options
@@ -34,49 +60,37 @@ var (
 	// etcd instance options
 	machines = flag.String("machines", "", "comma seperated peer addresses")
 
-	postgresHost     = flag.String("postgres-host", "localhost", "Host of Postgres DB")
-	postgresPort     = flag.Int("postgres-port", 5432, "Port of Postgres DB")
-	postgresUsername = flag.String("postgres-username", "", "Username of Postgres DB")
-	postgresDB       = flag.String("postgres-db", "", "DB Name of Postgres DB")
-	postgresPassword = flag.String("postgres-password", "", "Password Name of Postgres DB")
-
 	version = flag.String("version", "0.0.1", "version of kontrol")
 )
 
 func main() {
-	flag.Parse()
+	conf := new(Kontrol)
 
-	if *publicKeyFile == "" {
-		log.Fatalln("no -public-key given")
-	}
+	multiconfig.New().MustLoad(conf)
 
-	if *privateKeyFile == "" {
-		log.Fatalln("no -private-key given")
-	}
-
-	publicKey, err := ioutil.ReadFile(*publicKeyFile)
+	publicKey, err := ioutil.ReadFile(conf.PublicKeyFile)
 	if err != nil {
 		log.Fatalf("cannot read public key file: %s", err.Error())
 	}
 
-	privateKey, err := ioutil.ReadFile(*privateKeyFile)
+	privateKey, err := ioutil.ReadFile(conf.PrivateKeyFile)
 	if err != nil {
 		log.Fatalf("cannot read private key file: %s", err.Error())
 	}
 
-	if *initial {
+	if conf.Initial {
 		initialKey(publicKey, privateKey)
 		os.Exit(0)
 	}
 
-	conf := config.MustGet()
-	conf.IP = *ip
-	conf.Port = *port
+	kiteConf := config.MustGet()
+	kiteConf.IP = conf.Ip
+	kiteConf.Port = conf.Port
 
-	k := kontrol.New(conf, *version, string(publicKey), string(privateKey))
+	k := kontrol.New(kiteConf, conf.Version, string(publicKey), string(privateKey))
 
-	if *tlsCertFile != "" || *tlsKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(*tlsCertFile, *tlsKeyFile)
+	if conf.TLSCertFile != "" || conf.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(conf.TLSCertFile, conf.TLSKeyFile)
 		if err != nil {
 			log.Fatalf("cannot load TLS certificate: %s", err.Error())
 		}
@@ -84,20 +98,23 @@ func main() {
 		k.Kite.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	}
 
-	if *registerURL != "" {
-		k.RegisterURL = *registerURL
+	if conf.RegisterUrl != "" {
+		k.RegisterURL = conf.RegisterUrl
 	}
 
 	switch os.Getenv("KONTROL_STORAGE") {
 	case "etcd":
-		var etcdMachines []string
-		if *machines != "" {
-			etcdMachines = strings.Split(*machines, ",")
+		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
+	case "postgres":
+		postgresConf := &kontrol.PostgresConfig{
+			Host:     conf.Postgres.Host,
+			Port:     conf.Postgres.Port,
+			Username: conf.Postgres.Username,
+			Password: conf.Postgres.Password,
+			DBName:   conf.Postgres.DBName,
 		}
 
-		k.SetStorage(kontrol.NewEtcd(etcdMachines, k.Kite.Log))
-	case "postgres":
-		k.SetStorage(kontrol.NewPostgres(nil, k.Kite.Log))
+		k.SetStorage(kontrol.NewPostgres(postgresConf, k.Kite.Log))
 	}
 
 	k.Run()
