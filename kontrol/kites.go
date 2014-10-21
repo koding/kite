@@ -1,4 +1,4 @@
-package node
+package kontrol
 
 import (
 	"math/rand"

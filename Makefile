@@ -9,6 +9,12 @@ ifeq ($(DEBUG), 1)
 	VERBOSE="-v"
 endif
 
+# Default to etcd
+ifndef KONTROL_STORAGE
+	KONTROL_STORAGE=etcd
+endif
+
+
 all: test
 
 format:
@@ -28,7 +34,7 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -init -username kite -kontrol-url "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444
+	@`which go` run kontrol/kontrol/main.go -public-key /tmp/publicKey.pem -private-key /tmp/privateKey.pem -port 4444 
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
@@ -40,7 +46,33 @@ install:
 	@`which go` install -v ./reverseproxy/reverseproxy
 	@`which go` install -v ./tunnelproxy/tunnelproxy
 
-test:
+kontroltest:
+	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
+	@echo "Cleaning $(KITE_HOME) directory"
+	@rm -rf $(KITE_HOME)
+
+
+	@echo "Using as storage: $(KONTROL_STORAGE)"
+	ifeq ($(KONTROL_STORAGE), "etcd")
+		@echo "Killing previous etcd instance"
+		@killall etcd ||:
+
+		@echo "Installing etcd"
+		test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+		@rm -rf _etcd/kontrol_test ||: #remove previous folder
+		@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+	endif
+
+	@echo "Creating test key"
+	@`which go` run ./testutil/writekey/main.go
+
+	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
+	@`which go` get -d -v -t ./...
+
+	@echo "$(OK_COLOR)==> Starting kontrol test $(NO_COLOR)"
+	@`which go` test -race $(VERBOSE) ./kontrol
+
+test: 
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
@@ -48,6 +80,9 @@ test:
 	@echo "Setting ulimit to $(ULIMIT) for multiple client tests"
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
+	@echo "$(OK_COLOR)==> Using kontrol storage: '$(KONTROL_STORAGE)'$(NO_COLOR)"
+
+ifeq ($(KONTROL_STORAGE), etcd)
 	@echo "Killing previous etcd instance"
 	@killall etcd ||:
 
@@ -55,6 +90,19 @@ test:
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/kontrol_test ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd &
+endif
+
+ifeq ($(KONTROL_STORAGE), postgres)
+
+ifndef KONTROL_POSTGRES_USERNAME
+    $(error KONTROL_POSTGRES_USERNAME is not set)
+endif
+
+ifndef KONTROL_POSTGRES_DBNAME
+    $(error KONTROL_POSTGRES_DBNAME is not set)
+endif
+
+endif
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
@@ -71,7 +119,6 @@ test:
 	@`which go` test -race $(VERBOSE) ./kontrol
 	@`which go` test -race $(VERBOSE) ./tunnelproxy
 	@`which go` test -race $(VERBOSE) ./reverseproxy
-	@`which go` test -race $(VERBOSE) ./pool
 
 doc:
 	@`which godoc` github.com/koding/kite | less
@@ -87,4 +134,4 @@ lint:
 ctags:
 	@ctags -R --languages=c,go
 
-.PHONY: all install format test doc vet lint ctags kontrol
+.PHONY: all install format test doc vet lint ctags kontrol kontroltest

@@ -1,15 +1,21 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
+	"strconv"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 )
 
+var flagPort = flag.Int("port", 6667, "Port to bind")
+
 func main() {
+	flag.Parse()
+
 	// Create a kite
 	k := kite.New("math", "1.0.0")
 
@@ -19,13 +25,14 @@ func main() {
 	// Get config from kite.Key directly, usually it's under ~/.kite/kite.key
 	config := config.MustGet()
 	k.Config = config
-	k.Config.Port = 6667
+	k.Config.Port = *flagPort
+	k.Id = config.Id
 
 	// Register to kite with this url
-	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6667", Path: "/kite"}
+	kiteURL := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(*flagPort), Path: "/kite"}
 
 	// Register us ...
-	_, err := k.Register(kiteURL)
+	err := k.RegisterForever(kiteURL)
 	if err != nil {
 		log.Fatal(err)
 	}

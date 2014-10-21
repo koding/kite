@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -33,6 +34,16 @@ func init() {
 
 	DefaultPort = 5555
 	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
+
+	switch os.Getenv("KONTROL_STORAGE") {
+	case "etcd":
+		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
+	case "postgres":
+		kon.SetStorage(NewPostgres(nil, kon.Kite.Log))
+	default:
+		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
+	}
+
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
@@ -194,7 +205,7 @@ func TestMultiple(t *testing.T) {
 func TestGetKites(t *testing.T) {
 	t.Log("Setting up mathworker4")
 
-	testName := "mathwork4"
+	testName := "mathworker4"
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
 	m.Config = conf.Copy()
@@ -211,7 +222,7 @@ func TestGetKites(t *testing.T) {
 		Username:    conf.Username,
 		Environment: conf.Environment,
 		Name:        testName,
-		Version:     "~> 1.1",
+		Version:     "1.1.1",
 	}
 
 	// exp2 queries for mathkite
@@ -228,15 +239,15 @@ func TestGetKites(t *testing.T) {
 	}
 
 	if len(kites) != 1 {
-		t.Fatal("Only one kite is registerd, we have %d", len(kites))
+		t.Fatalf("Only one kite is registerd, we have %d", len(kites))
 	}
 
 	if kites[0].Name != testName {
-		t.Error("getkites got %s exptected %", kites[0].Name, testName)
+		t.Errorf("getkites got %s exptected %", kites[0].Name, testName)
 	}
 
 	if kites[0].Version != testVersion {
-		t.Error("getkites got %s exptected %", kites[0].Version, testVersion)
+		t.Errorf("getkites got %s exptected %", kites[0].Version, testVersion)
 	}
 }
 
@@ -348,76 +359,6 @@ func TestKontrol(t *testing.T) {
 		t.Fatalf("Invalid result: %d", result)
 	}
 
-	events := make(chan *kite.Event, 3)
-
-	// Test WatchKites
-	t.Log("calling  watchkites")
-	watcher, err := exp2Kite.WatchKites(query, func(e *kite.Event, err *kite.Error) {
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		t.Logf("Event.Action: %s Event.Kite.ID: %s", e.Action, e.Kite.ID)
-		events <- e
-	})
-	if err != nil {
-		t.Fatalf("Cannot watch: %s", err.Error())
-	}
-
-	// First event must be register event because math worker is already running
-	select {
-	case e := <-events:
-		if e.Action != protocol.Register {
-			t.Fatalf("unexpected action: %s", e.Action)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
-
-	t.Log("closing mathworker")
-	mathKite.Close()
-
-	// We must get Deregister event
-	select {
-	case e := <-events:
-		if e.Action != protocol.Deregister {
-			t.Fatalf("unexpected action: %s", e.Action)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
-
-	// Start a new mathworker kite
-	t.Log("Setting up mathworker2")
-	mathKite2 := kite.New("mathworker", "1.2.3")
-	mathKite2.Config = conf.Copy()
-	go mathKite2.Run()
-	<-mathKite2.ServerReadyNotify()
-
-	go mathKite2.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite2.Config.Port), Path: "/kite"})
-	<-mathKite2.KontrolReadyNotify()
-
-	// We must get Register event
-	select {
-	case e := <-events:
-		if e.Action != protocol.Register {
-			t.Fatalf("unexpected action: %s", e.Action)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
-
-	err = watcher.Cancel()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// We must not get any event after cancelling the watcher
-	select {
-	case e := <-events:
-		t.Fatalf("unexpected event: %s", e)
-	case <-time.After(time.Second):
-	}
 }
 
 func Square(r *kite.Request) (interface{}, error) {

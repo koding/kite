@@ -2,8 +2,7 @@ package kontrolclient_test
 
 import (
 	"net/url"
-	// "os"
-	// "strings"
+	"os"
 	"testing"
 	"time"
 
@@ -13,13 +12,11 @@ import (
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
-	// "github.com/koding/kite/tunnelproxy"
 )
 
 var (
 	conf *config.Config
 	kon  *kontrol.Kontrol
-	// prx  *tunnelproxy.Proxy
 )
 
 func init() {
@@ -32,12 +29,18 @@ func init() {
 
 	kontrol.DefaultPort = 4099
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+
+	switch os.Getenv("KONTROL_STORAGE") {
+	case "etcd":
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	case "postgres":
+		kon.SetStorage(kontrol.NewPostgres(nil, kon.Kite.Log))
+	default:
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	}
+
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
-
-	// prx := tunnelproxy.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
-	// prx.Kite.Config.DisableAuthentication = true
-	// prx.Start()
 }
 
 func TestRegisterToKontrol(t *testing.T) {
@@ -62,8 +65,8 @@ func TestRegisterToKontrol(t *testing.T) {
 		}
 
 		first := kites[0]
-		if first.Kite != *k.Kite() {
-			t.Errorf("unexpected kite key: %s", first.Kite)
+		if first.Username != k.Kite().Username {
+			t.Errorf("unexpected kite. got: %s, want: %s", first.Kite, *k.Kite())
 		}
 		if first.URL != "http://zubuzaretta:16500/kite" {
 			t.Errorf("unexpected url: %s", first.URL)
