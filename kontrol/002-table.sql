@@ -3,7 +3,6 @@ CREATE SCHEMA kite;
 
 -- give usage access to schema for our role
 GRANT USAGE ON SCHEMA kite TO kontrol;
-GRANT USAGE ON SCHEMA kite TO kontrolapplication;
 
 -- add our schema to search path
 -- with this way we can use our table name directly without the schema name.
