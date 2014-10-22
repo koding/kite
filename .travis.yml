@@ -8,7 +8,7 @@ addons:
   postgresql: "9.3"
 before_script:
   - psql -f kontrol/001-schema.sql -U postgres
-  - psql -f kontrol/002-table.sql -U kontrol
+  - psql -f kontrol/002-table.sql -U postgres
 env: 
   - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol_db KONTROL_POSTGRES_PASSWORD=somerandompassword
   - KONTROL_STORAGE="etcd"

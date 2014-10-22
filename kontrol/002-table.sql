@@ -1,3 +1,5 @@
+SET ROLE kontrol;
+
 -- create the table
 CREATE TABLE "kite"."kite" (
     username TEXT NOT NULL,

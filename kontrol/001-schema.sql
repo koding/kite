@@ -16,7 +16,7 @@
 
 
 -- create role
-CREATE ROLE kontrol LOGIN;
+CREATE ROLE kontrol;
 
 -- create user
 -- please change this password according to your conventions
