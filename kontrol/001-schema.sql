@@ -24,7 +24,7 @@ CREATE USER kontrolapplication PASSWORD 'somerandompassword';
 
 GRANT kontrol TO kontrolapplication;
 
-CREATE DATABASE kontrol_db OWNER kontrol;
+CREATE DATABASE kontrol OWNER kontrol;
 
 -- create a schema for our tables
 CREATE SCHEMA kite;
