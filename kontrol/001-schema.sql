@@ -14,6 +14,7 @@
 -- drop the table
 -- DROP TABLE IF EXISTS "kite"."kite";
 
+
 -- create role
 CREATE ROLE kontrol LOGIN;
 
@@ -21,8 +22,9 @@ CREATE ROLE kontrol LOGIN;
 -- please change this password according to your conventions
 CREATE USER kontrolapplication PASSWORD 'somerandompassword';
 
--- make the user a member of the role
 GRANT kontrol TO kontrolapplication;
+
+CREATE DATABASE kontrol_db OWNER kontrol;
 
 -- create a schema for our tables
 CREATE SCHEMA kite;
