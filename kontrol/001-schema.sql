@@ -19,10 +19,10 @@ CREATE ROLE kontrol;
 
 -- create user
 -- please change this password according to your conventions
-CREATE USER kontrolapp WITH PASSWORD 'kontrolapp';
+CREATE USER kontrolapplication PASSWORD 'somerandompassword';
 
 -- make the user a member of the role
-GRANT kontrol TO kontrolapp;
+GRANT kontrol TO kontrolapplication;
 
 -- create a schema for our tables
 CREATE SCHEMA kite;

@@ -9,7 +9,7 @@ addons:
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
   - psql -f kontrol/001-schema.sql -U postgres
-  - psql -f kontrol/002-table.sql -U kontrolapp
+  - psql -f kontrol/002-table.sql -U kontrol
 env: 
-  - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapp KONTROL_POSTGRES_DBNAME=travis_ci_test KONTROL_POSTGRES_PASSWORD=kontrolapp
+  - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=travis_ci_test KONTROL_POSTGRES_PASSWORD=somerandompassword
   - KONTROL_STORAGE="etcd"
