@@ -15,7 +15,7 @@
 -- DROP TABLE IF EXISTS "kite"."kite";
 
 -- create role
-CREATE ROLE kontrol;
+CREATE ROLE kontrol LOGIN;
 
 -- create user
 -- please change this password according to your conventions
