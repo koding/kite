@@ -1,29 +1,3 @@
--- Here is the required steps to run kontrol with postgresql storage.
-
--- those can be helpful for a fresh start
-
--- drop the database
--- DROP DATABASE IF EXISTS koding;
-
--- drop the role
--- DROP ROLE IF EXISTS kontrol;
-
--- drop the user
--- DROP USER IF EXISTS kontrol;
-
--- drop the table
--- DROP TABLE IF EXISTS "kite"."kite";
-
--- create role
-CREATE ROLE kontrol;
-
--- create user
--- please change this password according to your conventions
-CREATE USER kontrolapplication PASSWORD 'somerandompassword';
-
--- make the user a member of the role
-GRANT kontrol TO kontrolapplication;
-
 -- create a schema for our tables
 CREATE SCHEMA kite;
 
@@ -32,12 +6,8 @@ GRANT USAGE ON SCHEMA kite TO kontrol;
 
 -- add our schema to search path
 -- with this way we can use our table name directly without the schema name.
-SELECT
-    set_config (
-        'search_path',
-        current_setting ('search_path') || ',kite',
-        FALSE
-    );
+
+ALTER DATABASE kontrol SET search_path="$user", public, kite;
 
 -- create the table
 CREATE TABLE "kite"."kite" (
@@ -55,7 +25,6 @@ CREATE TABLE "kite"."kite" (
 
 -- add proper permissions for table
 GRANT SELECT, INSERT, UPDATE, DELETE ON "kite"."kite" TO "kontrol";
-
 
 -- create the index
 DROP INDEX IF EXISTS kite_updated_at_btree_idx;
