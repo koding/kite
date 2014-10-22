@@ -26,14 +26,3 @@ GRANT kontrol TO kontrolapplication;
 
 CREATE DATABASE kontrol OWNER kontrol;
 
--- create a schema for our tables
-CREATE SCHEMA kite;
-
--- give usage access to schema for our role
-GRANT USAGE ON SCHEMA kite TO kontrol;
-GRANT USAGE ON SCHEMA kite TO kontrolapplication;
-
--- add our schema to search path
--- with this way we can use our table name directly without the schema name.
-
-ALTER DATABASE kontrol SET search_path="$user", public, kite;
