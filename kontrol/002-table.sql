@@ -7,12 +7,7 @@ GRANT USAGE ON SCHEMA kite TO kontrol;
 -- add our schema to search path
 -- with this way we can use our table name directly without the schema name.
 
-SELECT
-    set_config (
-        'search_path',
-        current_setting ('search_path') || ',kite',
-        FALSE
-    );
+ALTER DATABASE kontrol SET search_path="$user", public, kite;
 
 -- create the table
 CREATE TABLE "kite"."kite" (
