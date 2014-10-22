@@ -75,37 +75,6 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		panic(err)
 	}
 
-	// create our initial kite table
-	// * url is containing the kite's register url
-	// * id is going to be kites' unique id. We are adding it as a primary key
-	// so each kite with the full path can only exist once.
-	// * created_at and updated_at are updated at creation and updating (like
-	//  if the URL has changed)
-	table := `CREATE TABLE IF NOT EXISTS kite (
-		username text NOT NULL,
-		environment text NOT NULL,
-		kitename text NOT NULL,
-		version text NOT NULL,
-		region text NOT NULL,
-		hostname text NOT NULL,
-		id uuid PRIMARY KEY,
-		url text NOT NULL,
-		created_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
-		updated_at timestamptz NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
-	);`
-
-	if _, err := db.Exec(table); err != nil {
-		panic(err)
-	}
-
-	// We enable index on the kite and updated_at columns. We don't return on
-	// errors because the operator `IF NOT EXISTS` doesn't work for index
-	// creation, therefore we assume the indexes might be already created.
-	enableBtreeIndex := `CREATE INDEX kite_updated_at_btree_idx ON kite USING BTREE(updated_at)`
-	if _, err := db.Exec(enableBtreeIndex); err != nil {
-		log.Warning("postgres: enable btree index: %s", err)
-	}
-
 	p := &Postgres{
 		DB:  db,
 		Log: log,

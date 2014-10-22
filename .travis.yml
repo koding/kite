@@ -8,6 +8,7 @@ addons:
   postgresql: "9.3"
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
+  - psql -f kontrol/database.sql -U postgres
 env: 
-  - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=postgres KONTROL_POSTGRES_DBNAME=travis_ci_test
+  - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=travis_ci_test KONTROL_POSTGRES_PASSWORD=somerandompassword
   - KONTROL_STORAGE="etcd"
