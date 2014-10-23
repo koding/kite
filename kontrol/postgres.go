@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -16,15 +15,16 @@ import (
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/multiconfig"
 )
 
 // Postgres holds Postgresql database related configuration
 type PostgresConfig struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	DBName   string
+	Host     string `default:"localhost"`
+	Port     int    `default:"5432"`
+	Username string `required:"true"`
+	Password string `required:"true"`
+	DBName   string `required:"true" `
 }
 
 type Postgres struct {
@@ -34,41 +34,31 @@ type Postgres struct {
 
 func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	if conf == nil {
-		conf = &PostgresConfig{}
-	}
+		conf = new(PostgresConfig)
 
-	if conf.Port == 0 {
-		conf.Port = 5432
-	}
+		envLoader := &multiconfig.EnvironmentLoader{Prefix: "kontrol_postgres"}
+		configLoader := multiconfig.MultiLoader(
+			&multiconfig.TagLoader{}, envLoader,
+		)
 
-	if conf.Host == "" {
-		conf.Host = "localhost"
-	}
+		if err := configLoader.Load(conf); err != nil {
+			fmt.Println("Valid environment variables are: ")
+			envLoader.PrintEnvs(conf)
+			panic(err)
+		}
 
-	if conf.DBName == "" {
-		conf.DBName = os.Getenv("KONTROL_POSTGRES_DBNAME")
-		if conf.DBName == "" {
-			panic("db name is not set for postgres kontrol storage")
+		err := multiconfig.MultiValidator(&multiconfig.RequiredValidator{}).Validate(conf)
+		if err != nil {
+			fmt.Println("Valid environment variables are: ")
+			envLoader.PrintEnvs(conf)
+			panic(err)
 		}
 	}
 
 	connString := fmt.Sprintf(
-		"host=%s port=%d dbname=%s sslmode=disable",
-		conf.Host, conf.Port, conf.DBName,
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
+		conf.Host, conf.Port, conf.DBName, conf.Username, conf.Password,
 	)
-
-	if conf.Password != "" {
-		connString += " password=" + conf.Password
-	}
-
-	if conf.Username == "" {
-		conf.Username = os.Getenv("KONTROL_POSTGRES_USERNAME")
-		if conf.Username == "" {
-			panic("username is not set for postgres kontrol storage")
-		}
-	}
-
-	connString += " user=" + conf.Username
 
 	db, err := sql.Open("postgres", connString)
 	if err != nil {
