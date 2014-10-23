@@ -12,7 +12,6 @@ import (
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
-	"github.com/mitchellh/mapstructure"
 )
 
 // Request contains information about the incoming request.
@@ -206,7 +205,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	// check if we have an audience and it matches our own signature
 	audience, ok := token.Claims["aud"].(string)
 	if ok {
-		a, err := kiteFromString(audience)
+		a, err := protocol.KiteFromString(audience)
 		if err != nil {
 			return err
 		}
@@ -250,34 +249,4 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 	}
 
 	return nil
-}
-
-// kiteFromString returns a protocol.Kite from the given string value in form
-// of "/username/environment/...".
-func kiteFromString(stringRepr string) (*protocol.Kite, error) {
-	fields := strings.Split(strings.TrimPrefix(stringRepr, "/"), "/")
-
-	var keyOrder = []string{
-		"username",
-		"environment",
-		"name",
-		"version",
-		"region",
-		"hostname",
-		"id",
-	}
-
-	kiteFields := make(map[string]string, len(fields))
-
-	for i, field := range fields {
-		kiteFields[keyOrder[i]] = field
-	}
-
-	var k *protocol.Kite
-
-	if err := mapstructure.Decode(kiteFields, &k); err != nil {
-		return nil, err
-	}
-
-	return k, nil
 }
