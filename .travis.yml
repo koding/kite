@@ -8,6 +8,7 @@ addons:
   postgresql: "9.3"
 before_script:
   - psql postgres -f kontrol/001-schema.sql -U postgres
+  - psql -c 'CREATE DATABASE kontrol owner kontrol;' -U postgres
   - psql kontrol -f kontrol/002-table.sql -U postgres
 env: 
   - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword

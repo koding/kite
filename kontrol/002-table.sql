@@ -4,11 +4,6 @@ CREATE SCHEMA kite;
 -- give usage access to schema for our role
 GRANT USAGE ON SCHEMA kite TO kontrol;
 
--- add our schema to search path
--- with this way we can use our table name directly without the schema name.
-
-ALTER DATABASE kontrol SET search_path="$user", public, kite;
-
 -- create the table
 CREATE TABLE "kite"."kite" (
     username TEXT NOT NULL,

@@ -24,5 +24,3 @@ CREATE USER kontrolapplication PASSWORD 'somerandompassword';
 
 GRANT kontrol TO kontrolapplication;
 
-CREATE DATABASE kontrol OWNER kontrol;
-
