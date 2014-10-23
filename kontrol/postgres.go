@@ -23,7 +23,7 @@ type PostgresConfig struct {
 	Host     string `default:"localhost"`
 	Port     int    `default:"5432"`
 	Username string `required:"true"`
-	Password string `required:"true"`
+	Password string
 	DBName   string `required:"true" `
 }
 
