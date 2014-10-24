@@ -192,7 +192,7 @@ func (k *Kontrol) registerSelf() {
 			continue
 		}
 
-		time.Sleep(HeartbeatDelay)
+		time.Sleep(HeartbeatDelay + HeartbeatInterval)
 	}
 }
 
