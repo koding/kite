@@ -18,11 +18,9 @@ import (
 )
 
 const (
-	KontrolVersion    = "0.0.4"
-	HeartbeatInterval = 10 * time.Second
-	HeartbeatDelay    = 20 * time.Second
-	KitesPrefix       = "/kites"
-	TokenLeeway       = 1 * time.Minute
+	KontrolVersion = "0.0.4"
+	KitesPrefix    = "/kites"
+	TokenLeeway    = 1 * time.Minute
 )
 
 var (
@@ -31,6 +29,24 @@ var (
 
 	tokenCache   = make(map[string]string)
 	tokenCacheMu sync.Mutex
+
+	// HeartbeatInterval is the interval in which kites are sending heartbeats
+	HeartbeatInterval = time.Second * 30
+
+	// HeartbeatDelay is the compensation interval which is added to the
+	// heartbeat to avoid network delays
+	HeartbeatDelay = time.Second * 10
+
+	// UpdateInterval is the interval in which the key gets updated
+	// periodically. Keeping it low increase the write load to the storage, so
+	// be cautious when changing it.
+	UpdateInterval = time.Second * 150
+
+	// KeyTLL is the timeout in which a key expires. Each storage
+	// implementation needs to set keys according to this Key. If a storage
+	// doesn't support TTL mechanism (such as PostgreSQL), it should use a
+	// background cleaner which cleans up keys that are KeyTTL old.
+	KeyTTL = time.Second * 180
 )
 
 type Kontrol struct {
@@ -41,8 +57,6 @@ type Kontrol struct {
 	// request must not be authenticated because clients do not have a kite.key
 	// before they register to this machine.
 	MachineAuthenticate func(r *kite.Request) error
-
-	Clients *Heartbeats
 
 	// RSA keys
 	publicKey  string // for validating tokens
@@ -58,7 +72,7 @@ type Kontrol struct {
 	log kite.Logger
 }
 
-// New creates a new kontrol instance with the given verson and config
+// New creates a new kontrol instance with the given version and config
 // instance. Publickey is used for validating tokens and privateKey is used for
 // signing tokens.
 //
@@ -81,9 +95,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		publicKey:  publicKey,
 		privateKey: privateKey,
 		log:        k.Log,
-		Clients: &Heartbeats{
-			kites: make(map[string]*time.Timer),
-		},
 	}
 
 	k.HandleFunc("register", kontrol.handleRegister)
@@ -178,7 +189,7 @@ func (k *Kontrol) registerSelf() {
 			continue
 		}
 
-		time.Sleep(HeartbeatInterval)
+		time.Sleep(HeartbeatDelay)
 	}
 }
 

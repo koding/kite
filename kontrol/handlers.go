@@ -50,35 +50,62 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("internal error - register")
 	}
 
-	// updater updates the value of the Kite in storage. We are going to update
-	// the value periodically so if we don't get any update we are going to
-	// assume that the klient is disconnected.
-	updaterFunc := func() error {
-		if err := k.storage.Update(&remote.Kite, value); err != nil {
-			k.log.Error("storage update error: %s", err)
-			return err
+	// we create a new ticker which is going to update the key periodically in
+	// the storage so it's always up to date.
+	updater := time.NewTicker(UpdateInterval)
+	updaterFunc := func() {
+		for _ = range updater.C {
+			k.log.Info("Kite is active, updating the value %s", remote.Kite)
+			err := k.storage.Update(&remote.Kite, value)
+			if err != nil {
+				k.log.Error("storage update '%s' error: %s", remote.Kite, err)
+			}
 		}
-
-		return nil
 	}
+
+	go updaterFunc()
+
+	// lostFunc is called when we don't get any heartbeat or we lost
+	// connection. In any case, it will remove the key from the storage
+	lostFunc := func(reason string) func() {
+		return func() {
+			k.log.Info("Kite %s. Deleting from storage %s", reason, remote.Kite)
+			// stop the updater so it doesn't update it in the background
+			updater.Stop()
+
+			// delete the key immediately
+			k.storage.Delete(&remote.Kite)
+		}
+	}
+
+	// we are now creating a timer that is going to call the lostFunc, which
+	// deletes the key from the storage and also stops the background updater
+	deleteTimer := time.AfterFunc(HeartbeatInterval+HeartbeatDelay,
+		lostFunc("didn't get heartbeat"))
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		dnode.Callback(func(args *dnode.Partial) {
-			updaterFunc()
+			// try to reset the timer every time the remote kite calls this
+			// callback(sends us heartbeat). Because the timer get reset, the
+			// deleteFunc above will never be fired, so the value get always
+			// updated with the updater in the background according to the
+			// write interval. If the kite doesn't send any heartbeat, the
+			// deleteFunc is being called, which removes the key from the
+			// storage.
+			k.log.Info("Kite send us an heartbeat. %s", remote.Kite)
+			deleteTimer.Reset(HeartbeatInterval + HeartbeatDelay)
 		}),
 	}
 
-	if _, err := remote.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...); err != nil {
+	_, err := remote.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	if err != nil {
 		return nil, err
 	}
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
-	remote.OnDisconnect(func() {
-		// Delete from storage once the remote kite is disconnected.
-		k.storage.Delete(&remote.Kite)
-	})
+	remote.OnDisconnect(lostFunc("disconnected")) // also call it when we disconnect
 
 	// send response back to the kite, also identify him with the new name
 	return &protocol.RegisterResult{URL: args.URL}, nil
@@ -89,8 +116,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	// Reason: We can't use the same struct for marshaling and unmarshaling.
 	// TODO use the struct in protocol
 	type GetKitesArgs struct {
-		Query         *protocol.KontrolQuery `json:"query"`
-		WatchCallback dnode.Function         `json:"watchCallback"`
+		Query *protocol.KontrolQuery `json:"query"`
 	}
 
 	var args GetKitesArgs
