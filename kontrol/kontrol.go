@@ -14,7 +14,6 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
-	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -62,8 +61,6 @@ type Kontrol struct {
 // New creates a new kontrol instance with the given verson and config
 // instance. Publickey is used for validating tokens and privateKey is used for
 // signing tokens.
-//
-// peers can be given nil if not running on cluster.
 //
 // Public and private keys are RSA pem blocks that can be generated with the
 // following command:
@@ -174,27 +171,14 @@ func (k *Kontrol) registerSelf() {
 		k.log.Error(err.Error())
 	}
 
-	updater := k.makeUpdater(k.Kite.Kite(), value)
 	for {
-		if err := updater(); err != nil {
+		if err := k.storage.Update(k.Kite.Kite(), value); err != nil {
 			k.log.Error(err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
 
 		time.Sleep(HeartbeatInterval)
-	}
-}
-
-//  makeUpdater returns a func for updating the value for the given kite key with value.
-func (k *Kontrol) makeUpdater(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
-	return func() error {
-		if err := k.storage.Update(kiteProt, value); err != nil {
-			k.log.Error("storage update error: %s", err)
-			return err
-		}
-
-		return nil
 	}
 }
 

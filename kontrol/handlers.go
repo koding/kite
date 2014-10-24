@@ -53,12 +53,19 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// updater updates the value of the Kite in storage. We are going to update
 	// the value periodically so if we don't get any update we are going to
 	// assume that the klient is disconnected.
-	updater := k.makeUpdater(&remote.Kite, value)
+	updaterFunc := func() error {
+		if err := k.storage.Update(&remote.Kite, value); err != nil {
+			k.log.Error("storage update error: %s", err)
+			return err
+		}
+
+		return nil
+	}
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		dnode.Callback(func(args *dnode.Partial) {
-			updater()
+			updaterFunc()
 		}),
 	}
 
