@@ -50,9 +50,6 @@ type Kontrol struct {
 	publicKey  string // for validating tokens
 	privateKey string // for signing tokens
 
-	// Holds refence to all connected clients (key is ID of kite)
-	clients map[string]*kite.Client
-
 	// storage defines the storage of the kites.
 	storage Storage
 
@@ -85,7 +82,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		Kite:       k,
 		publicKey:  publicKey,
 		privateKey: privateKey,
-		clients:    make(map[string]*kite.Client),
 	}
 
 	log = k.Log
@@ -94,19 +90,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
-
-	var mu sync.Mutex
-	k.OnFirstRequest(func(c *kite.Client) {
-		mu.Lock()
-		kontrol.clients[c.ID] = c
-		mu.Unlock()
-	})
-
-	k.OnDisconnect(func(c *kite.Client) {
-		mu.Lock()
-		delete(kontrol.clients, c.ID)
-		mu.Unlock()
-	})
 
 	return kontrol
 }
@@ -233,7 +216,14 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	// assume that the klient is disconnected.
 	updater := k.makeUpdater(&r.Kite, value)
 
-	if err := requestHeartbeat(r, updater); err != nil {
+	heartbeatArgs := []interface{}{
+		HeartbeatInterval / time.Second,
+		dnode.Callback(func(args *dnode.Partial) {
+			updater()
+		}),
+	}
+
+	if _, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...); err != nil {
 		return err
 	}
 
@@ -245,19 +235,6 @@ func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
 	})
 
 	return nil
-}
-
-// requestHeartbeat is calling the remote kite's kite.heartbeat method with the
-// given updaterFunc callback. The remote kite is calling this updaterFunc
-// every 4 seconds
-func requestHeartbeat(r *kite.Client, updaterFunc func() error) error {
-	heartbeatArgs := []interface{}{
-		HeartbeatInterval / time.Second,
-		dnode.Callback(func(args *dnode.Partial) { updaterFunc() }),
-	}
-
-	_, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
-	return err
 }
 
 // registerSelf adds Kontrol itself to the storage as a kite.
@@ -308,60 +285,13 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	type GetKitesArgs struct {
 		Query         *protocol.KontrolQuery `json:"query"`
 		WatchCallback dnode.Function         `json:"watchCallback"`
-		Who           map[string]interface{} `json:"who"`
 	}
 
 	var args GetKitesArgs
 	r.Args.One().MustUnmarshal(&args)
 
-	if len(args.Who) != 0 {
-		// Find all kites in the query and pick one.
-		// TODO do not allow "who" and "watchCallback" fields to be set at the same time.
-		allKites, err := k.getKites(r, args.Query, args.WatchCallback)
-		if err != nil {
-			return nil, err
-		}
-		if len(allKites.Kites) == 0 {
-			return allKites, err
-		}
+	query := args.Query
 
-		// We pick the first one because they come in random order.
-		whoKite := allKites.Kites[0]
-
-		// We will call the "kite.who" method of the selected kite.
-		// If the kite is connected to us, we can use the existing connection.
-		// Otherwise we need to open a new connection to the selected kite.
-		// TODO This approach will NOT work when there are more than one kontrol instance.
-		whoClient := k.clients[whoKite.Kite.ID]
-		if whoClient == nil {
-			// TODO Enable code below after fix.
-			return nil, errors.New("target kite is not connected")
-			// whoClient = k.Kite.NewClient(whoKite.URL)
-			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
-			// whoClient.Kite = whoKite.Kite
-
-			// err = whoClient.Dial()
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// defer whoClient.Close()
-		}
-
-		result, err := whoClient.TellWithTimeout("kite.who", 4*time.Second, args.Who)
-		if err != nil {
-			return nil, err
-		}
-
-		// Replace the original query with the query returned from kite.who method.
-		var whoResult protocol.WhoResult
-		result.MustUnmarshal(&whoResult)
-		args.Query = whoResult.Query
-	}
-
-	return k.getKites(r, args.Query, args.WatchCallback)
-}
-
-func (k *Kontrol) getKites(r *kite.Request, query *protocol.KontrolQuery, watchCallback dnode.Function) (*protocol.GetKitesResult, error) {
 	// audience will go into the token as "aud" claim.
 	audience := getAudience(query)
 
@@ -371,11 +301,6 @@ func (k *Kontrol) getKites(r *kite.Request, query *protocol.KontrolQuery, watchC
 		k.Kite.Kite().Username, k.privateKey)
 	if err != nil {
 		return nil, err
-	}
-
-	// disable this until it can be supported better with the storage interface
-	if watchCallback.Caller != nil {
-		return nil, errors.New("watch functionality is disabled")
 	}
 
 	// Get kites from the storage
