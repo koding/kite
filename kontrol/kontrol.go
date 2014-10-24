@@ -4,7 +4,6 @@ package kontrol
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
@@ -13,28 +12,41 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/kitekey"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
-	"github.com/koding/kite/protocol"
 	"github.com/nu7hatch/gouuid"
 )
 
 const (
-	KontrolVersion    = "0.0.4"
-	HeartbeatInterval = 10 * time.Second
-	HeartbeatDelay    = 20 * time.Second
-	KitesPrefix       = "/kites"
-	TokenLeeway       = 1 * time.Minute
+	KontrolVersion = "0.0.4"
+	KitesPrefix    = "/kites"
+	TokenLeeway    = 1 * time.Minute
 )
 
 var (
-	log         kite.Logger
 	TokenTTL    = 48 * time.Hour
 	DefaultPort = 4000
 
 	tokenCache   = make(map[string]string)
 	tokenCacheMu sync.Mutex
+
+	// HeartbeatInterval is the interval in which kites are sending heartbeats
+	HeartbeatInterval = time.Second * 30
+
+	// HeartbeatDelay is the compensation interval which is added to the
+	// heartbeat to avoid network delays
+	HeartbeatDelay = time.Second * 10
+
+	// UpdateInterval is the interval in which the key gets updated
+	// periodically. Keeping it low increase the write load to the storage, so
+	// be cautious when changing it.
+	UpdateInterval = time.Second * 150
+
+	// KeyTLL is the timeout in which a key expires. Each storage
+	// implementation needs to set keys according to this Key. If a storage
+	// doesn't support TTL mechanism (such as PostgreSQL), it should use a
+	// background cleaner which cleans up keys that are KeyTTL old.
+	KeyTTL = time.Second * 180
 )
 
 type Kontrol struct {
@@ -50,8 +62,7 @@ type Kontrol struct {
 	publicKey  string // for validating tokens
 	privateKey string // for signing tokens
 
-	// Holds refence to all connected clients (key is ID of kite)
-	clients map[string]*kite.Client
+	clientLocks *IdLock
 
 	// storage defines the storage of the kites.
 	storage Storage
@@ -59,13 +70,13 @@ type Kontrol struct {
 	// RegisterURL defines the URL that is used to self register when adding
 	// itself to the storage backend
 	RegisterURL string
+
+	log kite.Logger
 }
 
-// New creates a new kontrol instance with the given verson and config
+// New creates a new kontrol instance with the given version and config
 // instance. Publickey is used for validating tokens and privateKey is used for
 // signing tokens.
-//
-// peers can be given nil if not running on cluster.
 //
 // Public and private keys are RSA pem blocks that can be generated with the
 // following command:
@@ -82,31 +93,17 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	}
 
 	kontrol := &Kontrol{
-		Kite:       k,
-		publicKey:  publicKey,
-		privateKey: privateKey,
-		clients:    make(map[string]*kite.Client),
+		Kite:        k,
+		publicKey:   publicKey,
+		privateKey:  privateKey,
+		log:         k.Log,
+		clientLocks: NewIdlock(),
 	}
-
-	log = k.Log
 
 	k.HandleFunc("register", kontrol.handleRegister)
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
-
-	var mu sync.Mutex
-	k.OnFirstRequest(func(c *kite.Client) {
-		mu.Lock()
-		kontrol.clients[c.ID] = c
-		mu.Unlock()
-	})
-
-	k.OnDisconnect(func(c *kite.Client) {
-		mu.Lock()
-		delete(kontrol.clients, c.ID)
-		mu.Unlock()
-	})
 
 	return kontrol
 }
@@ -148,17 +145,6 @@ func (k *Kontrol) InitializeSelf() error {
 	return kitekey.Write(key)
 }
 
-func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
-	if k.MachineAuthenticate != nil {
-		if err := k.MachineAuthenticate(r); err != nil {
-			return nil, errors.New("cannot authenticate user")
-		}
-	}
-
-	username := r.Args.One().MustString() // username should be send as an argument
-	return k.registerUser(username)
-}
-
 func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	// Only accept requests of type machine
 	tknID, err := uuid.NewV4()
@@ -182,84 +168,6 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	return token.SignedString([]byte(k.privateKey))
 }
 
-func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
-	log.Info("Register request from: %s", r.Client.Kite)
-
-	if r.Args.One().MustMap()["url"].MustString() == "" {
-		return nil, errors.New("invalid url")
-	}
-
-	var args struct {
-		URL string `json:"url"`
-	}
-	r.Args.One().MustUnmarshal(&args)
-	if args.URL == "" {
-		return nil, errors.New("empty url")
-	}
-
-	// Only accept requests with kiteKey because we need this info
-	// for generating tokens for this kite.
-	if r.Auth.Type != "kiteKey" {
-		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
-	}
-
-	err := k.register(r.Client, args.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	// send response back to the kite, also identify him with the new name
-	return &protocol.RegisterResult{URL: args.URL}, nil
-}
-
-func (k *Kontrol) register(r *kite.Client, kiteURL string) error {
-	if err := validateKiteKey(&r.Kite); err != nil {
-		return err
-	}
-
-	value := &kontrolprotocol.RegisterValue{
-		URL: kiteURL,
-	}
-
-	// Register first by adding the value to the storage. Return if there is
-	// any error.
-	if err := k.storage.Upsert(&r.Kite, value); err != nil {
-		log.Error("storage add '%s' error: %s", r.Kite, err)
-		return errors.New("internal error - register")
-	}
-
-	// updater updates the value of the Kite in storage. We are going to update
-	// the value periodically so if we don't get any update we are going to
-	// assume that the klient is disconnected.
-	updater := k.makeUpdater(&r.Kite, value)
-
-	if err := requestHeartbeat(r, updater); err != nil {
-		return err
-	}
-
-	log.Info("Kite registered: %s", r.Kite)
-
-	r.OnDisconnect(func() {
-		// Delete from storage once the remote kite is disconnected.
-		k.storage.Delete(&r.Kite)
-	})
-
-	return nil
-}
-
-// requestHeartbeat is calling the remote kite's kite.heartbeat method with the
-// given updaterFunc callback. The remote kite is calling this updaterFunc
-// every 4 seconds
-func requestHeartbeat(r *kite.Client, updaterFunc func() error) error {
-	heartbeatArgs := []interface{}{
-		HeartbeatInterval / time.Second,
-		dnode.Callback(func(args *dnode.Partial) { updaterFunc() }),
-	}
-
-	_, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
-	return err
-}
-
 // registerSelf adds Kontrol itself to the storage as a kite.
 func (k *Kontrol) registerSelf() {
 	value := &kontrolprotocol.RegisterValue{
@@ -274,122 +182,18 @@ func (k *Kontrol) registerSelf() {
 	// Register first by adding the value to the storage. We don't return any
 	// error because we need to know why kontrol doesn't register itself
 	if err := k.storage.Add(k.Kite.Kite(), value); err != nil {
-		log.Error(err.Error())
+		k.log.Error(err.Error())
 	}
 
-	updater := k.makeUpdater(k.Kite.Kite(), value)
 	for {
-		if err := updater(); err != nil {
-			log.Error(err.Error())
+		if err := k.storage.Update(k.Kite.Kite(), value); err != nil {
+			k.log.Error(err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
 
-		time.Sleep(HeartbeatInterval)
+		time.Sleep(HeartbeatDelay + HeartbeatInterval)
 	}
-}
-
-//  makeUpdater returns a func for updating the value for the given kite key with value.
-func (k *Kontrol) makeUpdater(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterValue) func() error {
-	return func() error {
-		if err := k.storage.Update(kiteProt, value); err != nil {
-			log.Error("storage update error: %s", err)
-			return err
-		}
-
-		return nil
-	}
-}
-
-func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	// This type is here until inversion branch is merged.
-	// Reason: We can't use the same struct for marshaling and unmarshaling.
-	// TODO use the struct in protocol
-	type GetKitesArgs struct {
-		Query         *protocol.KontrolQuery `json:"query"`
-		WatchCallback dnode.Function         `json:"watchCallback"`
-		Who           map[string]interface{} `json:"who"`
-	}
-
-	var args GetKitesArgs
-	r.Args.One().MustUnmarshal(&args)
-
-	if len(args.Who) != 0 {
-		// Find all kites in the query and pick one.
-		// TODO do not allow "who" and "watchCallback" fields to be set at the same time.
-		allKites, err := k.getKites(r, args.Query, args.WatchCallback)
-		if err != nil {
-			return nil, err
-		}
-		if len(allKites.Kites) == 0 {
-			return allKites, err
-		}
-
-		// We pick the first one because they come in random order.
-		whoKite := allKites.Kites[0]
-
-		// We will call the "kite.who" method of the selected kite.
-		// If the kite is connected to us, we can use the existing connection.
-		// Otherwise we need to open a new connection to the selected kite.
-		// TODO This approach will NOT work when there are more than one kontrol instance.
-		whoClient := k.clients[whoKite.Kite.ID]
-		if whoClient == nil {
-			// TODO Enable code below after fix.
-			return nil, errors.New("target kite is not connected")
-			// whoClient = k.Kite.NewClient(whoKite.URL)
-			// whoClient.Authentication = &kite.Authentication{Type: "token", Key: whoKite.Token}
-			// whoClient.Kite = whoKite.Kite
-
-			// err = whoClient.Dial()
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// defer whoClient.Close()
-		}
-
-		result, err := whoClient.TellWithTimeout("kite.who", 4*time.Second, args.Who)
-		if err != nil {
-			return nil, err
-		}
-
-		// Replace the original query with the query returned from kite.who method.
-		var whoResult protocol.WhoResult
-		result.MustUnmarshal(&whoResult)
-		args.Query = whoResult.Query
-	}
-
-	return k.getKites(r, args.Query, args.WatchCallback)
-}
-
-func (k *Kontrol) getKites(r *kite.Request, query *protocol.KontrolQuery, watchCallback dnode.Function) (*protocol.GetKitesResult, error) {
-	// audience will go into the token as "aud" claim.
-	audience := getAudience(query)
-
-	// Generate token once here because we are using the same token for every
-	// kite we return and generating many tokens is really slow.
-	token, err := generateToken(audience, r.Username,
-		k.Kite.Kite().Username, k.privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// disable this until it can be supported better with the storage interface
-	if watchCallback.Caller != nil {
-		return nil, errors.New("watch functionality is disabled")
-	}
-
-	// Get kites from the storage
-	kites, err := k.storage.Get(query)
-	if err != nil {
-		return nil, err
-	}
-
-	// Attach tokens to kites
-	kites.Attach(token)
-
-	return &protocol.GetKitesResult{
-		Kites: kites,
-	}, nil
 }
 
 // generateToken returns a JWT token string. Please see the URL for details:
@@ -445,26 +249,4 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 	})
 
 	return signed, nil
-}
-
-func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
-	var query *protocol.KontrolQuery
-	err := r.Args.One().Unmarshal(&query)
-	if err != nil {
-		return nil, errors.New("Invalid query")
-	}
-
-	// check if it's exist
-	kites, err := k.storage.Get(query)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(kites) > 1 {
-		return nil, errors.New("query matches more than one kite")
-	}
-
-	audience := getAudience(query)
-
-	return generateToken(audience, r.Username, k.Kite.Kite().Username, k.privateKey)
 }
