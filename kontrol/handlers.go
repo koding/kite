@@ -69,6 +69,12 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// connection. In any case, it will remove the key from the storage
 	lostFunc := func(reason string) func() {
 		return func() {
+			_, err := remote.TellWithTimeout("kite.ping", time.Second*4)
+			if err == nil {
+				k.log.Info("Kite is still active %s", remote.Kite)
+				return // don't delete
+			}
+
 			k.log.Info("Kite %s. Deleting from storage %s", reason, remote.Kite)
 			// stop the updater so it doesn't update it in the background
 			updater.Stop()
@@ -98,10 +104,14 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		}),
 	}
 
-	_, err := remote.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	// let's ping first to see if they are alive
+	_, err := remote.TellWithTimeout("kite.ping", 4*time.Second)
 	if err != nil {
 		return nil, err
 	}
+
+	// now trigger the remote kite so it sends us periodically an heartbeat
+	remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
