@@ -30,6 +30,14 @@ func init() {
 	}
 }
 
+// HTTPMuxer abstracts the muxer implementation. We use the standard
+// http.ServeMux for now.
+type HTTPMuxer interface {
+	Handle(string, http.Handler)
+	HandleFunc(string, func(http.ResponseWriter, *http.Request))
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
 // Kite defines a single process that enables distributed service messaging
 // amongst the peers it is connected. A Kite process acts as a Client and as a
 // Server. That means it can receive request, process them, but it also can
@@ -65,7 +73,8 @@ type Kite struct {
 	// multiple handlers
 	MethodHandling MethodHandling
 
-	httpHandler http.Handler
+	// HTTP Muxer
+	HTTPMuxer HTTPMuxer
 
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
@@ -132,9 +141,11 @@ func New(name, version string) *Kite {
 		Id:                 kiteID.String(),
 		readyC:             make(chan bool),
 		closeC:             make(chan bool),
+		HTTPMuxer:          http.NewServeMux(),
 	}
 
-	k.httpHandler = sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler)
+	// All websocket communication is done through this endpoint.
+	k.HTTPMuxer.Handle("/", sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler))
 
 	// Add useful debug logs
 	k.OnConnect(func(c *Client) { k.Log.Debug("New session: %s", c.session.ID()) })
@@ -148,7 +159,7 @@ func New(name, version string) *Kite {
 	// A kite accepts requests with the same username.
 	k.Authenticators["kiteKey"] = k.AuthenticateFromKiteKey
 
-	// Register default methods.
+	// Register default methods and handlers.
 	k.addDefaultHandlers()
 
 	return k
@@ -172,8 +183,10 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 	k.trustedKontrolKeys[issuer] = key
 }
 
+// ServeHTTP helps Kite to satisfy the http.Handler interface. So kite can be
+// used as a standard http server.
 func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	k.httpHandler.ServeHTTP(w, req)
+	k.HTTPMuxer.ServeHTTP(w, req)
 }
 
 func (k *Kite) sockjsHandler(session sockjs.Session) {
