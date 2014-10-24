@@ -100,7 +100,9 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			// deleteFunc is being called, which removes the key from the
 			// storage.
 			k.log.Info("Kite send us an heartbeat. %s", remote.Kite)
+			k.clientLocks.Get(remote.Kite.ID).Lock()
 			deleteTimer.Reset(HeartbeatInterval + HeartbeatDelay)
+			k.clientLocks.Get(remote.Kite.ID).Unlock()
 		}),
 	}
 

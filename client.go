@@ -119,14 +119,6 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 
 	go r.sendHub()
 
-	var m sync.Mutex
-	r.OnDisconnect(func() {
-		m.Lock()
-		close(r.disconnect)
-		r.disconnect = make(chan struct{})
-		m.Unlock()
-	})
-
 	return r
 }
 
@@ -222,6 +214,8 @@ func (c *Client) run() {
 
 	// falls here when connection disconnects
 	c.callOnDisconnectHandlers()
+
+	c.disconnect <- struct{}{}
 
 	if c.Reconnect {
 		go c.dialForever(nil)

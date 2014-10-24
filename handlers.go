@@ -46,7 +46,6 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	// stop the ticker and close the done chan so we can break the loop
 	var once sync.Once
 	r.Client.OnDisconnect(func() {
-		heartbeat.Stop()
 		once.Do(func() { close(done) })
 	})
 
@@ -68,6 +67,7 @@ loop:
 
 	// remove the onDisconnect again so it doesn't call close twice
 	r.Client.onDisconnectHandlers = nil
+	heartbeat.Stop()
 
 	return nil, nil
 }

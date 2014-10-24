@@ -62,6 +62,8 @@ type Kontrol struct {
 	publicKey  string // for validating tokens
 	privateKey string // for signing tokens
 
+	clientLocks *IdLock
+
 	// storage defines the storage of the kites.
 	storage Storage
 
@@ -91,10 +93,11 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	}
 
 	kontrol := &Kontrol{
-		Kite:       k,
-		publicKey:  publicKey,
-		privateKey: privateKey,
-		log:        k.Log,
+		Kite:        k,
+		publicKey:   publicKey,
+		privateKey:  privateKey,
+		log:         k.Log,
+		clientLocks: NewIdlock(),
 	}
 
 	k.HandleFunc("register", kontrol.handleRegister)
