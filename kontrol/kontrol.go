@@ -256,8 +256,9 @@ func requestHeartbeat(r *kite.Client, updaterFunc func() error) error {
 		dnode.Callback(func(args *dnode.Partial) { updaterFunc() }),
 	}
 
-	_, err := r.TellWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
-	return err
+	// now trigger the remote kite so it sends us periodically an heartbeat
+	r.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	return nil
 }
 
 // registerSelf adds Kontrol itself to the storage as a kite.
