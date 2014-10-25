@@ -5,7 +5,7 @@ CREATE SCHEMA kite;
 GRANT USAGE ON SCHEMA kite TO kontrol;
 
 -- create the table
-CREATE TABLE "kite"."kite" (
+CREATE UNLOGGED TABLE "kite"."kite" (
     username TEXT NOT NULL,
     environment TEXT NOT NULL,
     kitename TEXT NOT NULL,

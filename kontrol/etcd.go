@@ -75,13 +75,13 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 
 	// Set the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err := e.client.Set(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err := e.client.Set(etcdKey, valueString, uint64(KeyTTL/time.Second))
 	if err != nil {
 		return err
 	}
 
 	// Also store the the kite.Key Id for easy lookup
-	_, err = e.client.Set(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err = e.client.Set(etcdIDKey, valueString, uint64(KeyTTL/time.Second))
 	if err != nil {
 		return err
 	}
@@ -98,20 +98,20 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 
 	// update the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err := e.client.Update(etcdKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err := e.client.Update(etcdKey, valueString, uint64(KeyTTL/time.Second))
 	if err != nil {
 		return err
 	}
 
 	// Also update the the kite.Key Id for easy lookup
-	_, err = e.client.Update(etcdIDKey, valueString, uint64(HeartbeatDelay/time.Second))
+	_, err = e.client.Update(etcdIDKey, valueString, uint64(KeyTTL/time.Second))
 	if err != nil {
 		return err
 	}
 
 	// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
 	_, err = e.client.Update(KitesPrefix+"/"+k.Username,
-		"", uint64(HeartbeatDelay/time.Second))
+		"", uint64(KeyTTL/time.Second))
 	if err != nil {
 		return err
 	}

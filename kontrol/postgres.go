@@ -70,14 +70,13 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 		Log: log,
 	}
 
-	cleanInterval := 30 * time.Second  // clean every 30 second
-	expireInterval := 20 * time.Second // clean rows that are 20 second old
-	go p.RunCleaner(cleanInterval, expireInterval)
+	cleanInterval := 120 * time.Second // clean every 120 second
+	go p.RunCleaner(cleanInterval, KeyTTL)
 
 	return p
 }
 
-// RunCleaner delets every "interval" duration rows which are older than
+// RunCleaner deletes every "interval" duration rows which are older than
 // "expire" duration based on the "updated_at" field. For more info check
 // CleanExpireRows which is used to delete old rows.
 func (p *Postgres) RunCleaner(interval, expire time.Duration) {
