@@ -55,7 +55,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	updater := time.NewTicker(UpdateInterval)
 	updaterFunc := func() {
 		for _ = range updater.C {
-			k.log.Info("Kite is active, updating the value %s", remote.Kite)
+			k.log.Debug("Kite is active, updating the value %s", remote.Kite)
 			err := k.storage.Update(&remote.Kite, value)
 			if err != nil {
 				k.log.Error("storage update '%s' error: %s", remote.Kite, err)
@@ -93,7 +93,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			// write interval. If the kite doesn't send any heartbeat, the
 			// deleteFunc is being called, which removes the key from the
 			// storage.
-			k.log.Info("Kite send us an heartbeat. %s", remote.Kite)
+			k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
 			k.clientLocks.Get(remote.Kite.ID).Lock()
 			deleteTimer.Reset(HeartbeatInterval + HeartbeatDelay)
 			k.clientLocks.Get(remote.Kite.ID).Unlock()
