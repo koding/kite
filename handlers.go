@@ -29,7 +29,7 @@ func (k *Kite) addDefaultHandlers() {
 	}
 }
 
-// systemInfo returns info about the system (CPU, memory, disk...).
+// handleSystemInfo returns info about the system (CPU, memory, disk...).
 func handleSystemInfo(r *Request) (interface{}, error) {
 	return systeminfo.New()
 }
