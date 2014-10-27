@@ -65,7 +65,8 @@ type Kite struct {
 	// multiple handlers
 	MethodHandling MethodHandling
 
-	httpHandler http.Handler
+	// HTTP muxer
+	httpHandler *http.ServeMux
 
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
@@ -132,9 +133,11 @@ func New(name, version string) *Kite {
 		Id:                 kiteID.String(),
 		readyC:             make(chan bool),
 		closeC:             make(chan bool),
+		httpHandler:        http.NewServeMux(),
 	}
 
-	k.httpHandler = sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler)
+	// All websocket communication is done through this endpoint.
+	k.HandleHTTP("/", sockjs.NewHandler("/kite", sockjs.DefaultOptions, k.sockjsHandler))
 
 	// Add useful debug logs
 	k.OnConnect(func(c *Client) { k.Log.Debug("New session: %s", c.session.ID()) })
@@ -148,7 +151,7 @@ func New(name, version string) *Kite {
 	// A kite accepts requests with the same username.
 	k.Authenticators["kiteKey"] = k.AuthenticateFromKiteKey
 
-	// Register default methods.
+	// Register default methods and handlers.
 	k.addDefaultHandlers()
 
 	return k
@@ -172,6 +175,20 @@ func (k *Kite) TrustKontrolKey(issuer, key string) {
 	k.trustedKontrolKeys[issuer] = key
 }
 
+// HandleHTTP registers the HTTP handler for the given pattern into the
+// underlying HTTP muxer.
+func (k *Kite) HandleHTTP(pattern string, handler http.Handler) {
+	k.httpHandler.Handle(pattern, handler)
+}
+
+// HandleHTTPFunc registers the HTTP handler for the given pattern into the
+// underlying HTTP muxer.
+func (k *Kite) HandleHTTPFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	k.httpHandler.HandleFunc(pattern, handler)
+}
+
+// ServeHTTP helps Kite to satisfy the http.Handler interface. So kite can be
+// used as a standard http server.
 func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	k.httpHandler.ServeHTTP(w, req)
 }
