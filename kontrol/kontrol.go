@@ -157,6 +157,7 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	token.Claims = map[string]interface{}{
 		"iss":        k.Kite.Kite().Username,         // Issuer
 		"sub":        username,                       // Subject
+		"aud":        "/" + username,                 // Audience
 		"iat":        time.Now().UTC().Unix(),        // Issued At
 		"jti":        tknID.String(),                 // JWT ID
 		"kontrolURL": k.Kite.Config.KontrolURL,       // Kontrol URL
