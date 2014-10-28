@@ -100,12 +100,6 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		}),
 	}
 
-	// let's ping first to see if they are alive
-	_, err := remote.TellWithTimeout("kite.ping", 4*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	// now trigger the remote kite so it sends us periodically an heartbeat
 	remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
 
