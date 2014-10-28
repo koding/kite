@@ -2,7 +2,6 @@
 package kite
 
 import (
-	"container/list"
 	"errors"
 	"math/rand"
 	"net/url"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
@@ -35,23 +33,12 @@ type kontrolClient struct {
 	readyConnected  chan struct{}
 	readyRegistered chan struct{}
 
-	// watchers are saved here to re-watch on reconnect.
-	watchers      *list.List
-	watchersMutex sync.RWMutex
-
 	// lastRegisteredURL stores the Kite url what was send/registered
 	// succesfully to kontrol
 	lastRegisteredURL *url.URL
 
 	// registerChan registers the url's it receives from the channel to Kontrol
 	registerChan chan *url.URL
-}
-
-// Event is the struct that is emitted from Kontrol.WatchKites method.
-type Event struct {
-	protocol.KiteEvent
-
-	localKite *Kite
 }
 
 type registerResult struct {
@@ -82,8 +69,6 @@ func (k *Kite) SetupKontrolClient() error {
 	k.kontrol.Client = client
 	k.kontrol.Unlock()
 
-	k.kontrol.watchers = list.New()
-
 	k.kontrol.OnConnect(func() {
 		k.Log.Info("Connected to Kontrol ")
 
@@ -98,16 +83,6 @@ func (k *Kite) SetupKontrolClient() error {
 		// signal all other methods that are listening on this channel, that we
 		// are connected to kontrol.
 		k.kontrol.onceConnected.Do(func() { close(k.kontrol.readyConnected) })
-
-		// Re-register existing watchers.
-		k.kontrol.watchersMutex.RLock()
-		for e := k.kontrol.watchers.Front(); e != nil; e = e.Next() {
-			watcher := e.Value.(*Watcher)
-			if err := watcher.rewatch(); err != nil {
-				k.Log.Error("Cannot rewatch query: %+v", watcher)
-			}
-		}
-		k.kontrol.watchersMutex.RUnlock()
 	})
 
 	k.kontrol.OnDisconnect(func() {
@@ -122,68 +97,6 @@ func (k *Kite) SetupKontrolClient() error {
 	return nil
 }
 
-// WatchKites watches for Kites that matches the query. The onEvent functions
-// is called for current kites and every nekite event.
-func (k *Kite) WatchKites(query *protocol.KontrolQuery, onEvent EventHandler) (*Watcher, error) {
-	if err := k.SetupKontrolClient(); err != nil {
-		return nil, err
-	}
-
-	<-k.kontrol.readyConnected
-
-	watcherID, err := k.watchKites(query, onEvent)
-	if err != nil {
-		return nil, err
-	}
-
-	return k.newWatcher(watcherID, query, onEvent), nil
-}
-
-func (k *Kite) eventCallbackHandler(onEvent EventHandler) dnode.Function {
-	return dnode.Callback(func(args *dnode.Partial) {
-		var response struct {
-			Result *Event `json:"result"`
-			Error  *Error `json:"error"`
-		}
-
-		args.One().MustUnmarshal(&response)
-
-		if response.Result != nil {
-			response.Result.localKite = k
-		}
-
-		onEvent(response.Result, response.Error)
-	})
-}
-
-func (k *Kite) watchKites(query *protocol.KontrolQuery, onEvent EventHandler) (watcherID string, err error) {
-	args := protocol.GetKitesArgs{
-		Query:         query,
-		WatchCallback: k.eventCallbackHandler(onEvent),
-	}
-	clients, watcherID, err := k.getKites(args)
-	if err != nil && err != ErrNoKitesAvailable {
-		return "", err // return only when something really happened
-	}
-
-	// also put the current kites to the eventChan.
-	for _, client := range clients {
-		event := Event{
-			KiteEvent: protocol.KiteEvent{
-				Action: protocol.Register,
-				Kite:   client.Kite,
-				URL:    client.URL,
-				Token:  client.Auth.Key,
-			},
-			localKite: k,
-		}
-
-		onEvent(&event, nil)
-	}
-
-	return watcherID, nil
-}
-
 // GetKites returns the list of Kites matching the query. The returned list
 // contains Ready to connect Client instances. The caller must connect
 // with Client.Dial() before using each Kite. An error is returned when no
@@ -193,7 +106,7 @@ func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 		return nil, err
 	}
 
-	clients, _, err := k.getKites(protocol.GetKitesArgs{Query: query})
+	clients, err := k.getKites(protocol.GetKitesArgs{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -206,25 +119,25 @@ func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 }
 
 // used internally for GetKites() and WatchKites()
-func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID string, err error) {
+func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
 	<-k.kontrol.readyConnected
 
 	response, err := k.kontrol.TellWithTimeout("getKites", 4*time.Second, args)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	var result = new(protocol.GetKitesResult)
 	err = response.Unmarshal(&result)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	clients := make([]*Client, len(result.Kites))
 	for i, currentKite := range result.Kites {
 		_, err := jwt.Parse(currentKite.Token, k.RSAKey)
 		if err != nil {
-			return nil, result.WatcherID, err
+			return nil, err
 		}
 
 		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
@@ -248,7 +161,7 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) (kites []*Client, watcherID 
 		token.RenewWhenExpires()
 	}
 
-	return clients, result.WatcherID, nil
+	return clients, nil
 }
 
 // GetToken is used to get a new token for a single Kite.
@@ -271,22 +184,6 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	}
 
 	return tkn, nil
-}
-
-// Create new Client from Register events. It panics if the action is not
-// Register.
-func (e *Event) Client() *Client {
-	if e.Action != protocol.Register {
-		panic("This method can only be called for 'Register' event.")
-	}
-
-	r := e.localKite.NewClient(e.URL)
-	r.Kite = e.Kite
-	r.Auth = &Auth{
-		Type: "token",
-		Key:  e.Token,
-	}
-	return r
 }
 
 // KontrolReadyNotify returns a channel that is closed when a successful

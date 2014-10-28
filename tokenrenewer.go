@@ -73,6 +73,7 @@ func (t *TokenRenewer) renewLoop() {
 				go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
 			}
 		case <-t.disconnect:
+			t.disconnect = make(chan struct{})
 			return
 		}
 	}

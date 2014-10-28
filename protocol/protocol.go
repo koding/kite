@@ -143,8 +143,7 @@ type WhoResult struct {
 }
 
 type GetKitesResult struct {
-	Kites     []*KiteWithToken `json:"kites"`
-	WatcherID string           `json:"watcherID,omitempty"`
+	Kites []*KiteWithToken `json:"kites"`
 }
 
 type KiteWithToken struct {
