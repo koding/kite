@@ -214,7 +214,11 @@ func (c *Client) run() {
 	// falls here when connection disconnects
 	c.callOnDisconnectHandlers()
 
-	c.disconnect <- struct{}{}
+	// let others know that the client has disconnected
+	select {
+	case c.disconnect <- struct{}{}:
+	default:
+	}
 
 	if c.Reconnect {
 		// we override it so it doesn't get selected next time. Because we are
