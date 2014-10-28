@@ -60,9 +60,6 @@ func TestRegisterToKontrol(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(kites) != 1 {
-			t.Fatalf("unexpected result: %+v", kites)
-		}
 
 		first := kites[0]
 		if first.Username != k.Kite().Username {
@@ -75,50 +72,6 @@ func TestRegisterToKontrol(t *testing.T) {
 		t.Fatal("timeout")
 	}
 }
-
-// func TestRegisterToTunnel(t *testing.T) {
-// 	k := setup()
-// 	defer k.Close()
-
-// 	go k.RegisterToTunnel()
-
-// 	select {
-// 	case <-k.KontrolReadyNotify():
-// 	case <-time.After(10 * time.Second):
-// 		t.Fatal("timeout")
-// 	}
-// }
-
-// func TestRegisterToTunnelAndKontrol(t *testing.T) {
-// 	k := setup()
-// 	defer k.Close()
-
-// 	go k.RegisterToTunnel()
-
-// 	select {
-// 	case <-k.KontrolReadyNotify():
-// 		kites, err := k.GetKites(protocol.KontrolQuery{
-// 			Username:    k.Kite().Username,
-// 			Environment: k.Kite().Environment,
-// 			Name:        k.Kite().Name,
-// 		})
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		if len(kites) != 1 {
-// 			t.Fatalf("unexpected result: %+v", kites)
-// 		}
-// 		first := kites[0]
-// 		if first.Kite != *k.Kite() {
-// 			t.Errorf("unexpected kite key: %s", first.Kite)
-// 		}
-// 		if !strings.Contains(first.WSConfig.Location.String(), "/proxy") {
-// 			t.Errorf("unexpected url: %s", first.WSConfig.Location.String())
-// 		}
-// 	case <-time.After(2 * time.Second):
-// 		t.Fatal("timeout")
-// 	}
-// }
 
 func setup() *kite.Kite {
 	k := kite.New("test", "1.0.0")
