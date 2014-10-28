@@ -3,7 +3,6 @@ package kite
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"net/url"
 	"os"
@@ -159,7 +158,6 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
 			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
 			continue
 		}
-		fmt.Println("new renew")
 		token.RenewWhenExpires()
 	}
 
