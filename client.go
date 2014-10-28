@@ -110,7 +110,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 	r := &Client{
 		LocalKite:     k,
 		URL:           remoteURL,
-		disconnect:    make(chan struct{}),
+		disconnect:    make(chan struct{}, 1),
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
 		Concurrent:    true,
@@ -144,8 +144,6 @@ func (c *Client) Dial() (err error) {
 // Dial connects to the remote Kite. If it can't connect, it retries
 // indefinitely. It returns a channel to check if it's connected or not.
 func (c *Client) DialForever() (connected chan bool, err error) {
-	c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-
 	c.Reconnect = true
 	connected = make(chan bool, 1) // This will be closed on first connection.
 	go c.dialForever(connected)
@@ -154,6 +152,7 @@ func (c *Client) DialForever() (connected chan bool, err error) {
 
 func (c *Client) dialForever(connectNotifyChan chan bool) {
 	dial := func() error {
+		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 		if !c.Reconnect {
 			return nil
 		}
@@ -218,6 +217,11 @@ func (c *Client) run() {
 	c.disconnect <- struct{}{}
 
 	if c.Reconnect {
+		// we override it so it doesn't get selected next time. Because we are
+		// redialing, so after redial if a new method is called, the disconnect
+		// channel is being read and the local "disconnect" message will be the
+		// final response. This shouldn't be happen for redials.
+		c.disconnect = make(chan struct{}, 1)
 		go c.dialForever(nil)
 	}
 }
