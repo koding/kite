@@ -31,7 +31,7 @@ var (
 	tokenCacheMu sync.Mutex
 
 	// HeartbeatInterval is the interval in which kites are sending heartbeats
-	HeartbeatInterval = time.Second * 30
+	HeartbeatInterval = time.Second * 10
 
 	// HeartbeatDelay is the compensation interval which is added to the
 	// heartbeat to avoid network delays
