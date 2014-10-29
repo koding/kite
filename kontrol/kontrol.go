@@ -5,7 +5,6 @@ package kontrol
 import (
 	"errors"
 	"math/rand"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +31,7 @@ var (
 	tokenCacheMu sync.Mutex
 
 	// HeartbeatInterval is the interval in which kites are sending heartbeats
-	HeartbeatInterval = time.Second * 10
+	HeartbeatInterval = time.Second * 1
 
 	// HeartbeatDelay is the compensation interval which is added to the
 	// heartbeat to avoid network delays
@@ -62,6 +61,9 @@ type Kontrol struct {
 	// RSA keys
 	publicKey  string // for validating tokens
 	privateKey string // for signing tokens
+
+	clients   map[string]*time.Timer
+	clientsMu sync.Mutex // protects clients
 
 	clientLocks *IdLock
 
@@ -98,6 +100,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		publicKey:   publicKey,
 		privateKey:  privateKey,
 		log:         k.Log,
+		clients:     make(map[string]*time.Timer),
 		clientLocks: NewIdlock(),
 	}
 
@@ -106,9 +109,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 
-	k.HandleHTTPFunc("/heartbeat", func(rw http.ResponseWriter, req *http.Request) {
-		rw.Write([]byte("pong"))
-	})
+	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
 
 	return kontrol
 }
