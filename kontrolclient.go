@@ -128,8 +128,17 @@ func (k *Kite) sendHeartbeats(interval time.Duration) {
 		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
 	}
 
+	u, err := url.Parse(heartbeatURL)
+	if err != nil {
+		k.Log.Fatal("HeartbeatURL is malformed: %s", err)
+	}
+
+	q := u.Query()
+	q.Set("id", k.Id)
+	u.RawQuery = q.Encode()
+
 	for _ = range tick {
-		if err := k.heartbeat(heartbeatURL); err != nil {
+		if err := k.heartbeat(u.String()); err != nil {
 			k.Log.Error("couldn't sent hearbeat: %s", err)
 		}
 	}
