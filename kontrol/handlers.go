@@ -100,6 +100,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			remote.Kite)
 		// stop the updater so it doesn't update it in the background
 		updater.Stop()
+
+		k.clientsMu.Lock()
+		delete(k.clients, remote.Kite.ID)
+		k.clientsMu.Unlock()
 	}
 
 	// we are now creating a timer that is going to call the lostFunc, which
