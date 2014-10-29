@@ -40,13 +40,13 @@ var (
 	// UpdateInterval is the interval in which the key gets updated
 	// periodically. Keeping it low increase the write load to the storage, so
 	// be cautious when changing it.
-	UpdateInterval = time.Second * 150
+	UpdateInterval = time.Second * 60
 
 	// KeyTLL is the timeout in which a key expires. Each storage
 	// implementation needs to set keys according to this Key. If a storage
 	// doesn't support TTL mechanism (such as PostgreSQL), it should use a
 	// background cleaner which cleans up keys that are KeyTTL old.
-	KeyTTL = time.Second * 180
+	KeyTTL = time.Second * 90
 )
 
 type Kontrol struct {
