@@ -113,13 +113,16 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())
 	}
 
-	go k.sendHeartbeats(time.Duration(rr.HeartbeatInterval) * time.Second)
+	go k.sendHeartbeats(
+		time.Duration(rr.HeartbeatInterval)*time.Second,
+		kiteURL,
+	)
 
 	return &registerResult{parsed}, nil
 }
 
-func (k *Kite) sendHeartbeats(interval time.Duration) {
-	tick := time.Tick(interval)
+func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
+	tick := time.NewTicker(interval)
 
 	var heartbeatURL string
 	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
@@ -137,34 +140,39 @@ func (k *Kite) sendHeartbeats(interval time.Duration) {
 	q.Set("id", k.Id)
 	u.RawQuery = q.Encode()
 
-	for _ = range tick {
-		if err := k.heartbeat(u.String()); err != nil {
+	heartbeatFunc := func() error {
+		k.Log.Info("Sending heartbeat to %s", u.String())
+
+		resp, err := http.Get(u.String())
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		// we are just receving the simple strings such as "pong", "registeragain"
+		// so it's totally normal to consume the whole response
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		switch string(body) {
+		case "pong":
+			return nil
+		case "registeragain":
+			tick.Stop()
+			k.Register(kiteURL)
+			return nil
+		}
+
+		return fmt.Errorf("malformed heartbeat response %v", string(body))
+	}
+
+	for _ = range tick.C {
+		if err := heartbeatFunc(); err != nil {
 			k.Log.Error("couldn't sent hearbeat: %s", err)
 		}
 	}
-}
-
-func (k *Kite) heartbeat(url string) error {
-	k.Log.Info("Sending heartbeat to %s", url)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// we are just receving the string "pong" so it's totally normal to consume
-	// the whole response
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if string(body) == "pong" {
-		return nil
-	}
-
-	return fmt.Errorf("malformed heartbeat response %v", string(body))
 }
 
 // SetupKontrolClient setups and prepares a the kontrol instance. It connects
