@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
@@ -37,9 +38,6 @@ type kontrolClient struct {
 	readyConnected  chan struct{}
 	readyRegistered chan struct{}
 
-	// closes when there is a disconnection
-	disconnect chan struct{}
-
 	// lastRegisteredURL stores the Kite url what was send/registered
 	// succesfully to kontrol
 	lastRegisteredURL *url.URL
@@ -50,6 +48,114 @@ type kontrolClient struct {
 
 type registerResult struct {
 	URL *url.URL
+}
+
+type kontrolFunc func(*kontrolClient) error
+
+func (k *Kite) kontrolFunc(fn kontrolFunc) error {
+	if k.Config.KontrolURL == "" {
+		return errors.New("no kontrol URL given in config")
+	}
+
+	client := k.NewClient(k.Config.KontrolURL)
+
+	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
+	client.Auth = &Auth{
+		Type: "kiteKey",
+		Key:  k.Config.KiteKey,
+	}
+
+	kontrol := &kontrolClient{}
+	kontrol.Lock()
+	kontrol.Client = client
+	kontrol.Unlock()
+
+	if err := kontrol.Dial(); err != nil {
+		return err
+	}
+	defer kontrol.Close()
+
+	return fn(kontrol)
+}
+
+// Register registers current Kite to Kontrol. After registration other Kites
+// can find it via GetKites() or WatchKites() method.  This method does not
+// handle the reconnection case. If you want to keep registered to kontrol, use
+// RegisterForever().
+func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
+	var response *dnode.Partial
+
+	registerFunc := func(kontrol *kontrolClient) error {
+		args := protocol.RegisterArgs{
+			URL: kiteURL.String(),
+		}
+
+		k.Log.Info("Registering to kontrol with URL: %s", kiteURL.String())
+		var err error
+		response, err = kontrol.TellWithTimeout("register", 4*time.Second, args)
+		return err
+	}
+
+	if err := k.kontrolFunc(registerFunc); err != nil {
+		return nil, err
+	}
+
+	var rr protocol.RegisterResult
+	if err := response.Unmarshal(&rr); err != nil {
+		return nil, err
+	}
+
+	k.Log.Info("Registered to kontrol with URL: %s and Kite query: %s",
+		rr.URL, k.Kite())
+
+	parsed, err := url.Parse(rr.URL)
+	if err != nil {
+		k.Log.Error("Cannot parse registered URL: %s", err.Error())
+	}
+
+	go k.sendHeartbeats(time.Duration(rr.HeartbeatInterval) * time.Second)
+
+	return &registerResult{parsed}, nil
+}
+
+func (k *Kite) sendHeartbeats(interval time.Duration) {
+	tick := time.Tick(interval)
+
+	var heartbeatURL string
+	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
+		heartbeatURL = strings.TrimSuffix(k.Config.KontrolURL, "/kite") + "/heartbeat"
+	} else {
+		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
+	}
+
+	for _ = range tick {
+		if err := k.heartbeat(heartbeatURL); err != nil {
+			k.Log.Error("couldn't sent hearbeat: %s", err)
+		}
+	}
+}
+
+func (k *Kite) heartbeat(url string) error {
+	k.Log.Info("Sending heartbeat to %s", url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// we are just receving the string "pong" so it's totally normal to consume
+	// the whole response
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if string(body) == "pong" {
+		return nil
+	}
+
+	return fmt.Errorf("malformed heartbeat response %v", string(body))
 }
 
 // SetupKontrolClient setups and prepares a the kontrol instance. It connects
@@ -99,7 +205,7 @@ func (k *Kite) SetupKontrolClient() error {
 	})
 
 	// non blocking, is going to reconnect if the connection goes down.
-	if _, err := k.kontrol.DialForever(); err != nil {
+	if err := k.kontrol.Dial(); err != nil {
 		return err
 	}
 
@@ -253,96 +359,6 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 	case err := <-errs:
 		return err
 	}
-}
-
-// Register registers current Kite to Kontrol. After registration other Kites
-// can find it via GetKites() or WatchKites() method.  This method does not
-// handle the reconnection case. If you want to keep registered to kontrol, use
-// RegisterForever().
-func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
-	if err := k.SetupKontrolClient(); err != nil {
-		return nil, err
-	}
-
-	<-k.kontrol.readyConnected
-
-	args := protocol.RegisterArgs{
-		URL: kiteURL.String(),
-	}
-
-	k.Log.Info("Registering to kontrol with URL: %s", kiteURL.String())
-
-	response, err := k.kontrol.TellWithTimeout("register", 4*time.Second, args)
-	if err != nil {
-		return nil, err
-	}
-
-	var rr protocol.RegisterResult
-	err = response.Unmarshal(&rr)
-	if err != nil {
-		return nil, err
-	}
-
-	k.Log.Info("Registered to kontrol with URL: %s and Kite query: %s",
-		rr.URL, k.Kite())
-
-	parsed, err := url.Parse(rr.URL)
-	if err != nil {
-		k.Log.Error("Cannot parse registered URL: %s", err.Error())
-	}
-
-	go k.sendHeartbeats(time.Duration(rr.HeartbeatInterval) * time.Second)
-
-	return &registerResult{parsed}, nil
-}
-
-func (k *Kite) sendHeartbeats(interval time.Duration) {
-	tick := time.NewTicker(interval)
-
-	var heartbeatURL string
-	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
-		heartbeatURL = strings.TrimSuffix(k.Config.KontrolURL, "/kite") + "/heartbeat"
-	} else {
-		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
-	}
-
-loop:
-	for {
-		select {
-		case <-k.kontrol.disconnect:
-			k.kontrol.disconnect = make(chan struct{})
-			break loop
-		case <-tick.C:
-			if err := k.heartbeat(heartbeatURL); err != nil {
-				k.Log.Error("couldn't sent hearbeat: %s", err)
-			}
-		}
-	}
-
-	tick.Stop()
-}
-
-func (k *Kite) heartbeat(url string) error {
-	k.Log.Info("Sending heartbeat to %s", url)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// we are just receving the string "pong" so it's totally normal to consume
-	// the whole response
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if string(body) == "pong" {
-		return nil
-	}
-
-	return fmt.Errorf("malformed heartbeat response %v", string(body))
 }
 
 // RegisterToTunnel finds a tunnel proxy kite by asking kontrol then registers

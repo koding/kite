@@ -67,13 +67,13 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// lostFunc is called when we don't get any heartbeat or we lost
 	// connection. In any case it will stop the updater
-	lostFunc := func(reason string) func() {
-		return func() {
-			k.log.Info("Kite %s. Stopping the updater %s", reason, remote.Kite)
-			// stop the updater so it doesn't update it in the background
-			updater.Stop()
-		}
-	}
+	// lostFunc := func(reason string) func() {
+	// 	return func() {
+	// 		k.log.Info("Kite %s. Stopping the updater %s", reason, remote.Kite)
+	// 		// stop the updater so it doesn't update it in the background
+	// 		updater.Stop()
+	// 	}
+	// }
 
 	// we are now creating a timer that is going to call the lostFunc, which
 	// stops the background updater if it's not resetted.
@@ -103,7 +103,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
-	remote.OnDisconnect(lostFunc("disconnected")) // also call it when we disconnect
+	// remote.OnDisconnect(lostFunc("disconnected")) // also call it when we disconnect
 
 	// send response back to the kite, also identify him with the new name
 	return &protocol.RegisterResult{
