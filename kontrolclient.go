@@ -37,6 +37,9 @@ type kontrolClient struct {
 	readyConnected  chan struct{}
 	readyRegistered chan struct{}
 
+	// closes when there is a disconnection
+	disconnect chan struct{}
+
 	// lastRegisteredURL stores the Kite url what was send/registered
 	// succesfully to kontrol
 	lastRegisteredURL *url.URL
@@ -71,6 +74,7 @@ func (k *Kite) SetupKontrolClient() error {
 
 	k.kontrol.Lock()
 	k.kontrol.Client = client
+	k.kontrol.disconnect = make(chan struct{})
 	k.kontrol.Unlock()
 
 	k.kontrol.OnConnect(func() {
@@ -91,6 +95,7 @@ func (k *Kite) SetupKontrolClient() error {
 
 	k.kontrol.OnDisconnect(func() {
 		k.Log.Warning("Disconnected from Kontrol.")
+		close(k.kontrol.disconnect)
 	})
 
 	// non blocking, is going to reconnect if the connection goes down.
@@ -301,11 +306,20 @@ func (k *Kite) sendHeartbeats(interval time.Duration) {
 		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
 	}
 
-	for _ = range tick.C {
-		if err := k.heartbeat(heartbeatURL); err != nil {
-			k.Log.Error("couldn't sent hearbeat: ", err)
+loop:
+	for {
+		select {
+		case <-k.kontrol.disconnect:
+			k.kontrol.disconnect = make(chan struct{})
+			break loop
+		case <-tick.C:
+			if err := k.heartbeat(heartbeatURL); err != nil {
+				k.Log.Error("couldn't sent hearbeat: %s", err)
+			}
 		}
 	}
+
+	tick.Stop()
 }
 
 func (k *Kite) heartbeat(url string) error {

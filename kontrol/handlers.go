@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/koding/kite"
-	"github.com/koding/kite/dnode"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
@@ -64,7 +63,6 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			}
 		}
 	}
-
 	go updaterFunc()
 
 	// lostFunc is called when we don't get any heartbeat or we lost
@@ -79,36 +77,39 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// we are now creating a timer that is going to call the lostFunc, which
 	// stops the background updater if it's not resetted.
-	updateTimer := time.AfterFunc(HeartbeatInterval+HeartbeatDelay,
-		lostFunc("didn't get heartbeat"))
+	// updateTimer := time.AfterFunc(HeartbeatInterval+HeartbeatDelay,
+	// 	lostFunc("didn't get heartbeat"))
 
-	heartbeatArgs := []interface{}{
-		HeartbeatInterval / time.Second,
-		dnode.Callback(func(args *dnode.Partial) {
-			// try to reset the timer every time the remote kite calls this
-			// callback(sends us heartbeat). Because the timer get reset, the
-			// lostFunc above will never be fired, so the value get always
-			// updated with the updater in the background according to the
-			// write interval. If the kite doesn't send any heartbeat, the
-			// deleteFunc is being called, which stops the updater so the key
-			// is being deleted automatically via the TTL mechanism.
-			k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
-
-			k.clientLocks.Get(remote.Kite.ID).Lock()
-			updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
-			k.clientLocks.Get(remote.Kite.ID).Unlock()
-		}),
-	}
+	// heartbeatArgs := []interface{}{
+	// 	HeartbeatInterval / time.Second,
+	// 	dnode.Callback(func(args *dnode.Partial) {
+	// 		// try to reset the timer every time the remote kite calls this
+	// 		// callback(sends us heartbeat). Because the timer get reset, the
+	// 		// lostFunc above will never be fired, so the value get always
+	// 		// updated with the updater in the background according to the
+	// 		// write interval. If the kite doesn't send any heartbeat, the
+	// 		// deleteFunc is being called, which stops the updater so the key
+	// 		// is being deleted automatically via the TTL mechanism.
+	// 		k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
+	//
+	// 		k.clientLocks.Get(remote.Kite.ID).Lock()
+	// 		updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
+	// 		k.clientLocks.Get(remote.Kite.ID).Unlock()
+	// 	}),
+	// }
 
 	// now trigger the remote kite so it sends us periodically an heartbeat
-	remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	// remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
 	remote.OnDisconnect(lostFunc("disconnected")) // also call it when we disconnect
 
 	// send response back to the kite, also identify him with the new name
-	return &protocol.RegisterResult{URL: args.URL}, nil
+	return &protocol.RegisterResult{
+		URL:               args.URL,
+		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
+	}, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
