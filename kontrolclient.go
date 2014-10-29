@@ -3,9 +3,13 @@ package kite
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -282,7 +286,49 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())
 	}
 
+	go k.sendHeartbeats(time.Duration(rr.HeartbeatInterval) * time.Second)
+
 	return &registerResult{parsed}, nil
+}
+
+func (k *Kite) sendHeartbeats(interval time.Duration) {
+	tick := time.NewTicker(interval)
+
+	var heartbeatURL string
+	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
+		heartbeatURL = strings.TrimSuffix(k.Config.KontrolURL, "/kite") + "/heartbeat"
+	} else {
+		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
+	}
+
+	for _ = range tick.C {
+		if err := k.heartbeat(heartbeatURL); err != nil {
+			k.Log.Error("couldn't sent hearbeat: ", err)
+		}
+	}
+}
+
+func (k *Kite) heartbeat(url string) error {
+	k.Log.Info("Sending heartbeat to %s", url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// we are just receving the string "pong" so it's totally normal to consume
+	// the whole response
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if string(body) == "pong" {
+		return nil
+	}
+
+	return fmt.Errorf("malformed heartbeat response %v", string(body))
 }
 
 // RegisterToTunnel finds a tunnel proxy kite by asking kontrol then registers

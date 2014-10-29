@@ -5,6 +5,7 @@ package kontrol
 import (
 	"errors"
 	"math/rand"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -104,6 +105,10 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
+
+	k.HandleHTTPFunc("/heartbeat", func(rw http.ResponseWriter, req *http.Request) {
+		rw.Write([]byte("pong"))
+	})
 
 	return kontrol
 }
