@@ -76,6 +76,67 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	return fn(kontrol)
 }
 
+// GetKites returns the list of Kites matching the query. The returned list
+// contains Ready to connect Client instances. The caller must connect
+// with Client.Dial() before using each Kite. An error is returned when no
+// kites are available.
+func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
+	var response *dnode.Partial
+	getKitesFunc := func(kontrol *kontrolClient) error {
+		args := protocol.GetKitesArgs{
+			Query: query,
+		}
+
+		var err error
+		response, err = kontrol.TellWithTimeout("getKites", 4*time.Second, args)
+		return err
+	}
+
+	if err := k.kontrolFunc(getKitesFunc); err != nil {
+		return nil, err
+	}
+
+	var result = new(protocol.GetKitesResult)
+
+	if err := response.Unmarshal(&result); err != nil {
+		return nil, err
+	}
+
+	if len(result.Kites) == 0 {
+		return nil, ErrNoKitesAvailable
+	}
+
+	clients := make([]*Client, len(result.Kites))
+	for i, currentKite := range result.Kites {
+		_, err := jwt.Parse(currentKite.Token, k.RSAKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
+		auth := &Auth{
+			Type: "token",
+			Key:  currentKite.Token,
+		}
+
+		clients[i] = k.NewClient(currentKite.URL)
+		clients[i].Kite = currentKite.Kite
+		clients[i].Auth = auth
+	}
+
+	// Renew tokens
+	for _, r := range clients {
+		token, err := NewTokenRenewer(r, k)
+		if err != nil {
+			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
+			continue
+		}
+		token.RenewWhenExpires()
+	}
+
+	return clients, nil
+}
+
 // Register registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() or WatchKites() method. It registers again if
 // connection to kontrol is lost.
@@ -226,73 +287,6 @@ func (k *Kite) SetupKontrolClient() error {
 	}
 
 	return nil
-}
-
-// GetKites returns the list of Kites matching the query. The returned list
-// contains Ready to connect Client instances. The caller must connect
-// with Client.Dial() before using each Kite. An error is returned when no
-// kites are available.
-func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
-	if err := k.SetupKontrolClient(); err != nil {
-		return nil, err
-	}
-
-	clients, err := k.getKites(protocol.GetKitesArgs{Query: query})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(clients) == 0 {
-		return nil, ErrNoKitesAvailable
-	}
-
-	return clients, nil
-}
-
-// used internally for GetKites() and WatchKites()
-func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
-	<-k.kontrol.readyConnected
-
-	response, err := k.kontrol.TellWithTimeout("getKites", 4*time.Second, args)
-	if err != nil {
-		return nil, err
-	}
-
-	var result = new(protocol.GetKitesResult)
-	err = response.Unmarshal(&result)
-	if err != nil {
-		return nil, err
-	}
-
-	clients := make([]*Client, len(result.Kites))
-	for i, currentKite := range result.Kites {
-		_, err := jwt.Parse(currentKite.Token, k.RSAKey)
-		if err != nil {
-			return nil, err
-		}
-
-		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
-		auth := &Auth{
-			Type: "token",
-			Key:  currentKite.Token,
-		}
-
-		clients[i] = k.NewClient(currentKite.URL)
-		clients[i].Kite = currentKite.Kite
-		clients[i].Auth = auth
-	}
-
-	// Renew tokens
-	for _, r := range clients {
-		token, err := NewTokenRenewer(r, k)
-		if err != nil {
-			k.Log.Error("Error in token. Token will not be renewed when it expires: %s", err.Error())
-			continue
-		}
-		token.RenewWhenExpires()
-	}
-
-	return clients, nil
 }
 
 // GetToken is used to get a new token for a single Kite.
