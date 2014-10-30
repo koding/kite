@@ -76,6 +76,27 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	return fn(kontrol)
 }
 
+// GetToken is used to get a new token for a single Kite.
+func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
+	var response *dnode.Partial
+	getTokenFunc := func(kontrol *kontrolClient) error {
+		var err error
+		response, err = kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
+		return err
+	}
+
+	if err := k.kontrolFunc(getTokenFunc); err != nil {
+		return "", err
+	}
+
+	var tkn string
+	if err := response.Unmarshal(&tkn); err != nil {
+		return "", err
+	}
+
+	return tkn, nil
+}
+
 // GetKites returns the list of Kites matching the query. The returned list
 // contains Ready to connect Client instances. The caller must connect
 // with Client.Dial() before using each Kite. An error is returned when no
@@ -287,28 +308,6 @@ func (k *Kite) SetupKontrolClient() error {
 	}
 
 	return nil
-}
-
-// GetToken is used to get a new token for a single Kite.
-func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
-	if err := k.SetupKontrolClient(); err != nil {
-		return "", err
-	}
-
-	<-k.kontrol.readyConnected
-
-	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
-	if err != nil {
-		return "", err
-	}
-
-	var tkn string
-	err = result.Unmarshal(&tkn)
-	if err != nil {
-		return "", err
-	}
-
-	return tkn, nil
 }
 
 // KontrolReadyNotify returns a channel that is closed when a successful
