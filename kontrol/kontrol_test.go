@@ -141,7 +141,7 @@ func TestMultiple(t *testing.T) {
 		m.Config = conf.Copy()
 
 		kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
-		err := m.RegisterForever(kiteURL)
+		_, err := m.Register(kiteURL)
 		if err != nil {
 			t.Error(err)
 		}
@@ -301,7 +301,7 @@ func TestKontrol(t *testing.T) {
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
 
-	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
+	go mathKite.Register(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
 	// exp2 kite is the mathworker client

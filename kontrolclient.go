@@ -148,8 +148,8 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		}
 		defer resp.Body.Close()
 
-		// we are just receving the simple strings such as "pong", "registeragain"
-		// so it's totally normal to consume the whole response
+		// we are just receving the strings such as "pong", "registeragain" so
+		// it's totally normal to consume the whole response
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
