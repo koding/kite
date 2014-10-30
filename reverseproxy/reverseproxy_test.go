@@ -119,8 +119,7 @@ func TestWebSocketProxy(t *testing.T) {
 
 	// register ourself to kontrol with this proxyUrl
 	color.Green("BackendKite is registering to Kontrol with the result from proxy")
-	go backendKite.Register(registerURL)
-	<-backendKite.KontrolReadyNotify()
+	backendKite.Register(registerURL)
 
 	// now another completely foreign kite and will search for our backend
 	// kite, connect to it and execute the "foo" method

@@ -301,8 +301,7 @@ func TestKontrol(t *testing.T) {
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
 
-	go mathKite.Register(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
-	<-mathKite.KontrolReadyNotify()
+	mathKite.Register(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 
 	// exp2 kite is the mathworker client
 	t.Log("Setting up exp2 kite")

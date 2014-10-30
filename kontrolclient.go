@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -16,40 +15,19 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-const (
-	kontrolRetryDuration = 10 * time.Second
-	proxyRetryDuration   = 10 * time.Second
-)
-
 // Returned from GetKites when query matches no kites.
 var ErrNoKitesAvailable = errors.New("no kites availabile")
-
-// kontrolClient is a kite for registering and querying Kites from Kontrol.
-type kontrolClient struct {
-	*Client
-	sync.Mutex // protects Client
-
-	// used for synchronizing methods that needs to be called after
-	// successful connection or/and registiration to kontrol.
-	onceConnected   sync.Once
-	onceRegistered  sync.Once
-	readyConnected  chan struct{}
-	readyRegistered chan struct{}
-
-	// lastRegisteredURL stores the Kite url what was send/registered
-	// succesfully to kontrol
-	lastRegisteredURL *url.URL
-
-	// registerChan registers the url's it receives from the channel to Kontrol
-	registerChan chan *url.URL
-}
 
 type registerResult struct {
 	URL *url.URL
 }
 
-type kontrolFunc func(*kontrolClient) error
+type kontrolFunc func(*Client) error
 
+// kontrolFunc setups and prepares a the kontrol instance. It connects to
+// kontrol and providers a way to call the given function in that connected
+// kontrol environment. This method is called internally whenever a kontrol
+// client specific action is taking (getKites, getToken, register)
 func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	if k.Config.KontrolURL == "" {
 		return errors.New("no kontrol URL given in config")
@@ -63,23 +41,18 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 		Key:  k.Config.KiteKey,
 	}
 
-	kontrol := &kontrolClient{}
-	kontrol.Lock()
-	kontrol.Client = client
-	kontrol.Unlock()
-
-	if err := kontrol.Dial(); err != nil {
+	if err := client.Dial(); err != nil {
 		return err
 	}
-	defer kontrol.Close()
+	defer client.Close()
 
-	return fn(kontrol)
+	return fn(client)
 }
 
 // GetToken is used to get a new token for a single Kite.
 func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	var response *dnode.Partial
-	getTokenFunc := func(kontrol *kontrolClient) error {
+	getTokenFunc := func(kontrol *Client) error {
 		var err error
 		response, err = kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
 		return err
@@ -103,7 +76,7 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 // kites are available.
 func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 	var response *dnode.Partial
-	getKitesFunc := func(kontrol *kontrolClient) error {
+	getKitesFunc := func(kontrol *Client) error {
 		args := protocol.GetKitesArgs{
 			Query: query,
 		}
@@ -164,7 +137,7 @@ func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 	var response *dnode.Partial
 
-	registerFunc := func(kontrol *kontrolClient) error {
+	registerFunc := func(kontrol *Client) error {
 		args := protocol.RegisterArgs{
 			URL: kiteURL.String(),
 		}
@@ -196,8 +169,6 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		time.Duration(rr.HeartbeatInterval)*time.Second,
 		kiteURL,
 	)
-
-	k.signalReady()
 
 	return &registerResult{parsed}, nil
 }
@@ -254,70 +225,4 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			k.Log.Error("couldn't sent hearbeat: %s", err)
 		}
 	}
-}
-
-// SetupKontrolClient setups and prepares a the kontrol instance. It connects
-// to kontrol and reconnects again if there is any disconnections. This method
-// is called internally whenever a kontrol client specific action is taking.
-// However if you wish to connect earlier you may call this method.
-func (k *Kite) SetupKontrolClient() error {
-	if k.kontrol.Client != nil {
-		return nil // already prepared
-	}
-
-	if k.Config.KontrolURL == "" {
-		return errors.New("no kontrol URL given in config")
-	}
-
-	client := k.NewClient(k.Config.KontrolURL)
-	client.Kite = protocol.Kite{Name: "kontrol"} // for logging purposes
-	client.Auth = &Auth{
-		Type: "kiteKey",
-		Key:  k.Config.KiteKey,
-	}
-
-	k.kontrol.Lock()
-	k.kontrol.Client = client
-	k.kontrol.disconnect = make(chan struct{})
-	k.kontrol.Unlock()
-
-	k.kontrol.OnConnect(func() {
-		k.Log.Info("Connected to Kontrol ")
-
-		// try to re-register on connect
-		if k.kontrol.lastRegisteredURL != nil {
-			select {
-			case k.kontrol.registerChan <- k.kontrol.lastRegisteredURL:
-			default:
-			}
-		}
-
-		// signal all other methods that are listening on this channel, that we
-		// are connected to kontrol.
-		k.kontrol.onceConnected.Do(func() { close(k.kontrol.readyConnected) })
-	})
-
-	k.kontrol.OnDisconnect(func() {
-		k.Log.Warning("Disconnected from Kontrol.")
-		close(k.kontrol.disconnect)
-	})
-
-	// non blocking, is going to reconnect if the connection goes down.
-	if err := k.kontrol.Dial(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// KontrolReadyNotify returns a channel that is closed when a successful
-// registiration to kontrol is done.
-func (k *Kite) KontrolReadyNotify() chan struct{} {
-	return k.kontrol.readyRegistered
-}
-
-// signalReady is an internal method to notify that a sucessful registiration
-// is done.
-func (k *Kite) signalReady() {
-	k.kontrol.onceRegistered.Do(func() { close(k.kontrol.readyRegistered) })
 }

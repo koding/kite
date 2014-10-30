@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
@@ -48,28 +47,26 @@ func TestRegisterToKontrol(t *testing.T) {
 	defer k.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "zubuzaretta:16500", Path: "/kite"}
-	go k.Register(kiteURL)
+	_, err := k.Register(kiteURL)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	select {
-	case <-k.KontrolReadyNotify():
-		kites, err := k.GetKites(&protocol.KontrolQuery{
-			Username:    k.Kite().Username,
-			Environment: k.Kite().Environment,
-			Name:        k.Kite().Name,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	kites, err := k.GetKites(&protocol.KontrolQuery{
+		Username:    k.Kite().Username,
+		Environment: k.Kite().Environment,
+		Name:        k.Kite().Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		first := kites[0]
-		if first.Username != k.Kite().Username {
-			t.Errorf("unexpected kite. got: %s, want: %s", first.Kite, *k.Kite())
-		}
-		if first.URL != "http://zubuzaretta:16500/kite" {
-			t.Errorf("unexpected url: %s", first.URL)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout")
+	first := kites[0]
+	if first.Username != k.Kite().Username {
+		t.Errorf("unexpected kite. got: %s, want: %s", first.Kite, *k.Kite())
+	}
+	if first.URL != "http://zubuzaretta:16500/kite" {
+		t.Errorf("unexpected url: %s", first.URL)
 	}
 }
 
