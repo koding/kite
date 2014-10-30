@@ -153,7 +153,6 @@ func TestMultiple(t *testing.T) {
 	for i := 0; i < clientNumber; i++ {
 		c := kite.New("client"+strconv.Itoa(i), "0.0.1")
 		c.Config = conf.Copy()
-		c.SetupKontrolClient()
 		clients[i] = c
 	}
 

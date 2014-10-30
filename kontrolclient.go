@@ -27,7 +27,9 @@ type kontrolFunc func(*Client) error
 // kontrolFunc setups and prepares a the kontrol instance. It connects to
 // kontrol and providers a way to call the given function in that connected
 // kontrol environment. This method is called internally whenever a kontrol
-// client specific action is taking (getKites, getToken, register)
+// client specific action is taking (getKites, getToken, register). The main
+// reason for having this is doing the call and close the connection
+// immediately, so there will be no persistent connection.
 func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	if k.Config.KontrolURL == "" {
 		return errors.New("no kontrol URL given in config")
@@ -193,7 +195,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	u.RawQuery = q.Encode()
 
 	heartbeatFunc := func() error {
-		k.Log.Info("Sending heartbeat to %s", u.String())
+		k.Log.Debug("Sending heartbeat to %s", u.String())
 
 		resp, err := http.Get(u.String())
 		if err != nil {
@@ -207,6 +209,8 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		if err != nil {
 			return err
 		}
+
+		k.Log.Debug("Heartbeat response %s", string(body))
 
 		switch string(body) {
 		case "pong":
