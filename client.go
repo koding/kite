@@ -48,6 +48,12 @@ type Client struct {
 	// To signal waiters of Go() on disconnect.
 	disconnect chan struct{}
 
+	// To signal about the close
+	closeChan chan struct{}
+
+	// To syncronize the consumers
+	wg *sync.WaitGroup
+
 	// SockJS session
 	// TODO: replace this with a proper interface to support multiple
 	// transport/protocols
@@ -111,13 +117,16 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		LocalKite:     k,
 		URL:           remoteURL,
 		disconnect:    make(chan struct{}, 1),
+		closeChan:     make(chan struct{}),
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
 		Concurrent:    true,
 		send:          make(chan []byte, 512), // buffered
+		wg:            &sync.WaitGroup{},
 	}
 
 	go r.sendHub()
+	r.wg.Add(1) // with sendHub we added a new listener
 
 	return r
 }
@@ -314,10 +323,22 @@ func (c *Client) Close() {
 	if c.session != nil {
 		c.session.Close(3000, "Go away!")
 	}
+
+	close(c.send)
+	close(c.closeChan)
+
+	// wait for consumers to finish buffered messages
+	c.wg.Wait()
+
+	// GC, not to cause a memory leak
+	c.send = nil
 }
 
 // sendhub sends the msg received from the send channel to the remote client
 func (c *Client) sendHub() {
+	// notify that we are done
+	defer c.wg.Done()
+
 	for {
 		select {
 		case msg, ok := <-c.send:
@@ -536,7 +557,13 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 		return nil, err
 	}
 
-	c.send <- data
+	select {
+	case <-c.closeChan:
+		return nil, errors.New("can not send")
+	default:
+		c.send <- data
+	}
+
 	return
 }
 
