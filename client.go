@@ -343,7 +343,7 @@ func (c *Client) sendHub() {
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
-				c.LocalKite.Log.Warning("Send hub is closed")
+				c.LocalKite.Log.Debug("Send hub is closed")
 				return
 			}
 
