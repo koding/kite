@@ -28,8 +28,19 @@ type Rand struct {
 
 var r = Rand{r: rand.New(rand.NewSource(time.Now().UnixNano()))}
 
-func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
-	dialURL, err := url.Parse(baseURL)
+type WebsocketSession struct {
+	conn     *websocket.Conn
+	id       string
+	messages []string
+}
+
+type DialOptions struct {
+	BaseURL                         string
+	ReadBufferSize, WriteBufferSize int
+}
+
+func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
+	dialURL, err := url.Parse(opts.BaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +65,12 @@ func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 	requestHeader := http.Header{}
 	requestHeader.Add("Origin", originalScheme+"://"+dialURL.Host)
 
-	conn, _, err := websocket.DefaultDialer.Dial(dialURL.String(), requestHeader)
+	ws := websocket.Dialer{
+		ReadBufferSize:  opts.ReadBufferSize,
+		WriteBufferSize: opts.WriteBufferSize,
+	}
+
+	conn, _, err := ws.Dial(dialURL.String(), requestHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +78,6 @@ func ConnectWebsocketSession(baseURL string) (*WebsocketSession, error) {
 	session := NewWebsocketSession(conn)
 	session.id = sessionID
 	return session, nil
-}
-
-type WebsocketSession struct {
-	conn     *websocket.Conn
-	id       string
-	messages []string
 }
 
 func NewWebsocketSession(conn *websocket.Conn) *WebsocketSession {

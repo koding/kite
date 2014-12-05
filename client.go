@@ -75,6 +75,12 @@ type Client struct {
 	m sync.RWMutex
 
 	firstRequestHandlersNotified sync.Once
+
+	// ReadBufferSize is the input buffer size. By default it's 4096.
+	ReadBufferSize int
+
+	// WriteBufferSize is the output buffer size. By default it's 4096.
+	WriteBufferSize int
 }
 
 // callOptions is the type of first argument in the dnode message.
@@ -178,7 +184,21 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 }
 
 func (c *Client) dial() (err error) {
-	c.session, err = sockjsclient.ConnectWebsocketSession(c.URL)
+	if c.ReadBufferSize == 0 {
+		c.ReadBufferSize = 4096
+	}
+
+	if c.WriteBufferSize == 0 {
+		c.WriteBufferSize = 4096
+	}
+
+	opts := &sockjsclient.DialOptions{
+		BaseURL:         c.URL,
+		ReadBufferSize:  c.ReadBufferSize,
+		WriteBufferSize: c.WriteBufferSize,
+	}
+
+	c.session, err = sockjsclient.ConnectWebsocketSession(opts)
 	if err != nil {
 		// explicitly set nil to avoid panicing when used the methods of that interface
 		c.session = nil
