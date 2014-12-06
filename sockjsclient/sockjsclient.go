@@ -76,6 +76,8 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 		ws.NetDial = func(network, addr string) (net.Conn, error) {
 			return net.DialTimeout(network, addr, opts.Timeout)
 		}
+		// this is used as Deadline inside gorillas dialer method
+		ws.HandshakeTimeout = opts.Timeout
 	}
 
 	conn, _, err := ws.Dial(dialURL.String(), requestHeader)
