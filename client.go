@@ -145,9 +145,15 @@ func (c *Client) SetUsername(username string) {
 
 // Dial connects to the remote Kite. Returns error if it can't.
 func (c *Client) Dial() (err error) {
+	// zero means no timeout
+	return c.DialTimeout(0)
+}
+
+// DialTimeout acts like Dial but takes a timeout.
+func (c *Client) DialTimeout(timeout time.Duration) (err error) {
 	c.LocalKite.Log.Debug("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 
-	if err := c.dial(); err != nil {
+	if err := c.dial(timeout); err != nil {
 		return err
 	}
 
@@ -165,25 +171,7 @@ func (c *Client) DialForever() (connected chan bool, err error) {
 	return
 }
 
-func (c *Client) dialForever(connectNotifyChan chan bool) {
-	dial := func() error {
-		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-		if !c.Reconnect {
-			return nil
-		}
-		return c.dial()
-	}
-
-	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
-
-	if connectNotifyChan != nil {
-		close(connectNotifyChan)
-	}
-
-	go c.run()
-}
-
-func (c *Client) dial() (err error) {
+func (c *Client) dial(timeout time.Duration) (err error) {
 	if c.ReadBufferSize == 0 {
 		c.ReadBufferSize = 4096
 	}
@@ -196,6 +184,7 @@ func (c *Client) dial() (err error) {
 		BaseURL:         c.URL,
 		ReadBufferSize:  c.ReadBufferSize,
 		WriteBufferSize: c.WriteBufferSize,
+		Timeout:         timeout,
 	}
 
 	c.session, err = sockjsclient.ConnectWebsocketSession(opts)
@@ -213,6 +202,24 @@ func (c *Client) dial() (err error) {
 	go c.callOnConnectHandlers()
 
 	return nil
+}
+
+func (c *Client) dialForever(connectNotifyChan chan bool) {
+	dial := func() error {
+		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+		if !c.Reconnect {
+			return nil
+		}
+		return c.dial(0)
+	}
+
+	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
+
+	if connectNotifyChan != nil {
+		close(connectNotifyChan)
+	}
+
+	go c.run()
 }
 
 func (c *Client) RemoteAddr() string {

@@ -37,6 +37,7 @@ type WebsocketSession struct {
 type DialOptions struct {
 	BaseURL                         string
 	ReadBufferSize, WriteBufferSize int
+	Timeout                         time.Duration
 }
 
 func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
@@ -68,6 +69,13 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 	ws := websocket.Dialer{
 		ReadBufferSize:  opts.ReadBufferSize,
 		WriteBufferSize: opts.WriteBufferSize,
+	}
+
+	// if the user passed a timeout, us a dial with a timeout
+	if opts.Timeout != 0 {
+		ws.NetDial = func(network, addr string) (net.Conn, error) {
+			return net.DialTimeout(network, addr, opts.Timeout)
+		}
 	}
 
 	conn, _, err := ws.Dial(dialURL.String(), requestHeader)
