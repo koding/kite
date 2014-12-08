@@ -32,7 +32,7 @@ func main() {
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(*flagPort), Path: "/kite"}
 
 	// Register us ...
-	err := k.RegisterForever(kiteURL)
+	_, err := k.Register(kiteURL)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -14,9 +14,9 @@ const publicEcho = "http://echoip.com"
 
 // RegisterURL returns a URL that is either local or public. It's an helper
 // method to get a Registration URL that can be passed to Kontrol (via the
-// methods Register(), RegisterToProxy(), etc.) It needs to be called after all
-// configurations are done (like TLS, Port,etc.). If local is true a local IP
-// is used, otherwise a public IP is being used.
+// methods Register()) It needs to be called after all configurations are done
+// (like TLS, Port,etc.). If local is true a local IP is used, otherwise a
+// public IP is being used.
 func (k *Kite) RegisterURL(local bool) *url.URL {
 	var ip net.IP
 	var err error

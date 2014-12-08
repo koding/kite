@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
-	"sync"
-	"time"
 
 	"code.google.com/p/go.crypto/ssh/terminal"
 	"github.com/gorilla/websocket"
@@ -18,7 +16,6 @@ import (
 func (k *Kite) addDefaultHandlers() {
 	// Default RPC methods
 	k.HandleFunc("kite.systemInfo", handleSystemInfo)
-	k.HandleFunc("kite.heartbeat", k.handleHeartbeat)
 	k.HandleFunc("kite.ping", handlePing).DisableAuthentication()
 	k.HandleFunc("kite.tunnel", handleTunnel)
 	k.HandleFunc("kite.log", k.handleLog)
@@ -33,44 +30,6 @@ func (k *Kite) addDefaultHandlers() {
 // handleSystemInfo returns info about the system (CPU, memory, disk...).
 func handleSystemInfo(r *Request) (interface{}, error) {
 	return systeminfo.New()
-}
-
-// handleHeartbeat pings the callback with the given interval seconds.
-func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	args := r.Args.MustSliceOfLength(2)
-	seconds := args[0].MustFloat64()
-	ping := args[1].MustFunction()
-
-	heartbeat := time.NewTicker(time.Duration(seconds) * time.Second)
-	done := make(chan bool, 0)
-
-	// stop the ticker and close the done chan so we can break the loop
-	var once sync.Once
-	r.Client.OnDisconnect(func() {
-		once.Do(func() { close(done) })
-	})
-
-	// we need to break out because stopping the ticker is not enough. If we
-	// stop the ticker ping.Call() will block until there is data from the
-	// other end of the connection. So use an explicit exit.
-
-loop:
-	for {
-		select {
-		case <-done:
-			break loop
-		case <-heartbeat.C:
-			if err := ping.Call(); err != nil {
-				k.Log.Error(err.Error())
-			}
-		}
-	}
-
-	// remove the onDisconnect again so it doesn't call close twice
-	r.Client.onDisconnectHandlers = nil
-	heartbeat.Stop()
-
-	return nil, nil
 }
 
 // handleLog prints a log message to stderr.
