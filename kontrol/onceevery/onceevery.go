@@ -1,4 +1,4 @@
-package kontrol
+package onceevery
 
 import (
 	"sync"
@@ -16,7 +16,7 @@ type OnceEvery struct {
 }
 
 // NewOnceEvery creates a new OnceEvery struct
-func NewOnceEvery(d time.Duration) *OnceEvery {
+func New(d time.Duration) *OnceEvery {
 	return &OnceEvery{
 		Interval: d,
 		stopped:  make(chan bool, 1),

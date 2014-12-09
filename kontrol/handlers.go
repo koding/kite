@@ -7,6 +7,7 @@ import (
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kontrol/onceevery"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
@@ -50,7 +51,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("internal error - register")
 	}
 
-	every := NewOnceEvery(UpdateInterval)
+	every := onceevery.New(UpdateInterval)
 
 	ping := make(chan struct{}, 1)
 	closed := false
