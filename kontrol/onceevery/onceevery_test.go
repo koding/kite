@@ -27,7 +27,7 @@ func TestOnceEvery(t *testing.T) {
 	defer countMu.Unlock()
 
 	if count != 2 {
-		t.Errorf("function should be calle two times, got '%d'", count)
+		t.Errorf("function should be called two times, got '%d'", count)
 	}
 
 	once.Stop()
