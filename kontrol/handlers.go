@@ -9,6 +9,7 @@ import (
 	"github.com/koding/kite/dnode"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
+	"github.com/tjgq/ticker"
 )
 
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
@@ -54,7 +55,9 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// the storage so it's always up to date. Instead of updating the key
 	// periodically according to the HeartBeatInterval below, we are buffering
 	// the write speed here with the UpdateInterval.
-	updater := time.NewTicker(UpdateInterval)
+	updater := ticker.New(UpdateInterval)
+	updater.Start()
+
 	updaterFunc := func() {
 		for _ = range updater.C {
 			k.log.Debug("Kite is active, updating the value %s", remote.Kite)
@@ -75,6 +78,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			// stop the updater so it doesn't update it in the background
 			updater.Stop()
 		}
+
 	}
 
 	// we are now creating a timer that is going to call the lostFunc, which
@@ -97,6 +101,12 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			k.clientLocks.Get(remote.Kite.ID).Lock()
 			updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
 			k.clientLocks.Get(remote.Kite.ID).Unlock()
+
+			// seems we miss a heartbeat, so start it again!
+			if updater.Stopped() {
+				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s", remote.Kite)
+				updater.Start()
+			}
 		}),
 	}
 
