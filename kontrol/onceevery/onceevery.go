@@ -29,6 +29,10 @@ func New(d time.Duration) *OnceEvery {
 // 10 seconds, and a total of 100 calls are made during this period, once will
 // be called it every 10 seconds.
 func (o *OnceEvery) Do(f func()) {
+	if f == nil {
+		panic("passed function is nil")
+	}
+
 	o.mu.Lock()
 	if o.ticker == nil {
 		o.ticker = time.NewTicker(o.Interval)
@@ -37,13 +41,11 @@ func (o *OnceEvery) Do(f func()) {
 
 	go func() {
 		o.once.Do(func() {
+			f() // call it once first
+
 			for {
 				select {
 				case <-o.ticker.C:
-					if f == nil {
-						continue
-					}
-
 					f()
 				case <-o.stopped:
 					return
