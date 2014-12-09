@@ -26,7 +26,7 @@ func New(d time.Duration) *OnceEvery {
 // Do calls the function f if and only if Do hits the given periodic interval.
 // In other words Do can be called multiple times during the interval but it
 // gets called only once if it hits the interval tick. So if the interval is
-// 10 seconds, and a total of 100 calls are made during this period, once will
+// 10 seconds, and a total of 100 calls are made during this period, f will
 // be called it every 10 seconds.
 func (o *OnceEvery) Do(f func()) {
 	if f == nil {
