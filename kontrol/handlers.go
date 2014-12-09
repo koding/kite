@@ -105,6 +105,11 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			// seems we miss a heartbeat, so start it again!
 			if updater.Stopped() {
 				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s", remote.Kite)
+
+				// it might be removed because the ttl cleaner would come
+				// before us, so try to add it again, the updater will than
+				// continue to update it afterwards.
+				k.storage.Upsert(&remote.Kite, value)
 				updater.Start()
 			}
 		}),
