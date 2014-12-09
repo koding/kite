@@ -30,4 +30,13 @@ func TestOnceEvery(t *testing.T) {
 		t.Errorf("function should be calle two times, got '%d'", count)
 	}
 
+	once.Stop()
+
+	defer func() {
+		if err := recover(); err != nil {
+			t.Errorf("Second stop should not panic: %s", err)
+		}
+	}()
+
+	once.Stop()
 }
