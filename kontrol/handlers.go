@@ -60,7 +60,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		for {
 			select {
 			case <-ping:
-				k.log.Info("Kite is active, got a ping %s", remote.Kite)
+				k.log.Debug("Kite is active, got a ping %s", remote.Kite)
 				every.Do(func() {
 					k.log.Info("Kite is active, updating the value %s", remote.Kite)
 					err := k.storage.Update(&remote.Kite, value)
@@ -80,7 +80,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		dnode.Callback(func(args *dnode.Partial) {
-			k.log.Info("Kite send us an heartbeat. %s", remote.Kite)
+			k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
 
 			k.clientLocks.Get(remote.Kite.ID).Lock()
 			defer k.clientLocks.Get(remote.Kite.ID).Unlock()
