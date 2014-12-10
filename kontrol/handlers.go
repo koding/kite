@@ -7,6 +7,7 @@ import (
 
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kontrol/onceevery"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
@@ -50,53 +51,57 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("internal error - register")
 	}
 
-	// we create a new ticker which is going to update the key periodically in
-	// the storage so it's always up to date. Instead of updating the key
-	// periodically according to the HeartBeatInterval below, we are buffering
-	// the write speed here with the UpdateInterval.
-	updater := time.NewTicker(UpdateInterval)
+	every := onceevery.New(UpdateInterval)
+
+	ping := make(chan struct{}, 1)
+	closed := false
+
 	updaterFunc := func() {
-		for _ = range updater.C {
-			k.log.Debug("Kite is active, updating the value %s", remote.Kite)
-			err := k.storage.Update(&remote.Kite, value)
-			if err != nil {
-				k.log.Error("storage update '%s' error: %s", remote.Kite, err)
+		for {
+			select {
+			case <-ping:
+				k.log.Info("Kite is active, got a ping %s", remote.Kite)
+				every.Do(func() {
+					k.log.Info("Kite is active, updating the value %s", remote.Kite)
+					err := k.storage.Update(&remote.Kite, value)
+					if err != nil {
+						k.log.Error("storage update '%s' error: %s", remote.Kite, err)
+					}
+				})
+			case <-time.After(HeartbeatInterval + HeartbeatDelay):
+				k.log.Info("Kite didn't sent any heartbeat %s.", remote.Kite)
+				closed = true
+				return
 			}
 		}
 	}
-
 	go updaterFunc()
-
-	// lostFunc is called when we don't get any heartbeat or we lost
-	// connection. In any case it will stop the updater
-	lostFunc := func(reason string) func() {
-		return func() {
-			k.log.Info("Kite %s. Stopping the updater %s", reason, remote.Kite)
-			// stop the updater so it doesn't update it in the background
-			updater.Stop()
-		}
-	}
-
-	// we are now creating a timer that is going to call the lostFunc, which
-	// stops the background updater if it's not resetted.
-	updateTimer := time.AfterFunc(HeartbeatInterval+HeartbeatDelay,
-		lostFunc("didn't get heartbeat"))
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		dnode.Callback(func(args *dnode.Partial) {
-			// try to reset the timer every time the remote kite calls this
-			// callback(sends us heartbeat). Because the timer get reset, the
-			// lostFunc above will never be fired, so the value get always
-			// updated with the updater in the background according to the
-			// write interval. If the kite doesn't send any heartbeat, the
-			// deleteFunc is being called, which stops the updater so the key
-			// is being deleted automatically via the TTL mechanism.
-			k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
+			k.log.Info("Kite send us an heartbeat. %s", remote.Kite)
 
 			k.clientLocks.Get(remote.Kite.ID).Lock()
-			updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
-			k.clientLocks.Get(remote.Kite.ID).Unlock()
+			defer k.clientLocks.Get(remote.Kite.ID).Unlock()
+
+			select {
+			case ping <- struct{}{}:
+			default:
+			}
+
+			// seems we miss a heartbeat, so start it again!
+			if closed {
+				closed = false
+				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s",
+					remote.Kite)
+
+				// it might be removed because the ttl cleaner would come
+				// before us, so try to add it again, the updater will than
+				// continue to update it afterwards.
+				k.storage.Upsert(&remote.Kite, value)
+				go updaterFunc()
+			}
 		}),
 	}
 
@@ -105,7 +110,10 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
-	remote.OnDisconnect(lostFunc("disconnected")) // also call it when we disconnect
+	remote.OnDisconnect(func() {
+		k.log.Info("Kite disconnected: %s", remote.Kite)
+		every.Stop()
+	})
 
 	// send response back to the kite, also identify him with the new name
 	return &protocol.RegisterResult{URL: args.URL}, nil
