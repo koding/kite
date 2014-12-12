@@ -107,7 +107,7 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 	// resetted on a separate HTTP endpoint "/heartbeat"
 	k.heartbeatsMu.Lock()
 	k.heartbeats[remote.Kite.ID] = time.AfterFunc(HeartbeatInterval+HeartbeatDelay, func() {
-		k.log.Info("Kite didn't get heartbeat (via HTTP). Stopping the updater %s",
+		k.log.Info("Kite didn't sent any heartbeat (via HTTP). Stopping the updater %s",
 			remote.Kite)
 		// stop the updater so it doesn't update it in the background
 		updater.Stop()
