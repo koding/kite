@@ -130,7 +130,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	errRegisterAgain := errors.New("register again")
 
 	heartbeatFunc := func() error {
-		k.Log.Info("Sending heartbeat to %s", u.String())
+		k.Log.Debug("Sending heartbeat to %s", u.String())
 
 		resp, err := http.Get(u.String())
 		if err != nil {
@@ -145,7 +145,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return err
 		}
 
-		k.Log.Info("Heartbeat response received '%s'", string(body))
+		k.Log.Debug("Heartbeat response received '%s'", string(body))
 
 		switch string(body) {
 		case "pong":
