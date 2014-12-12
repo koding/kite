@@ -19,7 +19,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	k.heartbeatsMu.Lock()
 	defer k.heartbeatsMu.Unlock()
 
-	k.log.Info("Heartbeat received '%s'", id)
+	k.log.Debug("Heartbeat received '%s'", id)
 	if updateTimer, ok := k.heartbeats[id]; ok {
 		// try to reset the timer every time the remote kite sends sends us a
 		// heartbeat. Because the timer get reset, the timer is never fired, so
@@ -30,7 +30,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 		updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
 		k.heartbeats[id] = updateTimer
 
-		k.log.Info("Sending pong '%s'", id)
+		k.log.Debug("Sending pong '%s'", id)
 		rw.Write([]byte("pong"))
 		return
 	}
