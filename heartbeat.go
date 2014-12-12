@@ -42,9 +42,9 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	return fn(client)
 }
 
-// RegisterHTTPForever is just lika RegisterHTTP however it first tries to
+// RegisterHTTPForever is just like RegisterHTTP however it first tries to
 // register forever until a response from kontrol is received. It's useful to
-// use it durint app initializations. After the registiration a reconnect is
+// use it during app initializations. After the registration a reconnect is
 // automatically handled inside the RegisterHTTP method.
 func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	interval := time.NewTicker(kontrolRetryDuration)
