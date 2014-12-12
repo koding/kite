@@ -64,6 +64,9 @@ type Kontrol struct {
 
 	clientLocks *IdLock
 
+	heartbeats   map[string]*time.Timer
+	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
+
 	// storage defines the storage of the kites.
 	storage Storage
 
@@ -98,12 +101,16 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 		privateKey:  privateKey,
 		log:         k.Log,
 		clientLocks: NewIdlock(),
+		heartbeats:  make(map[string]*time.Timer, 0),
 	}
 
 	k.HandleFunc("register", kontrol.handleRegister)
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
+
+	k.HandleFunc("registerHTTP", kontrol.handleRegisterHTTP)
+	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
 
 	return kontrol
 }
