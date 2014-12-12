@@ -21,7 +21,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 
 	k.log.Debug("Heartbeat received '%s'", id)
 	if updateTimer, ok := k.heartbeats[id]; ok {
-		// try to reset the timer every time the remote kite sends sends us a
+		// try to reset the timer every time the remote kite sends us a
 		// heartbeat. Because the timer get reset, the timer is never fired, so
 		// the value get always updated with the updater in the background
 		// according to the write interval. If the kite doesn't send any
@@ -41,7 +41,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	// * kite was no registered and someone else sends an heartbeat
 	// we send back "registeragain" so the caller can be added in to the
 	// heartbeats map above.
-	k.log.Info("Sending registeragain '%s'", id)
+	k.log.Debug("Sending registeragain '%s'", id)
 	rw.Write([]byte("registeragain"))
 }
 
