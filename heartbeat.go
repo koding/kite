@@ -15,7 +15,7 @@ import (
 
 type kontrolFunc func(*Client) error
 
-// kontrolFunc setups and prepares a the kontrol instance. It connects to
+// kontrolFunc setups and prepares a kontrol instance. It connects to
 // kontrol and providers a way to call the given function in that connected
 // kontrol environment. This method is called internally whenever a kontrol
 // client specific action is taking (getKites, getToken, register). The main
@@ -42,6 +42,10 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	return fn(client)
 }
 
+// RegisterHTTPForever is just lika RegisterHTTP however it first tries to
+// register forever until a response from kontrol is received. It's useful to
+// use it durint app initializations. After the registiration a reconnect is
+// automatically handled inside the RegisterHTTP method.
 func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	interval := time.NewTicker(kontrolRetryDuration)
 	defer interval.Stop()
