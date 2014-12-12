@@ -83,21 +83,20 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 	// the storage so it's always up to date. Instead of updating the key
 	// periodically according to the HeartBeatInterval below, we are buffering
 	// the write speed here with the UpdateInterval.
+	stopped := make(chan struct{})
 	updater := time.NewTicker(UpdateInterval)
 	updaterFunc := func() {
 		for {
 			select {
-			case _, ok := <-updater.C:
-				if !ok {
-					k.log.Info("Kite heartbeat has stopped (via HTTP). Closing it %s", remote.Kite)
-					return
-				}
-
+			case <-updater.C:
 				k.log.Info("Kite is active (via HTTP), updating the value %s", remote.Kite)
 				err := k.storage.Update(&remote.Kite, value)
 				if err != nil {
 					k.log.Error("storage update '%s' error: %s", remote.Kite, err)
 				}
+			case <-stopped:
+				k.log.Info("Kite is nonactive (via HTTP). Updater is closed %s", remote.Kite)
+				return
 			}
 		}
 	}
@@ -112,6 +111,13 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 		updater.Stop()
 
 		k.heartbeatsMu.Lock()
+
+		select {
+		case <-stopped:
+		default:
+			close(stopped)
+		}
+
 		delete(k.heartbeats, remote.Kite.ID)
 		k.heartbeatsMu.Unlock()
 	}
@@ -191,6 +197,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 				})
 			case <-time.After(HeartbeatInterval + HeartbeatDelay):
 				k.log.Info("Kite didn't sent any heartbeat %s.", remote.Kite)
+				every.Stop()
 				closed = true
 				return
 			}
