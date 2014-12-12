@@ -102,15 +102,18 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 	}
 	go updaterFunc()
 
-	// lostFunc is called when we don't get any heartbeat or we lost
-	// connection. In any case it will stop the updater
-	lostFunc := func() {
+	// we are now creating a timer that is going to call the function which
+	// stops the background updater if it's not resetted. The time is being
+	// resetted on a separate HTTP endpoint "/heartbeat"
+	k.heartbeatsMu.Lock()
+	k.heartbeats[remote.Kite.ID] = time.AfterFunc(HeartbeatInterval+HeartbeatDelay, func() {
 		k.log.Info("Kite didn't get heartbeat (via HTTP). Stopping the updater %s",
 			remote.Kite)
 		// stop the updater so it doesn't update it in the background
 		updater.Stop()
 
 		k.heartbeatsMu.Lock()
+		defer k.heartbeatsMu.Unlock()
 
 		select {
 		case <-stopped:
@@ -119,15 +122,7 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 		}
 
 		delete(k.heartbeats, remote.Kite.ID)
-		k.heartbeatsMu.Unlock()
-	}
-
-	// we are now creating a timer that is going to call the lostFunc, which
-	// stops the background updater if it's not resetted. The time is being
-	// resetted on a separate HTTP endpoint "/heartbeat"
-	k.heartbeatsMu.Lock()
-	k.heartbeats[remote.Kite.ID] = time.AfterFunc(HeartbeatInterval+HeartbeatDelay,
-		lostFunc)
+	})
 	k.heartbeatsMu.Unlock()
 
 	k.log.Info("Kite registered (via HTTP): %s", remote.Kite)
