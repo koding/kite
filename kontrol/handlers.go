@@ -15,6 +15,10 @@ import (
 
 func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
+	if id == "" {
+		http.Error(rw, "query id is empty", http.StatusBadRequest)
+		return
+	}
 
 	k.heartbeatsMu.Lock()
 	defer k.heartbeatsMu.Unlock()
