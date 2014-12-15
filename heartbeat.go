@@ -118,6 +118,8 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
 	}
 
+	k.Log.Debug("Sending heartbeat to: %s", heartbeatURL)
+
 	u, err := url.Parse(heartbeatURL)
 	if err != nil {
 		k.Log.Fatal("HeartbeatURL is malformed: %s", err)
@@ -129,10 +131,14 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 
 	errRegisterAgain := errors.New("register again")
 
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u.String())
 
-		resp, err := http.Get(u.String())
+		resp, err := client.Get(u.String())
 		if err != nil {
 			return err
 		}
@@ -145,7 +151,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return err
 		}
 
-		k.Log.Debug("Heartbeat response received '%s'", string(body))
+		k.Log.Debug("Heartbeat response received '%s'", strings.TrimSpace(string(body)))
 
 		switch string(body) {
 		case "pong":
@@ -156,7 +162,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return errRegisterAgain
 		}
 
-		return fmt.Errorf("malformed heartbeat response %v", string(body))
+		return fmt.Errorf("malformed heartbeat response %v", strings.TrimSpace(string(body)))
 	}
 
 	for _ = range tick.C {
