@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/multiconfig"
@@ -93,6 +94,7 @@ func main() {
 		k.SetStorage(kontrol.NewPostgres(postgresConf, k.Kite.Log))
 	}
 
+	k.Kite.SetLogLevel(kite.DEBUG)
 	k.Run()
 }
 

@@ -32,7 +32,14 @@ func main() {
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(*flagPort), Path: "/kite"}
 
 	// Register us ...
+	fmt.Println("registering over websocket")
 	err := k.RegisterForever(kiteURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("registering over http")
+	_, err = k.RegisterHTTP(kiteURL)
 	if err != nil {
 		log.Fatal(err)
 	}
