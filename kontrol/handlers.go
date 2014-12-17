@@ -109,7 +109,7 @@ func (k *Kontrol) handleRegisterHTTP(r *kite.Request) (interface{}, error) {
 			for {
 				select {
 				case <-updater.C:
-					k.log.Info("Kite is active (via HTTP), updating the value %s", remote.Kite)
+					k.log.Debug("Kite is active (via HTTP), updating the value %s", remote.Kite)
 					err := k.storage.Update(&remote.Kite, value)
 					if err != nil {
 						k.log.Error("storage update '%s' error: %s", remote.Kite, err)
