@@ -86,8 +86,8 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 
 	args := protocol.RegisterArgs{
 		URL:  kiteURL.String(),
-		Kite: protocol.Kite{Name: "kontrol"}, // for logging purposes
-		Auth: protocol.Auth{
+		Kite: k.Kite(),
+		Auth: &protocol.Auth{
 			Type: "kiteKey",
 			Key:  k.Config.KiteKey,
 		},
@@ -109,6 +109,10 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 
 	if err := dec.Decode(&rr); err != nil {
 		return nil, err
+	}
+
+	if rr.Error != "" {
+		return nil, errors.New(rr.Error)
 	}
 
 	parsed, err := url.Parse(rr.URL)

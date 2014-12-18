@@ -78,8 +78,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	username, err := k.Kite.AuthenticateSimpleKiteKey(args.Auth.Key)
 	if err != nil {
-		errMsg := fmt.Errorf("not authenticated : '%s'", err)
-		http.Error(rw, jsonError(errMsg), http.StatusUnauthorized)
+		http.Error(rw, jsonError(err), http.StatusUnauthorized)
 		return
 	}
 	args.Kite.Username = username
@@ -89,9 +88,8 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	kiteURL := args.URL
 	remoteKite := args.Kite
 
-	if err := validateKiteKey(&remoteKite); err != nil {
-		errMsg := fmt.Errorf("not validated: '%s'", err)
-		http.Error(rw, jsonError(errMsg), http.StatusUnauthorized)
+	if err := validateKiteKey(remoteKite); err != nil {
+		http.Error(rw, jsonError(err), http.StatusUnauthorized)
 		return
 	}
 
@@ -101,7 +99,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// Register first by adding the value to the storage. Return if there is
 	// any error.
-	if err := k.storage.Upsert(&remoteKite, value); err != nil {
+	if err := k.storage.Upsert(remoteKite, value); err != nil {
 		k.log.Error("storage add '%s' error: %s", remoteKite, err)
 		http.Error(rw, jsonError(errors.New("internal error - register")), http.StatusInternalServerError)
 		return
@@ -129,7 +127,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 				select {
 				case <-updater.C:
 					k.log.Debug("Kite is active (via HTTP), updating the value %s", remoteKite)
-					err := k.storage.Update(&remoteKite, value)
+					err := k.storage.Update(remoteKite, value)
 					if err != nil {
 						k.log.Error("storage update '%s' error: %s", remoteKite, err)
 					}

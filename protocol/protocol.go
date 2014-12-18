@@ -125,8 +125,8 @@ func KiteFromString(stringRepr string) (*Kite, error) {
 // method.
 type RegisterArgs struct {
 	URL  string `json:"url"`
-	Kite Kite   `json:"kite, omitempty"`
-	Auth Auth   `json:"auth,omitempty"`
+	Kite *Kite  `json:"kite, omitempty"`
+	Auth *Auth  `json:"auth,omitempty"`
 }
 
 type Auth struct {
