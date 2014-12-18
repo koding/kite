@@ -87,7 +87,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	// Be sure we have a valid Kite representation. We should not allow someone
 	// with an empty field to be registered.
 	if err := validateKiteKey(remoteKite); err != nil {
-		http.Error(rw, jsonError(err), http.StatusUnauthorized)
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
