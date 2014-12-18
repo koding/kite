@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -15,6 +16,17 @@ import (
 )
 
 type kontrolFunc func(*Client) error
+
+// the implementation of New() doesn't have any error to be returned yet it
+// returns, so it's totally safe to neglect the error
+var cookieJar, _ = cookiejar.New(nil)
+
+var defaultClient = &http.Client{
+	Timeout: time.Second * 10,
+	// add this so we can make use of load balancer's sticky session features,
+	// such as AWS ELB
+	Jar: cookieJar,
+}
 
 // kontrolFunc setups and prepares a kontrol instance. It connects to
 // kontrol and providers a way to call the given function in that connected
@@ -82,7 +94,6 @@ func (k *Kite) getKontrolPath(path string) string {
 // connection to kontrol is lost.
 func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	registerURL := k.getKontrolPath("register")
-	client := &http.Client{Timeout: time.Second * 10}
 
 	args := protocol.RegisterArgs{
 		URL:  kiteURL.String(),
@@ -98,7 +109,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := client.Post(registerURL, "application/json", bytes.NewBuffer(data))
+	resp, err := defaultClient.Post(registerURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
