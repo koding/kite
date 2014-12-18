@@ -48,10 +48,9 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) {
-	dec := json.NewDecoder(req.Body)
-
 	var args protocol.RegisterArgs
 
+	dec := json.NewDecoder(req.Body)
 	if err := dec.Decode(&args); err != nil {
 		errMsg := fmt.Errorf("wrong register input: '%s'", err)
 		http.Error(rw, jsonError(errMsg), http.StatusBadRequest)
@@ -60,20 +59,23 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	k.log.Info("Register (via HTTP) request from: %s", args.Kite)
 
-	// Only accept requests with kiteKey because we need this info
-	// for generating tokens for this kite.
+	// Only accept requests with kiteKey, because that's the only way one can
+	// register itself to kontrol.
 	if args.Auth.Type != "kiteKey" {
 		err := fmt.Errorf("unexpected authentication type: %s", args.Auth.Type)
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
+	// empty url is useless for us
 	if args.URL == "" {
 		err := errors.New("empty URL")
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
+	// decode and authenticated the token key. We'll get the authenticated
+	// username
 	username, err := k.Kite.AuthenticateSimpleKiteKey(args.Auth.Key)
 	if err != nil {
 		http.Error(rw, jsonError(err), http.StatusUnauthorized)
@@ -81,16 +83,18 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	args.Kite.Username = username
 
-	kiteURL := args.URL
 	remoteKite := args.Kite
 
+	// Be sure we have a valid Kite representation. We should not allow someone
+	// with an empty field to be registered.
 	if err := validateKiteKey(remoteKite); err != nil {
 		http.Error(rw, jsonError(err), http.StatusUnauthorized)
 		return
 	}
 
+	// This will be stored into the final storage
 	value := &kontrolprotocol.RegisterValue{
-		URL: kiteURL,
+		URL: args.URL,
 	}
 
 	// Register first by adding the value to the storage. Return if there is
@@ -101,7 +105,6 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	// if there is already just reset it
 	k.heartbeatsMu.Lock()
 	defer k.heartbeatsMu.Unlock()
 
@@ -165,6 +168,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
 	}
 
+	// send the response back to the requester
 	if err := enc.Encode(&rr); err != nil {
 		errMsg := fmt.Errorf("could not encode response: '%s'", err)
 		http.Error(rw, jsonError(errMsg), http.StatusInternalServerError)
