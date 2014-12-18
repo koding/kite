@@ -1,19 +1,32 @@
 package kite
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
 type kontrolFunc func(*Client) error
+
+// the implementation of New() doesn't have any error to be returned yet it
+// returns, so it's totally safe to neglect the error
+var cookieJar, _ = cookiejar.New(nil)
+
+var defaultClient = &http.Client{
+	Timeout: time.Second * 10,
+	// add this so we can make use of load balancer's sticky session features,
+	// such as AWS ELB
+	Jar: cookieJar,
+}
 
 // kontrolFunc setups and prepares a kontrol instance. It connects to
 // kontrol and providers a way to call the given function in that connected
@@ -67,30 +80,52 @@ func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	}
 }
 
+func (k *Kite) getKontrolPath(path string) string {
+	heartbeatURL := k.Config.KontrolURL + "/" + path
+	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
+		heartbeatURL = strings.TrimSuffix(k.Config.KontrolURL, "/kite") + "/" + path
+	}
+
+	return heartbeatURL
+}
+
 // RegisterHTTP registers current Kite to Kontrol. After registration other Kites
 // can find it via GetKites() or WatchKites() method. It registers again if
 // connection to kontrol is lost.
 func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
-	var response *dnode.Partial
+	registerURL := k.getKontrolPath("register")
 
-	registerFunc := func(kontrol *Client) error {
-		args := protocol.RegisterArgs{
-			URL: kiteURL.String(),
-		}
-
-		k.Log.Info("Registering to kontrol with URL (via HTTP): %s", kiteURL.String())
-		var err error
-		response, err = kontrol.TellWithTimeout("registerHTTP", 4*time.Second, args)
-		return err
+	args := protocol.RegisterArgs{
+		URL:  kiteURL.String(),
+		Kite: k.Kite(),
+		Auth: &protocol.Auth{
+			Type: "kiteKey",
+			Key:  k.Config.KiteKey,
+		},
 	}
 
-	if err := k.kontrolFunc(registerFunc); err != nil {
+	data, err := json.Marshal(&args)
+	if err != nil {
 		return nil, err
 	}
+
+	resp, err := defaultClient.Post(registerURL, "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	var rr protocol.RegisterResult
-	if err := response.Unmarshal(&rr); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rr); err != nil {
 		return nil, err
+	}
+
+	if rr.Error != "" {
+		return nil, errors.New(rr.Error)
+	}
+
+	if rr.HeartbeatInterval == 0 {
+		return nil, errors.New("heartbeal interval cannot be zero")
 	}
 
 	parsed, err := url.Parse(rr.URL)
@@ -111,12 +146,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	tick := time.NewTicker(interval)
 
-	var heartbeatURL string
-	if strings.HasSuffix(k.Config.KontrolURL, "/kite") {
-		heartbeatURL = strings.TrimSuffix(k.Config.KontrolURL, "/kite") + "/heartbeat"
-	} else {
-		heartbeatURL = k.Config.KontrolURL + "/heartbeat"
-	}
+	heartbeatURL := k.getKontrolPath("heartbeat")
 
 	k.Log.Debug("Sending heartbeat to: %s", heartbeatURL)
 
@@ -131,14 +161,10 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 
 	errRegisterAgain := errors.New("register again")
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
-
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u.String())
 
-		resp, err := client.Get(u.String())
+		resp, err := defaultClient.Get(u.String())
 		if err != nil {
 			return err
 		}

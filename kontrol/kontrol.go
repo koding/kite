@@ -109,7 +109,7 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
 
-	k.HandleFunc("registerHTTP", kontrol.handleRegisterHTTP)
+	k.HandleHTTPFunc("/register", kontrol.handleRegisterHTTP)
 	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
 
 	return kontrol

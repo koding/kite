@@ -124,13 +124,22 @@ func KiteFromString(stringRepr string) (*Kite, error) {
 // RegisterArgs is used as the function argument to the Kontrol's register
 // method.
 type RegisterArgs struct {
-	URL string `json:"url"`
+	URL  string `json:"url"`
+	Kite *Kite  `json:"kite,omitempty"`
+	Auth *Auth  `json:"auth,omitempty"`
+}
+
+type Auth struct {
+	// Type can be "kiteKey", "token" or "sessionID" for now.
+	Type string `json:"type"`
+	Key  string `json:"key"`
 }
 
 // RegisterResult is a response to Register request from Kite to Kontrol.
 type RegisterResult struct {
 	URL               string `json:"url"`
 	HeartbeatInterval int64  `json:"heartbeatInterval"`
+	Error             string `json:"err,omitempty"`
 }
 
 type GetKitesArgs struct {
