@@ -161,14 +161,10 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 
 	errRegisterAgain := errors.New("register again")
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
-
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u.String())
 
-		resp, err := client.Get(u.String())
+		resp, err := defaultClient.Get(u.String())
 		if err != nil {
 			return err
 		}
