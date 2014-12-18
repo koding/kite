@@ -50,8 +50,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) {
 	var args protocol.RegisterArgs
 
-	dec := json.NewDecoder(req.Body)
-	if err := dec.Decode(&args); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&args); err != nil {
 		errMsg := fmt.Errorf("wrong register input: '%s'", err)
 		http.Error(rw, jsonError(errMsg), http.StatusBadRequest)
 		return
@@ -162,14 +161,13 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	k.log.Info("Kite registered (via HTTP): %s", remoteKite)
 
-	enc := json.NewEncoder(rw)
 	rr := &protocol.RegisterResult{
 		URL:               args.URL,
 		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
 	}
 
 	// send the response back to the requester
-	if err := enc.Encode(&rr); err != nil {
+	if err := json.NewEncoder(rw).Encode(&rr); err != nil {
 		errMsg := fmt.Errorf("could not encode response: '%s'", err)
 		http.Error(rw, jsonError(errMsg), http.StatusInternalServerError)
 		return

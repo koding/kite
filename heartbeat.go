@@ -116,9 +116,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	defer resp.Body.Close()
 
 	var rr protocol.RegisterResult
-	dec := json.NewDecoder(resp.Body)
-
-	if err := dec.Decode(&rr); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&rr); err != nil {
 		return nil, err
 	}
 
