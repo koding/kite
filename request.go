@@ -265,3 +265,25 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 
 	return nil
 }
+
+// AuthenticateSimpleKiteKey authenticates user from the given kite key and
+// returns the authenticated username. It's the same as AuthenticateFromKiteKey
+// but can be used without the need for a *kite.Request.
+func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
+	token, err := jwt.Parse(key, kitekey.GetKontrolKey)
+	if err != nil {
+		return "", err
+	}
+
+	if !token.Valid {
+		return "", errors.New("Invalid signature in token")
+	}
+
+	username, ok := token.Claims["sub"].(string)
+	if !ok {
+		return "", errors.New("Username is not present in token")
+	}
+
+	// return authenticated username
+	return username, nil
+}
