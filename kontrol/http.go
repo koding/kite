@@ -53,9 +53,12 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	var args protocol.RegisterArgs
 
 	if err := dec.Decode(&args); err != nil {
-		http.Error(rw, fmt.Sprintf("wrong register input: '%s'", err), http.StatusBadRequest)
+		errMsg := fmt.Errorf("wrong register input: '%s'", err)
+		http.Error(rw, jsonError(errMsg), http.StatusBadRequest)
 		return
 	}
+
+	fmt.Printf("args %+v\n", args)
 
 	k.log.Info("Register (via HTTP) request from: %s", args.Kite)
 
@@ -63,28 +66,32 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	// for generating tokens for this kite.
 	if args.Auth.Type != "kiteKey" {
 		err := fmt.Errorf("unexpected authentication type: %s", args.Auth.Type)
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
 	if args.URL == "" {
 		err := errors.New("empty URL")
-		http.Error(rw, err.Error(), http.StatusBadRequest)
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
 	username, err := k.Kite.AuthenticateSimpleKiteKey(args.Auth.Key)
 	if err != nil {
-		http.Error(rw, fmt.Sprintf("not authenticated : '%s'", err), http.StatusUnauthorized)
+		errMsg := fmt.Errorf("not authenticated : '%s'", err)
+		http.Error(rw, jsonError(errMsg), http.StatusUnauthorized)
 		return
 	}
 	args.Kite.Username = username
+
+	fmt.Printf("username %+v\n", username)
 
 	kiteURL := args.URL
 	remoteKite := args.Kite
 
 	if err := validateKiteKey(&remoteKite); err != nil {
-		http.Error(rw, fmt.Sprintf("not validated: '%s'", err), http.StatusUnauthorized)
+		errMsg := fmt.Errorf("not validated: '%s'", err)
+		http.Error(rw, jsonError(errMsg), http.StatusUnauthorized)
 		return
 	}
 
@@ -96,7 +103,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	// any error.
 	if err := k.storage.Upsert(&remoteKite, value); err != nil {
 		k.log.Error("storage add '%s' error: %s", remoteKite, err)
-		http.Error(rw, "internal error - register", http.StatusInternalServerError)
+		http.Error(rw, jsonError(errors.New("internal error - register")), http.StatusInternalServerError)
 		return
 	}
 
@@ -165,7 +172,19 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	if err := enc.Encode(&rr); err != nil {
-		http.Error(rw, fmt.Sprintf("could not encode response: '%s'", err), http.StatusInternalServerError)
+		errMsg := fmt.Errorf("could not encode response: '%s'", err)
+		http.Error(rw, jsonError(errMsg), http.StatusInternalServerError)
 		return
 	}
+}
+
+// jsonError returns a JSON string of form {"err" : "error content"}
+func jsonError(err error) string {
+	var errMsg struct {
+		Err string `json:"err"`
+	}
+	errMsg.Err = err.Error()
+
+	data, _ := json.Marshal(&errMsg)
+	return string(data)
 }

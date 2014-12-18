@@ -139,6 +139,7 @@ type Auth struct {
 type RegisterResult struct {
 	URL               string `json:"url"`
 	HeartbeatInterval int64  `json:"heartbeatInterval"`
+	Error             string `json:"err"`
 }
 
 type GetKitesArgs struct {
