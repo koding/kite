@@ -115,6 +115,10 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, errors.New(rr.Error)
 	}
 
+	if rr.HeartbeatInterval == 0 {
+		return nil, errors.New("heartbeal interval cannot be zero")
+	}
+
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())

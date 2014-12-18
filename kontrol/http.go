@@ -58,8 +58,6 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	fmt.Printf("args %+v\n", args)
-
 	k.log.Info("Register (via HTTP) request from: %s", args.Kite)
 
 	// Only accept requests with kiteKey because we need this info
@@ -82,8 +80,6 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 	args.Kite.Username = username
-
-	fmt.Printf("username %+v\n", username)
 
 	kiteURL := args.URL
 	remoteKite := args.Kite
