@@ -248,7 +248,7 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 	// cache invalidation, because we cache the token in tokenCache we need to
 	// invalidate it expiration time. This was handled usually within JWT, but
 	// now we have to do it manually for our own cache.
-	time.AfterFunc(TokenTTL, func() {
+	time.AfterFunc(TokenTTL-TokenLeeway, func() {
 		tokenCacheMu.Lock()
 		defer tokenCacheMu.Unlock()
 
