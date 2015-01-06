@@ -62,7 +62,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 			case <-ping:
 				k.log.Debug("Kite is active, got a ping %s", remote.Kite)
 				every.Do(func() {
-					k.log.Info("Kite is active, updating the value %s", remote.Kite)
+					k.log.Debug("Kite is active, updating the value %s", remote.Kite)
 					err := k.storage.Update(&remote.Kite, value)
 					if err != nil {
 						k.log.Error("storage update '%s' error: %s", remote.Kite, err)
