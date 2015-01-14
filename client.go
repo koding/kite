@@ -18,7 +18,12 @@ import (
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
-var forever = backoff.NewExponentialBackOff()
+var (
+	forever                  = backoff.NewExponentialBackOff()
+	ErrCannotSend            = errors.New("can not send")
+	ErrNotConnected          = errors.New("not connected")
+	ErrSessionNotEstablished = errors.New("can't send, session is not established yet")
+)
 
 func init() {
 	forever.MaxElapsedTime = 365 * 24 * time.Hour // 1 year
@@ -311,7 +316,7 @@ func (c *Client) readLoop() error {
 // receiveData reads a message from session.
 func (c *Client) receiveData() ([]byte, error) {
 	if c.session == nil {
-		return nil, errors.New("not connected")
+		return nil, ErrNotConnected
 	}
 
 	msg, err := c.session.Recv()
@@ -613,10 +618,10 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 
 	select {
 	case <-c.closeChan:
-		return nil, errors.New("can not send")
+		return nil, ErrCannotSend
 	default:
 		if c.session == nil {
-			return nil, errors.New("can't send, session is not established yet")
+			return nil, ErrSessionNotEstablished
 		}
 
 		c.sendMu.Lock()

@@ -19,7 +19,10 @@ const (
 )
 
 // Returned from GetKites when query matches no kites.
-var ErrNoKitesAvailable = errors.New("no kites availabile")
+var (
+	ErrNoKitesAvailable        = errors.New("no kites availabile")
+	ErrConfigNoKontrolURLGiven = errors.New("no kontrol URL given in config")
+)
 
 // kontrolClient is a kite for registering and querying Kites from Kontrol.
 type kontrolClient struct {
@@ -55,7 +58,7 @@ func (k *Kite) SetupKontrolClient() error {
 	}
 
 	if k.Config.KontrolURL == "" {
-		return errors.New("no kontrol URL given in config")
+		return ErrConfigNoKontrolURLGiven
 	}
 
 	client := k.NewClient(k.Config.KontrolURL)

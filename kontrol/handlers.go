@@ -12,11 +12,21 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
+var (
+	ErrInvalidURL                  = errors.New("invalid url")
+	ErrEmptyURL                    = errors.New("empty url")
+	ErrInternalRegisterError       = errors.New("internal error - register")
+	ErrInvalidQuery                = errors.New("Invalid query")
+	ErrQueryMatchesMoreThanOneKite = errors.New("query matches more than one kite")
+	ErrCannotAuthenticate          = errors.New("cannot authenticate user")
+	ErrInteralRegister             = errors.New("internal error - register")
+)
+
 func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	k.log.Info("Register request from: %s", r.Client.Kite)
 
 	if r.Args.One().MustMap()["url"].MustString() == "" {
-		return nil, errors.New("invalid url")
+		return nil, ErrInvalidURL
 	}
 
 	var args struct {
@@ -24,7 +34,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 	r.Args.One().MustUnmarshal(&args)
 	if args.URL == "" {
-		return nil, errors.New("empty url")
+		return nil, ErrEmptyURL
 	}
 
 	// Only accept requests with kiteKey because we need this info
@@ -48,7 +58,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	// any error.
 	if err := k.storage.Upsert(&remote.Kite, value); err != nil {
 		k.log.Error("storage add '%s' error: %s", remote.Kite, err)
-		return nil, errors.New("internal error - register")
+		return nil, ErrInternalRegisterError
 	}
 
 	every := onceevery.New(UpdateInterval)
@@ -162,7 +172,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	var query *protocol.KontrolQuery
 	err := r.Args.One().Unmarshal(&query)
 	if err != nil {
-		return nil, errors.New("Invalid query")
+		return nil, ErrInvalidQuery
 	}
 
 	// check if it's exist
@@ -172,7 +182,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	}
 
 	if len(kites) > 1 {
-		return nil, errors.New("query matches more than one kite")
+		return nil, ErrQueryMatchesMoreThanOneKite
 	}
 
 	audience := getAudience(query)
@@ -183,7 +193,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 	if k.MachineAuthenticate != nil {
 		if err := k.MachineAuthenticate(r); err != nil {
-			return nil, errors.New("cannot authenticate user")
+			return nil, ErrCannotAuthenticate
 		}
 	}
 

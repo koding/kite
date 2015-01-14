@@ -12,6 +12,11 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+var (
+	ErrEmptyField          = errors.New("empty field")
+	ErrFieldsCannotContain = errors.New(`fields cannot contain "/"`)
+)
+
 // Kite is the base struct containing the public fields. It is usually embeded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
@@ -82,10 +87,10 @@ func (k *Kite) Values() []string {
 func (k *Kite) Validate() error {
 	s := k.String()
 	if strings.Contains(s, "//") {
-		return errors.New("empty field")
+		return ErrEmptyField
 	}
 	if strings.Count(s, "/") != 7 {
-		return errors.New(`fields cannot contain "/"`)
+		return ErrFieldsCannotContain
 	}
 	return nil
 }

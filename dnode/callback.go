@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+var ErrInvalidFunction = errors.New("invalid function")
+
 // Function is the type for sending and receiving functions in dnode messages.
 type Function struct {
 	Caller caller
@@ -17,7 +19,7 @@ type caller interface {
 // Call the received function.
 func (f Function) Call(args ...interface{}) error {
 	if !f.IsValid() {
-		return errors.New("invalid function")
+		return ErrInvalidFunction
 	}
 	return f.Caller.Call(args...)
 }

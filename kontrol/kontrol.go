@@ -23,6 +23,11 @@ const (
 )
 
 var (
+	ErrCannotGenerateToken            = errors.New("cannot generate a token")
+	ErrServerErrorCannotGenerateToken = errors.New("Server error: Cannot generate a token")
+)
+
+var (
 	TokenTTL    = 48 * time.Hour
 	TokenLeeway = 1 * time.Minute
 	DefaultPort = 4000
@@ -156,7 +161,7 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 	// Only accept requests of type machine
 	tknID, err := uuid.NewV4()
 	if err != nil {
-		return "", errors.New("cannot generate a token")
+		return "", ErrCannotGenerateToken
 	}
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
@@ -217,7 +222,7 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 
 	tknID, err := uuid.NewV4()
 	if err != nil {
-		return "", errors.New("Server error: Cannot generate a token")
+		return "", ErrServerErrorCannotGenerateToken
 	}
 
 	// Identifies the expiration time after which the JWT MUST NOT be accepted
@@ -239,7 +244,7 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 
 	signed, err = tkn.SignedString([]byte(privateKey))
 	if err != nil {
-		return "", errors.New("Server error: Cannot generate a token")
+		return "", ErrServerErrorCannotGenerateToken
 	}
 
 	// cache our token

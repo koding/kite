@@ -22,6 +22,9 @@ import (
 
 var hostname string
 
+// ErrTokenIssuerClaimInvalid - token does not contain a valid issue claim
+var ErrTokenIssuerClaimInvalid = errors.New("token does not contain a valid issuer claim")
+
 func init() {
 	var err error
 	hostname, err = os.Hostname()
@@ -254,7 +257,7 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 
 	issuer, ok := token.Claims["iss"].(string)
 	if !ok {
-		return nil, errors.New("token does not contain a valid issuer claim")
+		return nil, ErrTokenIssuerClaimInvalid
 	}
 
 	if issuer != k.Config.KontrolUser {

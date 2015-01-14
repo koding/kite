@@ -4,12 +4,13 @@ import (
 	"errors"
 )
 
-var errNotImplemented = errors.New("not implemented on windows")
+// ErrNotImplemented - windows not supported/implemented
+var ErrNotImplemented = errors.New("not implemented on windows")
 
 func diskStats() (*disk, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }
 
 func memoryStats() (*memory, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }

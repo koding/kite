@@ -7,6 +7,11 @@ import (
 	"reflect"
 )
 
+var (
+	ErrUnmarshalNilPointer = errors.New("json.Partial: UnmarshalJSON on nil pointer")
+	ErrInvalidArrayLength  = errors.New("Invalid array length")
+)
+
 // Partial is the type of "arguments" field in dnode.Message.
 type Partial struct {
 	Raw           []byte
@@ -21,7 +26,7 @@ func (p *Partial) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON puts the data into Partial.Raw.
 func (p *Partial) UnmarshalJSON(data []byte) error {
 	if p == nil {
-		return errors.New("json.Partial: UnmarshalJSON on nil pointer")
+		return ErrUnmarshalNilPointer
 	}
 
 	p.Raw = make([]byte, len(data))
@@ -74,7 +79,7 @@ func (p *Partial) SliceOfLength(length int) (a []*Partial, err error) {
 	}
 
 	if len(a) != length {
-		err = errors.New("Invalid array length")
+		err = ErrInvalidArrayLength
 	}
 
 	return

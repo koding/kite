@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-version"
 	sq "github.com/lann/squirrel"
 	_ "github.com/lib/pq"
 
@@ -17,6 +16,8 @@ import (
 	"github.com/koding/kite/protocol"
 	"github.com/koding/multiconfig"
 )
+
+var ErrAllQueryFieldsEmpty = errors.New("all query fields are empty")
 
 // Postgres holds Postgresql database related configuration
 type PostgresConfig struct {
@@ -336,7 +337,7 @@ func selectQuery(query *protocol.KontrolQuery) (string, []interface{}, error) {
 	}
 
 	if len(andQuery) == 0 {
-		return "", nil, errors.New("all query fields are empty")
+		return "", nil, ErrAllQueryFieldsEmpty
 	}
 
 	return kites.Where(andQuery).ToSql()
