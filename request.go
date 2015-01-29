@@ -154,9 +154,13 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 // authenticate tries to authenticate the user by selecting appropriate
 // authenticator function.
 func (r *Request) authenticate() *Error {
-	// Trust the Kite if we have initiated the connection.
-	// Following cast means, session is opened by the client.
+	// Trust the Kite if we have initiated the connection.  Following casts
+	// means, session is opened by the client.
 	if _, ok := r.Client.session.(*sockjsclient.WebsocketSession); ok {
+		return nil
+	}
+
+	if _, ok := r.Client.session.(*sockjsclient.XHRSession); ok {
 		return nil
 	}
 
