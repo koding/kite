@@ -187,7 +187,8 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		Timeout:         timeout,
 	}
 
-	c.session, err = sockjsclient.ConnectWebsocketSession(opts)
+	// c.session, err = sockjsclient.ConnectWebsocketSession(opts)
+	c.session, err = sockjsclient.NewXHRSession(opts)
 	if err != nil {
 		// explicitly set nil to avoid panicing when used the methods of that interface
 		c.session = nil
