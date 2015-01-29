@@ -39,9 +39,27 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	sessionID := randomStringLength(20)
 	sessionURL := opts.BaseURL + "/" + serverID + "/" + sessionID
 
+	// start the initial session handshake
+	sessionResp, err := client.Post(sessionURL+"/xhr", "text/plain", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer sessionResp.Body.Close()
+
+	buf := bufio.NewReader(sessionResp.Body)
+	frame, err := buf.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	if frame != 'o' {
+		return nil, fmt.Errorf("can't start session, invalid frame: %s", frame)
+	}
+
 	return &XHRSession{
 		client:     client,
 		sessionURL: sessionURL,
+		opened:     true,
 	}, nil
 }
 
@@ -49,6 +67,7 @@ type XHRSession struct {
 	client     *http.Client
 	sessionURL string
 	messages   []string
+	opened     bool
 }
 
 func (x *XHRSession) ID() string {
@@ -64,7 +83,6 @@ func (x *XHRSession) Recv() (string, error) {
 	}
 
 	for {
-		fmt.Println("sending post")
 		resp, err := x.client.Post(x.sessionURL+"/xhr", "text/plain", nil)
 		if err != nil {
 			return "", err
@@ -77,18 +95,22 @@ func (x *XHRSession) Recv() (string, error) {
 			return "", err
 		}
 
-		fmt.Printf("frame = %+v\n", string(frame))
+		fmt.Printf("received frame = %+v\n", string(frame))
 
 		switch frame {
 		case 'o':
 			// session started
+			x.opened = true
 			continue
 		case 'a':
+			fmt.Println("I'm hereeee")
 			var data []byte
 			_, err := buf.Read(data)
 			if err != nil {
 				return "", err
 			}
+
+			fmt.Printf("string(data) = %+v\n", string(data))
 
 			var messages []string
 			err = json.Unmarshal(data, &messages)
@@ -119,14 +141,16 @@ func (x *XHRSession) Recv() (string, error) {
 }
 
 func (x *XHRSession) Send(frame string) error {
+	if !x.opened {
+		return errors.New("connection is not opened yet")
+	}
+
 	fmt.Printf("sending frame = %+v\n", frame)
 	message := []string{frame}
 	body, err := json.Marshal(&message)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("string(body) = %+v\n", string(body))
 
 	resp, err := x.client.Post(x.sessionURL+"/xhr_send", "text/plain", bytes.NewReader(body))
 	if err != nil {
