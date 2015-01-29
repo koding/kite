@@ -84,6 +84,7 @@ func (x *XHRSession) Recv() (string, error) {
 		return msg, nil
 	}
 
+	// start to poll from the server until we receive something
 	for {
 		resp, err := x.client.Post(x.sessionURL+"/xhr", "text/plain", nil)
 		if err != nil {
@@ -93,7 +94,7 @@ func (x *XHRSession) Recv() (string, error) {
 
 		buf := bufio.NewReader(resp.Body)
 
-		// returns an error if buffer is empty ;)
+		// returns an error if buffer is empty
 		frame, err := buf.ReadByte()
 		if err != nil {
 			return "", err
@@ -105,6 +106,7 @@ func (x *XHRSession) Recv() (string, error) {
 			x.opened = true
 			continue
 		case 'a':
+			// received an array of messages
 			data, err := ioutil.ReadAll(buf)
 			if err != nil {
 				return "", err
@@ -131,7 +133,7 @@ func (x *XHRSession) Recv() (string, error) {
 			// heartbeat received
 			continue
 		case 'c':
-			// close received
+			return "", errors.New("session closed")
 		default:
 			return "", errors.New("invalid frame type")
 		}
@@ -171,5 +173,5 @@ func (x *XHRSession) Send(frame string) error {
 }
 
 func (x *XHRSession) Close(status uint32, reason string) error {
-	return errors.New("not implemented yet")
+	return nil
 }
