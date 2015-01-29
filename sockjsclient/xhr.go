@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -33,8 +34,12 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 		return nil, err
 	}
 
+	// TODO: do something with the info, probably we need to put it in a more
+	// high level place. Once we receive the info we can make use of WebSocket,
+	// XHR, co..
 	fmt.Printf("i = %+v\n", i)
 
+	// following /server_id/session_id should always be the same for every session
 	serverID := threeDigits()
 	sessionID := randomStringLength(20)
 	sessionURL := opts.BaseURL + "/" + serverID + "/" + sessionID
@@ -90,6 +95,8 @@ func (x *XHRSession) Recv() (string, error) {
 		defer resp.Body.Close()
 
 		buf := bufio.NewReader(resp.Body)
+
+		// returns an error if buffer is empty ;)
 		frame, err := buf.ReadByte()
 		if err != nil {
 			return "", err
@@ -103,9 +110,7 @@ func (x *XHRSession) Recv() (string, error) {
 			x.opened = true
 			continue
 		case 'a':
-			fmt.Println("I'm hereeee")
-			var data []byte
-			_, err := buf.Read(data)
+			data, err := ioutil.ReadAll(buf)
 			if err != nil {
 				return "", err
 			}
