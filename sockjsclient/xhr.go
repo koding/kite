@@ -11,17 +11,17 @@ import (
 	"net/http/cookiejar"
 )
 
-// info is returned from a SockJS Base_URL+/info path
-type info struct {
-	Websocket    bool     `json:"websocket"`
-	CookieNeeded bool     `json:"cookie_needed"`
-	Origins      []string `json:"origins"`
-	Entropy      int32    `json:"entropy"`
-}
-
 // the implementation of New() doesn't have any error to be returned yet it
 // returns, so it's totally safe to neglect the error
 var cookieJar, _ = cookiejar.New(nil)
+
+type XHRSession struct {
+	client     *http.Client
+	sessionURL string
+	sessionID  string
+	messages   []string
+	opened     bool
+}
 
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
 // xhr-polling
@@ -62,14 +62,6 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 		sessionURL: sessionURL,
 		opened:     true,
 	}, nil
-}
-
-type XHRSession struct {
-	client     *http.Client
-	sessionURL string
-	sessionID  string
-	messages   []string
-	opened     bool
 }
 
 func (x *XHRSession) ID() string {
@@ -159,7 +151,6 @@ func (x *XHRSession) Send(frame string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
 		return errors.New("XHR session doesn't exists")
