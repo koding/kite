@@ -56,10 +56,13 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("frame = %+v\n", frame)
 
 	if frame != 'o' {
 		return nil, fmt.Errorf("can't start session, invalid frame: %s", frame)
 	}
+
+	fmt.Println("received o")
 
 	return &XHRSession{
 		client:     client,
@@ -88,6 +91,7 @@ func (x *XHRSession) Recv() (string, error) {
 	}
 
 	for {
+		fmt.Println("recv /xhr")
 		resp, err := x.client.Post(x.sessionURL+"/xhr", "text/plain", nil)
 		if err != nil {
 			return "", err
@@ -123,8 +127,19 @@ func (x *XHRSession) Recv() (string, error) {
 				return "", err
 			}
 
+			fmt.Printf("messages = %+v\n", messages)
+
 			x.messages = append(x.messages, messages...)
-			break
+
+			if len(x.messages) == 0 {
+				return "", errors.New("no message")
+			}
+
+			// Return first message in slice, and remove it from the slice, so
+			// next time the others will be picked
+			msg := x.messages[0]
+			x.messages = x.messages[1:]
+			return msg, nil
 		case 'h':
 			// heartbeat received
 			continue
@@ -135,14 +150,7 @@ func (x *XHRSession) Recv() (string, error) {
 		}
 	}
 
-	fmt.Printf("x.messages = %+v\n", x.messages)
-
-	if len(x.messages) == 0 {
-		return "", errors.New("no message")
-	}
-	msg := x.messages[0]
-	x.messages = x.messages[1:]
-	return msg, nil
+	return "", errors.New("FATAL: If we get here, please revisit the logic again")
 }
 
 func (x *XHRSession) Send(frame string) error {
