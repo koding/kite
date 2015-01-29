@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 )
 
 // info is returned from a SockJS Base_URL+/info path
@@ -18,26 +19,20 @@ type info struct {
 	Entropy      int32    `json:"entropy"`
 }
 
+// the implementation of New() doesn't have any error to be returned yet it
+// returns, so it's totally safe to neglect the error
+var cookieJar, _ = cookiejar.New(nil)
+
+// NewXHRSession returns a new XHRSession, a SockJS client which supports
+// xhr-polling
+// http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74
 func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	client := &http.Client{
 		Timeout: opts.Timeout,
+		// add this so we can make use of load balancer's sticky session features,
+		// such as AWS ELB
+		Jar: cookieJar,
 	}
-
-	resp, err := client.Get(opts.BaseURL + "/info")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var i info
-	if err := json.NewDecoder(resp.Body).Decode(&i); err != nil {
-		return nil, err
-	}
-
-	// TODO: do something with the info, probably we need to put it in a more
-	// high level place. Once we receive the info we can make use of WebSocket,
-	// XHR, co..
-	fmt.Printf("i = %+v\n", i)
 
 	// following /server_id/session_id should always be the same for every session
 	serverID := threeDigits()
@@ -56,16 +51,14 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("frame = %+v\n", frame)
 
 	if frame != 'o' {
 		return nil, fmt.Errorf("can't start session, invalid frame: %s", frame)
 	}
 
-	fmt.Println("received o")
-
 	return &XHRSession{
 		client:     client,
+		sessionID:  sessionID,
 		sessionURL: sessionURL,
 		opened:     true,
 	}, nil
@@ -74,12 +67,13 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 type XHRSession struct {
 	client     *http.Client
 	sessionURL string
+	sessionID  string
 	messages   []string
 	opened     bool
 }
 
 func (x *XHRSession) ID() string {
-	return ""
+	return x.sessionID
 }
 
 func (x *XHRSession) Recv() (string, error) {
@@ -91,7 +85,6 @@ func (x *XHRSession) Recv() (string, error) {
 	}
 
 	for {
-		fmt.Println("recv /xhr")
 		resp, err := x.client.Post(x.sessionURL+"/xhr", "text/plain", nil)
 		if err != nil {
 			return "", err
@@ -106,8 +99,6 @@ func (x *XHRSession) Recv() (string, error) {
 			return "", err
 		}
 
-		fmt.Printf("received frame = %+v\n", string(frame))
-
 		switch frame {
 		case 'o':
 			// session started
@@ -119,15 +110,11 @@ func (x *XHRSession) Recv() (string, error) {
 				return "", err
 			}
 
-			fmt.Printf("string(data) = %+v\n", string(data))
-
 			var messages []string
 			err = json.Unmarshal(data, &messages)
 			if err != nil {
 				return "", err
 			}
-
-			fmt.Printf("messages = %+v\n", messages)
 
 			x.messages = append(x.messages, messages...)
 
@@ -158,7 +145,8 @@ func (x *XHRSession) Send(frame string) error {
 		return errors.New("connection is not opened yet")
 	}
 
-	fmt.Printf("sending frame = %+v\n", frame)
+	// Need's to be JSON encoded array of string messages (SockJS protocol
+	// requirement)
 	message := []string{frame}
 	body, err := json.Marshal(&message)
 	if err != nil {
@@ -171,7 +159,14 @@ func (x *XHRSession) Send(frame string) error {
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("resp.Status = %+v\n", resp.Status)
+	if resp.StatusCode == 404 {
+		return errors.New("XHR session doesn't exists")
+	}
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("Sending failed: %d", resp.StatusCode)
+	}
+
 	return nil
 }
 
