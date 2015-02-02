@@ -101,7 +101,7 @@ func TestMultiple(t *testing.T) {
 // sure the method is calling back with in the same time and not timing out.
 func TestConcurrency(t *testing.T) {
 	// Create a mathworker kite
-	mathKite := NewKite("mathworker", "0.0.1")
+	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("ping", func(r *Request) (interface{}, error) {
 		time.Sleep(time.Second)
@@ -118,7 +118,7 @@ func TestConcurrency(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := NewKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
+		c := newXhrKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestConcurrency(t *testing.T) {
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
 	// Create a mathworker kite
-	mathKite := NewKite("mathworker", "0.0.1")
+	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
@@ -160,7 +160,7 @@ func TestKite(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// Create exp2 kite
-	exp2Kite := NewKite("exp2", "0.0.1")
+	exp2Kite := newXhrKite("exp2", "0.0.1")
 	fooChan := make(chan string)
 	exp2Kite.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		s := r.Args.One().MustString()
@@ -272,7 +272,7 @@ func SquareCB(r *Request) (interface{}, error) {
 	return nil, nil
 }
 
-func NewKite(name, version string) *Kite {
+func newXhrKite(name, version string) *Kite {
 	k := New(name, version)
 	k.Config.Transport = config.XHRPolling
 	return k
