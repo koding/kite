@@ -52,6 +52,11 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	}
 	defer sessionResp.Body.Close()
 
+	if sessionResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Starting new session failed. Want: %d Got: %d",
+			http.StatusOK, sessionResp.StatusCode)
+	}
+
 	buf := bufio.NewReader(sessionResp.Body)
 	frame, err := buf.ReadByte()
 	if err != nil {
@@ -89,6 +94,11 @@ func (x *XHRSession) Recv() (string, error) {
 			return "", err
 		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("Receiving data failed. Want: %d Got: %d",
+				http.StatusOK, resp.StatusCode)
+		}
 
 		buf := bufio.NewReader(resp.Body)
 
@@ -167,12 +177,13 @@ func (x *XHRSession) Send(frame string) error {
 		return err
 	}
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusNotFound {
 		return errors.New("XHR session doesn't exists")
 	}
 
-	if resp.StatusCode != 204 {
-		return fmt.Errorf("Sending failed: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Sending data failed. Want: %d Got: %d",
+			http.StatusOK, resp.StatusCode)
 	}
 
 	return nil
