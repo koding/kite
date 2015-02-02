@@ -11,5 +11,7 @@ before_script:
   - psql -c 'CREATE DATABASE kontrol owner kontrol;' -U postgres
   - psql kontrol -f kontrol/002-table.sql -U postgres
 env: 
-  - KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword
-  - KONTROL_STORAGE="etcd"
+  - KITE_TRANSPORT="XHRPolling" KONTROL_STORAGE="etcd"
+  - KITE_TRANSPORT="XHRPolling" KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword
+  - KITE_TRANSPORT="WebSocket"  KONTROL_STORAGE="etcd"
+  - KITE_TRANSPORT="WebSocket"  KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword
