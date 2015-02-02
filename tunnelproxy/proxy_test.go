@@ -2,12 +2,15 @@ package tunnelproxy
 
 import (
 	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
 )
@@ -15,10 +18,27 @@ import (
 func TestProxy(t *testing.T) {
 	conf := config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = "ws://localhost:5555/kite"
+	conf.KontrolURL = "ws://localhost:6666/kite"
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
+
+	// start kontrol
+	color.Green("Starting kontrol")
+	kontrol.DefaultPort = 6666
+	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+
+	switch os.Getenv("KONTROL_STORAGE") {
+	case "etcd":
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	case "postgres":
+		kon.SetStorage(kontrol.NewPostgres(nil, kon.Kite.Log))
+	default:
+		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
+	}
+
+	go kon.Run()
+	<-kon.Kite.ServerReadyNotify()
 
 	DefaultPort = 4999
 	DefaultPublicHost = "localhost:4999"
@@ -26,6 +46,8 @@ func TestProxy(t *testing.T) {
 	prxConf.DisableAuthentication = true // no kontrol running in test
 	prx := New(prxConf, "0.1.0", testkeys.Public, testkeys.Private)
 	prx.Start()
+
+	log.Println("Proxy started")
 
 	// Proxy kite is ready.
 	kite1 := kite.New("kite1", "1.0.0")
