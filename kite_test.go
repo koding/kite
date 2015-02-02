@@ -70,8 +70,6 @@ func TestMultiple(t *testing.T) {
 	fmt.Printf("Calling mathworker kites with %d conccurent clients randomly\n", clientNumber)
 	timeout := time.After(testDuration)
 
-	var mu sync.Mutex
-
 	// every one second
 	for {
 		select {
@@ -85,16 +83,12 @@ func TestMultiple(t *testing.T) {
 
 					_, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
 					if err != nil {
-						mu.Lock()
-						t.Fatal(err)
-						mu.Unlock()
+						t.Error(err)
 					}
 				}(i, t)
 			}
 		case <-timeout:
 			fmt.Println("test stopped")
-			mu.Lock()
-			defer mu.Unlock()
 			t.SkipNow()
 		}
 
