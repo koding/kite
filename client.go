@@ -59,6 +59,7 @@ type Client struct {
 	// transport/protocols
 	session sockjs.Session
 	send    chan []byte
+	sendMu  sync.Mutex // protects send channel
 
 	// dnode scrubber for saving callbacks sent to remote.
 	scrubber *dnode.Scrubber
@@ -119,7 +120,7 @@ type response struct {
 // is not connected. You have to call Dial() or DialForever() before calling
 // Tell() and Go() methods.
 func (k *Kite) NewClient(remoteURL string) *Client {
-	r := &Client{
+	c := &Client{
 		LocalKite:     k,
 		URL:           remoteURL,
 		disconnect:    make(chan struct{}, 1),
@@ -131,10 +132,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		wg:            &sync.WaitGroup{},
 	}
 
-	go r.sendHub()
-	r.wg.Add(1) // with sendHub we added a new listener
-
-	return r
+	return c
 }
 
 func (c *Client) SetUsername(username string) {
@@ -187,13 +185,16 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		Timeout:         timeout,
 	}
 
-	// c.session, err = sockjsclient.ConnectWebsocketSession(opts)
-	c.session, err = sockjsclient.NewXHRSession(opts)
+	c.session, err = sockjsclient.ConnectWebsocketSession(opts)
+	// c.session, err = sockjsclient.NewXHRSession(opts)
 	if err != nil {
 		// explicitly set nil to avoid panicing when used the methods of that interface
 		c.session = nil
 		return err
 	}
+
+	go c.sendHub()
+	c.wg.Add(1) // with sendHub we added a new listener
 
 	// Reset the wait time.
 	c.redialBackOff.Reset()
@@ -246,7 +247,10 @@ func randomStringLength(length int) string {
 
 // run consumes incoming dnode messages. Reconnects if necessary.
 func (c *Client) run() {
-	c.readLoop()
+	err := c.readLoop()
+	if err != nil {
+		c.LocalKite.Log.Error("readloop err: %s", err)
+	}
 
 	// falls here when connection disconnects
 	c.callOnDisconnectHandlers()
@@ -290,6 +294,22 @@ func (c *Client) readLoop() error {
 			<-processed
 		}
 	}
+}
+
+// receiveData reads a message from session.
+func (c *Client) receiveData() ([]byte, error) {
+	if c.session == nil {
+		return nil, errors.New("not connected")
+	}
+
+	msg, err := c.session.Recv()
+	if err != nil {
+		c.LocalKite.Log.Debug("Receive err: %s", err)
+	} else {
+		c.LocalKite.Log.Debug("Received : %s", msg)
+	}
+
+	return []byte(msg), err
 }
 
 // processMessage processes a single message and calls a handler or callback.
@@ -352,7 +372,10 @@ func (c *Client) Close() {
 		c.session.Close(3000, "Go away!")
 	}
 
+	c.sendMu.Lock()
 	close(c.send)
+	c.sendMu.Unlock()
+
 	close(c.closeChan)
 
 	// wait for consumers to finish buffered messages
@@ -381,22 +404,12 @@ func (c *Client) sendHub() {
 				continue
 			}
 
-			c.session.Send(string(msg))
+			err := c.session.Send(string(msg))
+			if err != nil {
+				c.LocalKite.Log.Error("Send err: %s", err.Error())
+			}
 		}
 	}
-}
-
-// receiveData reads a message from session.
-func (c *Client) receiveData() ([]byte, error) {
-	if c.session == nil {
-		return nil, errors.New("not connected")
-	}
-
-	msg, err := c.session.Recv()
-
-	c.LocalKite.Log.Debug("Received : %s", msg)
-
-	return []byte(msg), err
 }
 
 // OnConnect registers a function to run on connect.
@@ -556,6 +569,7 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 // marshalAndSend takes a method and arguments, scrubs the arguments to create
 // a dnode message, marshals the message to JSON and sends it over the wire.
 func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (callbacks map[string]dnode.Path, err error) {
+	// scrub trough the arguments and save any callbacks.
 	callbacks = c.scrubber.Scrub(arguments)
 
 	defer func() {
@@ -589,7 +603,13 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 	case <-c.closeChan:
 		return nil, errors.New("can not send")
 	default:
+		if c.session == nil {
+			return nil, errors.New("can't send, session is not established yet")
+		}
+
+		c.sendMu.Lock()
 		c.send <- data
+		c.sendMu.Unlock()
 	}
 
 	return
