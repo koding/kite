@@ -74,6 +74,7 @@ func TestTokenInvalidation(t *testing.T) {
 	}()
 
 	TokenTTL = time.Millisecond * 500
+	TokenLeeway = 0
 
 	t.Log("Setting up mathworker6")
 	testName := "mathworker6"
