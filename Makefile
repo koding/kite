@@ -14,6 +14,10 @@ ifndef KONTROL_STORAGE
 	KONTROL_STORAGE=etcd
 endif
 
+ifndef KITE_TRANSPORT
+	KITE_TRANSPORT=WebSocket
+endif
+
 
 all: test
 
@@ -74,6 +78,7 @@ kontroltest:
 
 test: 
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
+	@echo "Using $(KITE_TRANSPORT) transport"
 	@echo "Cleaning $(KITE_HOME) directory"
 	@rm -rf $(KITE_HOME)
 
@@ -81,6 +86,7 @@ test:
 	@ulimit -n $(ULIMIT) #needed for multiple kontrol tests
 
 	@echo "$(OK_COLOR)==> Using kontrol storage: '$(KONTROL_STORAGE)'$(NO_COLOR)"
+
 
 ifeq ($(KONTROL_STORAGE), etcd)
 	@echo "Killing previous etcd instance"
