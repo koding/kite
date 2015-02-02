@@ -77,6 +77,15 @@ func (c *Config) ReadEnvironmentVariables() error {
 		c.KontrolURL = kontrolURL
 	}
 
+	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
+		transport, ok := Transports[transportName]
+		if !ok {
+			return fmt.Errorf("transport '%s' doesn't exists", transportName)
+		}
+
+		c.Transport = transport
+	}
+
 	return nil
 }
 

@@ -18,3 +18,8 @@ func (t Transport) String() string {
 		return "UnkownKiteTransport"
 	}
 }
+
+var Transports = map[string]Transport{
+	"WebSocket":  WebSocket,
+	"XHRPolling": XHRPolling,
+}

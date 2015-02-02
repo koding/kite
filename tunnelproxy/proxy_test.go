@@ -22,6 +22,7 @@ func TestProxy(t *testing.T) {
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
+	conf.Transport = config.WebSocket // tunnel only works via WebSocket
 
 	// start kontrol
 	color.Green("Starting kontrol")
