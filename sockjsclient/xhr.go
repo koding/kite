@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
+	"sync"
 )
 
 // the implementation of New() doesn't have any error to be returned yet it
@@ -16,6 +17,8 @@ import (
 var cookieJar, _ = cookiejar.New(nil)
 
 type XHRSession struct {
+	mu sync.Mutex
+
 	client     *http.Client
 	sessionURL string
 	sessionID  string
@@ -98,7 +101,9 @@ func (x *XHRSession) Recv() (string, error) {
 		switch frame {
 		case 'o':
 			// session started
+			x.mu.Lock()
 			x.opened = true
+			x.mu.Unlock()
 			continue
 		case 'a':
 			// received an array of messages
@@ -129,7 +134,9 @@ func (x *XHRSession) Recv() (string, error) {
 			// heartbeat received
 			continue
 		case 'c':
+			x.mu.Lock()
 			x.opened = false
+			x.mu.Unlock()
 			return "", errors.New("session closed")
 		default:
 			return "", errors.New("invalid frame type")
@@ -140,9 +147,12 @@ func (x *XHRSession) Recv() (string, error) {
 }
 
 func (x *XHRSession) Send(frame string) error {
+	x.mu.Lock()
 	if !x.opened {
+		x.mu.Unlock()
 		return errors.New("session is not opened yet")
 	}
+	x.mu.Unlock()
 
 	// Need's to be JSON encoded array of string messages (SockJS protocol
 	// requirement)
