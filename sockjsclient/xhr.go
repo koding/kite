@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"sync"
@@ -117,14 +116,8 @@ func (x *XHRSession) Recv() (string, error) {
 			continue
 		case 'a':
 			// received an array of messages
-			data, err := ioutil.ReadAll(buf)
-			if err != nil {
-				return "", err
-			}
-
 			var messages []string
-			err = json.Unmarshal(data, &messages)
-			if err != nil {
+			if err := json.NewDecoder(buf).Decode(&messages); err != nil {
 				return "", err
 			}
 
