@@ -19,6 +19,7 @@ type Config struct {
 	KiteKey               string
 	DisableAuthentication bool
 	DisableConcurrency    bool
+	Transport             Transport
 
 	// Options for Server
 	IP   string
@@ -36,6 +37,7 @@ var DefaultConfig = &Config{
 	Region:      "unknown",
 	IP:          "0.0.0.0",
 	Port:        0,
+	Transport:   WebSocket,
 }
 
 // New returns a new Config initialized with defaults.

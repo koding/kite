@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
@@ -185,8 +186,19 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		Timeout:         timeout,
 	}
 
-	c.session, err = sockjsclient.ConnectWebsocketSession(opts)
-	// c.session, err = sockjsclient.NewXHRSession(opts)
+	transport := c.LocalKite.Config.Transport
+
+	c.LocalKite.Log.Debug("Client transport is set to '%s'", transport)
+
+	switch transport {
+	case config.WebSocket:
+		c.session, err = sockjsclient.ConnectWebsocketSession(opts)
+	case config.XHRPolling:
+		c.session, err = sockjsclient.NewXHRSession(opts)
+	default:
+		return fmt.Errorf("Connection transport is not known '%v'", transport)
+	}
+
 	if err != nil {
 		// explicitly set nil to avoid panicing when used the methods of that interface
 		c.session = nil
