@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	_ "github.com/koding/kite/testutil"
 )
@@ -26,9 +28,21 @@ func TestMultiple(t *testing.T) {
 	port := 6000
 
 	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)
+
+	var transport config.Transport
+	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
+		tr, ok := config.Transports[transportName]
+		if !ok {
+			t.Fatalf("transport '%s' doesn't exists", transportName)
+		}
+
+		transport = tr
+	}
+
 	for i := 0; i < kiteNumber; i++ {
-		m := NewKite("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
+		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
 		m.Config.DisableAuthentication = true
+		m.Config.Transport = transport
 
 		m.HandleFunc("square", Square)
 
@@ -63,20 +77,12 @@ func TestMultiple(t *testing.T) {
 
 				go func(i int) {
 					defer wg.Done()
-					start := time.Now()
-
 					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
-					result, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
+					_, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
 					if err != nil {
 						t.Fatal(err)
 					}
-
-					elapsedTime := time.Since(start)
-
-					number := result.MustFloat64()
-
-					t.Log("rpc result: %f elapsedTime %f sec\n", number, elapsedTime.Seconds())
 				}(i)
 			}
 		case <-timeout:
@@ -266,6 +272,6 @@ func SquareCB(r *Request) (interface{}, error) {
 
 func NewKite(name, version string) *Kite {
 	k := New(name, version)
-	k.Config.ReadEnvironmentVariables()
+	k.Config.Transport = config.XHRPolling
 	return k
 }
