@@ -19,10 +19,10 @@ func TestMultiple(t *testing.T) {
 	testDuration := time.Second * 10
 
 	// number of available mathworker kites to be called
-	kiteNumber := 100
+	kiteNumber := 10
 
 	// number of exp kites that will call mathwork kites
-	clientNumber := 100
+	clientNumber := 10
 
 	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
