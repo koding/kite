@@ -55,7 +55,9 @@ func TestMultiple(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := NewKite("exp"+strconv.Itoa(i), "0.0.1").NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
+		cn := New("exp"+strconv.Itoa(i), "0.0.1")
+		cn.Config.Transport = transport
+		c := cn.NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
