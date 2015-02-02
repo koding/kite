@@ -28,6 +28,9 @@ type XHRSession struct {
 // http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74
 func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	client := &http.Client{
+		// never make it less than the heartbeat delay from the sockjs server.
+		// If this is los, your requests to the server will time out, so you'll
+		// never receive the heartbeat frames.
 		Timeout: opts.Timeout,
 		// add this so we can make use of load balancer's sticky session features,
 		// such as AWS ELB
@@ -120,11 +123,13 @@ func (x *XHRSession) Recv() (string, error) {
 			// next time the others will be picked
 			msg := x.messages[0]
 			x.messages = x.messages[1:]
+
 			return msg, nil
 		case 'h':
 			// heartbeat received
 			continue
 		case 'c':
+			x.opened = false
 			return "", errors.New("session closed")
 		default:
 			return "", errors.New("invalid frame type")
@@ -136,7 +141,7 @@ func (x *XHRSession) Recv() (string, error) {
 
 func (x *XHRSession) Send(frame string) error {
 	if !x.opened {
-		return errors.New("connection is not opened yet")
+		return errors.New("session is not opened yet")
 	}
 
 	// Need's to be JSON encoded array of string messages (SockJS protocol
