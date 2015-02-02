@@ -9,7 +9,7 @@ import (
 func TestMethod_Latest(t *testing.T) {
 	k := New("testkite", "0.0.1")
 	k.Config.DisableAuthentication = true
-	k.Config.Port = 9999
+	k.Config.Port = 9997
 
 	k.MethodHandling = ReturnLatest
 
@@ -28,7 +28,7 @@ func TestMethod_Latest(t *testing.T) {
 	defer k.Close()
 	<-k.ServerReadyNotify()
 
-	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9999/kite")
+	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9997/kite")
 	if err := c.Dial(); err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +46,9 @@ func TestMethod_Latest(t *testing.T) {
 
 func TestMethod_First(t *testing.T) {
 	k := New("testkite", "0.0.1")
+	k.SetLogLevel(DEBUG)
 	k.Config.DisableAuthentication = true
-	k.Config.Port = 9999
+	k.Config.Port = 9998
 
 	k.MethodHandling = ReturnFirst
 
@@ -66,7 +67,7 @@ func TestMethod_First(t *testing.T) {
 	defer k.Close()
 	<-k.ServerReadyNotify()
 
-	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9999/kite")
+	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9998/kite")
 	if err := c.Dial(); err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +122,7 @@ func TestMethod_Error(t *testing.T) {
 func TestMethod_Base(t *testing.T) {
 	k := New("testkite", "0.0.1")
 	k.Config.DisableAuthentication = true
-	k.Config.Port = 9999
+	k.Config.Port = 10000
 
 	k.PreHandleFunc(func(r *Request) (interface{}, error) {
 		r.Context.Set("pre1", "pre1")
@@ -182,7 +183,7 @@ func TestMethod_Base(t *testing.T) {
 	defer k.Close()
 	<-k.ServerReadyNotify()
 
-	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9999/kite")
+	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:10000/kite")
 	if err := c.Dial(); err != nil {
 		t.Fatal(err)
 	}

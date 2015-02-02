@@ -26,6 +26,7 @@ func init() {
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
+	conf.ReadEnvironmentVariables()
 
 	kontrol.DefaultPort = 4099
 	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)

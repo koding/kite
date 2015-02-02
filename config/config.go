@@ -19,6 +19,7 @@ type Config struct {
 	KiteKey               string
 	DisableAuthentication bool
 	DisableConcurrency    bool
+	Transport             Transport
 
 	// Options for Server
 	IP   string
@@ -36,6 +37,7 @@ var DefaultConfig = &Config{
 	Region:      "unknown",
 	IP:          "0.0.0.0",
 	Port:        0,
+	Transport:   WebSocket,
 }
 
 // New returns a new Config initialized with defaults.
@@ -73,6 +75,15 @@ func (c *Config) ReadEnvironmentVariables() error {
 
 	if kontrolURL := os.Getenv("KITE_KONTROL_URL"); kontrolURL != "" {
 		c.KontrolURL = kontrolURL
+	}
+
+	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
+		transport, ok := Transports[transportName]
+		if !ok {
+			return fmt.Errorf("transport '%s' doesn't exists", transportName)
+		}
+
+		c.Transport = transport
 	}
 
 	return nil

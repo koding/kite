@@ -20,11 +20,11 @@ import (
 const (
 	KontrolVersion = "0.0.4"
 	KitesPrefix    = "/kites"
-	TokenLeeway    = 1 * time.Minute
 )
 
 var (
 	TokenTTL    = 48 * time.Hour
+	TokenLeeway = 1 * time.Minute
 	DefaultPort = 4000
 
 	tokenCache   = make(map[string]string)

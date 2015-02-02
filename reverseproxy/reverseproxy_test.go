@@ -26,6 +26,7 @@ func TestWebSocketProxy(t *testing.T) {
 	conf.KontrolKey = testkeys.Public
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKey().Raw
+	conf.ReadEnvironmentVariables()
 
 	// start kontrol
 	color.Green("Starting kontrol")

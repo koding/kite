@@ -11,7 +11,10 @@ import (
 	"github.com/koding/kite/config"
 )
 
-var flagPort = flag.Int("port", 6667, "Port to bind")
+var (
+	flagPort      = flag.Int("port", 6667, "Port to bind")
+	flagTransport = flag.String("transport", "", "Change underlying transport")
+)
 
 func main() {
 	flag.Parse()
@@ -23,23 +26,22 @@ func main() {
 	k.HandleFunc("square", Square)
 
 	// Get config from kite.Key directly, usually it's under ~/.kite/kite.key
-	config := config.MustGet()
-	k.Config = config
+	c := config.MustGet()
+	k.Config = c
 	k.Config.Port = *flagPort
-	k.Id = config.Id
+	k.SetLogLevel(kite.DEBUG)
+	k.Id = c.Id
+
+	// by default it's already WebSocket
+	if *flagTransport != "" && *flagTransport == "xhrpolling" {
+		k.Config.Transport = config.XHRPolling
+	}
 
 	// Register to kite with this url
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:" + strconv.Itoa(*flagPort), Path: "/kite"}
 
 	// Register us ...
-	fmt.Println("registering over websocket")
 	err := k.RegisterForever(kiteURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("registering over http")
-	_, err = k.RegisterHTTP(kiteURL)
 	if err != nil {
 		log.Fatal(err)
 	}

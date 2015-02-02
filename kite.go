@@ -201,6 +201,9 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 	c := k.NewClient("")
 	c.session = session
 
+	go c.sendHub()
+	c.wg.Add(1) // with sendHub we added a new listener
+
 	k.callOnConnectHandlers(c)
 
 	// Run after methods are registered and delegate is set

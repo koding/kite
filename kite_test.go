@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	_ "github.com/koding/kite/testutil"
 )
@@ -17,18 +19,30 @@ func TestMultiple(t *testing.T) {
 	testDuration := time.Second * 10
 
 	// number of available mathworker kites to be called
-	kiteNumber := 100
+	kiteNumber := 10
 
 	// number of exp kites that will call mathwork kites
-	clientNumber := 100
+	clientNumber := 10
 
 	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
 
 	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)
+
+	var transport config.Transport
+	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
+		tr, ok := config.Transports[transportName]
+		if !ok {
+			t.Fatalf("transport '%s' doesn't exists", transportName)
+		}
+
+		transport = tr
+	}
+
 	for i := 0; i < kiteNumber; i++ {
 		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
 		m.Config.DisableAuthentication = true
+		m.Config.Transport = transport
 
 		m.HandleFunc("square", Square)
 
@@ -41,7 +55,9 @@ func TestMultiple(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := New("exp"+strconv.Itoa(i), "0.0.1").NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
+		cn := New("exp"+strconv.Itoa(i), "0.0.1")
+		cn.Config.Transport = transport
+		c := cn.NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
@@ -61,23 +77,15 @@ func TestMultiple(t *testing.T) {
 			for i := 0; i < clientNumber; i++ {
 				wg.Add(1)
 
-				go func(i int) {
+				go func(i int, t *testing.T) {
 					defer wg.Done()
-					start := time.Now()
-
 					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
-					result, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
+					_, err := clients[i].TellWithTimeout("square", 4*time.Second, 2)
 					if err != nil {
-						t.Fatal(err)
+						t.Error(err)
 					}
-
-					elapsedTime := time.Since(start)
-
-					number := result.MustFloat64()
-
-					t.Log("rpc result: %f elapsedTime %f sec\n", number, elapsedTime.Seconds())
-				}(i)
+				}(i, t)
 			}
 		case <-timeout:
 			fmt.Println("test stopped")
@@ -93,7 +101,7 @@ func TestMultiple(t *testing.T) {
 // sure the method is calling back with in the same time and not timing out.
 func TestConcurrency(t *testing.T) {
 	// Create a mathworker kite
-	mathKite := New("mathworker", "0.0.1")
+	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("ping", func(r *Request) (interface{}, error) {
 		time.Sleep(time.Second)
@@ -110,7 +118,7 @@ func TestConcurrency(t *testing.T) {
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
-		c := New("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
+		c := newXhrKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +149,7 @@ func TestConcurrency(t *testing.T) {
 // Test 2 way communication between kites.
 func TestKite(t *testing.T) {
 	// Create a mathworker kite
-	mathKite := New("mathworker", "0.0.1")
+	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
@@ -152,7 +160,7 @@ func TestKite(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// Create exp2 kite
-	exp2Kite := New("exp2", "0.0.1")
+	exp2Kite := newXhrKite("exp2", "0.0.1")
 	fooChan := make(chan string)
 	exp2Kite.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		s := r.Args.One().MustString()
@@ -262,4 +270,10 @@ func SquareCB(r *Request) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+func newXhrKite(name, version string) *Kite {
+	k := New(name, version)
+	k.Config.Transport = config.XHRPolling
+	return k
 }
