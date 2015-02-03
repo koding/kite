@@ -261,7 +261,7 @@ func randomStringLength(length int) string {
 func (c *Client) run() {
 	err := c.readLoop()
 	if err != nil {
-		c.LocalKite.Log.Error("readloop err: %s", err)
+		c.LocalKite.Log.Debug("readloop err: %s", err)
 	}
 
 	// falls here when connection disconnects
@@ -418,7 +418,7 @@ func (c *Client) sendHub() {
 
 			err := c.session.Send(string(msg))
 			if err != nil {
-				c.LocalKite.Log.Error("Send err: %s", err.Error())
+				c.LocalKite.Log.Debug("Send err: %s", err.Error())
 			}
 		}
 	}
