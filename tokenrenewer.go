@@ -13,6 +13,8 @@ const (
 	retryInterval = 10 * time.Second
 )
 
+var ErrTokenInvalidExplirationClaim = errors.New("token: invalid exp claim")
+
 // TokenRenewer renews the token of a Client just before it expires.
 type TokenRenewer struct {
 	client           *Client
@@ -41,7 +43,7 @@ func (t *TokenRenewer) parse(tokenString string) error {
 
 	exp, ok := token.Claims["exp"].(float64)
 	if !ok {
-		return errors.New("token: invalid exp claim")
+		return ErrTokenInvalidExplirationClaim
 	}
 
 	t.validUntil = time.Unix(int64(exp), 0).UTC()

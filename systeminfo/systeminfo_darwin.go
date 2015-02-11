@@ -11,6 +11,8 @@ import (
 	"unsafe"
 )
 
+var ErrCannotParseVmStat = errors.New("cannot parse vm_stat output")
+
 func memoryStats() (*memory, error) {
 	m := new(memory)
 
@@ -67,7 +69,7 @@ func vm_stat() (bytesFree, bytesInactive uint64, err error) {
 	// Check every stat is found in output
 	for _, stat := range stats {
 		if !stat.valid {
-			return 0, 0, errors.New("cannot parse vm_stat output")
+			return 0, 0, ErrCannotParseVmStat
 		}
 	}
 

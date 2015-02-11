@@ -2,7 +2,6 @@ package kontrol
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -68,8 +67,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// empty url is useless for us
 	if args.URL == "" {
-		err := errors.New("empty URL")
-		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		http.Error(rw, jsonError(ErrEmptyURL), http.StatusBadRequest)
 		return
 	}
 
@@ -100,7 +98,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	// any error.
 	if err := k.storage.Upsert(remoteKite, value); err != nil {
 		k.log.Error("storage add '%s' error: %s", remoteKite, err)
-		http.Error(rw, jsonError(errors.New("internal error - register")), http.StatusInternalServerError)
+		http.Error(rw, jsonError(ErrInteralRegister), http.StatusInternalServerError)
 		return
 	}
 

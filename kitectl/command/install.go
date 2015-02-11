@@ -18,6 +18,16 @@ import (
 	"github.com/mitchellh/cli"
 )
 
+var (
+	ErrOnlyGithubSupported         = errors.New("Repo other than github.com is not supported for now")
+	ErrPackageNotFound             = errors.New("Package is not found on the server.")
+	ErrNoPlatformKeyInKiteManifest = errors.New("no platforms key in kite manifest")
+	ErrInvalidPlatformURL          = errors.New("invalid platform URL")
+	ErrInvalidVersionString        = errors.New("invalid version string")
+	ErrInvalidPackage              = errors.New("Invalid package: Package must contain only one directory.")
+	ErrInvalidRepoURL              = errors.New("invalid repo URL")
+)
+
 type Install struct {
 	Ui cli.Ui
 }
@@ -121,7 +131,7 @@ func (c *Install) Run(args []string) int {
 
 func getManifest(repoName string) (map[string]interface{}, error) {
 	if !strings.HasPrefix(repoName, "github.com/") {
-		return nil, errors.New("Repo other than github.com is not supported for now")
+		return nil, ErrOnlyGithubSupported
 	}
 
 	repoName = strings.TrimRight(repoName, "/")
@@ -134,7 +144,7 @@ func getManifest(repoName string) (map[string]interface{}, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode == 404 {
-		return nil, errors.New("Package is not found on the server.")
+		return nil, ErrPackageNotFound
 	}
 
 	if res.StatusCode != 200 {
@@ -158,7 +168,7 @@ func getManifest(repoName string) (map[string]interface{}, error) {
 func getBinaryURL(manifest map[string]interface{}) (string, error) {
 	platforms, ok := manifest["platforms"].(map[string]interface{})
 	if !ok {
-		return "", errors.New("no platforms key in kite manifest")
+		return "", ErrNoPlatformKeyInKiteManifest
 	}
 
 	platform := runtime.GOOS + "_" + runtime.GOARCH
@@ -170,7 +180,7 @@ func getBinaryURL(manifest map[string]interface{}) (string, error) {
 
 	binaryURL, ok := platformURL.(string)
 	if !ok {
-		return "", errors.New("invalid platform URL")
+		return "", ErrInvalidPlatformURL
 	}
 
 	return binaryURL, nil
@@ -179,7 +189,7 @@ func getBinaryURL(manifest map[string]interface{}) (string, error) {
 func getVersion(manifest map[string]interface{}) (string, error) {
 	version, ok := manifest["version"].(string)
 	if !ok {
-		return "", errors.New("invalid version string")
+		return "", ErrInvalidVersionString
 	}
 
 	return version, nil
@@ -245,14 +255,14 @@ func validatePackage(tempKitePath, repoName string) (bundlePath string, err erro
 	}
 
 	if len(dirs) != 1 {
-		return "", errors.New("Invalid package: Package must contain only one directory.")
+		return "", ErrInvalidPackage
 	}
 
 	bundlePath = filepath.Join(tempKitePath, dirs[0].Name())
 
 	parts := strings.Split(repoName, "/")
 	if len(parts) == 0 {
-		return "", errors.New("invalid repo URL")
+		return "", ErrInvalidRepoURL
 	}
 
 	kiteName := strings.TrimSuffix(parts[len(parts)-1], ".kite")

@@ -12,6 +12,8 @@ import (
 
 const publicEcho = "http://echoip.com"
 
+var ErrCannotFindLocalIPAddress = errors.New("cannot find local IP address")
+
 // RegisterURL returns a URL that is either local or public. It's an helper
 // method to get a Registration URL that can be passed to Kontrol (via the
 // methods Register(), RegisterToProxy(), etc.) It needs to be called after all
@@ -71,7 +73,7 @@ func localIP() (net.IP, error) {
 		}
 	}
 
-	return nil, errors.New("cannot find local IP address")
+	return nil, ErrCannotFindLocalIPAddress
 }
 
 // publicIP returns an IP that is supposed to be Public.

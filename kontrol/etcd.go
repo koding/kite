@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
+
+var ErrEmptyUsernameField = errors.New("Empty username field")
 
 // keyOrder defines the order of the query paramaters.
 var keyOrder = []string{
@@ -269,7 +270,7 @@ func GetQueryKey(q *protocol.KontrolQuery) (string, error) {
 	fields := q.Fields()
 
 	if q.Username == "" {
-		return "", errors.New("Empty username field")
+		return "", ErrEmptyUsernameField
 	}
 
 	// Validate query and build key.

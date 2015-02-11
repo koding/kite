@@ -20,6 +20,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	ErrNoMessage              = errors.New("no message")
+	ErrInvalidFrametype       = errors.New("invalid frame type")
+	ErrSessionClosed          = errors.New("session closed")
+	ErrUnexpectedEmptyMessage = errors.New("unexpected empty message")
+)
+
 // Rand is a threaSafe rand.Rand type
 type Rand struct {
 	r *rand.Rand
@@ -122,7 +129,7 @@ read_frame:
 	}
 
 	if len(buf) == 0 {
-		return "", errors.New("unexpected empty message")
+		return "", ErrUnexpectedEmptyMessage
 	}
 
 	frameType := buf[0]
@@ -147,17 +154,17 @@ read_frame:
 		}
 		w.messages = append(w.messages, message)
 	case 'c':
-		return "", errors.New("session closed")
+		return "", ErrSessionClosed
 	case 'h':
 		// TODO handle heartbeat
 		goto read_frame
 	default:
-		return "", errors.New("invalid frame type")
+		return "", ErrInvalidFrametype
 	}
 
 	// Return first message in slice.
 	if len(w.messages) == 0 {
-		return "", errors.New("no message")
+		return "", ErrNoMessage
 	}
 	msg := w.messages[0]
 	w.messages = w.messages[1:]

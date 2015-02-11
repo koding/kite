@@ -4,11 +4,12 @@ import (
 	"errors"
 
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
+
+var ErrWatcherNotFound = errors.New("Watcher not found")
 
 type Event struct {
 	Action   string     `json:"action"`
@@ -26,7 +27,7 @@ func (k *Kontrol) cancelWatcher(watcherID string) error {
 	defer k.watchersMutex.Unlock()
 	watcher, ok := k.watchers[watcherID]
 	if !ok {
-		return errors.New("Watcher not found")
+		return ErrWatcherNotFound
 	}
 	watcher.Stop()
 	delete(k.watchers, watcherID)

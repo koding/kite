@@ -15,6 +15,12 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
+var (
+	ErrNoKontrolURLGiven             = errors.New("no kontrol URL given in config")
+	ErrHeartBeatIntervalCannotBeZero = errors.New("heartbeal interval cannot be zero")
+	ErrRegisterAgain                 = errors.New("register again")
+)
+
 type kontrolFunc func(*Client) error
 
 // the implementation of New() doesn't have any error to be returned yet it
@@ -36,7 +42,7 @@ var defaultClient = &http.Client{
 // immediately, so there will be no persistent connection.
 func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 	if k.Config.KontrolURL == "" {
-		return errors.New("no kontrol URL given in config")
+		return ErrNoKontrolURLGiven
 	}
 
 	client := k.NewClient(k.Config.KontrolURL)
@@ -125,7 +131,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	}
 
 	if rr.HeartbeatInterval == 0 {
-		return nil, errors.New("heartbeal interval cannot be zero")
+		return nil, ErrHeartBeatIntervalCannotBeZero
 	}
 
 	parsed, err := url.Parse(rr.URL)
@@ -159,8 +165,6 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	q.Set("id", k.Id)
 	u.RawQuery = q.Encode()
 
-	errRegisterAgain := errors.New("register again")
-
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u.String())
 
@@ -185,7 +189,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		case "registeragain":
 			tick.Stop()
 			k.RegisterHTTP(kiteURL)
-			return errRegisterAgain
+			return ErrRegisterAgain
 		}
 
 		return fmt.Errorf("malformed heartbeat response %v", strings.TrimSpace(string(body)))
@@ -193,7 +197,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 
 	for _ = range tick.C {
 		err := heartbeatFunc()
-		if err == errRegisterAgain {
+		if err == ErrRegisterAgain {
 			return // return so we don't run forever
 		}
 

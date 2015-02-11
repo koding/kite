@@ -14,6 +14,12 @@ import (
 	"github.com/koding/kite/sockjsclient"
 )
 
+// ErrInvalidSignatureToken - provided signature in token is invalid
+var ErrInvalidSignatureToken = errors.New("Invalid signature in token")
+
+// ErrUsernameNotPresentInToken - username is not present in token
+var ErrUsernameNotPresentInToken = errors.New("Username is not present in token")
+
 // Request contains information about the incoming request.
 type Request struct {
 	// Method defines the method name which is invoked by the incoming request
@@ -203,7 +209,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	}
 
 	if !token.Valid {
-		return errors.New("Invalid signature in token")
+		return ErrInvalidSignatureToken
 	}
 
 	// check if we have an audience and it matches our own signature
@@ -218,7 +224,7 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	// already checks them.
 	username, ok := token.Claims["sub"].(string)
 	if !ok {
-		return errors.New("Username is not present in token")
+		return ErrUsernameNotPresentInToken
 	}
 
 	// replace the requester username so we reflect the validated
@@ -258,14 +264,15 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 	}
 
 	if !token.Valid {
-		return errors.New("Invalid signature in token")
+		return ErrInvalidSignatureToken
 	}
 
-	if username, ok := token.Claims["sub"].(string); !ok {
-		return errors.New("Username is not present in token")
-	} else {
-		r.Username = username
+	username, ok := token.Claims["sub"].(string)
+	if !ok {
+		return ErrUsernameNotPresentInToken
 	}
+
+	r.Username = username
 
 	return nil
 }
@@ -280,12 +287,12 @@ func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
 	}
 
 	if !token.Valid {
-		return "", errors.New("Invalid signature in token")
+		return "", ErrInvalidSignatureToken
 	}
 
 	username, ok := token.Claims["sub"].(string)
 	if !ok {
-		return "", errors.New("Username is not present in token")
+		return "", ErrUsernameNotPresentInToken
 	}
 
 	// return authenticated username
