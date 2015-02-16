@@ -148,7 +148,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 
 	heartbeatURL := k.getKontrolPath("heartbeat")
 
-	k.Log.Debug("Sending heartbeat to: %s", heartbeatURL)
+	k.Log.Debug("Starting to send heartbeat to: %s", heartbeatURL)
 
 	u, err := url.Parse(heartbeatURL)
 	if err != nil {
@@ -183,8 +183,12 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		case "pong":
 			return nil
 		case "registeragain":
-			tick.Stop()
-			k.RegisterHTTP(kiteURL)
+			k.Log.Info("Disconnected from Kontrol, going to register again")
+			go func() {
+				k.RegisterHTTPForever(kiteURL)
+				tick.Stop()
+			}()
+
 			return errRegisterAgain
 		}
 
