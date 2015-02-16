@@ -183,8 +183,9 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		case "pong":
 			return nil
 		case "registeragain":
+			k.Log.Info("Disconnected from Kontrol, going to register again")
 			tick.Stop()
-			k.RegisterHTTP(kiteURL)
+			k.RegisterHTTPForever(kiteURL)
 			return errRegisterAgain
 		}
 
