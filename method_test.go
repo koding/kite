@@ -6,6 +6,43 @@ import (
 	"time"
 )
 
+func TestMethod_Throttling(t *testing.T) {
+	k := New("testkite", "0.0.1")
+	k.Config.DisableAuthentication = true
+	k.Config.Port = 9996
+
+	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
+		return "handle", nil
+	}).Throttle(20, time.Minute)
+
+	go k.Run()
+	defer k.Close()
+	<-k.ServerReadyNotify()
+
+	c := New("exp", "0.0.1").NewClient("http://127.0.0.1:9996/kite")
+	if err := c.Dial(); err != nil {
+		t.Fatal(err)
+	}
+
+	// First let us exhaust the bucket
+	for i := 0; i < 20; i++ {
+		_, err := c.TellWithTimeout("foo", 4*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// now, the request 21 should give a requestLimitError
+	_, err := c.TellWithTimeout("foo", 4*time.Second)
+	if err != nil {
+		if kErr, ok := err.(*Error); ok {
+			if kErr.Type != "requestLimitError" {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 func TestMethod_Latest(t *testing.T) {
 	k := New("testkite", "0.0.1")
 	k.Config.DisableAuthentication = true
