@@ -76,7 +76,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 			return
 		}
 	} else {
-		// if not valided accept any username it sends, also useful for test
+		// if not validated accept any username it sends, also useful for test
 		// cases.
 		request.Username = request.Client.Kite.Username
 	}
@@ -88,6 +88,19 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 		method.initialized = true
 	}
 	method.mu.Unlock()
+
+	// check if any throttling is enabled and then check token's available.
+	// Tokens are filled per frequency of the initial bucket, so every request
+	// is going to take one token from the bucket. If many requests come in (in
+	// span time larger than the bucket's frequency), there will be no token's
+	// available more so it will return a zero.
+	if method.bucket != nil && method.bucket.TakeAvailable(1) == 0 {
+		callFunc(nil, &Error{
+			Type:    "requestLimitError",
+			Message: "The maximum request rate is exceeded.",
+		})
+		return
+	}
 
 	// Call the handler functions.
 	result, err := method.ServeKite(request)

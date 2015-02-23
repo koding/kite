@@ -1,6 +1,11 @@
 package kite
 
-import "sync"
+import (
+	"sync"
+	"time"
+
+	"github.com/juju/ratelimit"
+)
 
 // MethodHandling defines how to handle chaining of kite.Handler middlewares.
 // An error breaks the chain regardless of what handling is used. Note that all
@@ -57,6 +62,9 @@ type Method struct {
 	// initialized.
 	initialized bool
 
+	// bucket is used for throttling the method by certain rule
+	bucket *ratelimit.Bucket
+
 	mu sync.Mutex // protects handler slices
 }
 
@@ -83,6 +91,29 @@ func (k *Kite) addHandle(method string, handler Handler) *Method {
 // DisableAuthentication disables authentication check for this method.
 func (m *Method) DisableAuthentication() *Method {
 	m.authenticate = false
+	return m
+}
+
+// Throttle throttles the method for each incoming request. The throttle
+// algorithm is based on token bucket implementation:
+// http://en.wikipedia.org/wiki/Token_bucket. Rate determines the number of
+// request which are allowed per frequency. Example: A rate of 50 and frequency
+// of two minutes means that the method can receive 50 request in two minutes,
+// if there is more requests in this two minutes they will be rejected. Another
+// example would be a rate of 30 and frequency of one second. This basically
+// means the method is limited to 30 requests per second.
+func (m *Method) Throttle(rate int64, frequency time.Duration) *Method {
+	// don't do anything if the bucket is initialized already
+	if m.bucket != nil {
+		return m
+	}
+
+	m.bucket = ratelimit.NewBucketWithQuantum(
+		frequency, // interval
+		rate,      // capacity
+		rate,      // token per interval
+	)
+
 	return m
 }
 
