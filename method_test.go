@@ -13,7 +13,7 @@ func TestMethod_Throttling(t *testing.T) {
 
 	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		return "handle", nil
-	}).Throttle(20, time.Minute)
+	}).Throttle(20, time.Second*2)
 
 	go k.Run()
 	defer k.Close()
@@ -40,6 +40,15 @@ func TestMethod_Throttling(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+	}
+
+	// now wait until the bucket is filled again
+	time.Sleep(time.Second * 2)
+
+	// this shouldn't give any error at all
+	_, err = c.TellWithTimeout("foo", 4*time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
