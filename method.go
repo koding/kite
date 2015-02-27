@@ -97,21 +97,22 @@ func (m *Method) DisableAuthentication() *Method {
 // Throttle throttles the method for each incoming request. The throttle
 // algorithm is based on token bucket implementation:
 // http://en.wikipedia.org/wiki/Token_bucket. Rate determines the number of
-// request which are allowed per frequency. Example: A rate of 50 and frequency
-// of two minutes means that the method can receive 50 request in two minutes,
-// if there is more requests in this two minutes they will be rejected. Another
-// example would be a rate of 30 and frequency of one second. This basically
-// means the method is limited to 30 requests per second.
-func (m *Method) Throttle(rate int64, frequency time.Duration) *Method {
+// request which are allowed per frequency. Example: A capacity of 50 and
+// fillInterval of two seconds means that initially it can handle 50 requests
+// and every two seconds the bucket will be filled with one token until it hits
+// the capacity. If there is a burst API calls, all tokens will be exhausted
+// and clients need to be wait until the bucket is filled with time.  For
+// example to have throttle with 30 req/second, you need to have a fillinterval
+// of 33.33 milliseconds.
+func (m *Method) Throttle(fillInterval time.Duration, capacity int64) *Method {
 	// don't do anything if the bucket is initialized already
 	if m.bucket != nil {
 		return m
 	}
 
-	m.bucket = ratelimit.NewBucketWithQuantum(
-		frequency, // interval
-		rate,      // capacity
-		rate,      // token per interval
+	m.bucket = ratelimit.NewBucket(
+		fillInterval, // interval
+		capacity,     // token per interval
 	)
 
 	return m

@@ -13,7 +13,7 @@ func TestMethod_Throttling(t *testing.T) {
 
 	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
 		return "handle", nil
-	}).Throttle(20, time.Second*2)
+	}).Throttle(time.Second*2, 30)
 
 	go k.Run()
 	defer k.Close()
