@@ -49,8 +49,8 @@ Options:
 }
 
 func (c *Query) Run(args []string) int {
-
 	c.KiteClient.Config = config.MustGet()
+	c.KiteClient.Config.Transport = config.XHRPolling
 
 	var query protocol.KontrolQuery
 
