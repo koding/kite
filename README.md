@@ -54,7 +54,7 @@ kites.
 
 Query has 7 fields:
 
-    /<username>/<environment>/<name>/<version>/<region>/<hotname>/<id>
+    /<username>/<environment>/<name>/<version>/<region>/<hostname>/<id>
 
 * You must at least give the username.
 * The order of the fields is from general to specific.
