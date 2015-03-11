@@ -119,5 +119,5 @@ func initialKey(kontrolConf *Kontrol, publicKey, privateKey []byte) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("kite.key is written to ~/.kite/kite.key. You can see it with:\n\tkite showkey")
+	fmt.Println("kite.key is written to ~/.kite/kite.key. You can see it with:\n\tkitectl showkey")
 }
