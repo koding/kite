@@ -84,6 +84,25 @@ func (k *Kite) listenAndServe() error {
 	return http.Serve(k.listener, k)
 }
 
+// Port returns the TCP port number that the kite listens.
+// Port must be called after the listener is initialized.
+// You can use ServerReadyNotify function to get notified when listener is ready.
+//
+// Kite starts to listen the port when Run() is called.
+// Since Run() is blocking you need to run it as a goroutine the call this function when listener is ready.
+//
+// Example:
+//     k := kite.New("x", "1.0.0")
+//     go k.Run()
+//     <-k.ServerReadyNotify()
+//     port := k.Port()
+func (k *Kite) Port() int {
+	if k.listener == nil {
+		return 0
+	}
+	return k.listener.Addr().(*net.TCPAddr).Port
+}
+
 func (k *Kite) UseTLS(certPEM, keyPEM string) {
 	if k.TLSConfig == nil {
 		k.TLSConfig = &tls.Config{}
