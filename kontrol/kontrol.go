@@ -35,7 +35,7 @@ var (
 
 	// HeartbeatDelay is the compensation interval which is added to the
 	// heartbeat to avoid network delays
-	HeartbeatDelay = time.Second * 20
+	HeartbeatDelay = time.Second * 10
 
 	// UpdateInterval is the interval in which the key gets updated
 	// periodically. Keeping it low increase the write load to the storage, so
