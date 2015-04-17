@@ -55,8 +55,10 @@ type Kontrol struct {
 	// MachineAuthenticate is used to authenticate the request in the
 	// "handleMachine" method.  The reason for a separate auth function is, the
 	// request must not be authenticated because clients do not have a kite.key
-	// before they register to this machine.
-	MachineAuthenticate func(r *kite.Request) error
+	// before they register to this machine. Also the requester can send a
+	// authType argument which can be used to distinguish between several
+	// authentication methods
+	MachineAuthenticate func(authType string, r *kite.Request) error
 
 	// RSA keys
 	publicKey  string // for validating tokens
