@@ -60,6 +60,39 @@ Query has 7 fields:
 * The order of the fields is from general to specific.
 * Query cannot contains empty parts between fields.
 
+Installing *Kontrol*
+------------------
+
+Install Kontrol:
+
+```
+go get github.com/koding/kite/kontrol/kontrol
+```
+
+Generate keys for the Kite key:
+
+```
+openssl genrsa -out key.pem 2048
+openssl rsa -in key.pem -pubout > key_pub.pem
+```
+
+Set environment variables:
+
+```
+KONTROL_PORT=6000
+KONTROL_USERNAME="kontrol"
+KONTROL_STORAGE="etcd"
+KONTROL_KONTROLURL="http://127.0.0.1:6000/kite"
+KONTROL_PUBLICKEYFILE="certs/key_pub.pem"
+KONTROL_PRIVATEKEYFILE="certs/key.pem"
+```
+
+Generate initial Kite key:
+
+```
+./bin/kontrol -initial
+```
+
 How can I use kites from a browser?
 ---------------------------------
 
