@@ -18,6 +18,10 @@ import (
 	"github.com/koding/multiconfig"
 )
 
+var (
+	ErrQueryFieldsEmpty = errors.New("all query fields are empty")
+)
+
 // Postgres holds Postgresql database related configuration
 type PostgresConfig struct {
 	Host     string `default:"localhost"`
@@ -85,7 +89,7 @@ func (p *Postgres) RunCleaner(interval, expire time.Duration) {
 		if err != nil {
 			p.Log.Warning("postgres: cleaning old rows failed: %s", err)
 		} else if affectedRows != 0 {
-			p.Log.Info("postgres: cleaned up %d rows", affectedRows)
+			p.Log.Debug("postgres: cleaned up %d rows", affectedRows)
 		}
 	}
 
@@ -336,7 +340,7 @@ func selectQuery(query *protocol.KontrolQuery) (string, []interface{}, error) {
 	}
 
 	if len(andQuery) == 0 {
-		return "", nil, errors.New("all query fields are empty")
+		return "", nil, ErrQueryFieldsEmpty
 	}
 
 	return kites.Where(andQuery).ToSql()
