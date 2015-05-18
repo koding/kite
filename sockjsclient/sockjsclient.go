@@ -105,10 +105,6 @@ func (w *WebsocketSession) ID() string {
 	return w.id
 }
 
-func (w *WebsocketSession) Request() *http.Request {
-	return nil
-}
-
 // Recv reads one text frame from session
 func (w *WebsocketSession) Recv() (string, error) {
 	// Return previously received messages if there is any.
