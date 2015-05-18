@@ -78,6 +78,10 @@ func (x *XHRSession) ID() string {
 	return x.sessionID
 }
 
+func (x *XHRSession) Request() *http.Request {
+	return nil
+}
+
 func (x *XHRSession) Recv() (string, error) {
 	// Return previously received messages if there is any.
 	if len(x.messages) > 0 {
