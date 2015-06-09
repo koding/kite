@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "kite"."key" (
     CONSTRAINT "key_created_at_lte_deleted_at_check" CHECK (created_at <= deleted_at)
 ) WITH (OIDS = FALSE);
 
-GRANT SELECT, INSERT, UPDATE ON "kite"."key" TO "kontrolapplication"; -- dont allow deletion from this table
+GRANT SELECT, INSERT, UPDATE ON "kite"."key" TO "kontrol"; -- dont allow deletion from this table
 
 -- create the table
 CREATE UNLOGGED TABLE "kite"."kite" (
