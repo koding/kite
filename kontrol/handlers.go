@@ -46,7 +46,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	// check if the key is valid and is stored in the key pair storage, if not
-	// found we don't allo to register anyone.
+	// found we don't allow to register anyone.
 	if _, err := k.keyPair.GetKeyFromPublic(publicKey); err != nil {
 		return nil, err
 	}
