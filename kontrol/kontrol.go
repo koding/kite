@@ -188,6 +188,10 @@ func (k *Kontrol) registerSelf() {
 		value.URL = k.RegisterURL
 	}
 
+	// just add a random uuid key
+	u, _ := uuid.NewV4()
+	value.KeyID = u.String()
+
 	// Register first by adding the value to the storage. We don't return any
 	// error because we need to know why kontrol doesn't register itself
 	if err := k.storage.Add(k.Kite.Kite(), value); err != nil {
