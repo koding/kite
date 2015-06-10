@@ -11,9 +11,9 @@
 -- drop the user
 -- DROP USER IF EXISTS kontrol;
 
--- drop the table
+-- drop the tables
 -- DROP TABLE IF EXISTS "kite"."kite";
-
+-- DROP TABLE IF EXISTS "kite"."key";
 
 -- create role
 CREATE ROLE kontrol;
