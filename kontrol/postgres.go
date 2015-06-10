@@ -269,7 +269,7 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return nil
 	}
 
-	insertSQL, args, err := insertQuery(kiteProt, value.URL, value.KeyID)
+	insertSQL, args, err := insertKiteQuery(kiteProt, value.URL, value.KeyID)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,20 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 		return err
 	}
 
-	sqlQuery, args, err := insertQuery(kiteProt, value.URL, value.KeyID)
+	sqlQuery, args, err := insertKeyQuery("1", "1")
+	if err != nil {
+		return err
+	}
+
+	// insertKeyQuery is using RETURNING, so we need to to read from the
+	// returned ROW
+	var keyId string
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyId)
+	if err != nil {
+		return err
+	}
+
+	sqlQuery, args, err = insertKiteQuery(kiteProt, value.URL, keyId)
 	if err != nil {
 		return err
 	}
@@ -346,8 +359,8 @@ func selectQuery(query *protocol.KontrolQuery) (string, []interface{}, error) {
 	return kites.Where(andQuery).ToSql()
 }
 
-// inseryQuery
-func insertQuery(kiteProt *protocol.Kite, url, keyId string) (string, []interface{}, error) {
+// inseryKiteQuery inserts the given kite, url and key to the kite.kite table
+func insertKiteQuery(kiteProt *protocol.Kite, url, keyId string) (string, []interface{}, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	kiteValues := kiteProt.Values()
@@ -371,4 +384,14 @@ func insertQuery(kiteProt *protocol.Kite, url, keyId string) (string, []interfac
 		"url",
 		"key_id",
 	).Values(values...).ToSql()
+}
+
+// inseryKeyQuery inserts the given kite, url and key to the kite.kite table
+func insertKeyQuery(public, private string) (string, []interface{}, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	return psql.Insert("kite.key").Columns(
+		"public",
+		"private",
+	).Values(public, private).Suffix("RETURNING id").ToSql()
 }
