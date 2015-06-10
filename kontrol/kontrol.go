@@ -170,6 +170,8 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 		return "", errors.New("cannot generate a token")
 	}
 
+	panic("pickup a public/private key for registering machines")
+
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
