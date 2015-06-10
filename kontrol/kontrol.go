@@ -150,6 +150,10 @@ func (k *Kontrol) Run() {
 		panic("kontrol storage is not set")
 	}
 
+	if k.keyPair == nil {
+		panic("kontrol key pair storage is not set")
+	}
+
 	// now go and register ourself
 	go k.registerSelf()
 
