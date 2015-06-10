@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "kite"."key" (
     id UUID NOT NULL DEFAULT uuid_generate_v4(),
     public TEXT NOT NULL COLLATE "default", -- public will store public key of pair
     private TEXT NOT NULL COLLATE "default", -- private will store private key of pair
-    created_at timestamp(6) WITH TIME ZONE NOT NULL DEFAULT now(),
+    created_at timestamp(6) WITH TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
     deleted_at timestamp(6) WITH TIME ZONE, -- update deleted at if a key pair become obsolote
 
     -- create constraints along with table creation
