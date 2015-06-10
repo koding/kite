@@ -44,6 +44,12 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		URL: kiteURL,
 	}
 
+	// just check if the key is valid and is stored in the key pair storage, if
+	// not found we don't allo to register anyone.
+	if _, err := k.keyPair.GetKeyFromPublic(""); err != nil {
+		return nil, err
+	}
+
 	// Register first by adding the value to the storage. Return if there is
 	// any error.
 	if err := k.storage.Upsert(&remote.Kite, value); err != nil {
