@@ -269,7 +269,7 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return nil
 	}
 
-	insertSQL, args, err := insertQuery(kiteProt, value.URL)
+	insertSQL, args, err := insertQuery(kiteProt, value.URL, value.KeyID)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 		return err
 	}
 
-	sqlQuery, args, err := insertQuery(kiteProt, value.URL)
+	sqlQuery, args, err := insertQuery(kiteProt, value.URL, value.KeyID)
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func selectQuery(query *protocol.KontrolQuery) (string, []interface{}, error) {
 }
 
 // inseryQuery
-func insertQuery(kiteProt *protocol.Kite, url string) (string, []interface{}, error) {
+func insertQuery(kiteProt *protocol.Kite, url, keyId string) (string, []interface{}, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	kiteValues := kiteProt.Values()
@@ -358,6 +358,7 @@ func insertQuery(kiteProt *protocol.Kite, url string) (string, []interface{}, er
 	}
 
 	values = append(values, url)
+	values = append(values, keyId)
 
 	return psql.Insert("kite.kite").Columns(
 		"username",
@@ -368,5 +369,6 @@ func insertQuery(kiteProt *protocol.Kite, url string) (string, []interface{}, er
 		"hostname",
 		"id",
 		"url",
+		"key_id",
 	).Values(values...).ToSql()
 }
