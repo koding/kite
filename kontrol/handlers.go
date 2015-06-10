@@ -139,37 +139,36 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	// This type is here until inversion branch is merged.
-	// Reason: We can't use the same struct for marshaling and unmarshaling.
-	// TODO use the struct in protocol
-	type GetKitesArgs struct {
-		Query *protocol.KontrolQuery `json:"query"`
-	}
-
-	var args GetKitesArgs
-	r.Args.One().MustUnmarshal(&args)
-
-	query := args.Query
-
-	// audience will go into the token as "aud" claim.
-	audience := getAudience(query)
-
-	// Generate token once here because we are using the same token for every
-	// kite we return and generating many tokens is really slow.
-	token, err := generateToken(audience, r.Username,
-		k.Kite.Kite().Username, k.privateKey)
-	if err != nil {
+	var args protocol.GetKitesArgs
+	if err := r.Args.One().Unmarshal(&args); err != nil {
 		return nil, err
 	}
 
 	// Get kites from the storage
-	kites, err := k.storage.Get(query)
+	kites, err := k.storage.Get(args.Query)
 	if err != nil {
 		return nil, err
 	}
 
-	// Attach tokens to kites
-	kites.Attach(token)
+	for _, kite := range kites {
+		// audience will go into the token as "aud" claim.
+		audience := getAudience(args.Query)
+
+		keyPair, err := k.keyPair.GetKeyFromID(kite.KeyID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Generate token once here because we are using the same token for every
+		// kite we return and generating many tokens is really slow.
+		token, err := generateToken(audience, r.Username,
+			k.Kite.Kite().Username, keyPair.Private)
+		if err != nil {
+			return nil, err
+		}
+
+		kite.Token = token
+	}
 
 	return &protocol.GetKitesResult{
 		Kites: kites,

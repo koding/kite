@@ -172,6 +172,7 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 		hostname    string
 		id          string
 		url         string
+		keyId       string
 		updated_at  time.Time
 		created_at  time.Time
 	)
@@ -188,6 +189,7 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 			&hostname,
 			&id,
 			&url,
+			&keyId,
 			&updated_at,
 			&created_at,
 		)
@@ -205,7 +207,8 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 				Hostname:    hostname,
 				ID:          id,
 			},
-			URL: url,
+			URL:   url,
+			KeyID: keyId,
 		})
 	}
 
