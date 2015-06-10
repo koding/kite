@@ -407,17 +407,22 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-	sqlQuery, args, err := psql.Select("id", "public", "private").From("kite.key").Where("id", id).ToSql()
+	sqlQuery, args, err := psql.
+		Select("id", "public", "private").
+		From("kite.key").
+		Where(map[string]interface{}{"id": id}).
+		ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
-	fmt.Printf("args = %+v\n", args)
-
 	keyPair := &KeyPair{}
-	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public)
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := keyPair.Validate(); err != nil {
 		return nil, err
 	}
 
