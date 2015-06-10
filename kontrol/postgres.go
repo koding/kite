@@ -376,17 +376,6 @@ func insertKiteQuery(kiteProt *protocol.Kite, url, keyId string) (string, []inte
 	).Values(values...).ToSql()
 }
 
-// inseryKeyQuery inserts the given kite, url and key to the kite.kite table
-func insertKeyQuery(id, public, private string) (string, []interface{}, error) {
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-
-	return psql.Insert("kite.key").Columns(
-		"id",
-		"public",
-		"private",
-	).Values(id, public, private).ToSql()
-}
-
 /*
 
 --- Key Pair -----------------
@@ -394,9 +383,16 @@ func insertKeyQuery(id, public, private string) (string, []interface{}, error) {
 */
 
 func (p *Postgres) AddKey(keyPair *KeyPair) error {
-	// first add our row into the key table, otherwise adding a new key to kite
-	// table will fail
-	sqlQuery, args, err := insertKeyQuery(keyPair.ID, keyPair.Public, keyPair.Private)
+	if err := keyPair.Validate(); err != nil {
+		return err
+	}
+
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	sqlQuery, args, err := psql.Insert("kite.key").Columns(
+		"id",
+		"public",
+		"private",
+	).Values(keyPair.ID, keyPair.Public, keyPair.Private).ToSql()
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,7 @@
 package kontrol
 
+import "errors"
+
 // KeyPair defines a single key pair entity
 type KeyPair struct {
 	// ID is the unique id defining the key pair
@@ -10,6 +12,21 @@ type KeyPair struct {
 
 	// Private key
 	Private string
+}
+
+func (k *KeyPair) Validate() error {
+	if k.ID == "" {
+		return errors.New("KeyPair ID field is empty")
+	}
+
+	if k.Public == "" {
+		return errors.New("KeyPair Public field is empty")
+	}
+
+	if k.Private == "" {
+		return errors.New("KeyPair Private field is empty")
+	}
+	return nil
 }
 
 // KeyPairStorage is responsible of managing key pairs
