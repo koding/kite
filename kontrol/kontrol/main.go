@@ -91,7 +91,9 @@ func main() {
 			DBName:   conf.Postgres.DBName,
 		}
 
-		k.SetStorage(kontrol.NewPostgres(postgresConf, k.Kite.Log))
+		p := kontrol.NewPostgres(postgresConf, k.Kite.Log)
+		k.SetStorage(p)
+		k.SetKeyPairStorage(p)
 	}
 
 	k.Kite.SetLogLevel(kite.DEBUG)

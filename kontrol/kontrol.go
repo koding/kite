@@ -69,6 +69,9 @@ type Kontrol struct {
 	heartbeats   map[string]*time.Timer
 	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
 
+	// keyPair defines the storage of keypairs
+	keyPair KeyPairStorage
+
 	// storage defines the storage of the kites.
 	storage Storage
 
@@ -140,6 +143,12 @@ func (k *Kontrol) SetStorage(storage Storage) {
 	k.storage = storage
 }
 
+// SetKeyPairStorage sets the backend storage that kontrol is going to use to
+// store keypairs
+func (k *Kontrol) SetKeyPairStorage(storage KeyPairStorage) {
+	k.keyPair = storage
+}
+
 // Close stops kontrol and closes all connections
 func (k *Kontrol) Close() {
 	k.Kite.Close()
@@ -191,6 +200,17 @@ func (k *Kontrol) registerSelf() {
 	// just add a random uuid key
 	u, _ := uuid.NewV4()
 	value.KeyID = u.String()
+
+	// Kontrol itselfs doesn't use keys at all, just add some placeholders
+	keyPair := &KeyPair{
+		ID:      u.String(),
+		Public:  "kontrol-self",
+		Private: "kontrol-self",
+	}
+
+	if err := k.keyPair.AddKey(keyPair); err != nil {
+		k.log.Error(err.Error())
+	}
 
 	// Register first by adding the value to the storage. We don't return any
 	// error because we need to know why kontrol doesn't register itself

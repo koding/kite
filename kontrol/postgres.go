@@ -285,19 +285,7 @@ func (p *Postgres) Add(kiteProt *protocol.Kite, value *kontrolprotocol.RegisterV
 		return err
 	}
 
-	// first add our row into the key tabl, otherwise adding a new key to kite
-	// table will fail
-	sqlQuery, args, err := insertKeyQuery(value.KeyID, "2", "2")
-	if err != nil {
-		return err
-	}
-
-	_, err = p.DB.Exec(sqlQuery, args...)
-	if err != nil {
-		return err
-	}
-
-	sqlQuery, args, err = insertKiteQuery(kiteProt, value.URL, value.KeyID)
+	sqlQuery, args, err := insertKiteQuery(kiteProt, value.URL, value.KeyID)
 	if err != nil {
 		return err
 	}
@@ -394,4 +382,34 @@ func insertKeyQuery(id, public, private string) (string, []interface{}, error) {
 		"public",
 		"private",
 	).Values(id, public, private).ToSql()
+}
+
+/*
+
+--- Key Pair -----------------
+
+*/
+
+func (p *Postgres) AddKey(keyPair *KeyPair) error {
+	// first add our row into the key table, otherwise adding a new key to kite
+	// table will fail
+	sqlQuery, args, err := insertKeyQuery(keyPair.ID, keyPair.Public, keyPair.Private)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.DB.Exec(sqlQuery, args...)
+	return err
+}
+
+func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
+	return errors.New("postgres: DeleteKey is not implemented yet")
+}
+
+func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
+	return nil, errors.New("postgres: GetKeyFromID is not implemented yet")
+}
+
+func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
+	return nil, errors.New("postgres: GetKeyFromPublic is not implemented yet")
 }
