@@ -40,7 +40,9 @@ func init() {
 	case "etcd":
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	case "postgres":
-		kon.SetStorage(NewPostgres(nil, kon.Kite.Log))
+		p := NewPostgres(nil, kon.Kite.Log)
+		kon.SetStorage(p)
+		kon.SetKeyPairStorage(p)
 	default:
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}

@@ -406,9 +406,45 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
-	return nil, errors.New("postgres: GetKeyFromID is not implemented yet")
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	sqlQuery, args, err := psql.Select("id", "public", "private").From("kite.key").Where("id", id).ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
+	fmt.Printf("args = %+v\n", args)
+
+	keyPair := &KeyPair{}
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
-	return nil, errors.New("postgres: GetKeyFromPublic is not implemented yet")
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	sqlQuery, args, err := psql.
+		Select("id", "public", "private").
+		From("kite.key").
+		Where(map[string]interface{}{"public": public}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
+	fmt.Printf("args = %+v\n", args)
+
+	keyPair := &KeyPair{}
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("keyPair = %+v\n", keyPair)
+
+	return keyPair, nil
 }
