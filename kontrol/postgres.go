@@ -435,16 +435,15 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 		return nil, err
 	}
 
-	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
-	fmt.Printf("args = %+v\n", args)
-
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("keyPair = %+v\n", keyPair)
+	if err := keyPair.Validate(); err != nil {
+		return nil, err
+	}
 
 	return keyPair, nil
 }

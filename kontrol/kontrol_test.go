@@ -34,7 +34,7 @@ func init() {
 	conf.ReadEnvironmentVariables()
 
 	DefaultPort = 5555
-	kon = New(conf.Copy(), "0.0.1", testkeys.Public, testkeys.Private)
+	kon = New(conf.Copy(), "0.0.1")
 
 	switch os.Getenv("KONTROL_STORAGE") {
 	case "etcd":
@@ -46,6 +46,8 @@ func init() {
 	default:
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}
+
+	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()

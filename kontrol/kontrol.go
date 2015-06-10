@@ -60,10 +60,6 @@ type Kontrol struct {
 	// authentication methods
 	MachineAuthenticate func(authType string, r *kite.Request) error
 
-	// RSA keys
-	publicKey  string // for validating tokens
-	privateKey string // for signing tokens
-
 	clientLocks *IdLock
 
 	heartbeats   map[string]*time.Timer
@@ -91,7 +87,7 @@ type Kontrol struct {
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
-func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
+func New(conf *config.Config, version string) *Kontrol {
 	k := kite.New("kontrol", version)
 	k.Config = conf
 
@@ -102,8 +98,6 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 
 	kontrol := &Kontrol{
 		Kite:        k,
-		publicKey:   publicKey,
-		privateKey:  privateKey,
 		log:         k.Log,
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*time.Timer, 0),
@@ -122,6 +116,31 @@ func New(conf *config.Config, version, publicKey, privateKey string) *Kontrol {
 
 func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error) {
 	k.Kite.Authenticators[keyType] = fn
+}
+
+// AddKeyPair add the given key pair so it can be used to validate and
+// sign/generate tokens. If id is empty, a unique ID will be generated.
+func (k *Kontrol) AddKeyPair(id, public, private string) error {
+	if k.keyPair == nil {
+		return errors.New("KeyPair storage is not set. Please use kontrol.SetKeyPairStorage() to fix it")
+	}
+
+	if id == "" {
+		i, _ := uuid.NewV4()
+		id = i.String()
+	}
+
+	keyPair := &KeyPair{
+		ID:      id,
+		Public:  public,
+		Private: private,
+	}
+
+	if err := keyPair.Validate(); err != nil {
+		return err
+	}
+
+	return k.keyPair.AddKey(keyPair)
 }
 
 func (k *Kontrol) Run() {
@@ -172,20 +191,23 @@ func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
 
 	panic("pickup a public/private key for registering machines")
 
+	publicKey := ""
+	privateKey := ""
+
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
 	token.Claims = map[string]interface{}{
-		"iss":        k.Kite.Kite().Username,         // Issuer
-		"sub":        username,                       // Subject
-		"iat":        time.Now().UTC().Unix(),        // Issued At
-		"jti":        tknID.String(),                 // JWT ID
-		"kontrolURL": k.Kite.Config.KontrolURL,       // Kontrol URL
-		"kontrolKey": strings.TrimSpace(k.publicKey), // Public key of kontrol
+		"iss":        k.Kite.Kite().Username,       // Issuer
+		"sub":        username,                     // Subject
+		"iat":        time.Now().UTC().Unix(),      // Issued At
+		"jti":        tknID.String(),               // JWT ID
+		"kontrolURL": k.Kite.Config.KontrolURL,     // Kontrol URL
+		"kontrolKey": strings.TrimSpace(publicKey), // Public key of kontrol
 	}
 
 	k.Kite.Log.Info("Registered machine on user: %s", username)
 
-	return token.SignedString([]byte(k.privateKey))
+	return token.SignedString([]byte(privateKey))
 }
 
 // registerSelf adds Kontrol itself to the storage as a kite.

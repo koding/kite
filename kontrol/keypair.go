@@ -7,10 +7,10 @@ type KeyPair struct {
 	// ID is the unique id defining the key pair
 	ID string
 
-	// Public key
+	// Public key is used to validate tokens
 	Public string
 
-	// Private key
+	// Private key is used to sign/generate tokens
 	Private string
 }
 
