@@ -192,9 +192,15 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("query matches more than one kite")
 	}
 
+	kite := kites[0]
 	audience := getAudience(query)
 
-	return generateToken(audience, r.Username, k.Kite.Kite().Username, k.privateKey)
+	keyPair, err := k.keyPair.GetKeyFromID(kite.KeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
