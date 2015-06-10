@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/kontrol/onceevery"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
@@ -33,6 +35,22 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
 	}
 
+	t, err := jwt.Parse(r.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		return nil, errors.New("public key is not passed")
+	}
+
+	// check if the key is valid and is stored in the key pair storage, if not
+	// found we don't allo to register anyone.
+	if _, err := k.keyPair.GetKeyFromPublic(publicKey); err != nil {
+		return nil, err
+	}
+
 	kiteURL := args.URL
 	remote := r.Client
 
@@ -42,12 +60,6 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	value := &kontrolprotocol.RegisterValue{
 		URL: kiteURL,
-	}
-
-	// just check if the key is valid and is stored in the key pair storage, if
-	// not found we don't allo to register anyone.
-	if _, err := k.keyPair.GetKeyFromPublic(""); err != nil {
-		return nil, err
 	}
 
 	// Register first by adding the value to the storage. Return if there is
