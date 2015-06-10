@@ -172,9 +172,9 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 		hostname    string
 		id          string
 		url         string
-		keyId       string
 		updated_at  time.Time
 		created_at  time.Time
+		keyId       string
 	)
 
 	kites := make(Kites, 0)
@@ -189,9 +189,9 @@ func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
 			&hostname,
 			&id,
 			&url,
-			&keyId,
 			&updated_at,
 			&created_at,
+			&keyId,
 		)
 		if err != nil {
 			return nil, err
