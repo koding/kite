@@ -47,7 +47,8 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// found we don't allow to register anyone.
-	if _, err := k.keyPair.GetKeyFromPublic(publicKey); err != nil {
+	keyPair, err := k.keyPair.GetKeyFromPublic(publicKey)
+	if err != nil {
 		return nil, err
 	}
 
@@ -59,7 +60,8 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	value := &kontrolprotocol.RegisterValue{
-		URL: kiteURL,
+		URL:   kiteURL,
+		KeyID: keyPair.ID,
 	}
 
 	// Register first by adding the value to the storage. Return if there is

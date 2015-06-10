@@ -240,6 +240,10 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return err
 	}
 
+	if value.KeyID == "" {
+		return errors.New("postgres: keyId is empty. Aborting upsert")
+	}
+
 	// we are going to try an UPDATE, if it's not successfull we are going to
 	// INSERT the document, all ine one single transaction
 	tx, err := p.DB.Begin()
