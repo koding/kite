@@ -1,6 +1,11 @@
 package kontrol
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/koding/cache"
+)
 
 // KeyPair defines a single key pair entity
 type KeyPair struct {
@@ -42,4 +47,64 @@ type KeyPairStorage interface {
 
 	// GetKeyFromPublic retrieves the KeyPairs from the given public Key
 	GetKeyFromPublic(publicKey string) (*KeyPair, error)
+}
+
+func NewMemKeyPairStorage() *MemKeyPairStorage {
+	return &MemKeyPairStorage{
+		id:     cache.NewMemory(),
+		public: cache.NewMemory(),
+	}
+}
+
+type MemKeyPairStorage struct {
+	id     cache.Cache
+	public cache.Cache
+}
+
+func (m *MemKeyPairStorage) AddKey(keyPair *KeyPair) error {
+	if err := keyPair.Validate(); err != nil {
+		return err
+	}
+
+	m.id.Set(keyPair.ID, keyPair)
+	m.public.Set(keyPair.Public, keyPair)
+	return nil
+}
+
+func (m *MemKeyPairStorage) DeleteKey(keyPair *KeyPair) error {
+	if err := keyPair.Validate(); err != nil {
+		return err
+	}
+
+	m.id.Delete(keyPair.ID)
+	m.public.Delete(keyPair.Public)
+	return nil
+}
+
+func (m *MemKeyPairStorage) GetKeyFromID(id string) (*KeyPair, error) {
+	v, err := m.id.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPair, ok := v.(*KeyPair)
+	if !ok {
+		return nil, fmt.Errorf("MemKeyPairStorage: GetKeyFromID value is malformed %+v", v)
+	}
+
+	return keyPair, nil
+}
+
+func (m *MemKeyPairStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
+	v, err := m.public.Get(public)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPair, ok := v.(*KeyPair)
+	if !ok {
+		return nil, fmt.Errorf("MemKeyPairStorage: GetKeyFromPublic value is malformed %+v", v)
+	}
+
+	return keyPair, nil
 }

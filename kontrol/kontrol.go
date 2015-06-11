@@ -168,7 +168,8 @@ func (k *Kontrol) Run() {
 	}
 
 	if k.keyPair == nil {
-		panic("kontrol key pair storage is not set")
+		k.log.Warning("Key pair storage is not set. Using in memory cache")
+		k.keyPair = NewMemKeyPairStorage()
 	}
 
 	// now go and register ourself
