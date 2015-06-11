@@ -135,6 +135,7 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 // kontorl.MachineKeyPicker function.
 func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	if k.keyPair == nil {
+		k.log.Warning("Key pair storage is not set. Using in memory cache")
 		k.keyPair = NewMemKeyPairStorage()
 	}
 
