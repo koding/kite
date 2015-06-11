@@ -135,7 +135,7 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 // kontorl.MachineKeyPicker function.
 func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	if k.keyPair == nil {
-		return errors.New("KeyPair storage is not set. Please use kontrol.SetKeyPairStorage() to fix it")
+		k.keyPair = NewMemKeyPairStorage()
 	}
 
 	if id == "" {
