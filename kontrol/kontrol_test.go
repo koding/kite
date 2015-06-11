@@ -421,3 +421,79 @@ func TestGetQueryKey(t *testing.T) {
 		t.Errorf("Key is not expected: %s", key)
 	}
 }
+
+func TestKontrolMultiKey(t *testing.T) {
+	// add so we can use it as key
+	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
+
+	// Start mathworker
+	t.Log("Setting up mathworker")
+	mathKite := kite.New("mathworker", "1.2.3")
+	mathKite.Config = conf.Copy()
+	mathKite.Config.Port = 6161
+	mathKite.HandleFunc("square", Square)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
+
+	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
+	<-mathKite.KontrolReadyNotify()
+
+	// exp2 kite is the mathworker client. However it uses a different public
+	// key
+	t.Log("Setting up exp2 kite")
+	exp2Kite := kite.New("exp2", "0.0.1")
+	exp2Kite.Config = conf.Copy()
+	exp2Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
+	exp2Kite.Config.KontrolKey = testkeys.PrivateSecond
+
+	query := &protocol.KontrolQuery{
+		Username:    exp2Kite.Kite().Username,
+		Environment: exp2Kite.Kite().Environment,
+		Name:        "mathworker",
+		Version:     "~> 1.1",
+	}
+
+	// exp2 queries for mathkite
+	t.Log("Querying for mathworkers")
+	kites, err := exp2Kite.GetKites(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(kites) == 0 {
+		t.Fatal("No mathworker available")
+	}
+
+	// exp2 connectes to mathworker
+	remoteMathWorker := kites[0]
+	err = remoteMathWorker.Dial()
+	if err != nil {
+		t.Fatal("Cannot connect to remote mathworker", err)
+	}
+
+	// Test Kontrol.GetToken
+	t.Logf("oldToken: %s", remoteMathWorker.Auth.Key)
+	newToken, err := exp2Kite.GetToken(&remoteMathWorker.Kite)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("newToken: %s", newToken)
+
+	// Run "square" method
+	response, err := remoteMathWorker.TellWithTimeout("square", 4*time.Second, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result int
+	err = response.Unmarshal(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Result must be "4"
+	if result != 4 {
+		t.Fatalf("Invalid result: %d", result)
+	}
+
+}

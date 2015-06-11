@@ -17,16 +17,20 @@ import (
 // kontrol.go) If the host does not have a kite.key file kite.New() panics.
 // This is a helper to put a fake key on it's location.
 func NewKiteKey() *jwt.Token {
-	return newKiteKey("")
+	return newKiteKey("", testkeys.Private, testkeys.Public)
 }
 
 // NewKiteKeyUsername is like NewKiteKey() but it uses the given username
 // instead of using the "testuser" name
 func NewKiteKeyUsername(username string) *jwt.Token {
-	return newKiteKey(username)
+	return newKiteKey(username, testkeys.Private, testkeys.Public)
 }
 
-func newKiteKey(username string) *jwt.Token {
+func NewKiteKeyWithKeyPair(private, public string) *jwt.Token {
+	return newKiteKey("", private, public)
+}
+
+func newKiteKey(username, private, public string) *jwt.Token {
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		panic(err)

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/protocol"
 )
 
@@ -135,12 +134,6 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
 
 	clients := make([]*Client, len(result.Kites))
 	for i, currentKite := range result.Kites {
-		_, err := jwt.Parse(currentKite.Token, k.RSAKey)
-		if err != nil {
-			return nil, err
-		}
-
-		// exp := time.Unix(int64(token.Claims["exp"].(float64)), 0).UTC()
 		auth := &Auth{
 			Type: "token",
 			Key:  currentKite.Token,
