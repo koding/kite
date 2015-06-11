@@ -60,6 +60,11 @@ type Kontrol struct {
 	// authentication methods
 	MachineAuthenticate func(authType string, r *kite.Request) error
 
+	// MachineKeyPicker is used to choose the key pair to generate a valid
+	// kite.key file for the "handleMachine" method. This overrides the default
+	// last keypair added with kontrol.AddKeyPair method.
+	MachineKeyPicker func(r *kite.Request) (*KeyPair, error)
+
 	clientLocks *IdLock
 
 	heartbeats   map[string]*time.Timer
@@ -67,6 +72,11 @@ type Kontrol struct {
 
 	// keyPair defines the storage of keypairs
 	keyPair KeyPairStorage
+
+	// lastPublic and lastPrivate are used to store the last added keys for
+	// convinience
+	lastPublic  string
+	lastPrivate string
 
 	// storage defines the storage of the kites.
 	storage Storage
@@ -119,7 +129,10 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 }
 
 // AddKeyPair add the given key pair so it can be used to validate and
-// sign/generate tokens. If id is empty, a unique ID will be generated.
+// sign/generate tokens. If id is empty, a unique ID will be generated. The
+// last added key pair is also used to generate tokens for machine
+// registrations via "handleMachine" method. This can be overiden with the
+// kontorl.MachineKeyPicker function.
 func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	if k.keyPair == nil {
 		return errors.New("KeyPair storage is not set. Please use kontrol.SetKeyPairStorage() to fix it")
@@ -135,6 +148,10 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 		Public:  public,
 		Private: private,
 	}
+
+	// set last set key pair
+	k.lastPublic = public
+	k.lastPrivate = private
 
 	if err := keyPair.Validate(); err != nil {
 		return err
@@ -179,24 +196,23 @@ func (k *Kontrol) Close() {
 
 // InitializeSelf registers his host by writing a key to ~/.kite/kite.key
 func (k *Kontrol) InitializeSelf() error {
-	key, err := k.registerUser(k.Kite.Config.Username)
+	if k.lastPublic == "" && k.lastPrivate == "" {
+		return errors.New("Please initialize AddKeyPair() method")
+	}
+
+	key, err := k.registerUser(k.Kite.Config.Username, k.lastPublic, k.lastPrivate)
 	if err != nil {
 		return err
 	}
 	return kitekey.Write(key)
 }
 
-func (k *Kontrol) registerUser(username string) (kiteKey string, err error) {
+func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey string, err error) {
 	// Only accept requests of type machine
 	tknID, err := uuid.NewV4()
 	if err != nil {
 		return "", errors.New("cannot generate a token")
 	}
-
-	panic("pickup a public/private key for registering machines")
-
-	publicKey := ""
-	privateKey := ""
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 

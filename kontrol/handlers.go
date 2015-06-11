@@ -211,7 +211,8 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		AuthType string
 	}
 
-	if err := r.Args.One().Unmarshal(&args); err != nil {
+	err := r.Args.One().Unmarshal(&args)
+	if err != nil {
 		return nil, err
 	}
 
@@ -227,5 +228,21 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	return k.registerUser(args.Username)
+	var keyPair *KeyPair
+	if k.MachineKeyPicker != nil {
+		keyPair, err = k.MachineKeyPicker(r)
+		if err != nil {
+			return nil, err
+		}
+	} else if k.lastPublic != "" && k.lastPrivate != "" {
+		keyPair = &KeyPair{
+			Public:  k.lastPublic,
+			Private: k.lastPrivate,
+		}
+	} else {
+		k.log.Error("neither machineKeyPicker neither public/private keys are available")
+		return nil, errors.New("internal error - 1")
+	}
+
+	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
 }

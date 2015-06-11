@@ -56,7 +56,7 @@ func init() {
 }
 
 func TestRegisterMachine(t *testing.T) {
-	key, err := kon.registerUser("foo")
+	key, err := kon.registerUser("foo", testkeys.Public, testkeys.Private)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -279,7 +279,7 @@ func TestGetToken(t *testing.T) {
 	}
 }
 
-func TestRegister(t *testing.T) {
+func TestRegisterKite(t *testing.T) {
 	t.Log("Setting up mathworker3")
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
 	m := kite.New("mathworker3", "1.1.1")
