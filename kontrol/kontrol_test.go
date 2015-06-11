@@ -430,7 +430,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	t.Log("Setting up mathworker")
 	mathKite := kite.New("mathworker", "1.2.3")
 	mathKite.Config = conf.Copy()
-	mathKite.Config.Port = 6161
+	mathKite.Config.Port = 6162
 	mathKite.HandleFunc("square", Square)
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
