@@ -406,7 +406,18 @@ func (p *Postgres) AddKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
-	return errors.New("postgres: DeleteKey is not implemented yet")
+	res, err := p.DB.Exec(`UPDATE kite.key SET deleted_at = (now() at time zone 'utc')`)
+	if err != nil {
+		return err
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("n = %+v\n", n)
+	return nil
 }
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
