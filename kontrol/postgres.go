@@ -432,10 +432,6 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 		return nil, err
 	}
 
-	if err := keyPair.Validate(); err != nil {
-		return nil, err
-	}
-
 	return keyPair, nil
 }
 
@@ -453,10 +449,6 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := keyPair.Validate(); err != nil {
 		return nil, err
 	}
 
