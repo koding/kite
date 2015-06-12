@@ -420,8 +420,7 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 	return nil
 }
 
-func (p *Postgres) IsValid(keyPair *KeyPair) error {
-	public := keyPair.Public
+func (p *Postgres) IsValid(public string) error {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 	andQuery := sq.And{
 		sq.Eq{"public": public},

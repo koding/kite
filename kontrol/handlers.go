@@ -230,12 +230,16 @@ func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
 
 	err = k.keyPair.IsValid(publicKey)
 	if err == nil {
-		// everything is ok, just return
-		return true, nil
+		// everything is ok, just return the old one
+		return publicKey, nil
 	}
 
-	panic("add returning new key")
-	return nil, nil
+	keyPair, err := k.pickKey(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyPair.Public, nil
 }
 
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
@@ -261,21 +265,30 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	var keyPair *KeyPair
-	if k.MachineKeyPicker != nil {
-		keyPair, err = k.MachineKeyPicker(r)
-		if err != nil {
-			return nil, err
-		}
-	} else if k.lastPublic != "" && k.lastPrivate != "" {
-		keyPair = &KeyPair{
-			Public:  k.lastPublic,
-			Private: k.lastPrivate,
-		}
-	} else {
-		k.log.Error("neither machineKeyPicker neither public/private keys are available")
-		return nil, errors.New("internal error - 1")
+	keyPair, err := k.pickKey(r)
+	if err != nil {
+		return nil, err
 	}
 
 	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
+}
+
+func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
+	if k.MachineKeyPicker != nil {
+		keyPair, err := k.MachineKeyPicker(r)
+		if err != nil {
+			return nil, err
+		}
+		return keyPair, nil
+	}
+
+	if k.lastPublic != "" && k.lastPrivate != "" {
+		return &KeyPair{
+			Public:  k.lastPublic,
+			Private: k.lastPrivate,
+		}, nil
+	}
+
+	k.log.Error("neither machineKeyPicker neither public/private keys are available")
+	return nil, errors.New("internal error - 1")
 }
