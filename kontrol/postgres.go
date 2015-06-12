@@ -420,6 +420,36 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 	return nil
 }
 
+func (p *Postgres) IsValid(keyPair *KeyPair) error {
+	public := keyPair.Public
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	andQuery := sq.And{
+		sq.Eq{"public": public},
+		sq.Eq{"deleted_at": nil},
+	}
+
+	sqlQuery, args, err := psql.
+		Select("*").
+		From("kite.key").
+		Where(andQuery).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
+	fmt.Printf("args = %+v\n", args)
+
+	var res bool
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&res)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("res = %+v\n", res)
+	return nil
+}
+
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 	sqlQuery, args, err := psql.

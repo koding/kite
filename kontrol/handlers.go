@@ -205,6 +205,39 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
+func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
+	var query *protocol.KontrolQuery
+	err := r.Args.One().Unmarshal(&query)
+	if err != nil {
+		return nil, errors.New("Invalid query")
+	}
+
+	// Only accept requests with kiteKey because we need this info
+	// for checking if the key is valid and needs to be regenerated
+	if r.Auth.Type != "kiteKey" {
+		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
+	}
+
+	t, err := jwt.Parse(r.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		return nil, errors.New("public key is not passed")
+	}
+
+	err = k.keyPair.IsValid(publicKey)
+	if err == nil {
+		// everything is ok, just return
+		return true, nil
+	}
+
+	panic("add returning new key")
+	return nil, nil
+}
+
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 	var args struct {
 		Username string

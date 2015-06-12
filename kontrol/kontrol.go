@@ -117,6 +117,7 @@ func New(conf *config.Config, version string) *Kontrol {
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
+	k.HandleFunc("getKey", kontrol.handleGetKey)
 
 	k.HandleHTTPFunc("/register", kontrol.handleRegisterHTTP)
 	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
