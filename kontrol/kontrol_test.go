@@ -513,8 +513,8 @@ func TestKeyRenew(t *testing.T) {
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
-	fmt.Printf("old = %+v\n", mathKite.Config.KontrolKey)
-	fmt.Printf("new = %+v\n", testkeys.PublicSecond)
+	// fmt.Printf("old = %+v\n", mathKite.Config.KontrolKey)
+	// fmt.Printf("new = %+v\n", testkeys.PublicSecond)
 
 	// now remove the old Key
 
@@ -526,6 +526,6 @@ func TestKeyRenew(t *testing.T) {
 	}
 
 	if publicKey != testkeys.PublicSecond {
-		t.Errorf("Key renewe failed\n\twant:%s\n\tgot :%s\n", testkeys.PublicSecond, publicKey)
+		t.Errorf("Key renew failed\n\twant:%s\n\tgot :%s\n", testkeys.PublicSecond, publicKey)
 	}
 }

@@ -406,7 +406,8 @@ func (p *Postgres) AddKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
-	res, err := p.DB.Exec(`UPDATE kite.key SET deleted_at = (now() at time zone 'utc')`)
+	res, err := p.DB.Exec(`UPDATE kite.key SET deleted_at = (now() at time zone 'utc') WHERE id = $1`,
+		keyPair.ID)
 	if err != nil {
 		return err
 	}
@@ -445,8 +446,12 @@ func (p *Postgres) IsValid(public string) error {
 		return err
 	}
 
-	fmt.Printf("id = %+v\n", id)
-	return nil
+	// if id exists it means delated_at is null, so it's a valid key
+	if id != "" {
+		return nil
+	}
+
+	return errors.New("key is not valid")
 }
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
