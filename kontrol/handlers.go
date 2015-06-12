@@ -205,6 +205,37 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
+func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
+	var args struct {
+		Username string
+		AuthType string
+	}
+
+	err := r.Args.One().Unmarshal(&args)
+	if err != nil {
+		return nil, err
+	}
+
+	if args.Username == "" {
+		return nil, errors.New("usename is empty")
+	}
+
+	if k.MachineAuthenticate != nil {
+		// an empty authType is ok, the implementer is responsible of it. It
+		// can care of it or it can return an error
+		if err := k.MachineAuthenticate(args.AuthType, r); err != nil {
+			return nil, errors.New("cannot authenticate user")
+		}
+	}
+
+	keyPair, err := k.pickKey(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
+}
+
 func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
 	// Only accept requests with kiteKey because we need this info
 	// for checking if the key is valid and needs to be regenerated
@@ -236,37 +267,6 @@ func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
 	}
 
 	return keyPair.Public, nil
-}
-
-func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
-	var args struct {
-		Username string
-		AuthType string
-	}
-
-	err := r.Args.One().Unmarshal(&args)
-	if err != nil {
-		return nil, err
-	}
-
-	if args.Username == "" {
-		return nil, errors.New("usename is empty")
-	}
-
-	if k.MachineAuthenticate != nil {
-		// an empty authType is ok, the implementer is responsible of it. It
-		// can care of it or it can return an error
-		if err := k.MachineAuthenticate(args.AuthType, r); err != nil {
-			return nil, errors.New("cannot authenticate user")
-		}
-	}
-
-	keyPair, err := k.pickKey(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
 }
 
 func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {

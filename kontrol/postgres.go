@@ -432,9 +432,6 @@ func (p *Postgres) IsValid(public string) error {
 		return err
 	}
 
-	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
-	// fmt.Printf("args = %+v\n", args)
-
 	var id string
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&id)
 	if err != nil {
