@@ -259,8 +259,6 @@ func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
 		return publicKey, nil
 	}
 
-	fmt.Printf("err = %+v\n", err)
-
 	keyPair, err := k.pickKey(r)
 	if err != nil {
 		return nil, err

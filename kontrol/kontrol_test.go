@@ -17,11 +17,13 @@ import (
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
+	"github.com/nu7hatch/gouuid"
 )
 
 var (
-	conf *config.Config
-	kon  *Kontrol
+	conf  *config.Config
+	kon   *Kontrol
+	keyId string
 )
 
 func init() {
@@ -47,7 +49,9 @@ func init() {
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}
 
-	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
+	i, _ := uuid.NewV4()
+	keyId = i.String()
+	kon.AddKeyPair(keyId, testkeys.Public, testkeys.Private)
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
@@ -499,7 +503,9 @@ func TestKontrolMultiKey(t *testing.T) {
 
 func TestKeyRenew(t *testing.T) {
 	// This key will be used as key replacement
-	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
+	i, _ := uuid.NewV4()
+	id := i.String()
+	kon.AddKeyPair(id, testkeys.PublicSecond, testkeys.PrivateSecond)
 
 	// This kite is using the old key. We are going to invalidate it and thus a
 	// new key will be used
@@ -513,10 +519,12 @@ func TestKeyRenew(t *testing.T) {
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
-	// fmt.Printf("old = %+v\n", mathKite.Config.KontrolKey)
-	// fmt.Printf("new = %+v\n", testkeys.PublicSecond)
-
 	// now remove the old Key
+	if err := kon.keyPair.DeleteKey(&KeyPair{
+		ID: keyId,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// try to get a new key, this should replace mathKite.Config.KontrolKey
 	// with the new key and also should return the new key
@@ -527,5 +535,10 @@ func TestKeyRenew(t *testing.T) {
 
 	if publicKey != testkeys.PublicSecond {
 		t.Errorf("Key renew failed\n\twant:%s\n\tgot :%s\n", testkeys.PublicSecond, publicKey)
+	}
+
+	if mathKite.Config.KontrolKey != publicKey {
+		t.Errorf("Key renew should replace config.KontrolKey\n\twant:%s\n\tgot :%s\n",
+			testkeys.PublicSecond, publicKey)
 	}
 }
