@@ -48,6 +48,46 @@ Bt+/AzX98FU9DGJIZTm38OzCFJnbp/awI1QnUqPTtLV3WYtdH58kQUByszdyt7aQ
 RBO19jSxMDjWlQeZbfh/goPdXvuCu8/mgrxa8xO3anx7M5WGrSKS1A==
 -----END RSA PRIVATE KEY-----`
 
+//////////////////////////////////////////////////
+
+const PublicSecond = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyk80fw95zWJ/WZaaYD8C
+l65QC9sHwE1SoJvMgV7nauxWL63aj5MIFgYbrgpG9qr2FBTOvx+tHFkuLzOkykoO
+/blYXqFhsq4ok3euVX0m61tz1IfiEkw+w+fxJDQzzBF0kPrwTlFwND9bx/n89dak
+CtfcyOxiapM5P27oiUzgFNyHuts9+SeuN92Y8zKqk6XKein6emnRU7OeUJALsUTx
+akvGCKwkwDArWYNUF5Vsg7TaIRDgkDZ1frtWI3D34fFyjcEPme7xkXzgsocHM1gL
+4M+YqqToBzg6/PTJRRWXVlK1xfCFl9K9WNG475msjojCxOKOLrFlbaVg4LAO2xT7
+yQIDAQAB
+-----END PUBLIC KEY-----`
+
+const PrivateSecond = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpQIBAAKCAQEAyk80fw95zWJ/WZaaYD8Cl65QC9sHwE1SoJvMgV7nauxWL63a
+j5MIFgYbrgpG9qr2FBTOvx+tHFkuLzOkykoO/blYXqFhsq4ok3euVX0m61tz1Ifi
+Ekw+w+fxJDQzzBF0kPrwTlFwND9bx/n89dakCtfcyOxiapM5P27oiUzgFNyHuts9
++SeuN92Y8zKqk6XKein6emnRU7OeUJALsUTxakvGCKwkwDArWYNUF5Vsg7TaIRDg
+kDZ1frtWI3D34fFyjcEPme7xkXzgsocHM1gL4M+YqqToBzg6/PTJRRWXVlK1xfCF
+l9K9WNG475msjojCxOKOLrFlbaVg4LAO2xT7yQIDAQABAoIBADapHcryuHsYkMX4
+3e8BN0caLsB1RmvbuGZykdemd6o4/rRVKcc+96FTtyjX2AKPgHs+f/m9qj0Nj1/r
+eSu6xMAi0tCGk+n+CjKF1JF+hgRzKiGTMS62cQLnaQzaGeCaGr+NPV47vLAxKjAm
+yAT4IExZtGqJC7I14vLTmXp3Tdf0nlp3KkQ3Uamm3gZW3OKNQd3+GbdeHOgWbO7W
+eaRilR2uCPkXYdFjho3Q04NzURwrfnlAfKkq1Bb4/vgpoVg35xquHQ7gXXFTr64H
+VG11K6pHDImn5QiiCti7fSYx7lbuuMtPBMvh+5EIefXzib3OASpBrmscpzO2rk9v
+wV3c4e0CgYEA9SOXLp4QxiAUMlMDMOK23K/+ovO8sgiDXdBHsWpQ8RLjnLsR7mVr
+eI/WGTzLtSK4YqWcDquLAyiQids0NmU9g4XLhap1rsf++r231e9bGhzBMP9bYQF1
+YcBB9qK5rujCezZLGKb2Javwv7zvszbjS5usNodBbVPuI9P2dXnaJ/sCgYEA00XV
+WQ4QyvYbft45dlhvwQ3urqP79JGXjQkeFhU3Q95wNGtOuxBV+7TwZRwulB/RNwFV
+eifCmpqQjRX9F4MEag52PmjH63t6GIhvcqkCQ1Qzx8mGs6ydXh6qUs4Xi3t4fk8N
+cjgkAZ69GrRP6GhZN3xyWJFfxarMkCK2yGMIjAsCgYEA0YPKufg04/EU8fILPyP2
+IGZ3XzSsqQknpe3W6KayaWi4iwNEDxo1oYRl+4n/nWAAcaeT2uH43Qk1h+2HEZqz
+2Y5n5WVMUcbzgcDWt41sssOyxrrpkd5aQeK9PhvUUc70MbS0uGwy4v2ytV25DNYz
+rDJwHOa7H8LlPU/zTHKJ5zMCgYEAgo3awsdQVTszznggZiNMG64yWjT3UzBMyFhk
+AR1nI0dnat0Mr8fuejZbfv+lQN9Qd38ZhPzg4oy02ppF5auOpML/Cp3RPJD26AYX
+aHFL9rMntEOyO4FlVW35rmWwYv8PfG35TyWmCmI/VSsrXeBtkT4ToutilVFwS3lI
+HhgkhfUCgYEA741+vMOgrhcpsiSefLMIdOr4Iv6NlfHMbWKvWLDiij2O9P/P/UE+
+vldcz+pdoqFuADPkJaDP2BuSi3qrMtQTtJs8tD3GYwKXRliA0GWiM+PrQ8TU13NA
+CLREiOYwWNgwzHuKvCqCvYoLKP4Ks1eceViCW9v4RyzoMBn9iSiwvzs=
+-----END RSA PRIVATE KEY-----`
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // TLS certificate

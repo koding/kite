@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 const (
@@ -36,7 +36,17 @@ func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 func (t *TokenRenewer) parse(tokenString string) error {
 	token, err := jwt.Parse(tokenString, t.localKite.RSAKey)
 	if err != nil {
-		return fmt.Errorf("Cannot parse token: %s", err.Error())
+		valErr, ok := err.(*jwt.ValidationError)
+		if !ok {
+			return err
+		}
+
+		// do noy return for ValidationErrorSignatureValid. This is because we
+		// might asked for a kite who's public Key is different what we have.
+		// We still should be able to send them requests.
+		if valErr.Errors != jwt.ValidationErrorSignatureInvalid {
+			return fmt.Errorf("Cannot parse token: %s", err.Error())
+		}
 	}
 
 	exp, ok := token.Claims["exp"].(float64)

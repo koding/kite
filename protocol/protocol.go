@@ -159,6 +159,7 @@ type GetKitesResult struct {
 type KiteWithToken struct {
 	Kite  Kite   `json:"kite"`
 	URL   string `json:"url"`
+	KeyID string `json:"keyId,omitempty"`
 	Token string `json:"token"`
 }
 

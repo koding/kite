@@ -221,9 +221,14 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 func (c *Client) dialForever(connectNotifyChan chan bool) {
 	dial := func() error {
 		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+
+		c.sendMu.Lock()
 		if !c.Reconnect {
+			c.sendMu.Unlock()
 			return nil
 		}
+		c.sendMu.Unlock()
+
 		return c.dial(0)
 	}
 
@@ -379,7 +384,10 @@ func (c *Client) processMessage(data []byte) (err error) {
 }
 
 func (c *Client) Close() {
+	c.sendMu.Lock()
 	c.Reconnect = false
+	c.sendMu.Unlock()
+
 	if c.session != nil {
 		c.session.Close(3000, "Go away!")
 	}

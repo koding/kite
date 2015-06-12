@@ -29,16 +29,20 @@ func init() {
 	conf.ReadEnvironmentVariables()
 
 	kontrol.DefaultPort = 4099
-	kon := kontrol.New(conf.Copy(), "0.1.0", testkeys.Public, testkeys.Private)
+	kon := kontrol.New(conf.Copy(), "0.1.0")
 
 	switch os.Getenv("KONTROL_STORAGE") {
 	case "etcd":
 		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
 	case "postgres":
-		kon.SetStorage(kontrol.NewPostgres(nil, kon.Kite.Log))
+		p := kontrol.NewPostgres(nil, kon.Kite.Log)
+		kon.SetStorage(p)
+		kon.SetKeyPairStorage(p)
 	default:
 		kon.SetStorage(kontrol.NewEtcd(nil, kon.Kite.Log))
 	}
+
+	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()

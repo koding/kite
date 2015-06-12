@@ -52,14 +52,15 @@ func (n *Node) Kite() (*protocol.KiteWithToken, error) {
 		return nil, err
 	}
 
-	url, err := n.Value()
+	val, err := n.Value()
 	if err != nil {
 		return nil, err
 	}
 
 	return &protocol.KiteWithToken{
-		Kite: *kite,
-		URL:  url,
+		Kite:  *kite,
+		URL:   val.URL,
+		KeyID: val.KeyID,
 	}, nil
 }
 
@@ -84,14 +85,10 @@ func (n *Node) KiteFromKey() (*protocol.Kite, error) {
 }
 
 // Value returns the value associated with the current node.
-func (n *Node) Value() (string, error) {
+func (n *Node) Value() (kontrolprotocol.RegisterValue, error) {
 	var rv kontrolprotocol.RegisterValue
 	err := json.Unmarshal([]byte(n.Node.Value), &rv)
-	if err != nil {
-		return "", err
-	}
-
-	return rv.URL, nil
+	return rv, err
 }
 
 // Kites returns a list of kites that are gathered by collecting recursively

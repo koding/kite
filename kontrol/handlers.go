@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/kontrol/onceevery"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
@@ -33,6 +35,23 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
 	}
 
+	t, err := jwt.Parse(r.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		return nil, errors.New("public key is not passed")
+	}
+
+	// check if the key is valid and is stored in the key pair storage, if not
+	// found we don't allow to register anyone.
+	keyPair, err := k.keyPair.GetKeyFromPublic(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
 	kiteURL := args.URL
 	remote := r.Client
 
@@ -41,7 +60,8 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	value := &kontrolprotocol.RegisterValue{
-		URL: kiteURL,
+		URL:   kiteURL,
+		KeyID: keyPair.ID,
 	}
 
 	// Register first by adding the value to the storage. Return if there is
@@ -121,37 +141,36 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
-	// This type is here until inversion branch is merged.
-	// Reason: We can't use the same struct for marshaling and unmarshaling.
-	// TODO use the struct in protocol
-	type GetKitesArgs struct {
-		Query *protocol.KontrolQuery `json:"query"`
-	}
-
-	var args GetKitesArgs
-	r.Args.One().MustUnmarshal(&args)
-
-	query := args.Query
-
-	// audience will go into the token as "aud" claim.
-	audience := getAudience(query)
-
-	// Generate token once here because we are using the same token for every
-	// kite we return and generating many tokens is really slow.
-	token, err := generateToken(audience, r.Username,
-		k.Kite.Kite().Username, k.privateKey)
-	if err != nil {
+	var args protocol.GetKitesArgs
+	if err := r.Args.One().Unmarshal(&args); err != nil {
 		return nil, err
 	}
 
 	// Get kites from the storage
-	kites, err := k.storage.Get(query)
+	kites, err := k.storage.Get(args.Query)
 	if err != nil {
 		return nil, err
 	}
 
-	// Attach tokens to kites
-	kites.Attach(token)
+	for _, kite := range kites {
+		// audience will go into the token as "aud" claim.
+		audience := getAudience(args.Query)
+
+		keyPair, err := k.keyPair.GetKeyFromID(kite.KeyID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Generate token once here because we are using the same token for every
+		// kite we return and generating many tokens is really slow.
+		token, err := generateToken(audience, r.Username,
+			k.Kite.Kite().Username, keyPair.Private)
+		if err != nil {
+			return nil, err
+		}
+
+		kite.Token = token
+	}
 
 	return &protocol.GetKitesResult{
 		Kites: kites,
@@ -175,9 +194,15 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("query matches more than one kite")
 	}
 
+	kite := kites[0]
 	audience := getAudience(query)
 
-	return generateToken(audience, r.Username, k.Kite.Kite().Username, k.privateKey)
+	keyPair, err := k.keyPair.GetKeyFromID(kite.KeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
@@ -186,7 +211,8 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		AuthType string
 	}
 
-	if err := r.Args.One().Unmarshal(&args); err != nil {
+	err := r.Args.One().Unmarshal(&args)
+	if err != nil {
 		return nil, err
 	}
 
@@ -202,5 +228,21 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	return k.registerUser(args.Username)
+	var keyPair *KeyPair
+	if k.MachineKeyPicker != nil {
+		keyPair, err = k.MachineKeyPicker(r)
+		if err != nil {
+			return nil, err
+		}
+	} else if k.lastPublic != "" && k.lastPrivate != "" {
+		keyPair = &KeyPair{
+			Public:  k.lastPublic,
+			Private: k.lastPrivate,
+		}
+	} else {
+		k.log.Error("neither machineKeyPicker neither public/private keys are available")
+		return nil, errors.New("internal error - 1")
+	}
+
+	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
 }

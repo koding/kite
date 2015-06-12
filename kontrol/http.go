@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite/kitekey"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
@@ -62,6 +64,26 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	// register itself to kontrol.
 	if args.Auth.Type != "kiteKey" {
 		err := fmt.Errorf("unexpected authentication type: %s", args.Auth.Type)
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	t, err := jwt.Parse(args.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		err := errors.New("public key is not passed")
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	// check if the key is valid and is stored in the key pair storage, if not
+	// found we don't allow to register anyone.
+	if _, err := k.keyPair.GetKeyFromPublic(publicKey); err != nil {
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
