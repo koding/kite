@@ -412,13 +412,8 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 		return err
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("n = %+v\n", n)
-	return nil
+	_, err = res.RowsAffected()
+	return err
 }
 
 func (p *Postgres) IsValid(public string) error {
@@ -459,8 +454,10 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	sqlQuery, args, err := psql.
 		Select("id", "public", "private").
 		From("kite.key").
-		Where(map[string]interface{}{"id": id}).
-		ToSql()
+		Where(map[string]interface{}{
+		"id":         id,
+		"deleted_at": nil,
+	}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -468,10 +465,6 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := keyPair.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -483,8 +476,10 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	sqlQuery, args, err := psql.
 		Select("id", "public", "private").
 		From("kite.key").
-		Where(map[string]interface{}{"public": public}).
-		ToSql()
+		Where(map[string]interface{}{
+		"public":     public,
+		"deleted_at": nil,
+	}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -492,10 +487,6 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := keyPair.Validate(); err != nil {
 		return nil, err
 	}
 
