@@ -411,13 +411,8 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 		return err
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("n = %+v\n", n)
-	return nil
+	_, err = res.RowsAffected()
+	return err
 }
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
