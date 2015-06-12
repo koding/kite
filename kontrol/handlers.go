@@ -206,12 +206,6 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
-	var query *protocol.KontrolQuery
-	err := r.Args.One().Unmarshal(&query)
-	if err != nil {
-		return nil, errors.New("Invalid query")
-	}
-
 	// Only accept requests with kiteKey because we need this info
 	// for checking if the key is valid and needs to be regenerated
 	if r.Auth.Type != "kiteKey" {
@@ -233,6 +227,8 @@ func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
 		// everything is ok, just return the old one
 		return publicKey, nil
 	}
+
+	fmt.Printf("err = %+v\n", err)
 
 	keyPair, err := k.pickKey(r)
 	if err != nil {

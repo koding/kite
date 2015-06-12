@@ -428,7 +428,7 @@ func (p *Postgres) IsValid(public string) error {
 	}
 
 	sqlQuery, args, err := psql.
-		Select("*").
+		Select("id").
 		From("kite.key").
 		Where(andQuery).
 		ToSql()
@@ -437,15 +437,15 @@ func (p *Postgres) IsValid(public string) error {
 	}
 
 	fmt.Printf("sqlQuery = %+v\n", sqlQuery)
-	fmt.Printf("args = %+v\n", args)
+	// fmt.Printf("args = %+v\n", args)
 
-	var res bool
-	err = p.DB.QueryRow(sqlQuery, args...).Scan(&res)
+	var id string
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&id)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("res = %+v\n", res)
+	fmt.Printf("id = %+v\n", id)
 	return nil
 }
 

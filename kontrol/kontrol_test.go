@@ -495,5 +495,37 @@ func TestKontrolMultiKey(t *testing.T) {
 	if result != 4 {
 		t.Fatalf("Invalid result: %d", result)
 	}
+}
 
+func TestKeyRenew(t *testing.T) {
+	// This key will be used as key replacement
+	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
+
+	// This kite is using the old key. We are going to invalidate it and thus a
+	// new key will be used
+	t.Log("Setting up mathworker")
+	mathKite := kite.New("mathworker", "1.2.3")
+	mathKite.Config = conf.Copy()
+	mathKite.Config.Port = 6163
+	mathKite.HandleFunc("square", Square)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
+	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
+	<-mathKite.KontrolReadyNotify()
+
+	fmt.Printf("old = %+v\n", mathKite.Config.KontrolKey)
+	fmt.Printf("new = %+v\n", testkeys.PublicSecond)
+
+	// now remove the old Key
+
+	// try to get a new key, this should replace mathKite.Config.KontrolKey
+	// with the new key and also should return the new key
+	publicKey, err := mathKite.GetKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if publicKey != testkeys.PublicSecond {
+		t.Errorf("Key renewe failed\n\twant:%s\n\tgot :%s\n", testkeys.PublicSecond, publicKey)
+	}
 }
