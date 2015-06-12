@@ -420,8 +420,10 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	sqlQuery, args, err := psql.
 		Select("id", "public", "private").
 		From("kite.key").
-		Where(map[string]interface{}{"id": id}).
-		ToSql()
+		Where(map[string]interface{}{
+		"id":         id,
+		"deleted_at": nil,
+	}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -440,8 +442,10 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	sqlQuery, args, err := psql.
 		Select("id", "public", "private").
 		From("kite.key").
-		Where(map[string]interface{}{"public": public}).
-		ToSql()
+		Where(map[string]interface{}{
+		"public":     public,
+		"deleted_at": nil,
+	}).ToSql()
 	if err != nil {
 		return nil, err
 	}
