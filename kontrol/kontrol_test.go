@@ -17,13 +17,11 @@ import (
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
-	"github.com/nu7hatch/gouuid"
 )
 
 var (
-	conf  *config.Config
-	kon   *Kontrol
-	keyId string
+	conf *config.Config
+	kon  *Kontrol
 )
 
 func init() {
@@ -44,14 +42,14 @@ func init() {
 	case "postgres":
 		p := NewPostgres(nil, kon.Kite.Log)
 		kon.SetStorage(p)
-		kon.SetKeyPairStorage(p)
+		kon.SetKeyPairStorage(&PostgresMockKeyPair{
+			Postgres: p,
+		})
 	default:
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}
 
-	i, _ := uuid.NewV4()
-	keyId = i.String()
-	kon.AddKeyPair(keyId, testkeys.Public, testkeys.Private)
+	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
@@ -198,7 +196,7 @@ func TestMultiple(t *testing.T) {
 						fmt.Printf("[%d] aborted, elapsed %f sec err: %s\n",
 							i, elapsedTime.Seconds(), err)
 					} else {
-						fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
+						// fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
 					}
 				}(i)
 			}
@@ -378,9 +376,6 @@ func Square(r *kite.Request) (interface{}, error) {
 	}
 
 	result := a * a
-
-	fmt.Printf("Kite call, sending result '%f' back\n", result)
-
 	return result, nil
 }
 
@@ -428,7 +423,9 @@ func TestGetQueryKey(t *testing.T) {
 
 func TestKontrolMultiKey(t *testing.T) {
 	// add so we can use it as key
-	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
+	if err := kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond); err != nil {
+		t.Fatal(err)
+	}
 
 	// Start mathworker
 	t.Log("Setting up mathworker")
@@ -503,9 +500,7 @@ func TestKontrolMultiKey(t *testing.T) {
 
 func TestKeyRenew(t *testing.T) {
 	// This key will be used as key replacement
-	i, _ := uuid.NewV4()
-	id := i.String()
-	kon.AddKeyPair(id, testkeys.PublicSecond, testkeys.PrivateSecond)
+	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
 
 	// This kite is using the old key. We are going to invalidate it and thus a
 	// new key will be used
@@ -519,9 +514,15 @@ func TestKeyRenew(t *testing.T) {
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
+	// get the key we want to delete
+	keyPair, err := kon.keyPair.GetKeyFromPublic(testkeys.Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// now remove the old Key
 	if err := kon.keyPair.DeleteKey(&KeyPair{
-		ID: keyId,
+		ID: keyPair.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -541,4 +542,21 @@ func TestKeyRenew(t *testing.T) {
 		t.Errorf("Key renew should replace config.KontrolKey\n\twant:%s\n\tgot :%s\n",
 			testkeys.PublicSecond, publicKey)
 	}
+}
+
+// A PostgreMockKeyPair which deletes the key instead of updating the
+// deleted_at row.
+type PostgresMockKeyPair struct {
+	*Postgres
+}
+
+func (p *PostgresMockKeyPair) DeleteKey(keyPair *KeyPair) error {
+	// we need to first delete kites that depend on the key because of the
+	// constraints we set up
+	deleteKites := `DELETE FROM kite.kite WHERE key_id = $1`
+	_, err := p.DB.Exec(deleteKites, keyPair.ID)
+
+	deleteKey := `DELETE FROM kite.key WHERE id = $1`
+	_, err = p.DB.Exec(deleteKey, keyPair.ID)
+	return err
 }

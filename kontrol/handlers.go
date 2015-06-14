@@ -45,11 +45,18 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("public key is not passed")
 	}
 
+	var keyPair *KeyPair
+	var newKey bool
+
 	// check if the key is valid and is stored in the key pair storage, if not
-	// found we don't allow to register anyone.
-	keyPair, err := k.keyPair.GetKeyFromPublic(publicKey)
+	// check if there is a new key we can use.
+	keyPair, err = k.keyPair.GetKeyFromPublic(publicKey)
 	if err != nil {
-		return nil, err
+		newKey = true
+		keyPair, err = k.pickKey(r)
+		if err != nil {
+			return nil, err // nothing to do here ..
+		}
 	}
 
 	kiteURL := args.URL
@@ -136,8 +143,13 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		every.Stop()
 	})
 
-	// send response back to the kite, also identify him with the new name
-	return &protocol.RegisterResult{URL: args.URL}, nil
+	// send response back to the kite, also send the new public Key if it's exist
+	p := &protocol.RegisterResult{URL: args.URL}
+	if newKey {
+		p.PublicKey = keyPair.Public
+	}
+
+	return p, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {

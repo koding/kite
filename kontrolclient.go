@@ -202,7 +202,6 @@ func (k *Kite) GetKey() (string, error) {
 	}
 
 	k.Config.KontrolKey = key
-
 	return key, nil
 }
 
@@ -300,6 +299,12 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())
+	}
+
+	// we also received a new public key (means the old one was invalidated).
+	// Use it now.
+	if rr.PublicKey != "" {
+		k.Config.KontrolKey = rr.PublicKey
 	}
 
 	return &registerResult{parsed}, nil
