@@ -429,6 +429,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	exp3Kite.Config.KontrolKey = testkeys.PublicSecond
 
 	query := &protocol.KontrolQuery{
+		Username:    exp3Kite.Kite().Username,
 		Environment: exp3Kite.Kite().Environment,
 		Name:        "mathworker2",
 		Version:     "~> 1.1",
