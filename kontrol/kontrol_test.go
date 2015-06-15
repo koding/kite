@@ -2,6 +2,7 @@ package kontrol
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net/url"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
+	"github.com/nu7hatch/gouuid"
 )
 
 var (
@@ -42,9 +44,7 @@ func init() {
 	case "postgres":
 		p := NewPostgres(nil, kon.Kite.Log)
 		kon.SetStorage(p)
-		kon.SetKeyPairStorage(&PostgresMockKeyPair{
-			Postgres: p,
-		})
+		kon.SetKeyPairStorage(p)
 	default:
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}
@@ -422,8 +422,10 @@ func TestGetQueryKey(t *testing.T) {
 }
 
 func TestKontrolMultiKey(t *testing.T) {
+	i, _ := uuid.NewV4()
+	secondID := i.String()
 	// add so we can use it as key
-	if err := kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond); err != nil {
+	if err := kon.AddKeyPair(secondID, testkeys.PublicSecond, testkeys.PrivateSecond); err != nil {
 		t.Fatal(err)
 	}
 
@@ -441,21 +443,18 @@ func TestKontrolMultiKey(t *testing.T) {
 
 	// exp2 kite is the mathworker client. However it uses a different public
 	// key
-	t.Log("Setting up exp2 kite")
 	exp2Kite := kite.New("exp2", "0.0.1")
 	exp2Kite.Config = conf.Copy()
 	exp2Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
-	exp2Kite.Config.KontrolKey = testkeys.PrivateSecond
+	exp2Kite.Config.KontrolKey = testkeys.PublicSecond
 
 	query := &protocol.KontrolQuery{
-		Username:    exp2Kite.Kite().Username,
 		Environment: exp2Kite.Kite().Environment,
 		Name:        "mathworker",
 		Version:     "~> 1.1",
 	}
 
 	// exp2 queries for mathkite
-	t.Log("Querying for mathworkers")
 	kites, err := exp2Kite.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
@@ -473,12 +472,14 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
-	t.Logf("oldToken: %s", remoteMathWorker.Auth.Key)
 	newToken, err := exp2Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
 	}
-	t.Logf("newToken: %s", newToken)
+
+	if remoteMathWorker.Auth.Key == newToken {
+		t.Errorf("Token renew failed. Tokens should be different after renew")
+	}
 
 	// Run "square" method
 	response, err := remoteMathWorker.TellWithTimeout("square", 4*time.Second, 2)
@@ -496,67 +497,29 @@ func TestKontrolMultiKey(t *testing.T) {
 	if result != 4 {
 		t.Fatalf("Invalid result: %d", result)
 	}
-}
 
-func TestKeyRenew(t *testing.T) {
-	// This key will be used as key replacement
-	kon.AddKeyPair("", testkeys.PublicSecond, testkeys.PrivateSecond)
-
-	// This kite is using the old key. We are going to invalidate it and thus a
-	// new key will be used
-	t.Log("Setting up mathworker")
-	mathKite := kite.New("mathworker", "1.2.3")
-	mathKite.Config = conf.Copy()
-	mathKite.Config.Port = 6163
-	mathKite.HandleFunc("square", Square)
-	go mathKite.Run()
-	<-mathKite.ServerReadyNotify()
-	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
-	<-mathKite.KontrolReadyNotify()
-
-	// get the key we want to delete
-	keyPair, err := kon.keyPair.GetKeyFromPublic(testkeys.Public)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// now remove the old Key
+	// now invalidate the second key
+	log.Printf("Invalidating %s\n", secondID)
 	if err := kon.keyPair.DeleteKey(&KeyPair{
-		ID: keyPair.ID,
+		ID: secondID,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	// try to get a new key, this should replace mathKite.Config.KontrolKey
-	// with the new key and also should return the new key
-	publicKey, err := mathKite.GetKey()
+	// try to get a new key, this should replace exp2Kite.Config.KontrolKey
+	// with the new (in our case because PublicSecond is invalidated, it's
+	// going to use Public (the first key). Also it should return the new Key.
+	publicKey, err := exp2Kite.GetKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if publicKey != testkeys.PublicSecond {
-		t.Errorf("Key renew failed\n\twant:%s\n\tgot :%s\n", testkeys.PublicSecond, publicKey)
+	if publicKey != testkeys.Public {
+		t.Errorf("Key renew failed\n\twant:%s\n\tgot :%s\n", testkeys.Public, publicKey)
 	}
 
-	if mathKite.Config.KontrolKey != publicKey {
+	if exp2Kite.Config.KontrolKey != publicKey {
 		t.Errorf("Key renew should replace config.KontrolKey\n\twant:%s\n\tgot :%s\n",
-			testkeys.PublicSecond, publicKey)
+			testkeys.Public, publicKey)
 	}
-}
-
-// A PostgreMockKeyPair which deletes the key instead of updating the
-// deleted_at row.
-type PostgresMockKeyPair struct {
-	*Postgres
-}
-
-func (p *PostgresMockKeyPair) DeleteKey(keyPair *KeyPair) error {
-	// we need to first delete kites that depend on the key because of the
-	// constraints we set up
-	deleteKites := `DELETE FROM kite.kite WHERE key_id = $1`
-	_, err := p.DB.Exec(deleteKites, keyPair.ID)
-
-	deleteKey := `DELETE FROM kite.key WHERE id = $1`
-	_, err = p.DB.Exec(deleteKey, keyPair.ID)
-	return err
 }
