@@ -407,7 +407,9 @@ func (c *Client) Close() {
 	c.wg.Wait()
 
 	// GC, not to cause a memory leak
+	c.sendMu.Lock()
 	c.send = nil
+	c.sendMu.Unlock()
 }
 
 // sendhub sends the msg received from the send channel to the remote client
