@@ -411,7 +411,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Start mathworker
-	mathKite := kite.New("mathworker", "1.2.3")
+	mathKite := kite.New("mathworker2", "1.2.3")
 	mathKite.Config = conf.Copy()
 	mathKite.Config.Port = 6162
 	mathKite.HandleFunc("square", Square)
@@ -421,21 +421,21 @@ func TestKontrolMultiKey(t *testing.T) {
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
-	// exp2 kite is the mathworker client. However it uses a different public
+	// exp3 kite is the mathworker client. However it uses a different public
 	// key
-	exp2Kite := kite.New("exp2", "0.0.1")
-	exp2Kite.Config = conf.Copy()
-	exp2Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
-	exp2Kite.Config.KontrolKey = testkeys.PublicSecond
+	exp3Kite := kite.New("exp3", "0.0.1")
+	exp3Kite.Config = conf.Copy()
+	exp3Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
+	exp3Kite.Config.KontrolKey = testkeys.PublicSecond
 
 	query := &protocol.KontrolQuery{
-		Environment: exp2Kite.Kite().Environment,
-		Name:        "mathworker",
+		Environment: exp3Kite.Kite().Environment,
+		Name:        "mathworker2",
 		Version:     "~> 1.1",
 	}
 
-	// exp2 queries for mathkite
-	kites, err := exp2Kite.GetKites(query)
+	// exp3 queries for mathkite
+	kites, err := exp3Kite.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -444,7 +444,7 @@ func TestKontrolMultiKey(t *testing.T) {
 		t.Fatal("No mathworker available")
 	}
 
-	// exp2 connectes to mathworker
+	// exp3 connectes to mathworker
 	remoteMathWorker := kites[0]
 	err = remoteMathWorker.Dial()
 	if err != nil {
@@ -452,11 +452,13 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
-	newToken, err := exp2Kite.GetToken(&remoteMathWorker.Kite)
+	newToken, err := exp3Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
 	}
 
+	fmt.Printf("newToken = %+v\n", newToken)
+	fmt.Printf("remoteMathWorker.Auth.Key = %+v\n", remoteMathWorker.Auth.Key)
 	if remoteMathWorker.Auth.Key == newToken {
 		t.Errorf("Token renew failed. Tokens should be different after renew")
 	}
@@ -484,10 +486,10 @@ func TestKontrolMultiKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// try to get a new key, this should replace exp2Kite.Config.KontrolKey
+	// try to get a new key, this should replace exp3Kite.Config.KontrolKey
 	// with the new (in our case because PublicSecond is invalidated, it's
 	// going to use Public (the first key). Also it should return the new Key.
-	publicKey, err := exp2Kite.GetKey()
+	publicKey, err := exp3Kite.GetKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +498,7 @@ func TestKontrolMultiKey(t *testing.T) {
 		t.Errorf("Key renew failed\n\twant:%s\n\tgot :%s\n", testkeys.Public, publicKey)
 	}
 
-	if exp2Kite.Config.KontrolKey != publicKey {
+	if exp3Kite.Config.KontrolKey != publicKey {
 		t.Errorf("Key renew should replace config.KontrolKey\n\twant:%s\n\tgot :%s\n",
 			testkeys.Public, publicKey)
 	}

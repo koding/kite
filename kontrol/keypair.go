@@ -76,10 +76,6 @@ func (m *MemKeyPairStorage) AddKey(keyPair *KeyPair) error {
 }
 
 func (m *MemKeyPairStorage) DeleteKey(keyPair *KeyPair) error {
-	if err := keyPair.Validate(); err != nil {
-		return err
-	}
-
 	m.id.Delete(keyPair.ID)
 	m.public.Delete(keyPair.Public)
 	return nil
