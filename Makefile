@@ -63,8 +63,8 @@ ifeq ($(KONTROL_STORAGE), "etcd")
 
 	@echo "Installing etcd"
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
-	@rm -rf _etcd/kontrol_test ||: #remove previous folder
-	@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
+	@rm -rf _etcd/default.etcd ||: #remove previous folder
+	@cd _etcd; ./build; ./bin/etcd &
 endif
 
 	@echo "Creating test key"
