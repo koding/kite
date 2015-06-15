@@ -326,6 +326,7 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
+	tokenCache = make(map[string]string) // empty it
 	_, err = exp2Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
@@ -411,7 +412,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Start mathworker
-	mathKite := kite.New("mathworker2", "1.2.3")
+	mathKite := kite.New("mathworker2", "2.0.0")
 	mathKite.Config = conf.Copy()
 	mathKite.Config.Port = 6162
 	mathKite.HandleFunc("square", Square)
@@ -432,7 +433,7 @@ func TestKontrolMultiKey(t *testing.T) {
 		Username:    exp3Kite.Kite().Username,
 		Environment: exp3Kite.Kite().Environment,
 		Name:        "mathworker2",
-		Version:     "~> 1.1",
+		Version:     "2.0.0",
 	}
 
 	// exp3 queries for mathkite
@@ -453,13 +454,12 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
+	tokenCache = make(map[string]string) // empty it
 	newToken, err := exp3Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
 	}
 
-	fmt.Printf("newToken = %+v\n", newToken)
-	fmt.Printf("remoteMathWorker.Auth.Key = %+v\n", remoteMathWorker.Auth.Key)
 	if remoteMathWorker.Auth.Key == newToken {
 		t.Errorf("Token renew failed. Tokens should be different after renew")
 	}
