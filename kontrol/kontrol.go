@@ -75,8 +75,8 @@ type Kontrol struct {
 
 	// lastPublic and lastPrivate are used to store the last added keys for
 	// convinience
-	lastPublic  string
-	lastPrivate string
+	lastPublic  []string
+	lastPrivate []string
 
 	// storage defines the storage of the kites.
 	storage Storage
@@ -111,6 +111,8 @@ func New(conf *config.Config, version string) *Kontrol {
 		log:         k.Log,
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*time.Timer, 0),
+		lastPublic:  make([]string, 0),
+		lastPrivate: make([]string, 0),
 	}
 
 	k.HandleFunc("register", kontrol.handleRegister)
@@ -127,6 +129,24 @@ func New(conf *config.Config, version string) *Kontrol {
 
 func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error) {
 	k.Kite.Authenticators[keyType] = fn
+}
+
+// DeleteKeyPair deletes the key with the given id or public key. (One of eac
+// other can be empty)
+func (k *Kontrol) DeleteKeyPair(id, public string) error {
+	if k.keyPair == nil {
+		return errors.New("Key pair storage is not initialized")
+	}
+
+	k.keyPair.DeleteKey(&KeyPair{
+		ID:     id,
+		Public: public,
+	})
+
+	// delete latest added key so it doesn't get picked up
+	k.lastPublic = k.lastPublic[:len(k.lastPublic)-1]
+	k.lastPrivate = k.lastPrivate[:len(k.lastPrivate)-1]
+	return nil
 }
 
 // AddKeyPair add the given key pair so it can be used to validate and
@@ -152,8 +172,8 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	}
 
 	// set last set key pair
-	k.lastPublic = public
-	k.lastPrivate = private
+	k.lastPublic = append(k.lastPublic, public)
+	k.lastPrivate = append(k.lastPrivate, private)
 
 	if err := keyPair.Validate(); err != nil {
 		return err
@@ -199,11 +219,11 @@ func (k *Kontrol) Close() {
 
 // InitializeSelf registers his host by writing a key to ~/.kite/kite.key
 func (k *Kontrol) InitializeSelf() error {
-	if k.lastPublic == "" && k.lastPrivate == "" {
+	if len(k.lastPublic) == 0 && len(k.lastPrivate) == 0 {
 		return errors.New("Please initialize AddKeyPair() method")
 	}
 
-	key, err := k.registerUser(k.Kite.Config.Username, k.lastPublic, k.lastPrivate)
+	key, err := k.registerUser(k.Kite.Config.Username, k.lastPublic[0], k.lastPrivate[0])
 	if err != nil {
 		return err
 	}

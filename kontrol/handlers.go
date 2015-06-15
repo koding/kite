@@ -288,10 +288,10 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 		return keyPair, nil
 	}
 
-	if k.lastPublic != "" && k.lastPrivate != "" {
+	if len(k.lastPublic) != 0 && len(k.lastPrivate) != 0 {
 		return &KeyPair{
-			Public:  k.lastPublic,
-			Private: k.lastPrivate,
+			Public:  k.lastPublic[len(k.lastPublic)-1],
+			Private: k.lastPrivate[len(k.lastPrivate)-1],
 		}, nil
 	}
 
