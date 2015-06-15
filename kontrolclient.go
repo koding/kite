@@ -205,6 +205,17 @@ func (k *Kite) GetKey() (string, error) {
 	return key, nil
 }
 
+// NewKeyRenewer renews the internal key every given interval
+func (k *Kite) NewKeyRenewer(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	for range ticker.C {
+		_, err := k.GetKey()
+		if err != nil {
+			k.Log.Warning("Key renew failed: %s", err)
+		}
+	}
+}
+
 // KontrolReadyNotify returns a channel that is closed when a successful
 // registiration to kontrol is done.
 func (k *Kite) KontrolReadyNotify() chan struct{} {
