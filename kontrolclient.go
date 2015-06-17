@@ -208,7 +208,7 @@ func (k *Kite) GetKey() (string, error) {
 // NewKeyRenewer renews the internal key every given interval
 func (k *Kite) NewKeyRenewer(interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	for range ticker.C {
+	for _ = range ticker.C {
 		_, err := k.GetKey()
 		if err != nil {
 			k.Log.Warning("Key renew failed: %s", err)
