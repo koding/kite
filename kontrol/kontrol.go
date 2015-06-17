@@ -143,9 +143,21 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 		Public: public,
 	})
 
-	// delete latest added key so it doesn't get picked up
-	k.lastPublic = k.lastPublic[:len(k.lastPublic)-1]
-	k.lastPrivate = k.lastPrivate[:len(k.lastPrivate)-1]
+	deleteIndex := -1
+	for i, p := range k.lastPublic {
+		if p == public {
+			deleteIndex = i
+		}
+	}
+
+	if deleteIndex == -1 {
+		return errors.New("deleteKeyPair: public key not found")
+	}
+
+	// delete the given public key
+	k.lastPublic = append(k.lastPublic[:deleteIndex], k.lastPublic[deleteIndex+1:]...)
+	k.lastPrivate = append(k.lastPrivate[:deleteIndex], k.lastPrivate[deleteIndex+1:]...)
+
 	return nil
 }
 
