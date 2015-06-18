@@ -45,11 +45,18 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("public key is not passed")
 	}
 
+	var keyPair *KeyPair
+	var newKey bool
+
 	// check if the key is valid and is stored in the key pair storage, if not
-	// found we don't allow to register anyone.
-	keyPair, err := k.keyPair.GetKeyFromPublic(publicKey)
+	// check if there is a new key we can use.
+	keyPair, err = k.keyPair.GetKeyFromPublic(publicKey)
 	if err != nil {
-		return nil, err
+		newKey = true
+		keyPair, err = k.pickKey(r)
+		if err != nil {
+			return nil, err // nothing to do here ..
+		}
 	}
 
 	kiteURL := args.URL
@@ -136,8 +143,13 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 		every.Stop()
 	})
 
-	// send response back to the kite, also identify him with the new name
-	return &protocol.RegisterResult{URL: args.URL}, nil
+	// send response back to the kite, also send the new public Key if it's exist
+	p := &protocol.RegisterResult{URL: args.URL}
+	if newKey {
+		p.PublicKey = keyPair.Public
+	}
+
+	return p, nil
 }
 
 func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
@@ -228,21 +240,61 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	var keyPair *KeyPair
-	if k.MachineKeyPicker != nil {
-		keyPair, err = k.MachineKeyPicker(r)
-		if err != nil {
-			return nil, err
-		}
-	} else if k.lastPublic != "" && k.lastPrivate != "" {
-		keyPair = &KeyPair{
-			Public:  k.lastPublic,
-			Private: k.lastPrivate,
-		}
-	} else {
-		k.log.Error("neither machineKeyPicker neither public/private keys are available")
-		return nil, errors.New("internal error - 1")
+	keyPair, err := k.pickKey(r)
+	if err != nil {
+		return nil, err
 	}
 
 	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
+}
+
+func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
+	// Only accept requests with kiteKey because we need this info
+	// for checking if the key is valid and needs to be regenerated
+	if r.Auth.Type != "kiteKey" {
+		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
+	}
+
+	t, err := jwt.Parse(r.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		return nil, errors.New("public key is not passed")
+	}
+
+	err = k.keyPair.IsValid(publicKey)
+	if err == nil {
+		// everything is ok, just return the old one
+		return publicKey, nil
+	}
+
+	keyPair, err := k.pickKey(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyPair.Public, nil
+}
+
+func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
+	if k.MachineKeyPicker != nil {
+		keyPair, err := k.MachineKeyPicker(r)
+		if err != nil {
+			return nil, err
+		}
+		return keyPair, nil
+	}
+
+	if len(k.lastPublic) != 0 && len(k.lastPrivate) != 0 {
+		return &KeyPair{
+			Public:  k.lastPublic[len(k.lastPublic)-1],
+			Private: k.lastPrivate[len(k.lastPrivate)-1],
+		}, nil
+	}
+
+	k.log.Error("neither machineKeyPicker neither public/private keys are available")
+	return nil, errors.New("internal error - 1")
 }

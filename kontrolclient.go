@@ -179,6 +179,43 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	return tkn, nil
 }
 
+// GetKey is used to get a new public key from kontrol if the current one is
+// invalidated. The key is also replaced in memory and every request is going
+// to use it. This means even if kite.key contains the old key, the kite itself
+// uses the new one.
+func (k *Kite) GetKey() (string, error) {
+	if err := k.SetupKontrolClient(); err != nil {
+		return "", err
+	}
+
+	<-k.kontrol.readyConnected
+
+	result, err := k.kontrol.TellWithTimeout("getKey", 4*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	var key string
+	err = result.Unmarshal(&key)
+	if err != nil {
+		return "", err
+	}
+
+	k.Config.KontrolKey = key
+	return key, nil
+}
+
+// NewKeyRenewer renews the internal key every given interval
+func (k *Kite) NewKeyRenewer(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	for _ = range ticker.C {
+		_, err := k.GetKey()
+		if err != nil {
+			k.Log.Warning("Key renew failed: %s", err)
+		}
+	}
+}
+
 // KontrolReadyNotify returns a channel that is closed when a successful
 // registiration to kontrol is done.
 func (k *Kite) KontrolReadyNotify() chan struct{} {
@@ -273,6 +310,12 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())
+	}
+
+	// we also received a new public key (means the old one was invalidated).
+	// Use it now.
+	if rr.PublicKey != "" {
+		k.Config.KontrolKey = rr.PublicKey
 	}
 
 	return &registerResult{parsed}, nil

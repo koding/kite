@@ -20,6 +20,7 @@ import (
 
 var (
 	ErrQueryFieldsEmpty = errors.New("all query fields are empty")
+	ErrNoKeyFound       = errors.New("no key pair found")
 )
 
 // Postgres holds Postgresql database related configuration
@@ -406,12 +407,20 @@ func (p *Postgres) AddKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
-	res, err := p.DB.Exec(`UPDATE kite.key SET deleted_at = (now() at time zone 'utc')`)
+	res, err := p.DB.Exec(`UPDATE kite.key SET deleted_at = (now() at time zone 'utc') WHERE id = $1`,
+		keyPair.ID)
 	if err != nil {
 		return err
 	}
 
 	_, err = res.RowsAffected()
+	return err
+}
+
+func (p *Postgres) IsValid(public string) error {
+	// for us valid means if deleted_at is not set. Because the gey keys
+	// doesn't if  deleted_at row is set, we just check if we can fetch it.
+	_, err := p.GetKeyFromPublic(public)
 	return err
 }
 
@@ -431,6 +440,9 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNoKeyFound
+		}
 		return nil, err
 	}
 
@@ -453,6 +465,9 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNoKeyFound
+		}
 		return nil, err
 	}
 

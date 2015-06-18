@@ -75,8 +75,8 @@ type Kontrol struct {
 
 	// lastPublic and lastPrivate are used to store the last added keys for
 	// convinience
-	lastPublic  string
-	lastPrivate string
+	lastPublic  []string
+	lastPrivate []string
 
 	// storage defines the storage of the kites.
 	storage Storage
@@ -111,12 +111,15 @@ func New(conf *config.Config, version string) *Kontrol {
 		log:         k.Log,
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*time.Timer, 0),
+		lastPublic:  make([]string, 0),
+		lastPrivate: make([]string, 0),
 	}
 
 	k.HandleFunc("register", kontrol.handleRegister)
 	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
 	k.HandleFunc("getKites", kontrol.handleGetKites)
 	k.HandleFunc("getToken", kontrol.handleGetToken)
+	k.HandleFunc("getKey", kontrol.handleGetKey)
 
 	k.HandleHTTPFunc("/register", kontrol.handleRegisterHTTP)
 	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
@@ -126,6 +129,46 @@ func New(conf *config.Config, version string) *Kontrol {
 
 func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error) {
 	k.Kite.Authenticators[keyType] = fn
+}
+
+// DeleteKeyPair deletes the key with the given id or public key. (One of them
+// can be empty)
+func (k *Kontrol) DeleteKeyPair(id, public string) error {
+	if k.keyPair == nil {
+		return errors.New("Key pair storage is not initialized")
+	}
+
+	pair, err := k.keyPair.GetKeyFromID(id)
+	if err != nil {
+		return err
+	}
+
+	k.keyPair.DeleteKey(&KeyPair{
+		ID:     id,
+		Public: public,
+	})
+
+	// if public is empty
+	if public == "" {
+		public = pair.Public
+	}
+
+	deleteIndex := -1
+	for i, p := range k.lastPublic {
+		if p == public {
+			deleteIndex = i
+		}
+	}
+
+	if deleteIndex == -1 {
+		return errors.New("deleteKeyPair: public key not found")
+	}
+
+	// delete the given public key
+	k.lastPublic = append(k.lastPublic[:deleteIndex], k.lastPublic[deleteIndex+1:]...)
+	k.lastPrivate = append(k.lastPrivate[:deleteIndex], k.lastPrivate[deleteIndex+1:]...)
+
+	return nil
 }
 
 // AddKeyPair add the given key pair so it can be used to validate and
@@ -151,8 +194,8 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	}
 
 	// set last set key pair
-	k.lastPublic = public
-	k.lastPrivate = private
+	k.lastPublic = append(k.lastPublic, public)
+	k.lastPrivate = append(k.lastPrivate, private)
 
 	if err := keyPair.Validate(); err != nil {
 		return err
@@ -198,11 +241,11 @@ func (k *Kontrol) Close() {
 
 // InitializeSelf registers his host by writing a key to ~/.kite/kite.key
 func (k *Kontrol) InitializeSelf() error {
-	if k.lastPublic == "" && k.lastPrivate == "" {
+	if len(k.lastPublic) == 0 && len(k.lastPrivate) == 0 {
 		return errors.New("Please initialize AddKeyPair() method")
 	}
 
-	key, err := k.registerUser(k.Kite.Config.Username, k.lastPublic, k.lastPrivate)
+	key, err := k.registerUser(k.Kite.Config.Username, k.lastPublic[0], k.lastPrivate[0])
 	if err != nil {
 		return err
 	}

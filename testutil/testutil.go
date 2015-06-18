@@ -58,10 +58,10 @@ func newKiteKey(username, private, public string) *jwt.Token {
 		"iat":        time.Now().UTC().Unix(),      // Issued At
 		"jti":        tknID.String(),               // JWT ID
 		"kontrolURL": "http://localhost:4000/kite", // Kontrol URL
-		"kontrolKey": testkeys.Public,              // Public key of kontrol
+		"kontrolKey": public,                       // Public key of kontrol
 	}
 
-	token.Raw, err = token.SignedString([]byte(testkeys.Private))
+	token.Raw, err = token.SignedString([]byte(private))
 	if err != nil {
 		panic(err)
 	}

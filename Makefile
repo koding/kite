@@ -57,15 +57,15 @@ kontroltest:
 
 
 	@echo "Using as storage: $(KONTROL_STORAGE)"
-	ifeq ($(KONTROL_STORAGE), "etcd")
-		@echo "Killing previous etcd instance"
-		@killall etcd ||:
+ifeq ($(KONTROL_STORAGE), "etcd")
+	@echo "Killing previous etcd instance"
+	@killall etcd ||:
 
-		@echo "Installing etcd"
-		test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
-		@rm -rf _etcd/kontrol_test ||: #remove previous folder
-		@cd _etcd; ./build; ./bin/etcd --name=kontrol --data-dir=kontrol_test &
-	endif
+	@echo "Installing etcd"
+	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	@rm -rf _etcd/default.etcd ||: #remove previous folder
+	@cd _etcd; ./build; ./bin/etcd &
+endif
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
@@ -94,7 +94,7 @@ ifeq ($(KONTROL_STORAGE), etcd)
 
 	@echo "Installing etcd"
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
-	@rm -rf _etcd/kontrol_test ||: #remove previous folder
+	@rm -rf _etcd/default.etcd ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd &
 endif
 

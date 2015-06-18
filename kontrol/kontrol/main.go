@@ -64,7 +64,7 @@ func main() {
 	kiteConf.IP = conf.Ip
 	kiteConf.Port = conf.Port
 
-	k := kontrol.New(kiteConf, conf.Version, string(publicKey), string(privateKey))
+	k := kontrol.New(kiteConf, conf.Version)
 
 	if conf.TLSCertFile != "" || conf.TLSKeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(conf.TLSCertFile, conf.TLSKeyFile)
@@ -94,8 +94,11 @@ func main() {
 		p := kontrol.NewPostgres(postgresConf, k.Kite.Log)
 		k.SetStorage(p)
 		k.SetKeyPairStorage(p)
+	default:
+		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	}
 
+	k.AddKeyPair("", string(publicKey), string(privateKey))
 	k.Kite.SetLogLevel(kite.DEBUG)
 	k.Run()
 }
@@ -115,7 +118,8 @@ func initialKey(kontrolConf *Kontrol, publicKey, privateKey []byte) {
 
 	conf.KontrolURL = kontrolConf.KontrolURL
 
-	k := kontrol.New(conf, kontrolConf.Version, string(publicKey), string(privateKey))
+	k := kontrol.New(conf, kontrolConf.Version)
+	k.AddKeyPair("", string(publicKey), string(privateKey))
 	err = k.InitializeSelf()
 	if err != nil {
 		log.Fatal(err)

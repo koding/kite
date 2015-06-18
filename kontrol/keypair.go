@@ -47,6 +47,10 @@ type KeyPairStorage interface {
 
 	// GetKeyFromPublic retrieves the KeyPairs from the given public Key
 	GetKeyFromPublic(publicKey string) (*KeyPair, error)
+
+	// Is valid checks if the given publicKey is valid or not. It's up to the
+	// implementer how to implement it. A valid public key returns a nil error.
+	IsValid(publicKey string) error
 }
 
 func NewMemKeyPairStorage() *MemKeyPairStorage {
@@ -72,12 +76,16 @@ func (m *MemKeyPairStorage) AddKey(keyPair *KeyPair) error {
 }
 
 func (m *MemKeyPairStorage) DeleteKey(keyPair *KeyPair) error {
-	if err := keyPair.Validate(); err != nil {
-		return err
+	if keyPair.Public == "" {
+		k, err := m.GetKeyFromID(keyPair.ID)
+		if err != nil {
+			return err
+		}
+
+		m.public.Delete(k.Public)
 	}
 
 	m.id.Delete(keyPair.ID)
-	m.public.Delete(keyPair.Public)
 	return nil
 }
 
@@ -107,4 +115,9 @@ func (m *MemKeyPairStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
 	}
 
 	return keyPair, nil
+}
+
+func (m *MemKeyPairStorage) IsValid(public string) error {
+	_, err := m.GetKeyFromPublic(public)
+	return err
 }

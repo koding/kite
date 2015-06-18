@@ -47,7 +47,8 @@ type Client struct {
 	Concurrent bool
 
 	// To signal waiters of Go() on disconnect.
-	disconnect chan struct{}
+	disconnect   chan struct{}
+	disconnectMu sync.Mutex // protects disconnect chan
 
 	// To signal about the close
 	closeChan chan struct{}
@@ -273,17 +274,21 @@ func (c *Client) run() {
 	c.callOnDisconnectHandlers()
 
 	// let others know that the client has disconnected
+	c.disconnectMu.Lock()
 	select {
 	case c.disconnect <- struct{}{}:
 	default:
 	}
+	c.disconnectMu.Unlock()
 
 	if c.Reconnect {
 		// we override it so it doesn't get selected next time. Because we are
 		// redialing, so after redial if a new method is called, the disconnect
 		// channel is being read and the local "disconnect" message will be the
 		// final response. This shouldn't be happen for redials.
+		c.disconnectMu.Lock()
 		c.disconnect = make(chan struct{}, 1)
+		c.disconnectMu.Unlock()
 		go c.dialForever(nil)
 	}
 }
@@ -402,7 +407,9 @@ func (c *Client) Close() {
 	c.wg.Wait()
 
 	// GC, not to cause a memory leak
+	c.sendMu.Lock()
 	c.send = nil
+	c.sendMu.Unlock()
 }
 
 // sendhub sends the msg received from the send channel to the remote client
@@ -555,6 +562,9 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 
 	// Waits until the response has came or the connection has disconnected.
 	go func() {
+		c.disconnectMu.Lock()
+		defer c.disconnectMu.Unlock()
+
 		select {
 		case resp := <-doneChan:
 			responseChan <- resp
