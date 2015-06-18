@@ -131,17 +131,27 @@ func (k *Kontrol) AddAuthenticator(keyType string, fn func(*kite.Request) error)
 	k.Kite.Authenticators[keyType] = fn
 }
 
-// DeleteKeyPair deletes the key with the given id or public key. (One of eac
+// DeleteKeyPair deletes the key with the given id or public key. (One of each
 // other can be empty)
 func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	if k.keyPair == nil {
 		return errors.New("Key pair storage is not initialized")
 	}
 
+	pair, err := k.keyPair.GetKeyFromID(id)
+	if err != nil {
+		return err
+	}
+
 	k.keyPair.DeleteKey(&KeyPair{
 		ID:     id,
 		Public: public,
 	})
+
+	// if public is empty
+	if public == "" {
+		public = pair.Public
+	}
 
 	deleteIndex := -1
 	for i, p := range k.lastPublic {
