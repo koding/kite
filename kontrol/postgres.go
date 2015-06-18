@@ -417,33 +417,10 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) IsValid(public string) error {
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-	andQuery := sq.And{
-		sq.Eq{"public": public},
-		sq.Eq{"deleted_at": nil},
-	}
-
-	sqlQuery, args, err := psql.
-		Select("id").
-		From("kite.key").
-		Where(andQuery).
-		ToSql()
-	if err != nil {
-		return err
-	}
-
-	var id string
-	err = p.DB.QueryRow(sqlQuery, args...).Scan(&id)
-	if err != nil {
-		return err
-	}
-
-	// if id exists it means delated_at is null, so it's a valid key
-	if id != "" {
-		return nil
-	}
-
-	return errors.New("key is not valid")
+	// for us valid means if deleted_at is not set. Because the gey keys
+	// doesn't if  deleted_at row is set, we just check if we can fetch it.
+	_, err := p.GetKeyFromPublic(public)
+	return err
 }
 
 func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
