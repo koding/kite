@@ -20,6 +20,7 @@ import (
 
 var (
 	ErrQueryFieldsEmpty = errors.New("all query fields are empty")
+	ErrNoKeyFound       = errors.New("no key pair found")
 )
 
 // Postgres holds Postgresql database related configuration
@@ -439,6 +440,9 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNoKeyFound
+		}
 		return nil, err
 	}
 
@@ -461,6 +465,9 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 	keyPair := &KeyPair{}
 	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrNoKeyFound
+		}
 		return nil, err
 	}
 
