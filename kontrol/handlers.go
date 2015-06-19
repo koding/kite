@@ -219,17 +219,12 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 
 func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 	var args struct {
-		Username string
 		AuthType string
 	}
 
 	err := r.Args.One().Unmarshal(&args)
 	if err != nil {
 		return nil, err
-	}
-
-	if args.Username == "" {
-		return nil, errors.New("usename is empty")
 	}
 
 	if k.MachineAuthenticate != nil {
@@ -245,7 +240,7 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	return k.registerUser(args.Username, keyPair.Public, keyPair.Private)
+	return k.registerUser(r.Client.Kite.Username, keyPair.Public, keyPair.Private)
 }
 
 func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
