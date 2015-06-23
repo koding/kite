@@ -287,6 +287,7 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 		return &KeyPair{
 			Public:  k.lastPublic[len(k.lastPublic)-1],
 			Private: k.lastPrivate[len(k.lastPrivate)-1],
+			ID:      k.lastIDs[len(k.lastIDs)-1],
 		}, nil
 	}
 

@@ -73,8 +73,9 @@ type Kontrol struct {
 	// keyPair defines the storage of keypairs
 	keyPair KeyPairStorage
 
-	// lastPublic and lastPrivate are used to store the last added keys for
-	// convinience
+	// ids, lastPublic and lastPrivate are used to store the last added keys
+	// for convinience
+	lastIDs     []string
 	lastPublic  []string
 	lastPrivate []string
 
@@ -111,6 +112,7 @@ func New(conf *config.Config, version string) *Kontrol {
 		log:         k.Log,
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*time.Timer, 0),
+		lastIDs:     make([]string, 0),
 		lastPublic:  make([]string, 0),
 		lastPrivate: make([]string, 0),
 	}
@@ -165,6 +167,7 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	}
 
 	// delete the given public key
+	k.lastIDs = append(k.lastIDs[:deleteIndex], k.lastIDs[deleteIndex+1:]...)
 	k.lastPublic = append(k.lastPublic[:deleteIndex], k.lastPublic[deleteIndex+1:]...)
 	k.lastPrivate = append(k.lastPrivate[:deleteIndex], k.lastPrivate[deleteIndex+1:]...)
 
@@ -194,6 +197,7 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	}
 
 	// set last set key pair
+	k.lastIDs = append(k.lastIDs, id)
 	k.lastPublic = append(k.lastPublic, public)
 	k.lastPrivate = append(k.lastPrivate, private)
 
