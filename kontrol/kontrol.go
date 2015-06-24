@@ -190,6 +190,9 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 		id = i.String()
 	}
 
+	public = strings.TrimSpace(public)
+	private = strings.TrimSpace(private)
+
 	keyPair := &KeyPair{
 		ID:      id,
 		Public:  public,

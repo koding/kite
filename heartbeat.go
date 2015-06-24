@@ -128,6 +128,12 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, errors.New("heartbeal interval cannot be zero")
 	}
 
+	// we also received a new public key (means the old one was invalidated).
+	// Use it now.
+	if rr.PublicKey != "" {
+		k.Config.KontrolKey = rr.PublicKey
+	}
+
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())

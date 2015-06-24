@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/koding/kite"
 	"github.com/koding/kite/kitekey"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
@@ -68,26 +69,6 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	t, err := jwt.Parse(args.Auth.Key, kitekey.GetKontrolKey)
-	if err != nil {
-		http.Error(rw, jsonError(err), http.StatusBadRequest)
-		return
-	}
-
-	publicKey, ok := t.Claims["kontrolKey"].(string)
-	if !ok {
-		err := errors.New("public key is not passed")
-		http.Error(rw, jsonError(err), http.StatusBadRequest)
-		return
-	}
-
-	// check if the key is valid and is stored in the key pair storage, if not
-	// found we don't allow to register anyone.
-	if _, err := k.keyPair.GetKeyFromPublic(publicKey); err != nil {
-		http.Error(rw, jsonError(err), http.StatusBadRequest)
-		return
-	}
-
 	// empty url is useless for us
 	if args.URL == "" {
 		err := errors.New("empty URL")
@@ -104,6 +85,40 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	args.Kite.Username = username
 
+	t, err := jwt.Parse(args.Auth.Key, kitekey.GetKontrolKey)
+	if err != nil {
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	publicKey, ok := t.Claims["kontrolKey"].(string)
+	if !ok {
+		err := errors.New("public key is not passed")
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	var keyPair *KeyPair
+	var newKey bool
+
+	// check if the key is valid and is stored in the key pair storage, if not
+	// found we don't allow to register anyone.
+	keyPair, err = k.keyPair.GetKeyFromPublic(publicKey)
+	if err != nil {
+		newKey = true
+		keyPair, err = k.pickKey(&kite.Request{
+			Username: username,
+			Auth: &kite.Auth{
+				Type: args.Auth.Type,
+				Key:  args.Auth.Key,
+			},
+		})
+		if err != nil {
+			http.Error(rw, jsonError(err), http.StatusBadRequest)
+			return
+		}
+	}
+
 	remoteKite := args.Kite
 
 	// Be sure we have a valid Kite representation. We should not allow someone
@@ -115,7 +130,8 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// This will be stored into the final storage
 	value := &kontrolprotocol.RegisterValue{
-		URL: args.URL,
+		URL:   args.URL,
+		KeyID: keyPair.ID,
 	}
 
 	// Register first by adding the value to the storage. Return if there is
@@ -186,6 +202,10 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	rr := &protocol.RegisterResult{
 		URL:               args.URL,
 		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
+	}
+
+	if newKey {
+		rr.PublicKey = keyPair.Public
 	}
 
 	// send the response back to the requester
