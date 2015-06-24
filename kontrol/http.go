@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -103,7 +104,7 @@ func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// found we don't allow to register anyone.
-	keyPair, err = k.keyPair.GetKeyFromPublic(publicKey)
+	keyPair, err = k.keyPair.GetKeyFromPublic(strings.TrimSpace(publicKey))
 	if err != nil {
 		newKey = true
 		keyPair, err = k.pickKey(&kite.Request{

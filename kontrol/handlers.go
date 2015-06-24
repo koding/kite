@@ -3,6 +3,7 @@ package kontrol
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -50,7 +51,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// check if there is a new key we can use.
-	keyPair, err = k.keyPair.GetKeyFromPublic(publicKey)
+	keyPair, err = k.keyPair.GetKeyFromPublic(strings.TrimSpace(publicKey))
 	if err != nil {
 		newKey = true
 		keyPair, err = k.pickKey(r)
