@@ -207,6 +207,10 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, errors.New("query matches more than one kite")
 	}
 
+	if len(kites) == 0 {
+		return nil, errors.New("no kites found")
+	}
+
 	kite := kites[0]
 	audience := getAudience(query)
 
