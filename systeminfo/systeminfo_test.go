@@ -17,10 +17,10 @@ func TestInfo(t *testing.T) {
 	t.Logf("DiskUsage: %dG\n", i.DiskUsage/1024/1024)
 
 	if i.MemoryTotal == 0 {
-		t.Errorf("unexpected memory total", i.MemoryTotal)
+		t.Errorf("unexpected memory total %d", i.MemoryTotal)
 	}
 
 	if i.MemoryUsage == 0 || i.MemoryUsage > i.MemoryTotal {
-		t.Errorf("unexpected memory usage", i.MemoryUsage)
+		t.Errorf("unexpected memory usage %d", i.MemoryUsage)
 	}
 }
