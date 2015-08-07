@@ -5,7 +5,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"strconv"
 	"sync"
@@ -41,19 +40,19 @@ func init() {
 
 }
 
-func BenchmarkKiteConnection(b *testing.B) {
-	req, err := http.NewRequest("GET", "http://example.com/foo", nil)
-	if err != nil {
-		log.Fatal(err)
+func TestSingle(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		fmt.Printf("i = %+v\n", i)
+		benchClient.Dial()
 	}
+}
 
-	w := httptest.NewRecorder()
-
+func BenchmarkKiteConnection(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		benchServer.ServeHTTP(w, req)
+		benchClient.Dial()
 	}
 }
 
