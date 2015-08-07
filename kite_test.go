@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"sync"
@@ -18,6 +19,7 @@ import (
 
 var (
 	benchServer *Kite
+	benchKite   *Kite
 	benchClient *Client
 )
 
@@ -31,7 +33,7 @@ func init() {
 	go benchServer.Run()
 	<-benchServer.ServerReadyNotify()
 
-	benchKite := newXhrKite("exp", "0.0.1")
+	benchKite = newXhrKite("exp", "0.0.1")
 	benchClient = benchKite.NewClient("http://127.0.0.1:3630/kite")
 	if err := benchClient.Dial(); err != nil {
 		log.Fatal(err)
@@ -40,11 +42,18 @@ func init() {
 }
 
 func BenchmarkKiteConnection(b *testing.B) {
+	req, err := http.NewRequest("GET", "http://example.com/foo", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		benchClient.Tell("ping")
+		benchServer.ServeHTTP(w, req)
 	}
 }
 
