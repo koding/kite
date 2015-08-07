@@ -130,7 +130,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
 		Concurrent:    true,
-		send:          make(chan []byte, 512), // buffered
+		send:          make(chan []byte),
 		wg:            &sync.WaitGroup{},
 	}
 
