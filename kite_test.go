@@ -150,14 +150,14 @@ func TestConcurrency(t *testing.T) {
 func TestKite(t *testing.T) {
 	// Create a mathworker kite
 	mathKite := newXhrKite("mathworker", "0.0.1")
+	mathKite.Config.Port = 3636
 	mathKite.Config.DisableAuthentication = true
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
 	mathKite.HandleFunc("sleep", Sleep)
-	go http.ListenAndServe("127.0.0.1:3636", mathKite)
 
-	// Wait until it's started
-	time.Sleep(time.Second)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
 
 	// Create exp2 kite
 	exp2Kite := newXhrKite("exp2", "0.0.1")
