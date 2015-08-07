@@ -2,6 +2,7 @@ package kite
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -14,6 +15,38 @@ import (
 	"github.com/koding/kite/dnode"
 	_ "github.com/koding/kite/testutil"
 )
+
+var (
+	benchServer *Kite
+	benchClient *Client
+)
+
+func init() {
+	benchServer = newXhrKite("mathworker", "0.0.1")
+	benchServer.Config.Port = 3630
+	benchServer.Config.DisableAuthentication = true
+	benchServer.HandleFunc("ping", func(r *Request) (interface{}, error) {
+		return "pong", nil
+	})
+	go benchServer.Run()
+	<-benchServer.ServerReadyNotify()
+
+	benchKite := newXhrKite("exp", "0.0.1")
+	benchClient = benchKite.NewClient("http://127.0.0.1:3630/kite")
+	if err := benchClient.Dial(); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func BenchmarkKiteConnection(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		benchClient.Tell("ping")
+	}
+}
 
 func TestMultiple(t *testing.T) {
 	testDuration := time.Second * 10
