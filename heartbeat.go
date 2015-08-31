@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/protocol"
 )
 
@@ -60,24 +61,20 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 // use it during app initializations. After the registration a reconnect is
 // automatically handled inside the RegisterHTTP method.
 func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
-	interval := time.NewTicker(kontrolRetryDuration)
-	defer interval.Stop()
-
-	_, err := k.RegisterHTTP(kiteURL)
-	if err == nil {
-		return
-	}
-
-	for _ = range interval.C {
+	register := func() error {
 		_, err := k.RegisterHTTP(kiteURL)
-		if err == nil {
-			return
+		if err != nil {
+			k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
+				err,
+				k.httpRegisterBackOff.NextBackOff()/time.Second)
+			return err
 		}
 
-		k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
-			err, kontrolRetryDuration/time.Second)
-
+		return nil
 	}
+
+	// this will retry register forever
+	backoff.Retry(register, k.httpRegisterBackOff)
 }
 
 func (k *Kite) getKontrolPath(path string) string {

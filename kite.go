@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/koding/kite/config"
@@ -74,6 +75,9 @@ type Kite struct {
 	// from kontrol
 	kontrol *kontrolClient
 
+	// Time to wait before repeated RegisterHTTPForever attempts.
+	httpRegisterBackOff *backoff.ExponentialBackOff
+
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)
 
@@ -120,22 +124,30 @@ func New(name, version string) *Kite {
 		registerChan:    make(chan *url.URL, 1),
 	}
 
+	// Create the httpBackoffRegister that RegisterHTTPForever will
+	// use to backoff repeated register attempts.
+	httpRegisterBackOff := backoff.NewExponentialBackOff()
+	httpRegisterBackOff.InitialInterval = 10 * time.Second
+	httpRegisterBackOff.Multiplier = 1.7
+	httpRegisterBackOff.MaxElapsedTime = 0
+
 	k := &Kite{
-		Config:             config.New(),
-		Log:                l,
-		SetLogLevel:        setlevel,
-		Authenticators:     make(map[string]func(*Request) error),
-		trustedKontrolKeys: make(map[string]string),
-		handlers:           make(map[string]*Method),
-		preHandlers:        make([]Handler, 0),
-		postHandlers:       make([]Handler, 0),
-		kontrol:            kClient,
-		name:               name,
-		version:            version,
-		Id:                 kiteID.String(),
-		readyC:             make(chan bool),
-		closeC:             make(chan bool),
-		muxer:              mux.NewRouter(),
+		Config:              config.New(),
+		Log:                 l,
+		SetLogLevel:         setlevel,
+		Authenticators:      make(map[string]func(*Request) error),
+		trustedKontrolKeys:  make(map[string]string),
+		handlers:            make(map[string]*Method),
+		preHandlers:         make([]Handler, 0),
+		postHandlers:        make([]Handler, 0),
+		kontrol:             kClient,
+		httpRegisterBackOff: httpRegisterBackOff,
+		name:                name,
+		version:             version,
+		Id:                  kiteID.String(),
+		readyC:              make(chan bool),
+		closeC:              make(chan bool),
+		muxer:               mux.NewRouter(),
 	}
 
 	// We change the heartbeat interval from 25 seconds to 10 seconds. This is
