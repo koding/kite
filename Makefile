@@ -97,7 +97,7 @@ ifeq ($(KONTROL_STORAGE), etcd)
 	@echo "Installing etcd"
 	@curl -L  https://github.com/coreos/etcd/releases/download/v2.2.0-rc.0/etcd-v2.2.0-rc.0-linux-amd64.tar.gz -o etcd-v2.2.0-rc.0-linux-amd64.tar.gz
 	tar xzvf etcd-v2.2.0-rc.0-linux-amd64.tar.gz
-	cd etcd-v2.2.0-rc.0-linux-amd64; ./etcd
+	cd etcd-v2.2.0-rc.0-linux-amd64; ./etcd &
 endif
 
 ifeq ($(KONTROL_STORAGE), postgres)
