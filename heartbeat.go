@@ -74,7 +74,10 @@ func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	}
 
 	// this will retry register forever
-	backoff.Retry(register, k.httpRegisterBackOff)
+	err := backoff.Retry(register, k.httpRegisterBackOff)
+	if err != nil {
+		k.Log.Error("BackOff stopped retrying with Error '%s'", err)
+	}
 }
 
 func (k *Kite) getKontrolPath(path string) string {
