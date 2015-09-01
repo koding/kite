@@ -98,8 +98,9 @@ ifeq ($(KONTROL_STORAGE), etcd)
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/default.etcd ||: #remove previous folder
 	@cd _etcd
-	sed '1 s/^.*$$/#!\/bin\/bash\ -e/g' build
-	cat build
+	ls
+	sed '1 s/^.*$$/#!\/bin\/bash\ -e/g' ./build
+	cat ./build
 	./build; ./bin/etcd &
 endif
 
