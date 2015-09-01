@@ -61,12 +61,19 @@ func (k *Kite) kontrolFunc(fn kontrolFunc) error {
 // use it during app initializations. After the registration a reconnect is
 // automatically handled inside the RegisterHTTP method.
 func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
+	// Create the httpBackoffRegister that RegisterHTTPForever will
+	// use to backoff repeated register attempts.
+	httpRegisterBackOff := backoff.NewExponentialBackOff()
+	httpRegisterBackOff.InitialInterval = 10 * time.Second
+	httpRegisterBackOff.Multiplier = 1.7
+	httpRegisterBackOff.MaxElapsedTime = 0
+
 	register := func() error {
 		_, err := k.RegisterHTTP(kiteURL)
 		if err != nil {
 			k.Log.Error("Cannot register to Kontrol: %s Will retry after %d seconds",
 				err,
-				k.httpRegisterBackOff.NextBackOff()/time.Second)
+				httpRegisterBackOff.NextBackOff()/time.Second)
 			return err
 		}
 
@@ -74,7 +81,7 @@ func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	}
 
 	// this will retry register forever
-	err := backoff.Retry(register, k.httpRegisterBackOff)
+	err := backoff.Retry(register, httpRegisterBackOff)
 	if err != nil {
 		k.Log.Error("BackOff stopped retrying with Error '%s'", err)
 	}
