@@ -97,11 +97,8 @@ ifeq ($(KONTROL_STORAGE), etcd)
 	@echo "Installing etcd"
 	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/default.etcd ||: #remove previous folder
-	@cd _etcd
-	ls
-	sed '1 s/^.*$$/#!\/bin\/bash\ -e/g' ./build
-	cat ./build
-	./build; ./bin/etcd &
+	@cd _etcd; ls
+	cd ./_etcd; sed '1 s/^.*$$/#!\/bin\/bash\ -e/g' ./build; ./build; ./bin/etcd &
 endif
 
 ifeq ($(KONTROL_STORAGE), postgres)
