@@ -117,14 +117,14 @@ func New(conf *config.Config, version string) *Kontrol {
 		lastPrivate: make([]string, 0),
 	}
 
-	k.HandleFunc("register", kontrol.handleRegister)
-	k.HandleFunc("registerMachine", kontrol.handleMachine).DisableAuthentication()
-	k.HandleFunc("getKites", kontrol.handleGetKites)
-	k.HandleFunc("getToken", kontrol.handleGetToken)
-	k.HandleFunc("getKey", kontrol.handleGetKey)
+	k.HandleFunc("register", kontrol.HandleRegister)
+	k.HandleFunc("registerMachine", kontrol.HandleMachine).DisableAuthentication()
+	k.HandleFunc("getKites", kontrol.HandleGetKites)
+	k.HandleFunc("getToken", kontrol.HandleGetToken)
+	k.HandleFunc("getKey", kontrol.HandleGetKey)
 
-	k.HandleHTTPFunc("/register", kontrol.handleRegisterHTTP)
-	k.HandleHTTPFunc("/heartbeat", kontrol.handleHeartbeat)
+	k.HandleHTTPFunc("/register", kontrol.HandleRegisterHTTP)
+	k.HandleHTTPFunc("/heartbeat", kontrol.HandleHeartbeat)
 
 	return kontrol
 }

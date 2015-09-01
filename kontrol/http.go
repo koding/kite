@@ -15,7 +15,7 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
+func (k *Kontrol) HandleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
 	if id == "" {
 		http.Error(rw, "query id is empty", http.StatusBadRequest)
@@ -51,7 +51,7 @@ func (k *Kontrol) handleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("registeragain"))
 }
 
-func (k *Kontrol) handleRegisterHTTP(rw http.ResponseWriter, req *http.Request) {
+func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) {
 	var args protocol.RegisterArgs
 
 	if err := json.NewDecoder(req.Body).Decode(&args); err != nil {

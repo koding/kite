@@ -15,7 +15,7 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
+func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	k.log.Info("Register request from: %s", r.Client.Kite)
 
 	if r.Args.One().MustMap()["url"].MustString() == "" {
@@ -153,7 +153,7 @@ func (k *Kontrol) handleRegister(r *kite.Request) (interface{}, error) {
 	return p, nil
 }
 
-func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
+func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 	var args protocol.GetKitesArgs
 	if err := r.Args.One().Unmarshal(&args); err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (k *Kontrol) handleGetKites(r *kite.Request) (interface{}, error) {
 	}, nil
 }
 
-func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
+func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 	var query *protocol.KontrolQuery
 	err := r.Args.One().Unmarshal(&query)
 	if err != nil {
@@ -222,7 +222,7 @@ func (k *Kontrol) handleGetToken(r *kite.Request) (interface{}, error) {
 	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
-func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
+func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {
 	var args struct {
 		AuthType string
 	}
@@ -248,7 +248,7 @@ func (k *Kontrol) handleMachine(r *kite.Request) (interface{}, error) {
 	return k.registerUser(r.Client.Kite.Username, keyPair.Public, keyPair.Private)
 }
 
-func (k *Kontrol) handleGetKey(r *kite.Request) (interface{}, error) {
+func (k *Kontrol) HandleGetKey(r *kite.Request) (interface{}, error) {
 	// Only accept requests with kiteKey because we need this info
 	// for checking if the key is valid and needs to be regenerated
 	if r.Auth.Type != "kiteKey" {
