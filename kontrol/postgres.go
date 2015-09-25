@@ -25,11 +25,12 @@ var (
 
 // Postgres holds Postgresql database related configuration
 type PostgresConfig struct {
-	Host     string `default:"localhost"`
-	Port     int    `default:"5432"`
-	Username string `required:"true"`
-	Password string
-	DBName   string `required:"true" `
+	Host           string `default:"localhost"`
+	Port           int    `default:"5432"`
+	Username       string `required:"true"`
+	Password       string
+	DBName         string `required:"true" `
+	ConnectTimeout int    `default:"20"`
 }
 
 type Postgres struct {
@@ -61,8 +62,8 @@ func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	}
 
 	connString := fmt.Sprintf(
-		"host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
-		conf.Host, conf.Port, conf.DBName, conf.Username, conf.Password,
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=disable connect_timeout=%d",
+		conf.Host, conf.Port, conf.DBName, conf.Username, conf.Password, conf.ConnectTimeout,
 	)
 
 	db, err := sql.Open("postgres", connString)
