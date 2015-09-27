@@ -168,7 +168,17 @@ func (m *CachedStorage) GetKeyFromID(id string) (*KeyPair, error) {
 		return keyPair, nil
 	}
 
-	return m.backend.GetKeyFromID(id)
+	keyPair, err := m.backend.GetKeyFromID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// set key to the cache
+	if err := m.cache.AddKey(keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 func (m *CachedStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
@@ -176,7 +186,17 @@ func (m *CachedStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
 		return keyPair, nil
 	}
 
-	return m.backend.GetKeyFromPublic(public)
+	keyPair, err := m.backend.GetKeyFromPublic(public)
+	if err != nil {
+		return nil, err
+	}
+
+	// set key to the cache
+	if err := m.cache.AddKey(keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 func (m *CachedStorage) IsValid(public string) error {
