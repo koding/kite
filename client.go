@@ -406,7 +406,7 @@ func (c *Client) Close() {
 	if c.session != nil {
 		c.session.Close(3000, "Go away!")
 	}
-	c.m.Unlock()
+	c.m.RUnlock()
 
 	c.sendMu.Lock()
 	close(c.send)
