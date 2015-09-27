@@ -64,7 +64,8 @@ func (k *Kite) RegisterHTTPForever(kiteURL *url.URL) {
 	// Create the httpBackoffRegister that RegisterHTTPForever will
 	// use to backoff repeated register attempts.
 	httpRegisterBackOff := backoff.NewExponentialBackOff()
-	httpRegisterBackOff.InitialInterval = 10 * time.Second
+	httpRegisterBackOff.InitialInterval = 30 * time.Second
+	httpRegisterBackOff.MaxInterval = 5 * time.Minute
 	httpRegisterBackOff.Multiplier = 1.7
 	httpRegisterBackOff.MaxElapsedTime = 0
 
