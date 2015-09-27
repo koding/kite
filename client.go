@@ -191,6 +191,9 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 	c.LocalKite.Log.Debug("Client transport is set to '%s'", transport)
 
+	c.m.Lock()
+	defer c.m.Unlock()
+
 	switch transport {
 	case config.WebSocket:
 		c.session, err = sockjsclient.ConnectWebsocketSession(opts)
@@ -243,9 +246,12 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 }
 
 func (c *Client) RemoteAddr() string {
+	c.m.RLock()
 	if c.session == nil {
+		c.m.RUnlock()
 		return ""
 	}
+	c.m.RUnlock()
 
 	websocketsession, ok := c.session.(*sockjsclient.WebsocketSession)
 	if !ok {
@@ -320,9 +326,12 @@ func (c *Client) readLoop() error {
 
 // receiveData reads a message from session.
 func (c *Client) receiveData() ([]byte, error) {
+	c.m.RLock()
 	if c.session == nil {
+		c.m.RUnlock()
 		return nil, errors.New("not connected")
 	}
+	c.m.RUnlock()
 
 	msg, err := c.session.Recv()
 	if err != nil {
@@ -393,9 +402,11 @@ func (c *Client) Close() {
 	c.Reconnect = false
 	c.sendMu.Unlock()
 
+	c.m.RLock()
 	if c.session != nil {
 		c.session.Close(3000, "Go away!")
 	}
+	c.m.RUnlock()
 
 	c.sendMu.Lock()
 	close(c.send)
@@ -426,10 +437,13 @@ func (c *Client) sendHub() {
 			}
 
 			c.LocalKite.Log.Debug("Sending: %s", string(msg))
+			c.m.RLock()
 			if c.session == nil {
+				c.m.RUnlock()
 				c.LocalKite.Log.Error("not connected")
 				continue
 			}
+			c.m.RUnlock()
 
 			err := c.session.Send(string(msg))
 			if err != nil {
@@ -633,9 +647,12 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 	case <-c.closeChan:
 		return nil, errors.New("can not send")
 	default:
+		c.m.RLock()
 		if c.session == nil {
+			c.m.RUnlock()
 			return nil, errors.New("can't send, session is not established yet")
 		}
+		c.m.RUnlock()
 
 		c.sendMu.Lock()
 		c.send <- data
