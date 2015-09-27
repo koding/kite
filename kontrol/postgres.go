@@ -458,7 +458,7 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 		Where(map[string]interface{}{
 		"public":     public,
 		"deleted_at": nil,
-	}).ToSql()
+	}).Limit(1).ToSql()
 	if err != nil {
 		return nil, err
 	}
