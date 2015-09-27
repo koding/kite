@@ -530,7 +530,6 @@ func (c *Client) Go(method string, args ...interface{}) chan *response {
 func (c *Client) GoWithTimeout(method string, timeout time.Duration, args ...interface{}) chan *response {
 	// We will return this channel to the caller.
 	// It can wait on this channel to get the response.
-	c.LocalKite.Log.Debug("Telling method [%s] on kite [%s]", method, c.Name)
 	responseChan := make(chan *response, 1)
 
 	c.sendMethod(method, args, timeout, responseChan)

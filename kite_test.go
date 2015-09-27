@@ -113,7 +113,7 @@ func TestConcurrency(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// number of exp kites that will call mathworker kite
-	clientNumber := 10
+	clientNumber := 3
 
 	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
