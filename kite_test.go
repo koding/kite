@@ -22,7 +22,7 @@ func TestMultiple(t *testing.T) {
 	kiteNumber := 3
 
 	// number of exp kites that will call mathwork kites
-	clientNumber := 10
+	clientNumber := 3
 
 	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
