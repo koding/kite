@@ -133,7 +133,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	}
 
 	if rr.HeartbeatInterval == 0 {
-		return nil, errors.New("heartbeal interval cannot be zero")
+		return nil, errors.New("heartbeat interval cannot be zero")
 	}
 
 	// we also received a new public key (means the old one was invalidated).

@@ -3,6 +3,7 @@ package kontrol
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/koding/cache"
 )
@@ -57,6 +58,13 @@ func NewMemKeyPairStorage() *MemKeyPairStorage {
 	return &MemKeyPairStorage{
 		id:     cache.NewMemory(),
 		public: cache.NewMemory(),
+	}
+}
+
+func NewMemKeyPairStorageTTL(ttl time.Duration) *MemKeyPairStorage {
+	return &MemKeyPairStorage{
+		id:     cache.NewMemoryWithTTL(ttl),
+		public: cache.NewMemoryWithTTL(ttl),
 	}
 }
 
@@ -120,4 +128,81 @@ func (m *MemKeyPairStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
 func (m *MemKeyPairStorage) IsValid(public string) error {
 	_, err := m.GetKeyFromPublic(public)
 	return err
+}
+
+// CachedStorage caches the requests that are going to backend and tries to
+// lower the load on the backend
+type CachedStorage struct {
+	cache   KeyPairStorage
+	backend KeyPairStorage
+}
+
+// NewCachedStorage creates a new CachedStorage
+func NewCachedStorage(backend KeyPairStorage, cache KeyPairStorage) *CachedStorage {
+	return &CachedStorage{
+		cache:   cache,
+		backend: backend,
+	}
+}
+
+var _ KeyPairStorage = (&CachedStorage{})
+
+func (m *CachedStorage) AddKey(keyPair *KeyPair) error {
+	if err := m.backend.AddKey(keyPair); err != nil {
+		return err
+	}
+
+	return m.cache.AddKey(keyPair)
+}
+
+func (m *CachedStorage) DeleteKey(keyPair *KeyPair) error {
+	if err := m.backend.DeleteKey(keyPair); err != nil {
+		return err
+	}
+
+	return m.cache.DeleteKey(keyPair)
+}
+
+func (m *CachedStorage) GetKeyFromID(id string) (*KeyPair, error) {
+	if keyPair, err := m.cache.GetKeyFromID(id); err == nil {
+		return keyPair, nil
+	}
+
+	keyPair, err := m.backend.GetKeyFromID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// set key to the cache
+	if err := m.cache.AddKey(keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+func (m *CachedStorage) GetKeyFromPublic(public string) (*KeyPair, error) {
+	if keyPair, err := m.cache.GetKeyFromPublic(public); err == nil {
+		return keyPair, nil
+	}
+
+	keyPair, err := m.backend.GetKeyFromPublic(public)
+	if err != nil {
+		return nil, err
+	}
+
+	// set key to the cache
+	if err := m.cache.AddKey(keyPair); err != nil {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+func (m *CachedStorage) IsValid(public string) error {
+	if err := m.cache.IsValid(public); err == nil {
+		return nil
+	}
+
+	return m.backend.IsValid(public)
 }
