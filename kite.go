@@ -206,7 +206,9 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 	// This Client also handles the connected client.
 	// Since both sides can send/receive messages the client code is reused here.
 	c := k.NewClient("")
+	c.m.Lock()
 	c.session = session
+	c.m.Unlock()
 
 	go c.sendHub()
 	c.wg.Add(1) // with sendHub we added a new listener

@@ -130,7 +130,9 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	// Notify the handlers registered with Kite.OnFirstRequest().
 	if _, ok := c.session.(*sockjsclient.WebsocketSession); !ok {
 		c.firstRequestHandlersNotified.Do(func() {
+			c.m.Lock()
 			c.Kite = options.Kite
+			c.m.Unlock()
 			c.LocalKite.callOnFirstRequestHandlers(c)
 		})
 	}
