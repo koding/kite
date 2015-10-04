@@ -1,3 +1,7 @@
+// TODO: Watcher was disabled by e8ad10d.
+
+// +build ignore
+
 package main
 
 import (
