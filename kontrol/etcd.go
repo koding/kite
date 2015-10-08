@@ -108,7 +108,11 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 	_, err = e.client.Update(etcdKey, valueString, uint64(KeyTTL/time.Second))
 	if err != nil {
-		return err
+		err = e.Add(k, value)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// Also update the the kite.Key Id for easy lookup
