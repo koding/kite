@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/koding/kite"
+	"github.com/koding/kite/examples/math"
 )
 
 func init() {
@@ -33,7 +34,10 @@ func main() {
 		i := rand.Intn(10)
 
 		// Call a method of mathworker kite
-		response, err := mathWorker.TellWithTimeout("square", 4*time.Second, i)
+		response, err := mathWorker.TellWithTimeout("square", 4*time.Second, &math.Request{
+			Number: i,
+			Name:   "example-2-kite",
+		})
 		if err != nil {
 			k.Log.Error(err.Error())
 			continue

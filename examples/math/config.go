@@ -7,6 +7,11 @@ import (
 	"strconv"
 )
 
+type Request struct {
+	Number int
+	Name   string
+}
+
 var Host = &Config{
 	URL: &url.URL{
 		Scheme: "http",
