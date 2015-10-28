@@ -47,15 +47,18 @@ func main() {
 
 func Square(r *kite.Request) (interface{}, error) {
 	// Unmarshal method arguments.
-	a := r.Args.One().MustFloat64()
+	var params math.Request
+	if err := r.Args.One().Unmarshal(&params); err != nil {
+		return nil, err
+	}
 
-	result := a * a
+	result := params.Number * params.Number
 
-	fmt.Printf("Call received, sending result %.0f back\n", result)
+	fmt.Printf("Call received from '%s', sending result '%.0d' back\n", params.Name, result)
 
 	// Print a log on remote Kite.
 	// This message will be printed on client's console.
-	r.Client.Go("kite.log", fmt.Sprintf("Message from %s: \"You have requested square of %.0f\"", r.LocalKite.Kite().Name, a))
+	r.Client.Go("kite.log", fmt.Sprintf("Message from %s: \"You have requested square of %.0d\"", r.LocalKite.Kite().Name, params.Number))
 
 	// You can return anything as result, as long as it is JSON marshalable.
 	return result, nil

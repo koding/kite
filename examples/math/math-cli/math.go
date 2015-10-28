@@ -24,7 +24,11 @@ func main() {
 	}
 
 	// Call square method with the given argument.
-	response, err := mathWorker.Tell("square", *arg)
+
+	response, err := mathWorker.Tell("square", &math.Request{
+		Number: *arg,
+		Name:   "math-cli",
+	})
 	if err != nil {
 		panic(err)
 	}
