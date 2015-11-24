@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -209,7 +209,7 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	}
 
 	if id == "" {
-		i, _ := uuid.NewV4()
+		i := uuid.NewV4()
 		id = i.String()
 	}
 
@@ -284,10 +284,7 @@ func (k *Kontrol) InitializeSelf() error {
 
 func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey string, err error) {
 	// Only accept requests of type machine
-	tknID, err := uuid.NewV4()
-	if err != nil {
-		return "", errors.New("cannot generate a token")
-	}
+	tknID := uuid.NewV4()
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
@@ -317,7 +314,7 @@ func (k *Kontrol) registerSelf() {
 	}
 
 	// just add a random uuid key
-	u, _ := uuid.NewV4()
+	u := uuid.NewV4()
 	value.KeyID = u.String()
 
 	// Kontrol itselfs doesn't use keys at all, just add some placeholders
@@ -360,10 +357,7 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 		return signed, nil
 	}
 
-	tknID, err := uuid.NewV4()
-	if err != nil {
-		return "", errors.New("Server error: Cannot generate a token")
-	}
+	tknID := uuid.NewV4()
 
 	// Identifies the expiration time after which the JWT MUST NOT be accepted
 	// for processing.
@@ -382,6 +376,7 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
 	tkn.Claims["jti"] = tknID.String()                               // JWT ID
 
+	var err error
 	signed, err = tkn.SignedString([]byte(privateKey))
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")

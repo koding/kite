@@ -5,14 +5,14 @@ import (
 
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func BenchmarkPostgres(b *testing.B) {
 	kon.SetStorage(NewPostgres(nil, kon.Kite.Log))
 
 	newKite := func() *protocol.Kite {
-		id, _ := uuid.NewV4()
+		id := uuid.NewV4()
 		return &protocol.Kite{
 			Username:    "bench-user",
 			Environment: "bench-env",
@@ -53,7 +53,7 @@ func BenchmarkEtcdAdd(b *testing.B) {
 	kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 
 	newKite := func() *protocol.Kite {
-		id, _ := uuid.NewV4()
+		id := uuid.NewV4()
 		return &protocol.Kite{
 			Username:    "bench-user",
 			Environment: "bench-env",

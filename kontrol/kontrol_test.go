@@ -11,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/kite/testutil"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -404,7 +404,7 @@ func TestGetQueryKey(t *testing.T) {
 }
 
 func TestKontrolMultiKey(t *testing.T) {
-	i, _ := uuid.NewV4()
+	i := uuid.NewV4()
 	secondID := i.String()
 	// add so we can use it as key
 	if err := kon.AddKeyPair(secondID, testkeys.PublicSecond, testkeys.PrivateSecond); err != nil {

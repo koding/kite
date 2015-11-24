@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/logging"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 // NewKiteKey returns a new generated kite key. (Copied and modified from
@@ -31,10 +31,7 @@ func NewKiteKeyWithKeyPair(private, public string) *jwt.Token {
 }
 
 func newKiteKey(username, private, public string) *jwt.Token {
-	tknID, err := uuid.NewV4()
-	if err != nil {
-		panic(err)
-	}
+	tknID := uuid.NewV4()
 
 	hostname, err := os.Hostname()
 	if err != nil {

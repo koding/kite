@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/satori/go.uuid"
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
@@ -107,10 +107,7 @@ func New(name, version string) *Kite {
 		panic("kite: version must be 3-digits semantic version")
 	}
 
-	kiteID, err := uuid.NewV4()
-	if err != nil {
-		panic(fmt.Sprintf("kite: cannot generate unique ID: %s", err.Error()))
-	}
+	kiteID := uuid.NewV4()
 
 	l, setlevel := newLogger(name)
 
