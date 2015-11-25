@@ -17,6 +17,10 @@ import (
 const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
+
+	// tellKontrolConnectTimeout is the timeout for connecting to Kontrol in
+	// TellKontrol-like methods.
+	tellKontrolConnectTimeout = 10 * time.Second
 )
 
 // Returned from GetKites when query matches no kites.
@@ -443,28 +447,22 @@ func (k *Kite) registerToProxyKite(c *Client, kiteURL *url.URL) (*url.URL, error
 // kontrol. Like GetKites and GetToken, this automatically sets up and connects to
 // kontrol as needed.
 func (k *Kite) TellKontrolWithTimeout(method string, timeout time.Duration, args ...interface{}) (result *dnode.Partial, err error) {
-	start := time.Now()
-
 	if err := k.SetupKontrolClient(); err != nil {
 		return nil, err
 	}
 
 	// Wait for readyConnect, or timeout
 	select {
-	case <-time.After(timeout):
+	case <-time.After(tellKontrolConnectTimeout):
 		return nil, &Error{
 			Type: "timeout",
 			Message: fmt.Sprintf(
 				"Timed out registering to kontrol for %s method after %s",
-				method, timeout,
+				method, tellKontrolConnectTimeout,
 			),
 		}
 	case <-k.kontrol.readyConnected:
 	}
 
-	// Calculate the difference in duration that it took to connect to kontrol, if any,
-	// and then TellWithTimeout for that duration.
-	timeoutAfterReg := time.Now().Sub(start) - timeout
-
-	return k.kontrol.TellWithTimeout(method, timeoutAfterReg, args...)
+	return k.kontrol.TellWithTimeout(method, timeout, args...)
 }
