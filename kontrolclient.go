@@ -18,9 +18,9 @@ const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
 
-	// tellKontrolConnectTimeout is the timeout for connecting to Kontrol in
+	// kontrolConnectTimeout is the timeout for connecting to Kontrol in
 	// TellKontrol-like methods.
-	tellKontrolConnectTimeout = 10 * time.Second
+	kontrolConnectTimeout = 10 * time.Second
 )
 
 // Returned from GetKites when query matches no kites.
@@ -453,12 +453,12 @@ func (k *Kite) TellKontrolWithTimeout(method string, timeout time.Duration, args
 
 	// Wait for readyConnect, or timeout
 	select {
-	case <-time.After(tellKontrolConnectTimeout):
+	case <-time.After(kontrolConnectTimeout):
 		return nil, &Error{
 			Type: "timeout",
 			Message: fmt.Sprintf(
 				"Timed out registering to kontrol for %s method after %s",
-				method, tellKontrolConnectTimeout,
+				method, kontrolConnectTimeout,
 			),
 		}
 	case <-k.kontrol.readyConnected:
