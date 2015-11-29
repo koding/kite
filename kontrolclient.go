@@ -3,18 +3,24 @@ package kite
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"net/url"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
 const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
+
+	// kontrolConnectTimeout is the timeout for connecting to Kontrol in
+	// TellKontrol-like methods.
+	kontrolConnectTimeout = 10 * time.Second
 )
 
 // Returned from GetKites when query matches no kites.
@@ -435,4 +441,28 @@ func (k *Kite) registerToProxyKite(c *Client, kiteURL *url.URL) (*url.URL, error
 	}
 
 	return parsed, nil
+}
+
+// TellKontrolWithTimeout is a lower level function for communicating directly with
+// kontrol. Like GetKites and GetToken, this automatically sets up and connects to
+// kontrol as needed.
+func (k *Kite) TellKontrolWithTimeout(method string, timeout time.Duration, args ...interface{}) (result *dnode.Partial, err error) {
+	if err := k.SetupKontrolClient(); err != nil {
+		return nil, err
+	}
+
+	// Wait for readyConnect, or timeout
+	select {
+	case <-time.After(kontrolConnectTimeout):
+		return nil, &Error{
+			Type: "timeout",
+			Message: fmt.Sprintf(
+				"Timed out registering to kontrol for %s method after %s",
+				method, kontrolConnectTimeout,
+			),
+		}
+	case <-k.kontrol.readyConnected:
+	}
+
+	return k.kontrol.TellWithTimeout(method, timeout, args...)
 }
