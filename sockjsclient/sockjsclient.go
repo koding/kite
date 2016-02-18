@@ -35,9 +35,18 @@ type WebsocketSession struct {
 }
 
 type DialOptions struct {
-	BaseURL                         string
-	ReadBufferSize, WriteBufferSize int
-	Timeout                         time.Duration
+	BaseURL         string
+	ReadBufferSize  int
+	WriteBufferSize int
+	Timeout         time.Duration
+	ClientFunc      func(*DialOptions) *http.Client
+}
+
+func (opts *DialOptions) client() *http.Client {
+	if opts.ClientFunc != nil {
+		return opts.ClientFunc(opts)
+	}
+	return defaultClient(opts)
 }
 
 func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {

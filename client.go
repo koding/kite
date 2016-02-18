@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -45,6 +46,14 @@ type Client struct {
 
 	// Should we process incoming messages concurrently or not? Default: true
 	Concurrent bool
+
+	// ClientFunc is called each time new sockjs.Session is established.
+	// The session will use returned *http.Client for HTTP round trips
+	// for XHR transport.
+	//
+	// If ClientFunc is nil, sockjs.Session will use default, internal
+	// *http.Client value.
+	ClientFunc func(*sockjsclient.DialOptions) *http.Client
 
 	// To signal waiters of Go() on disconnect.
 	disconnect   chan struct{}
@@ -184,6 +193,7 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		BaseURL:         c.URL,
 		ReadBufferSize:  c.ReadBufferSize,
 		WriteBufferSize: c.WriteBufferSize,
+		ClientFunc:      c.ClientFunc,
 		Timeout:         timeout,
 	}
 
