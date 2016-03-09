@@ -372,7 +372,6 @@ func generateToken(aud, username, issuer, privateKey string) (string, error) {
 	tkn.Claims["sub"] = username                                     // Subject
 	tkn.Claims["aud"] = aud                                          // Audience
 	tkn.Claims["exp"] = time.Now().UTC().Add(ttl).Add(leeway).Unix() // Expiration Time
-	tkn.Claims["nbf"] = time.Now().UTC().Add(-leeway).Unix()         // Not Before
 	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
 	tkn.Claims["jti"] = tknID.String()                               // JWT ID
 
