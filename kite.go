@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/sockjsclient"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
@@ -52,6 +53,12 @@ type Kite struct {
 	// Contains different functions for authenticating user from request.
 	// Keys are the authentication types (options.auth.type).
 	Authenticators map[string]func(*Request) error
+
+	// ClientFunc is used as the default value for kite.Client.ClientFunc.
+	// If nil, a default ClientFunc will be used.
+	//
+	// See also: kite.Client.ClientFunc docstring.
+	ClientFunc func(*sockjsclient.DialOptions) *http.Client
 
 	// Kontrol keys to trust. Kontrol will issue access tokens for kites
 	// that are signed with the private counterpart of these keys.

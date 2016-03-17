@@ -133,6 +133,7 @@ type response struct {
 func (k *Kite) NewClient(remoteURL string) *Client {
 	c := &Client{
 		LocalKite:     k,
+		ClientFunc:    k.ClientFunc,
 		URL:           remoteURL,
 		disconnect:    make(chan struct{}, 1),
 		closeChan:     make(chan struct{}),
