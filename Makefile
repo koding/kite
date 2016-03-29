@@ -38,7 +38,7 @@ kontrol:
 	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -initial -username kite -kontrolurl "http://localhost:4444/kite"
 
 	@echo "$(OK_COLOR)==> Running Kontrol $(NO_COLOR)"
-	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -port 4444 
+	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -port 4444
 
 install:
 	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
@@ -62,7 +62,7 @@ ifeq ($(KONTROL_STORAGE), "etcd")
 	@killall etcd ||:
 
 	@echo "Installing etcd"
-	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	test -d "_etcd" || git clone -b release-2.3 https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/default.etcd ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd &
 endif
@@ -76,7 +76,7 @@ endif
 	@echo "$(OK_COLOR)==> Starting kontrol test $(NO_COLOR)"
 	@`which go` test -race $(VERBOSE) ./kontrol
 
-test: 
+test:
 	@echo "$(OK_COLOR)==> Preparing test environment $(NO_COLOR)"
 	@echo "Using $(KITE_TRANSPORT) transport"
 	@echo "Cleaning $(KITE_HOME) directory"
@@ -93,7 +93,7 @@ ifeq ($(KONTROL_STORAGE), etcd)
 	@killall etcd ||:
 
 	@echo "Installing etcd"
-	test -d "_etcd" || git clone https://github.com/coreos/etcd _etcd
+	test -d "_etcd" || git clone -b release-2.3 https://github.com/coreos/etcd _etcd
 	@rm -rf _etcd/default.etcd ||: #remove previous folder
 	@cd _etcd; ./build; ./bin/etcd &
 endif
