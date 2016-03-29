@@ -78,12 +78,14 @@ func (k *Kite) SetupKontrolClient() error {
 		k.Log.Info("Connected to Kontrol ")
 
 		// try to re-register on connect
+		k.kontrol.Lock()
 		if k.kontrol.lastRegisteredURL != nil {
 			select {
 			case k.kontrol.registerChan <- k.kontrol.lastRegisteredURL:
 			default:
 			}
 		}
+		k.kontrol.Unlock()
 
 		// signal all other methods that are listening on this channel, that we
 		// are connected to kontrol.
@@ -244,7 +246,9 @@ func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 		for u := range k.kontrol.registerChan {
 			_, err := k.Register(u)
 			if err == nil {
+				k.kontrol.Lock()
 				k.kontrol.lastRegisteredURL = u
+				k.kontrol.Unlock()
 				k.signalReady()
 				continue
 			}
