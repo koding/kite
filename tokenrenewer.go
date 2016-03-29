@@ -3,6 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -20,6 +21,7 @@ type TokenRenewer struct {
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
+	active           uint32
 }
 
 func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
@@ -27,7 +29,7 @@ func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 		client:           r,
 		localKite:        k,
 		signalRenewToken: make(chan struct{}, 1),
-		disconnect:       make(chan struct{}),
+		disconnect:       make(chan struct{}, 1),
 	}
 	return t, t.parse(r.Auth.Key)
 }
@@ -60,8 +62,10 @@ func (t *TokenRenewer) parse(tokenString string) error {
 
 // RenewWhenExpires renews the token before it expires.
 func (t *TokenRenewer) RenewWhenExpires() {
-	t.client.OnConnect(func() { go t.renewLoop() })
-	t.client.OnDisconnect(func() { close(t.disconnect) })
+	if atomic.CompareAndSwapUint32(&t.active, 0, 1) {
+		t.client.OnConnect(t.startRenewLoop)
+		t.client.OnDisconnect(t.sendDisconnectSignal)
+	}
 }
 
 func (t *TokenRenewer) renewLoop() {
@@ -83,7 +87,6 @@ func (t *TokenRenewer) renewLoop() {
 				go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
 			}
 		case <-t.disconnect:
-			t.disconnect = make(chan struct{})
 			return
 		}
 	}
@@ -95,10 +98,22 @@ func (t *TokenRenewer) renewDuration() time.Duration {
 	return t.validUntil.Add(-renewBefore).Sub(time.Now().UTC())
 }
 
+func (t *TokenRenewer) startRenewLoop() {
+	go t.renewLoop()
+}
+
 func (t *TokenRenewer) sendRenewTokenSignal() {
 	// Needs to be non-blocking because tokenRenewer may be stopped.
 	select {
 	case t.signalRenewToken <- struct{}{}:
+	default:
+	}
+}
+
+func (t *TokenRenewer) sendDisconnectSignal() {
+	// Needs to be non-blocking because tokenRenewer may be stopped.
+	select {
+	case t.disconnect <- struct{}{}:
 	default:
 	}
 }
