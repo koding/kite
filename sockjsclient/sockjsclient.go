@@ -80,13 +80,23 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 		WriteBufferSize: opts.WriteBufferSize,
 	}
 
-	// if the user passed a timeout, us a dial with a timeout
-	if opts.Timeout != 0 {
-		ws.NetDial = func(network, addr string) (net.Conn, error) {
-			return net.DialTimeout(network, addr, opts.Timeout)
-		}
-		// this is used as Deadline inside gorillas dialer method
-		ws.HandshakeTimeout = opts.Timeout
+	// if the user passed a custom HTTP client and its transport
+	// is of *http.Transport type - we're using its Dial field
+	// for connecting to remote host
+	if t, ok := opts.client().Transport.(*http.Transport); ok {
+		ws.NetDial = t.Dial
+	}
+
+	// if the user passed a timeout, use a dial with a timeout
+	if opts.Timeout != 0 && ws.NetDial == nil {
+		// If ws.NetDial is non-nil then gorilla does not
+		// use ws.HandshakeTimeout for the deadlines.
+		//
+		// Instead we're going to set it ourselves.
+		ws.NetDial = (&net.Dialer{
+			Timeout:  opts.Timeout,
+			Deadline: time.Now().Add(opts.Timeout),
+		}).Dial
 	}
 
 	conn, _, err := ws.Dial(dialURL.String(), requestHeader)
