@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/kitekey"
 )
 
@@ -45,6 +46,21 @@ func New() *Config {
 	c := new(Config)
 	*c = *DefaultConfig
 	return c
+}
+
+// NewFromKiteKey parses the given kite key file and gives a new Config value.
+func NewFromKiteKey(file string) (*Config, error) {
+	key, err := kitekey.ParseFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var c Config
+	if err := c.readToken(key); err != nil {
+		return nil, err
+	}
+
+	return &c, nil
 }
 
 func (c *Config) ReadEnvironmentVariables() error {
@@ -96,6 +112,10 @@ func (c *Config) ReadKiteKey() error {
 		return err
 	}
 
+	return c.readToken(key)
+}
+
+func (c *Config) readToken(key *jwt.Token) error {
 	c.KiteKey = key.Raw
 
 	if username, ok := key.Claims["sub"].(string); ok {
