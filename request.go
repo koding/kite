@@ -200,7 +200,7 @@ func (r *Request) authenticate() *Error {
 	if err != nil {
 		return &Error{
 			Type:    "authenticationError",
-			Message: err.Error(),
+			Message: fmt.Sprintf("%s: %s", r.Auth.Type, err),
 		}
 	}
 
@@ -214,7 +214,7 @@ func (r *Request) authenticate() *Error {
 func (k *Kite) AuthenticateFromToken(r *Request) error {
 	token, err := jwt.Parse(r.Auth.Key, r.LocalKite.RSAKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed parsing JWT token: %s", err)
 	}
 
 	if !token.Valid {
