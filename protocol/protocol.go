@@ -6,6 +6,7 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/koding/kite/dnode"
@@ -115,7 +116,7 @@ func KiteFromString(stringRepr string) (*Kite, error) {
 	var k *Kite
 
 	if err := mapstructure.Decode(kiteFields, &k); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed parsing kite string: %s", err)
 	}
 
 	return k, nil
