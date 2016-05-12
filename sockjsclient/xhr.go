@@ -25,18 +25,6 @@ type XHRSession struct {
 	opened     bool
 }
 
-func defaultClient(opts *DialOptions) *http.Client {
-	return &http.Client{
-		// never make it less than the heartbeat delay from the sockjs server.
-		// If this is los, your requests to the server will time out, so you'll
-		// never receive the heartbeat frames.
-		Timeout: opts.Timeout,
-		// add this so we can make use of load balancer's sticky session features,
-		// such as AWS ELB
-		Jar: cookieJar,
-	}
-}
-
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
 // xhr-polling
 // http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74

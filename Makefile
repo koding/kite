@@ -53,7 +53,7 @@ kontrol:
 
 	@echo "$(OK_COLOR)==> Creating openssl keys $(NO_COLOR)"
 	@openssl genrsa -out /tmp/privateKey.pem 2048
-	@openssl rsa -in /tmp/privateKey.pem -pubout > /tmp/publicKey.pem
+	@openssl rsa -in /tmp/privateKey.pem -pubout -out /tmp/publicKey.pem
 
 	@echo "$(OK_COLOR)==> Creating test kite key $(NO_COLOR)"
 	@`which go` run kontrol/kontrol/main.go -publickeyfile /tmp/publicKey.pem -privatekeyfile /tmp/privateKey.pem -initial -username kite -kontrolurl "http://localhost:4444/kite"
@@ -138,14 +138,14 @@ endif
 	@`which go` get -d -v -t ./...
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
-	@`which go` test -race $(VERBOSE) ./dnode
-	@`which go` test -race $(VERBOSE) ./kitectl
-	@`which go` test -race $(VERBOSE) ./systeminfo
-	@`which go` test -race $(VERBOSE) ./
-	@`which go` test -race $(VERBOSE) ./test
-	@`which go` test -race $(VERBOSE) ./kontrol
-	@`which go` test -race $(VERBOSE) ./tunnelproxy
-	@`which go` test -race $(VERBOSE) ./reverseproxy
+	# @`which go` test -race $(VERBOSE) ./dnode
+	# @`which go` test -race $(VERBOSE) ./kitectl
+	# @`which go` test -race $(VERBOSE) ./systeminfo
+	# @`which go` test -race $(VERBOSE) ./
+	# @`which go` test -race $(VERBOSE) ./test
+	@`which go` test -race $(VERBOSE) -run TestUpdateKeys ./kontrol
+	# @`which go` test -race $(VERBOSE) ./tunnelproxy
+	# @`which go` test -race $(VERBOSE) ./reverseproxy
 
 doc:
 	@`which godoc` github.com/koding/kite | less

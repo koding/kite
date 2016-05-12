@@ -26,16 +26,16 @@ var (
 	kon  *Kontrol
 )
 
-func init() {
+func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config) {
 	conf = config.New()
 	conf.Username = "testuser"
-	conf.KontrolURL = "http://localhost:5555/kite"
-	conf.KontrolKey = testkeys.Public
+	conf.KontrolURL = fmt.Sprintf("http://localhost:%d/kite", port)
+	conf.KontrolKey = pub
 	conf.KontrolUser = "testuser"
-	conf.KiteKey = testutil.NewKiteKey().Raw
+	conf.KiteKey = testutil.NewKiteKeyWithKeyPair(pem, pub).Raw
 	conf.ReadEnvironmentVariables()
 
-	DefaultPort = 5555
+	DefaultPort = port
 	kon = New(conf.Copy(), "0.0.1")
 
 	switch os.Getenv("KONTROL_STORAGE") {
@@ -49,12 +49,134 @@ func init() {
 		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 	}
 
-	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
+	kon.AddKeyPair("", pub, pem)
 
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
+	return kon, conf
+}
+
+func helloKite(name string, conf *config.Config) (*kite.Kite, *url.URL, error) {
+	k := kite.New(name, "1.0.0")
+	k.Config = conf.Copy()
+	k.Config.Port = 0
+
+	k.HandleFunc("hello", func(r *kite.Request) (interface{}, error) {
+		return fmt.Sprintf("%s says hello", name), nil
+	})
+
+	go k.Run()
+	<-k.ServerReadyNotify()
+
+	u := &url.URL{
+		Scheme: "http",
+		Host:   fmt.Sprintf("127.0.0.1:%d", k.Port()),
+		Path:   "/kite",
+	}
+
+	if err := k.RegisterForever(u); err != nil {
+		k.Close()
+		return nil, nil, err
+	}
+
+	return k, u, nil
+}
+
+func hello(k *kite.Kite, u *url.URL) (string, error) {
+	const timeout = 10 * time.Second
+
+	c := k.NewClient(u.String())
+	c.Auth = &kite.Auth{
+		Type: "kiteKey",
+		Key:  k.Config.KiteKey,
+	}
+
+	if err := c.DialTimeout(timeout); err != nil {
+		return "", nil
+	}
+	defer c.Close()
+
+	res, err := c.TellWithTimeout("hello", timeout)
+	if err != nil {
+		return "", err
+	}
+
+	s, err := res.String()
+	if err != nil {
+		return "", err
+	}
+
+	return s, nil
+}
+
+func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+
+	kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5500)
+}
+
+func TestUpdateKeys(t *testing.T) {
+	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
+	defer kon.Close()
+
+	k1, u1, err := helloKite("kite1", conf)
+	if err != nil {
+		t.Fatalf("error creating kite1: %s", err)
+	}
+	defer k1.Close()
+
+	k2, u2, err := helloKite("kite2", conf)
+	if err != nil {
+		t.Fatalf("error creating kite1: %s", err)
+	}
+	defer k2.Close()
+
+	msg, err := hello(k1, u2)
+	if err != nil {
+		t.Fatalf("error calling hello(kite1 -> kite2): %s", err)
+	}
+
+	if want := "kite2 says hello"; msg != want {
+		t.Fatalf("got %q, want %q", msg, want)
+	}
+
+	msg, err = hello(k2, u1)
+	if err != nil {
+		t.Fatalf("error calling hello(kite2 -> kite1): %s", err)
+	}
+
+	if want := "kite1 says hello"; msg != want {
+		t.Fatalf("got %q, want %q", msg, want)
+	}
+
+	kon.Close()
+
+	kon, conf = startKontrol(testkeys.PrivateSecond, testkeys.PublicSecond, 5501)
+
+	k3, u3, err := helloKite("kite3", conf)
+	if err != nil {
+		t.Fatalf("error creating kite3: %s", err)
+	}
+	defer k1.Close()
+
+	msg, err = hello(k3, u1)
+	if err != nil {
+		t.Fatalf("error calling hello(kite3 -> kite1): %s", err)
+	}
+
+	if want := "kite1 says hello"; msg != want {
+		t.Fatalf("got %q, want %q", msg, want)
+	}
+
+	msg, err = hello(k1, u3)
+	if err != nil {
+		t.Fatalf("error calling hello(kite1 -> kite3): %s", err)
+	}
+
+	if want := "kite3 says hello"; msg != want {
+		t.Fatalf("got %q, want %q", msg, want)
+	}
 }
 
 func TestRegisterMachine(t *testing.T) {
