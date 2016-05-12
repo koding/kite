@@ -18,8 +18,29 @@ ifndef KITE_TRANSPORT
 	KITE_TRANSPORT=WebSocket
 endif
 
+ifndef POSTGRES_HOST
+	ifdef DOCKER_HOST
+		POSTGRES_HOST=$(shell echo $(DOCKER_HOST) | cut -d: -f2 | cut -c 3-)
+	else
+		POSTGRES_HOST==127.0.0.1
+	endif
+endif
 
 all: test
+
+postgres:
+	docker stop postgres && docker rm postgres || true
+	docker run -d -v $(PWD)/postgres.d:/docker-entrypoint-initdb.d --name postgres -p 5432:5432 -P postgres:9.3
+	while ! docker logs postgres 2>&1 | grep 'ready for start up' >/dev/null; do sleep 1; done
+	psql -h $(POSTGRES_HOST) postgres -f kontrol/001-schema.sql -U postgres
+	psql -h $(POSTGRES_HOST) -c 'CREATE DATABASE kontrol owner kontrol;' -U postgres
+	psql -h $(POSTGRES_HOST) kontrol -f kontrol/002-table.sql -U postgres
+	psql -h $(POSTGRES_HOST) kontrol -f kontrol/003-migration-001-add-kite-key-table.sql -U postgres
+	psql -h $(POSTGRES_HOST) kontrol -f kontrol/003-migration-002-add-key-indexes.sql -U postgres
+	echo "export KONTROL_POSTGRES_HOST=$(POSTGRES_HOST) KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword"
+
+postgres-logs:
+	docker exec -ti postgres /bin/bash -c 'tail -f /var/lib/postgresql/data/pg_log/*.log'
 
 format:
 	@echo "$(OK_COLOR)==> Formatting the code $(NO_COLOR)"
