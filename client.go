@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -70,7 +71,12 @@ type Client struct {
 	// transport/protocols
 	session sockjs.Session
 	send    chan []byte
-	sendMu  sync.Mutex // protects send channel
+
+	// muReconnect protects Reconnect
+	muReconnect sync.Mutex
+
+	// closed is to ensure Close is idempotent
+	closed int32
 
 	// dnode scrubber for saving callbacks sent to remote.
 	scrubber *dnode.Scrubber
@@ -237,12 +243,9 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 	dial := func() error {
 		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
 
-		c.sendMu.Lock()
-		if !c.Reconnect {
-			c.sendMu.Unlock()
+		if !c.reconnect() {
 			return nil
 		}
-		c.sendMu.Unlock()
 
 		return c.dial(0)
 	}
@@ -298,7 +301,7 @@ func (c *Client) run() {
 	}
 	c.disconnectMu.Unlock()
 
-	if c.Reconnect {
+	if c.reconnect() {
 		// we override it so it doesn't get selected next time. Because we are
 		// redialing, so after redial if a new method is called, the disconnect
 		// channel is being read and the local "disconnect" message will be the
@@ -308,6 +311,13 @@ func (c *Client) run() {
 		c.disconnectMu.Unlock()
 		go c.dialForever(nil)
 	}
+}
+
+func (c *Client) reconnect() bool {
+	c.muReconnect.Lock()
+	defer c.muReconnect.Unlock()
+
+	return c.Reconnect
 }
 
 // readLoop reads a message from websocket and processes it.
@@ -409,9 +419,15 @@ func (c *Client) processMessage(data []byte) (err error) {
 }
 
 func (c *Client) Close() {
-	c.sendMu.Lock()
+	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
+		return // TODO: ErrAlreadyClosed
+	}
+
+	c.muReconnect.Lock()
+	// TODO(rjeczalik): add another internal field for controlling redials
+	// instead of mutating public field
 	c.Reconnect = false
-	c.sendMu.Unlock()
+	c.muReconnect.Unlock()
 
 	c.m.RLock()
 	if c.session != nil {
@@ -419,19 +435,11 @@ func (c *Client) Close() {
 	}
 	c.m.RUnlock()
 
-	c.sendMu.Lock()
 	close(c.send)
-	c.sendMu.Unlock()
-
 	close(c.closeChan)
 
 	// wait for consumers to finish buffered messages
 	c.wg.Wait()
-
-	// GC, not to cause a memory leak
-	c.sendMu.Lock()
-	c.send = nil
-	c.sendMu.Unlock()
 }
 
 // sendhub sends the msg received from the send channel to the remote client
@@ -443,6 +451,7 @@ func (c *Client) sendHub() {
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
+				c.send = nil
 				c.LocalKite.Log.Debug("Send hub is closed")
 				return
 			}
@@ -655,7 +664,7 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 
 	select {
 	case <-c.closeChan:
-		return nil, errors.New("can not send")
+		return nil, errors.New("can't send, client is closed")
 	default:
 		c.m.RLock()
 		if c.session == nil {
@@ -664,9 +673,7 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 		}
 		c.m.RUnlock()
 
-		c.sendMu.Lock()
 		c.send <- data
-		c.sendMu.Unlock()
 	}
 
 	return
