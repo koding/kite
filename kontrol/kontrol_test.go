@@ -6,8 +6,10 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -25,6 +27,8 @@ var (
 	conf *config.Config
 	kon  *Kontrol
 )
+
+var interactive = os.Getenv("TEST_INTERACTIVE") == "1"
 
 func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config) {
 	conf = config.New()
@@ -110,6 +114,16 @@ func hello(k *kite.Kite, u *url.URL) (string, error) {
 	return s, nil
 }
 
+func pause(args ...interface{}) {
+	if testing.Verbose() && interactive {
+		fmt.Println("[PAUSE]", fmt.Sprint(args...), fmt.Sprintf(`("kill -1 %d" to continue)`, os.Getpid()))
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGHUP)
+		<-ch
+		signal.Stop(ch)
+	}
+}
+
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
@@ -120,17 +134,23 @@ func TestUpdateKeys(t *testing.T) {
 	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
 	defer kon.Close()
 
+	pause("kontrol 1 started")
+
 	k1, u1, err := helloKite("kite1", conf)
 	if err != nil {
 		t.Fatalf("error creating kite1: %s", err)
 	}
 	defer k1.Close()
 
+	pause("kite 1 started")
+
 	k2, u2, err := helloKite("kite2", conf)
 	if err != nil {
 		t.Fatalf("error creating kite1: %s", err)
 	}
 	defer k2.Close()
+
+	pause("kite 2 started")
 
 	msg, err := hello(k1, u2)
 	if err != nil {
@@ -154,11 +174,15 @@ func TestUpdateKeys(t *testing.T) {
 
 	kon, conf = startKontrol(testkeys.PrivateSecond, testkeys.PublicSecond, 5501)
 
+	pause("kontrol 2 started")
+
 	k3, u3, err := helloKite("kite3", conf)
 	if err != nil {
 		t.Fatalf("error creating kite3: %s", err)
 	}
 	defer k1.Close()
+
+	pause("kite 3 started")
 
 	msg, err = hello(k3, u1)
 	if err != nil {
