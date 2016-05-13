@@ -63,6 +63,15 @@ func newKiteKey(username, private, public string) *jwt.Token {
 		panic(err)
 	}
 
+	// verify the token
+	_, err = jwt.Parse(token.Raw, func(*jwt.Token) (interface{}, error) {
+		return []byte(public), nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
 	token.Valid = true
 	return token
 

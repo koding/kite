@@ -131,6 +131,10 @@ func init() {
 }
 
 func TestUpdateKeys(t *testing.T) {
+	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
+		t.Skip("skipping TestUpdateKeys for storage %q: not implemented", storage)
+	}
+
 	pause("starting TestUpdateKeys")
 
 	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)

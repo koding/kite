@@ -4,6 +4,7 @@ package kontrol
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
@@ -182,6 +183,7 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	for i, p := range k.lastPublic {
 		if p == public {
 			deleteIndex = i
+			break
 		}
 	}
 
@@ -313,36 +315,79 @@ func (k *Kontrol) registerSelf() {
 		value.URL = k.RegisterURL
 	}
 
-	// just add a random uuid key
-	u := uuid.NewV4()
-	value.KeyID = u.String()
+	keyPair, err := k.selfKeyPair()
+	if err != nil {
+		if err != errNoSelfKeyPair {
+			k.log.Error("%s", err)
+		}
 
-	// Kontrol itselfs doesn't use keys at all, just add some placeholders
-	keyPair := &KeyPair{
-		ID:      u.String(),
-		Public:  "kontrol-self",
-		Private: "kontrol-self",
+		// If Kontrol does not hold any key pairs that was used
+		// to generate its kitekey or no kitekey is defined,
+		// use a dummy entry in order to register the kontrol.
+		keyPair = &KeyPair{
+			ID:      uuid.NewV4().String(),
+			Public:  "kontrol-self",
+			Private: "kontrol-self",
+		}
+
+		if err := k.keyPair.AddKey(keyPair); err != nil {
+			k.log.Error("%s", err)
+		}
 	}
 
-	if err := k.keyPair.AddKey(keyPair); err != nil {
-		k.log.Error(err.Error())
-	}
+	value.KeyID = keyPair.ID
 
 	// Register first by adding the value to the storage. We don't return any
 	// error because we need to know why kontrol doesn't register itself
 	if err := k.storage.Add(k.Kite.Kite(), value); err != nil {
-		k.log.Error(err.Error())
+		k.log.Error("%s", err)
 	}
 
 	for {
 		if err := k.storage.Update(k.Kite.Kite(), value); err != nil {
-			k.log.Error(err.Error())
+			k.log.Error("%s", err)
 			time.Sleep(time.Second)
 			continue
 		}
 
 		time.Sleep(HeartbeatDelay + HeartbeatInterval)
 	}
+}
+
+func (k *Kontrol) selfKeyPair() (pair *KeyPair, err error) {
+	if k.Kite.Config.KiteKey == "" || len(k.lastPublic) == 0 {
+		return nil, errNoSelfKeyPair
+	}
+
+	keyIndex := -1
+
+	me := new(multiError)
+
+	for i := range k.lastPublic {
+		ri := len(k.lastPublic) - i - 1
+
+		keyFn := func(token *jwt.Token) (interface{}, error) {
+			return []byte(k.lastPublic[ri]), nil
+		}
+
+		if _, err := jwt.Parse(k.Kite.Config.KiteKey, keyFn); err != nil {
+			me.err = append(me.err, err)
+			continue
+		}
+
+		keyIndex = ri
+		break
+	}
+
+	if keyIndex == -1 {
+		return nil, fmt.Errorf("no matching self key pair found: %s", me)
+	}
+
+	return &KeyPair{
+		ID:      k.lastIDs[keyIndex],
+		Public:  k.lastPublic[keyIndex],
+		Private: k.lastPrivate[keyIndex],
+	}, nil
 }
 
 // generateToken returns a JWT token string. Please see the URL for details:
