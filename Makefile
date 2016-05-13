@@ -37,7 +37,13 @@ postgres:
 	psql -h $(POSTGRES_HOST) kontrol -f kontrol/002-table.sql -U postgres
 	psql -h $(POSTGRES_HOST) kontrol -f kontrol/003-migration-001-add-kite-key-table.sql -U postgres
 	psql -h $(POSTGRES_HOST) kontrol -f kontrol/003-migration-002-add-key-indexes.sql -U postgres
-	echo "export KONTROL_POSTGRES_HOST=$(POSTGRES_HOST) KONTROL_STORAGE=postgres KONTROL_POSTGRES_USERNAME=kontrolapplication KONTROL_POSTGRES_DBNAME=kontrol KONTROL_POSTGRES_PASSWORD=somerandompassword"
+	echo "#!/bin/bash" > .env
+	echo "alias psql-kite='psql postgresql://postgres@$(POSTGRES_HOST):5432/kontrol'" >> .env
+	echo "export KONTROL_POSTGRES_HOST=$(POSTGRES_HOST)" >> .env
+	echo "export KONTROL_STORAGE=postgres" >> .env
+	echo "export KONTROL_POSTGRES_USERNAME=kontrolapplication" >> .env
+	echo "export KONTROL_POSTGRES_DBNAME=kontrol" >> .env
+	echo "export KONTROL_POSTGRES_PASSWORD=somerandompassword" >> .env
 
 postgres-logs:
 	docker exec -ti postgres /bin/bash -c 'tail -f /var/lib/postgresql/data/pg_log/*.log'

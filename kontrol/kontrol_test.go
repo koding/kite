@@ -131,6 +131,8 @@ func init() {
 }
 
 func TestUpdateKeys(t *testing.T) {
+	pause("starting TestUpdateKeys")
+
 	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
 	defer kon.Close()
 
