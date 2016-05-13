@@ -166,7 +166,7 @@ func (x *XHRSession) Send(frame string) error {
 		return errors.New("XHR session doesn't exists")
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("Sending data failed. Want: %d Got: %d",
 			http.StatusOK, resp.StatusCode)
 	}

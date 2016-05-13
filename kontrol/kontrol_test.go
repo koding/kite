@@ -37,6 +37,7 @@ func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config)
 	conf.KontrolKey = pub
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewKiteKeyWithKeyPair(pem, pub).Raw
+	conf.Transport = config.XHRPolling
 	conf.ReadEnvironmentVariables()
 
 	DefaultPort = port
@@ -65,6 +66,7 @@ func helloKite(name string, conf *config.Config) (*kite.Kite, *url.URL, error) {
 	k := kite.New(name, "1.0.0")
 	k.Config = conf.Copy()
 	k.Config.Port = 0
+	k.SetLogLevel(kite.DEBUG)
 
 	k.HandleFunc("hello", func(r *kite.Request) (interface{}, error) {
 		return fmt.Sprintf("%s says hello", name), nil
@@ -91,6 +93,7 @@ func hello(k *kite.Kite, u *url.URL) (string, error) {
 	const timeout = 10 * time.Second
 
 	c := k.NewClient(u.String())
+	// TODO: change to token
 	c.Auth = &kite.Auth{
 		Type: "kiteKey",
 		Key:  k.Config.KiteKey,
@@ -127,7 +130,7 @@ func pause(args ...interface{}) {
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5500)
+	// kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5500)
 }
 
 func TestUpdateKeys(t *testing.T) {
@@ -138,7 +141,6 @@ func TestUpdateKeys(t *testing.T) {
 	pause("starting TestUpdateKeys")
 
 	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
-	defer kon.Close()
 
 	pause("kontrol 1 started")
 
@@ -178,6 +180,8 @@ func TestUpdateKeys(t *testing.T) {
 
 	kon.Close()
 
+	pause("kontrol 1 closed")
+
 	kon, conf = startKontrol(testkeys.PrivateSecond, testkeys.PublicSecond, 5501)
 
 	pause("kontrol 2 started")
@@ -198,6 +202,8 @@ func TestUpdateKeys(t *testing.T) {
 	if want := "kite1 says hello"; msg != want {
 		t.Fatalf("got %q, want %q", msg, want)
 	}
+
+	pause("kite 3  -> klient 1")
 
 	msg, err = hello(k1, u3)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -82,11 +83,13 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	every := onceevery.New(UpdateInterval)
 
 	ping := make(chan struct{}, 1)
-	closed := false
+	closed := int32(0)
 
 	updaterFunc := func() {
 		for {
 			select {
+			case <-k.closed:
+				return
 			case <-ping:
 				k.log.Debug("Kite is active, got a ping %s", remote.Kite)
 				every.Do(func() {
@@ -99,7 +102,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 			case <-time.After(HeartbeatInterval + HeartbeatDelay):
 				k.log.Debug("Kite didn't sent any heartbeat %s.", remote.Kite)
 				every.Stop()
-				closed = true
+				atomic.StoreInt32(&closed, 1)
 				return
 			}
 		}
@@ -120,8 +123,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 			}
 
 			// seems we miss a heartbeat, so start it again!
-			if closed {
-				closed = false
+			if atomic.CompareAndSwapInt32(&closed, 1, 0) {
 				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s",
 					remote.Kite)
 
@@ -135,7 +137,13 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	// now trigger the remote kite so it sends us periodically an heartbeat
-	remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	resp := remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+
+	go func() {
+		if err := (<-resp).Err; err != nil {
+			k.log.Error("failed requesting heartbeats from %q kite: %s", remote.Kite.ID, err)
+		}
+	}()
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 

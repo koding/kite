@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Run is a blocking method. It runs the kite server and then accepts requests
@@ -49,7 +50,6 @@ func (k *Kite) Close() {
 	if k.listener != nil {
 		k.listener.Close()
 	}
-
 }
 
 func (k *Kite) Addr() string {
@@ -59,28 +59,29 @@ func (k *Kite) Addr() string {
 // listenAndServe listens on the TCP network address k.URL.Host and then
 // calls Serve to handle requests on incoming connectionk.
 func (k *Kite) listenAndServe() error {
-	var err error
-
 	// create a new one if there doesn't exist
-	k.listener, err = net.Listen("tcp4", k.Addr())
+	l, err := net.Listen("tcp4", k.Addr())
 	if err != nil {
 		return err
 	}
 
-	k.Log.Info("New listening: %s", k.listener.Addr().String())
+	k.Log.Info("New listening: %s", l.Addr())
 
 	if k.TLSConfig != nil {
 		if k.TLSConfig.NextProtos == nil {
 			k.TLSConfig.NextProtos = []string{"http/1.1"}
 		}
-		k.listener = tls.NewListener(k.listener, k.TLSConfig)
+		l = tls.NewListener(l, k.TLSConfig)
 	}
+
+	k.listener = newGracefulListener(l)
 
 	// listener is ready, notify waiters.
 	close(k.readyC)
 
 	defer close(k.closeC) // serving is finished, notify waiters.
 	k.Log.Info("Serving...")
+
 	return http.Serve(k.listener, k)
 }
 
@@ -92,14 +93,17 @@ func (k *Kite) listenAndServe() error {
 // Since Run() is blocking you need to run it as a goroutine the call this function when listener is ready.
 //
 // Example:
-//     k := kite.New("x", "1.0.0")
-//     go k.Run()
-//     <-k.ServerReadyNotify()
-//     port := k.Port()
+//
+//   k := kite.New("x", "1.0.0")
+//   go k.Run()
+//   <-k.ServerReadyNotify()
+//   port := k.Port()
+//
 func (k *Kite) Port() int {
 	if k.listener == nil {
 		return 0
 	}
+
 	return k.listener.Addr().(*net.TCPAddr).Port
 }
 
@@ -136,4 +140,65 @@ func (k *Kite) ServerCloseNotify() chan bool {
 
 func (k *Kite) ServerReadyNotify() chan bool {
 	return k.readyC
+}
+
+// gracefulListener closes all accepted connections upon Close to ensure
+// no dangling websocket/xhr sessions outlive the kite.
+type gracefulListener struct {
+	net.Listener
+
+	conns   map[net.Conn]struct{}
+	connsMu sync.Mutex
+}
+
+func newGracefulListener(l net.Listener) *gracefulListener {
+	return &gracefulListener{
+		Listener: l,
+		conns:    make(map[net.Conn]struct{}),
+	}
+}
+
+func (l *gracefulListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	l.connsMu.Lock()
+	l.conns[conn] = struct{}{}
+	l.connsMu.Unlock()
+
+	return &gracefulConn{
+		Conn: conn,
+		close: func() {
+			l.connsMu.Lock()
+			delete(l.conns, conn)
+			l.connsMu.Unlock()
+		},
+	}, nil
+}
+
+func (l *gracefulListener) Close() error {
+	err := l.Listener.Close()
+
+	l.connsMu.Lock()
+	for conn := range l.conns {
+		conn.Close()
+	}
+	l.conns = nil
+	l.connsMu.Unlock()
+
+	return err
+}
+
+type gracefulConn struct {
+	net.Conn
+
+	close func()
+}
+
+func (c *gracefulConn) Close() error {
+	c.close()
+
+	return c.Conn.Close()
 }

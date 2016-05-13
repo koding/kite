@@ -71,6 +71,9 @@ type Kontrol struct {
 	heartbeats   map[string]*time.Timer
 	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
 
+	// closed notifies goroutines started by kontrol that it got closed
+	closed chan struct{}
+
 	// keyPair defines the storage of keypairs
 	keyPair KeyPairStorage
 
@@ -142,11 +145,14 @@ func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
 		k.Config.Port = DefaultPort
 	}
 
+	k.SetLogLevel(kite.DEBUG)
+
 	return &Kontrol{
 		Kite:        k,
 		log:         k.Log,
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*time.Timer, 0),
+		closed:      make(chan struct{}),
 		lastIDs:     make([]string, 0),
 		lastPublic:  make([]string, 0),
 		lastPrivate: make([]string, 0),
@@ -268,6 +274,7 @@ func (k *Kontrol) SetKeyPairStorage(storage KeyPairStorage) {
 
 // Close stops kontrol and closes all connections
 func (k *Kontrol) Close() {
+	close(k.closed)
 	k.Kite.Close()
 }
 
@@ -335,6 +342,10 @@ func (k *Kontrol) registerSelf() {
 		}
 	}
 
+	if pair, err := k.keyPair.GetKeyFromPublic(keyPair.Public); err == nil {
+		keyPair = pair
+	}
+
 	value.KeyID = keyPair.ID
 
 	// Register first by adding the value to the storage. We don't return any
@@ -344,13 +355,18 @@ func (k *Kontrol) registerSelf() {
 	}
 
 	for {
-		if err := k.storage.Update(k.Kite.Kite(), value); err != nil {
-			k.log.Error("%s", err)
-			time.Sleep(time.Second)
-			continue
-		}
+		select {
+		case <-k.closed:
+			return
+		default:
+			if err := k.storage.Update(k.Kite.Kite(), value); err != nil {
+				k.log.Error("%s", err)
+				time.Sleep(time.Second)
+				continue
+			}
 
-		time.Sleep(HeartbeatDelay + HeartbeatInterval)
+			time.Sleep(HeartbeatDelay + HeartbeatInterval)
+		}
 	}
 }
 
