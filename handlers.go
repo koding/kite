@@ -58,8 +58,6 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 		for {
 			select {
 			case <-done:
-				// remove the onDisconnect again so it doesn't call close twice
-				r.Client.onDisconnectHandlers = nil
 				heartbeat.Stop()
 			case <-heartbeat.C:
 				if err := ping.Call(); err != nil {

@@ -30,18 +30,24 @@ var (
 
 var interactive = os.Getenv("TEST_INTERACTIVE") == "1"
 
-func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config) {
-	conf = config.New()
+type Config struct {
+	Config  *config.Config
+	Private string
+	Public  string
+}
+
+func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
+	conf := config.New()
 	conf.Username = "testuser"
 	conf.KontrolURL = fmt.Sprintf("http://localhost:%d/kite", port)
 	conf.KontrolKey = pub
 	conf.KontrolUser = "testuser"
-	conf.KiteKey = testutil.NewKiteKeyWithKeyPair(pem, pub).Raw
+	conf.KiteKey = testutil.NewToken("kontrol", pem, pub).Raw
 	conf.Transport = config.XHRPolling
 	conf.ReadEnvironmentVariables()
 
 	DefaultPort = port
-	kon = New(conf.Copy(), "0.0.1")
+	kon := New(conf.Copy(), "1.0.0")
 
 	switch os.Getenv("KONTROL_STORAGE") {
 	case "etcd":
@@ -59,7 +65,11 @@ func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config)
 	go kon.Run()
 	<-kon.Kite.ServerReadyNotify()
 
-	return kon, conf
+	return kon, &Config{
+		Config:  conf,
+		Private: pem,
+		Public:  pub,
+	}
 }
 
 type HelloKite struct {
@@ -70,10 +80,11 @@ type HelloKite struct {
 	clients map[string]*kite.Client
 }
 
-func NewHelloKite(name string, conf *config.Config) (*HelloKite, error) {
+func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 	k := kite.New(name, "1.0.0")
-	k.Config = conf.Copy()
+	k.Config = conf.Config.Copy()
 	k.Config.Port = 0
+	k.Config.KiteKey = testutil.NewToken(name, conf.Private, conf.Public).Raw
 	k.SetLogLevel(kite.DEBUG)
 
 	k.HandleFunc("hello", func(r *kite.Request) (interface{}, error) {
@@ -187,6 +198,40 @@ func Call(kitePairs HelloKites) error {
 	return nil
 }
 
+func WaitTillConnected(conf *Config, timeout time.Duration, hks ...*HelloKite) error {
+	k := kite.New("WaitTillConnected", "1.0.0")
+	k.Config = conf.Config.Copy()
+
+	t := time.After(timeout)
+
+	for {
+		select {
+		case <-t:
+			return fmt.Errorf("timed out waiting for %v after %s", hks, timeout)
+		default:
+			kites, err := k.GetKites(&protocol.KontrolQuery{
+				Version: "1.0.0",
+			})
+			if err != nil && err != kite.ErrNoKitesAvailable {
+				return err
+			}
+
+			notReady := make(map[string]struct{}, len(hks))
+			for _, hk := range hks {
+				notReady[hk.Kite.Kite().ID] = struct{}{}
+			}
+
+			for _, kite := range kites {
+				delete(notReady, kite.Kite.ID)
+			}
+
+			if len(notReady) == 0 {
+				return nil
+			}
+		}
+	}
+}
+
 func pause(args ...interface{}) {
 	if testing.Verbose() && interactive {
 		fmt.Println("[PAUSE]", fmt.Sprint(args...), fmt.Sprintf(`("kill -1 %d" to continue)`, os.Getpid()))
@@ -208,19 +253,13 @@ func TestUpdateKeys(t *testing.T) {
 		t.Skip("skipping TestUpdateKeys for storage %q: not implemented", storage)
 	}
 
-	pause("starting TestUpdateKeys")
-
 	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
-
-	pause("kontrol 1 started")
 
 	hk1, err := NewHelloKite("kite1", conf)
 	if err != nil {
 		t.Fatalf("error creating kite1: %s", err)
 	}
 	defer hk1.Close()
-
-	pause("kite 1 started")
 
 	hk2, err := NewHelloKite("kite2", conf)
 	if err != nil {
@@ -229,8 +268,6 @@ func TestUpdateKeys(t *testing.T) {
 	defer hk2.Close()
 
 	hk2.Token = true
-
-	pause("kite 2 started")
 
 	calls := HelloKites{
 		hk1: hk2,
@@ -241,13 +278,15 @@ func TestUpdateKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// pause("going to close kontrol 1")
+
 	kon.Close()
 
-	pause("kontrol 1 closed")
+	// pause("going to start kontrol 2")
 
 	kon, conf = startKontrol(testkeys.PrivateSecond, testkeys.PublicSecond, 5501)
 
-	pause("kontrol 2 started")
+	pause("started kontrol 2")
 
 	hk3, err := NewHelloKite("kite3", conf)
 	if err != nil {
@@ -255,7 +294,9 @@ func TestUpdateKeys(t *testing.T) {
 	}
 	defer hk3.Close()
 
-	pause("kite 3 started")
+	if err := WaitTillConnected(conf, 15*time.Second, hk1, hk2, hk3); err != nil {
+		t.Fatal(err)
+	}
 
 	calls = HelloKites{
 		hk3: hk1,
@@ -346,7 +387,6 @@ func TestTokenInvalidation(t *testing.T) {
 	if token3 != token4 {
 		t.Error("tokens should be the same")
 	}
-
 }
 
 func TestMultiple(t *testing.T) {
