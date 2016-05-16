@@ -141,7 +141,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 
 	go func() {
 		if err := (<-resp).Err; err != nil {
-			k.log.Error("failed requesting heartbeats from %q kite: %s", remote.Kite.ID, err)
+			k.log.Error("failed requesting heartbeats from %q kite: %s", remote.Kite.Name, err)
 		}
 	}()
 

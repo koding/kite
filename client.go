@@ -208,24 +208,22 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 	c.LocalKite.Log.Debug("Client transport is set to '%s'", transport)
 
-	c.m.Lock()
-	defer c.m.Unlock()
+	var session sockjs.Session
 
 	switch transport {
 	case config.WebSocket:
-		c.session, err = sockjsclient.ConnectWebsocketSession(opts)
+		session, err = sockjsclient.ConnectWebsocketSession(opts)
 	case config.XHRPolling:
-		c.session, err = sockjsclient.NewXHRSession(opts)
+		session, err = sockjsclient.NewXHRSession(opts)
 	default:
 		return fmt.Errorf("Connection transport is not known '%v'", transport)
 	}
 
 	if err != nil {
-		// explicitly set nil to avoid panicing when used the methods of that interface
-		c.session = nil
 		return err
 	}
 
+	c.setSession(session)
 	go c.sendHub()
 	c.wg.Add(1) // with sendHub we added a new listener
 
@@ -260,14 +258,12 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 }
 
 func (c *Client) RemoteAddr() string {
-	c.m.RLock()
-	if c.session == nil {
-		c.m.RUnlock()
+	session := c.getSession()
+	if session == nil {
 		return ""
 	}
-	c.m.RUnlock()
 
-	websocketsession, ok := c.session.(*sockjsclient.WebsocketSession)
+	websocketsession, ok := session.(*sockjsclient.WebsocketSession)
 	if !ok {
 		return ""
 	}
@@ -347,14 +343,12 @@ func (c *Client) readLoop() error {
 
 // receiveData reads a message from session.
 func (c *Client) receiveData() ([]byte, error) {
-	c.m.RLock()
-	if c.session == nil {
-		c.m.RUnlock()
+	session := c.getSession()
+	if session == nil {
 		return nil, errors.New("not connected")
 	}
-	c.m.RUnlock()
 
-	msg, err := c.session.Recv()
+	msg, err := session.Recv()
 	if err != nil {
 		c.LocalKite.Log.Debug("Receive err: %s", err)
 	} else {
@@ -429,11 +423,9 @@ func (c *Client) Close() {
 	c.Reconnect = false
 	c.muReconnect.Unlock()
 
-	c.m.RLock()
-	if c.session != nil {
-		c.session.Close(3000, "Go away!")
+	if session := c.getSession(); session != nil {
+		session.Close(3000, "Go away!")
 	}
-	c.m.RUnlock()
 
 	close(c.send)
 	close(c.closeChan)
@@ -457,15 +449,13 @@ func (c *Client) sendHub() {
 			}
 
 			c.LocalKite.Log.Debug("Sending: %s", string(msg))
-			c.m.RLock()
-			if c.session == nil {
-				c.m.RUnlock()
+			session := c.getSession()
+			if session == nil {
 				c.LocalKite.Log.Error("not connected")
 				continue
 			}
-			c.m.RUnlock()
 
-			err := c.session.Send(string(msg))
+			err := session.Send(string(msg))
 			if err != nil {
 				c.LocalKite.Log.Debug("Send err: %s", err.Error())
 			}
@@ -666,17 +656,27 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 	case <-c.closeChan:
 		return nil, errors.New("can't send, client is closed")
 	default:
-		c.m.RLock()
-		if c.session == nil {
-			c.m.RUnlock()
+		if c.getSession() == nil {
 			return nil, errors.New("can't send, session is not established yet")
 		}
-		c.m.RUnlock()
 
 		c.send <- data
 	}
 
 	return
+}
+
+func (c *Client) getSession() sockjs.Session {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	return c.session
+}
+
+func (c *Client) setSession(session sockjs.Session) {
+	c.m.Lock()
+	c.session = session
+	c.m.Unlock()
 }
 
 // Used to remove callbacks after error occurs in send().
