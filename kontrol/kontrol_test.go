@@ -62,7 +62,15 @@ func startKontrol(pem, pub string, port int) (kon *Kontrol, conf *config.Config)
 	return kon, conf
 }
 
-func helloKite(name string, conf *config.Config) (*kite.Kite, *url.URL, error) {
+type HelloKite struct {
+	Kite  *kite.Kite
+	URL   *url.URL
+	Token bool
+
+	clients map[string]*kite.Client
+}
+
+func NewHelloKite(name string, conf *config.Config) (*HelloKite, error) {
 	k := kite.New(name, "1.0.0")
 	k.Config = conf.Copy()
 	k.Config.Port = 0
@@ -83,26 +91,50 @@ func helloKite(name string, conf *config.Config) (*kite.Kite, *url.URL, error) {
 
 	if err := k.RegisterForever(u); err != nil {
 		k.Close()
-		return nil, nil, err
+		return nil, err
 	}
 
-	return k, u, nil
+	return &HelloKite{
+		Kite:    k,
+		URL:     u,
+		clients: make(map[string]*kite.Client),
+	}, nil
 }
 
-func hello(k *kite.Kite, u *url.URL) (string, error) {
+func (hk *HelloKite) Hello(remote *HelloKite) (string, error) {
 	const timeout = 10 * time.Second
 
-	c := k.NewClient(u.String())
-	// TODO: change to token
-	c.Auth = &kite.Auth{
-		Type: "kiteKey",
-		Key:  k.Config.KiteKey,
-	}
+	c, ok := hk.clients[remote.Kite.Id]
+	if !ok {
+		if hk.Token {
+			query := &protocol.KontrolQuery{
+				ID: remote.Kite.Id,
+			}
 
-	if err := c.DialTimeout(timeout); err != nil {
-		return "", nil
+			kites, err := hk.Kite.GetKites(query)
+			if err != nil {
+				return "", err
+			}
+
+			if len(kites) != 1 {
+				return "", fmt.Errorf("%s: expected to get 1 kite, got %d", remote.Kite.Id, len(kites))
+			}
+
+			c = kites[0]
+		} else {
+			c = hk.Kite.NewClient(remote.URL.String())
+			c.Auth = &kite.Auth{
+				Type: "kiteKey",
+				Key:  hk.Kite.Config.KiteKey,
+			}
+		}
+
+		if err := c.DialTimeout(timeout); err != nil {
+			return "", nil
+		}
+
+		hk.clients[remote.Kite.Id] = c
 	}
-	defer c.Close()
 
 	res, err := c.TellWithTimeout("hello", timeout)
 	if err != nil {
@@ -115,6 +147,35 @@ func hello(k *kite.Kite, u *url.URL) (string, error) {
 	}
 
 	return s, nil
+}
+
+func (hk *HelloKite) Close() error {
+	for _, c := range hk.clients {
+		c.Close()
+	}
+
+	hk.Kite.Close()
+
+	return nil
+}
+
+type HelloKites map[*HelloKite]*HelloKite
+
+func Call(kitePairs HelloKites) error {
+	for local, remote := range kitePairs {
+		call := fmt.Sprintf("%s -> %s", local.Kite.Kite().Name, remote.Kite.Kite().Name)
+
+		got, err := local.Hello(remote)
+		if err != nil {
+			return fmt.Errorf("%s: error calling: %s", call, err)
+		}
+
+		if want := fmt.Sprintf("%s says hello", remote.Kite.Kite().Name); got != want {
+			return fmt.Errorf("%s: invalid response: got %q, want %q", call, got, want)
+		}
+	}
+
+	return nil
 }
 
 func pause(args ...interface{}) {
@@ -144,38 +205,31 @@ func TestUpdateKeys(t *testing.T) {
 
 	pause("kontrol 1 started")
 
-	k1, u1, err := helloKite("kite1", conf)
+	hk1, err := NewHelloKite("kite1", conf)
 	if err != nil {
 		t.Fatalf("error creating kite1: %s", err)
 	}
-	defer k1.Close()
+	defer hk1.Close()
 
 	pause("kite 1 started")
 
-	k2, u2, err := helloKite("kite2", conf)
+	hk2, err := NewHelloKite("kite2", conf)
 	if err != nil {
 		t.Fatalf("error creating kite1: %s", err)
 	}
-	defer k2.Close()
+	defer hk2.Close()
+
+	hk2.Token = true
 
 	pause("kite 2 started")
 
-	msg, err := hello(k1, u2)
-	if err != nil {
-		t.Fatalf("error calling hello(kite1 -> kite2): %s", err)
+	calls := HelloKites{
+		hk1: hk2,
+		hk2: hk1,
 	}
 
-	if want := "kite2 says hello"; msg != want {
-		t.Fatalf("got %q, want %q", msg, want)
-	}
-
-	msg, err = hello(k2, u1)
-	if err != nil {
-		t.Fatalf("error calling hello(kite2 -> kite1): %s", err)
-	}
-
-	if want := "kite1 says hello"; msg != want {
-		t.Fatalf("got %q, want %q", msg, want)
+	if err := Call(calls); err != nil {
+		t.Fatal(err)
 	}
 
 	kon.Close()
@@ -186,32 +240,25 @@ func TestUpdateKeys(t *testing.T) {
 
 	pause("kontrol 2 started")
 
-	k3, u3, err := helloKite("kite3", conf)
+	hk3, err := NewHelloKite("kite3", conf)
 	if err != nil {
 		t.Fatalf("error creating kite3: %s", err)
 	}
-	defer k1.Close()
+	defer hk3.Close()
 
 	pause("kite 3 started")
 
-	msg, err = hello(k3, u1)
-	if err != nil {
-		t.Fatalf("error calling hello(kite3 -> kite1): %s", err)
+	calls = HelloKites{
+		hk3: hk1,
+		hk3: hk2,
+		hk2: hk1,
+		hk2: hk3,
+		hk1: hk3,
+		hk1: hk2,
 	}
 
-	if want := "kite1 says hello"; msg != want {
-		t.Fatalf("got %q, want %q", msg, want)
-	}
-
-	pause("kite 3  -> klient 1")
-
-	msg, err = hello(k1, u3)
-	if err != nil {
-		t.Fatalf("error calling hello(kite1 -> kite3): %s", err)
-	}
-
-	if want := "kite3 says hello"; msg != want {
-		t.Fatalf("got %q, want %q", msg, want)
+	if err := Call(calls); err != nil {
+		t.Fatal(err)
 	}
 }
 
