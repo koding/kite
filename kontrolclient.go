@@ -75,7 +75,8 @@ func (k *Kite) SetupKontrolClient() error {
 	k.kontrol.Unlock()
 
 	k.kontrol.OnConnect(func() {
-		k.Log.Info("Connected to Kontrol ")
+		k.Log.Info("Connected to Kontrol")
+		k.Log.Debug("Connected to Kontrol with session %q", client.session.ID())
 
 		// try to re-register on connect
 		k.kontrol.Lock()

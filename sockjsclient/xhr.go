@@ -101,11 +101,15 @@ func (x *XHRSession) Recv() (string, error) {
 
 		switch frame {
 		case 'o':
-			// session started
+			// Abort session on second 'o' frame:
+			//
+			//   https://github.com/sockjs/sockjs-protocol/wiki/Connecting-to-SockJS-without-the-browser
+			//
 			x.mu.Lock()
-			x.opened = true
+			x.opened = false
 			x.mu.Unlock()
-			continue
+
+			return "", errors.New("session aborted")
 		case 'a':
 			// received an array of messages
 			var messages []string
@@ -132,6 +136,7 @@ func (x *XHRSession) Recv() (string, error) {
 			x.mu.Lock()
 			x.opened = false
 			x.mu.Unlock()
+
 			return "", errors.New("session closed")
 		default:
 			return "", errors.New("invalid frame type")
