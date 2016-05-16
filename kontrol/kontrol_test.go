@@ -102,10 +102,14 @@ func NewHelloKite(name string, conf *config.Config) (*HelloKite, error) {
 }
 
 func (hk *HelloKite) Hello(remote *HelloKite) (string, error) {
+	return hk.hello(remote, false)
+}
+
+func (hk *HelloKite) hello(remote *HelloKite, force bool) (string, error) {
 	const timeout = 10 * time.Second
 
 	c, ok := hk.clients[remote.Kite.Id]
-	if !ok {
+	if !ok || force {
 		if hk.Token {
 			query := &protocol.KontrolQuery{
 				ID: remote.Kite.Id,
@@ -138,6 +142,11 @@ func (hk *HelloKite) Hello(remote *HelloKite) (string, error) {
 
 	res, err := c.TellWithTimeout("hello", timeout)
 	if err != nil {
+		// TODO(rjeczalik): remove "timeout" - see comment in (*Client).sendHub method
+		if e, ok := err.(*kite.Error); ok && (e.Type == "disconnect" || e.Type == "timeout") && !force {
+			return hk.hello(remote, true)
+		}
+
 		return "", err
 	}
 
@@ -252,12 +261,17 @@ func TestUpdateKeys(t *testing.T) {
 		hk3: hk1,
 		hk3: hk2,
 		hk2: hk1,
-		hk2: hk3,
 		hk1: hk3,
 		hk1: hk2,
 	}
 
 	if err := Call(calls); err != nil {
+		t.Fatal(err)
+	}
+
+	pause("kite2 -> kite3 starting")
+
+	if err := Call(HelloKites{hk2: hk3}); err != nil {
 		t.Fatal(err)
 	}
 }

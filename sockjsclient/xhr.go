@@ -23,6 +23,7 @@ type XHRSession struct {
 	sessionID  string
 	messages   []string
 	opened     bool
+	abort      chan struct{}
 }
 
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
@@ -63,6 +64,7 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 		sessionID:  sessionID,
 		sessionURL: sessionURL,
 		opened:     true,
+		abort:      make(chan struct{}, 1),
 	}, nil
 }
 
@@ -71,6 +73,10 @@ func (x *XHRSession) ID() string {
 }
 
 func (x *XHRSession) Recv() (string, error) {
+	type requestCanceler interface {
+		CancelRequest(*http.Request)
+	}
+
 	// Return previously received messages if there is any.
 	if len(x.messages) > 0 {
 		msg := x.messages[0]
@@ -80,66 +86,84 @@ func (x *XHRSession) Recv() (string, error) {
 
 	// start to poll from the server until we receive something
 	for {
-		resp, err := x.client.Post(x.sessionURL+"/xhr", "text/plain", nil)
+		req, err := http.NewRequest("POST", x.sessionURL+"/xhr", nil)
 		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("Receiving data failed. Want: %d Got: %d",
-				http.StatusOK, resp.StatusCode)
+			return "", fmt.Errorf("Receiving data failed: %s", err)
 		}
 
-		buf := bufio.NewReader(resp.Body)
+		req.Header.Set("Content-Type", "text/plain")
 
-		// returns an error if buffer is empty
-		frame, err := buf.ReadByte()
-		if err != nil {
-			return "", err
-		}
+		select {
+		case <-x.abort:
+			if cn, ok := x.client.Transport.(requestCanceler); ok {
+				cn.CancelRequest(req)
+			}
 
-		switch frame {
-		case 'o':
-			// Abort session on second 'o' frame:
-			//
-			//   https://github.com/sockjs/sockjs-protocol/wiki/Connecting-to-SockJS-without-the-browser
-			//
-			x.mu.Lock()
-			x.opened = false
-			x.mu.Unlock()
+			return "", fmt.Errorf("session aborted by server")
+		case res := <-x.do(req):
+			resp := res.Response
 
-			return "", errors.New("session aborted")
-		case 'a':
-			// received an array of messages
-			var messages []string
-			if err := json.NewDecoder(buf).Decode(&messages); err != nil {
+			if res.Error != nil {
+				return "", fmt.Errorf("Receiving data failed: %s", res.Error)
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return "", fmt.Errorf("Receiving data failed. Want: %d Got: %d",
+					http.StatusOK, resp.StatusCode)
+			}
+
+			buf := bufio.NewReader(resp.Body)
+
+			// returns an error if buffer is empty
+			frame, err := buf.ReadByte()
+			if err != nil {
 				return "", err
 			}
 
-			x.messages = append(x.messages, messages...)
+			switch frame {
+			case 'o':
+				// Abort session on second 'o' frame:
+				//
+				//   https://github.com/sockjs/sockjs-protocol/wiki/Connecting-to-SockJS-without-the-browser
+				//
+				x.mu.Lock()
+				x.opened = false
+				x.mu.Unlock()
 
-			if len(x.messages) == 0 {
-				return "", errors.New("no message")
+				return "", errors.New("session aborted")
+			case 'a':
+				// received an array of messages
+				var messages []string
+				if err := json.NewDecoder(buf).Decode(&messages); err != nil {
+					return "", err
+				}
+
+				x.messages = append(x.messages, messages...)
+
+				if len(x.messages) == 0 {
+					return "", errors.New("no message")
+				}
+
+				// Return first message in slice, and remove it from the slice, so
+				// next time the others will be picked
+				msg := x.messages[0]
+				x.messages = x.messages[1:]
+
+				return msg, nil
+			case 'h':
+				// heartbeat received
+				continue
+			case 'c':
+				x.mu.Lock()
+				x.opened = false
+				x.mu.Unlock()
+
+				return "", errors.New("session closed")
+			default:
+				return "", errors.New("invalid frame type")
 			}
-
-			// Return first message in slice, and remove it from the slice, so
-			// next time the others will be picked
-			msg := x.messages[0]
-			x.messages = x.messages[1:]
-
-			return msg, nil
-		case 'h':
-			// heartbeat received
-			continue
-		case 'c':
-			x.mu.Lock()
-			x.opened = false
-			x.mu.Unlock()
-
-			return "", errors.New("session closed")
-		default:
-			return "", errors.New("invalid frame type")
 		}
 	}
 
@@ -168,7 +192,9 @@ func (x *XHRSession) Send(frame string) error {
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		return errors.New("XHR session doesn't exists")
+		x.Close(0, "") // invalidate session - see details: sockjs/sockjs-client#66
+
+		return fmt.Errorf("XHR session does not exist: %s", x.sessionID)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
@@ -180,5 +206,31 @@ func (x *XHRSession) Send(frame string) error {
 }
 
 func (x *XHRSession) Close(status uint32, reason string) error {
+	x.mu.Lock()
+	x.opened = false
+	x.mu.Unlock()
+
+	select {
+	case x.abort <- struct{}{}:
+	default:
+	}
+
 	return nil
+}
+
+type doResult struct {
+	Response *http.Response
+	Error    error
+}
+
+func (x *XHRSession) do(req *http.Request) <-chan doResult {
+	ch := make(chan doResult)
+
+	go func() {
+		var res doResult
+		res.Response, res.Error = x.client.Do(req)
+		ch <- res
+	}()
+
+	return ch
 }

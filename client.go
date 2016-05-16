@@ -459,6 +459,13 @@ func (c *Client) sendHub() {
 
 			err := session.Send(string(msg))
 			if err != nil {
+				// TODO(rjeczalik): dnode.ParseCallbacks and signal
+				// error to the caller - would fix the bug mentioned
+				// in (*Client).sendMethod (e.g. in cases when
+				// send failed due to invalidated XHR session
+				// by the server).
+				//
+				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Debug("Send err: %s", err.Error())
 			}
 		}
