@@ -54,23 +54,22 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 	// stop the ticker ping.Call() will block until there is data from the
 	// other end of the connection. So use an explicit exit.
 
-loop:
-	for {
-		select {
-		case <-done:
-			break loop
-		case <-heartbeat.C:
-			if err := ping.Call(); err != nil {
-				k.Log.Error(err.Error())
+	go func() {
+		for {
+			select {
+			case <-done:
+				// remove the onDisconnect again so it doesn't call close twice
+				r.Client.onDisconnectHandlers = nil
+				heartbeat.Stop()
+			case <-heartbeat.C:
+				if err := ping.Call(); err != nil {
+					k.Log.Error(err.Error())
+				}
 			}
 		}
-	}
+	}()
 
-	// remove the onDisconnect again so it doesn't call close twice
-	r.Client.onDisconnectHandlers = nil
-	heartbeat.Stop()
-
-	return nil, nil
+	return nil, ping.Call()
 }
 
 // handleLog prints a log message to stderr.
