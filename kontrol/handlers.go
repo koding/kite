@@ -304,6 +304,6 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 		}, nil
 	}
 
-	k.log.Error("neither machineKeyPicker neither public/private keys are available")
+	k.log.Error("neither machineKeyPicker nor public/private keys are available")
 	return nil, errors.New("internal error - 1")
 }

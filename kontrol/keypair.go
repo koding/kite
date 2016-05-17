@@ -3,7 +3,6 @@ package kontrol
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/koding/cache"
@@ -33,10 +32,6 @@ func (k *KeyPair) Validate() error {
 	if k.Private == "" {
 		return errors.New("KeyPair Private field is empty")
 	}
-
-	// TODO(rjeczalik): parse keys to ensure the raw form is canonical
-	k.Private = strings.TrimSpace(k.Private)
-	k.Public = strings.TrimSpace(k.Public)
 
 	return nil
 }

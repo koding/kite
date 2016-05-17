@@ -170,7 +170,20 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 		return errors.New("Key pair storage is not initialized")
 	}
 
-	pair, err := k.keyPair.GetKeyFromID(id)
+	var (
+		pair *KeyPair
+		err  error
+	)
+
+	switch {
+	case id == "" && public == "":
+		return errors.New("keypair ID and public key are both empty")
+	case id == "":
+		pair, err = k.keyPair.GetKeyFromPublic(public)
+	default:
+		pair, err = k.keyPair.GetKeyFromID(id)
+	}
+
 	if err != nil {
 		return err
 	}
