@@ -144,14 +144,14 @@ endif
 	@`which go` get -d -v -t ./...
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
-	# @`which go` test -race $(VERBOSE) ./dnode
-	# @`which go` test -race $(VERBOSE) ./kitectl
-	# @`which go` test -race $(VERBOSE) ./systeminfo
-	# @`which go` test -race $(VERBOSE) ./
-	# @`which go` test -race $(VERBOSE) ./test
-	@`which go` test -race $(VERBOSE) -run TestUpdateKeys ./kontrol
-	# @`which go` test -race $(VERBOSE) ./tunnelproxy
-	# @`which go` test -race $(VERBOSE) ./reverseproxy
+	@`which go` test -race $(VERBOSE) ./dnode
+	@`which go` test -race $(VERBOSE) ./kitectl
+	@`which go` test -race $(VERBOSE) ./systeminfo
+	@`which go` test -race $(VERBOSE) ./
+	@`which go` test -race $(VERBOSE) ./test
+	@`which go` test -race $(VERBOSE) ./kontrol
+	@`which go` test -race $(VERBOSE) ./tunnelproxy
+	@`which go` test -race $(VERBOSE) ./reverseproxy
 
 doc:
 	@`which godoc` github.com/koding/kite | less
