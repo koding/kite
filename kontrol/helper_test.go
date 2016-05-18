@@ -30,7 +30,6 @@ func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
 	conf.KontrolKey = pub
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewToken("testuser", pem, pub).Raw
-	conf.Transport = config.XHRPolling
 	conf.ReadEnvironmentVariables()
 
 	DefaultPort = port

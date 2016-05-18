@@ -22,7 +22,7 @@ ifndef POSTGRES_HOST
 	ifdef DOCKER_HOST
 		POSTGRES_HOST=$(shell echo $(DOCKER_HOST) | cut -d: -f2 | cut -c 3-)
 	else
-		POSTGRES_HOST==127.0.0.1
+		POSTGRES_HOST=127.0.0.1
 	endif
 endif
 
