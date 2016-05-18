@@ -113,7 +113,7 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 				Type: args.Auth.Type,
 				Key:  args.Auth.Key,
 			},
-		})
+		}, false)
 		if err != nil {
 			http.Error(rw, jsonError(err), http.StatusBadRequest)
 			return

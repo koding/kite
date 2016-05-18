@@ -55,7 +55,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	keyPair, err = k.keyPair.GetKeyFromPublic(strings.TrimSpace(publicKey))
 	if err != nil {
 		newKey = true
-		keyPair, err = k.pickKey(r)
+		keyPair, err = k.pickKey(r, false)
 		if err != nil {
 			return nil, err // nothing to do here ..
 		}
@@ -248,7 +248,9 @@ func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {
 		}
 	}
 
-	keyPair, err := k.pickKey(r)
+	// TODO(rjeczalik): add test and ensure no identity is leaked
+
+	keyPair, err := k.pickKey(r, true)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +281,7 @@ func (k *Kontrol) HandleGetKey(r *kite.Request) (interface{}, error) {
 		return publicKey, nil
 	}
 
-	keyPair, err := k.pickKey(r)
+	keyPair, err := k.pickKey(r, false)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +289,7 @@ func (k *Kontrol) HandleGetKey(r *kite.Request) (interface{}, error) {
 	return keyPair.Public, nil
 }
 
-func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
+func (k *Kontrol) pickKey(r *kite.Request, self bool) (*KeyPair, error) {
 	if k.MachineKeyPicker != nil {
 		keyPair, err := k.MachineKeyPicker(r)
 		if err != nil {
@@ -296,14 +298,9 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 		return keyPair, nil
 	}
 
-	if len(k.lastPublic) != 0 && len(k.lastPrivate) != 0 {
-		return &KeyPair{
-			Public:  k.lastPublic[len(k.lastPublic)-1],
-			Private: k.lastPrivate[len(k.lastPrivate)-1],
-			ID:      k.lastIDs[len(k.lastIDs)-1],
-		}, nil
+	if !self {
+		return nil, errors.New("no valid authentication key found")
 	}
 
-	k.log.Error("neither machineKeyPicker nor public/private keys are available")
-	return nil, errors.New("internal error - 1")
+	return k.KeyPair()
 }
