@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -177,7 +178,7 @@ func TestMultiple(t *testing.T) {
 	// number of kites that will be queried. Means if there are 50 example
 	// kites available only 10 of them will be queried. Increasing this number
 	// makes the test fail.
-	kiteNumber := 5
+	kiteNumber := runtime.GOMAXPROCS(0)
 
 	// number of clients that will query example kites
 	clientNumber := 10
@@ -235,14 +236,13 @@ func TestMultiple(t *testing.T) {
 						// fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
 					}
 				}(i)
+
+				wg.Wait()
 			}
 		case <-timeout:
-			t.SkipNow()
+			return
 		}
-
 	}
-
-	wg.Wait()
 }
 
 func TestGetKites(t *testing.T) {
