@@ -178,20 +178,24 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	switch {
 	case id == "" && public == "":
 		return errors.New("keypair ID and public key are both empty")
-	case id == "":
-		pair, err = k.keyPair.GetKeyFromPublic(public)
-	default:
+	case public == "":
 		pair, err = k.keyPair.GetKeyFromID(id)
+	default:
+		pair, err = k.keyPair.GetKeyFromPublic(public)
 	}
 
 	if err != nil {
 		return err
 	}
 
-	k.keyPair.DeleteKey(&KeyPair{
+	err = k.keyPair.DeleteKey(&KeyPair{
 		ID:     id,
 		Public: public,
 	})
+
+	if err != nil {
+		return err
+	}
 
 	// if public is empty
 	if public == "" {
