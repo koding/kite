@@ -65,8 +65,6 @@ func TestMultiple(t *testing.T) {
 		clients[i] = c
 	}
 
-	var wg sync.WaitGroup
-
 	fmt.Printf("Calling mathworker kites with %d conccurent clients randomly\n", clientNumber)
 	timeout := time.After(testDuration)
 
@@ -74,6 +72,8 @@ func TestMultiple(t *testing.T) {
 	for {
 		select {
 		case <-time.Tick(time.Second):
+			var wg sync.WaitGroup
+
 			for i := 0; i < clientNumber; i++ {
 				wg.Add(1)
 
@@ -87,14 +87,12 @@ func TestMultiple(t *testing.T) {
 					}
 				}(i, t)
 			}
+
+			wg.Wait()
 		case <-timeout:
-			fmt.Println("test stopped")
-			t.SkipNow()
+			return
 		}
-
 	}
-
-	wg.Wait()
 }
 
 // Call a single method with multiple clients. This test is implemented to be
