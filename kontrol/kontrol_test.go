@@ -131,13 +131,13 @@ func TestTokenInvalidation(t *testing.T) {
 	m := kite.New(testName, testVersion)
 	m.Config = conf.Config.Copy()
 	m.Config.Port = 6666
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6666", Path: "/mathworker6"}
 	_, err := m.Register(kiteURL)
 	if err != nil {
 		t.Error(err)
 	}
-	defer m.Close()
 
 	token, err := m.GetToken(m.Kite())
 	if err != nil {
@@ -201,6 +201,7 @@ func TestMultiple(t *testing.T) {
 		c.Config = conf.Config.Copy()
 		c.SetupKontrolClient()
 		clients[i] = c
+		defer c.Close()
 	}
 
 	var wg sync.WaitGroup
@@ -226,13 +227,14 @@ func TestMultiple(t *testing.T) {
 					}
 
 					start := time.Now()
-					_, err := clients[i].GetKites(query)
+					k, err := clients[i].GetKites(query)
 					elapsedTime := time.Since(start)
 					if err != nil {
 						// we don't fail here otherwise pprof can't gather information
 						fmt.Printf("[%d] aborted, elapsed %f sec err: %s\n",
 							i, elapsedTime.Seconds(), err)
 					} else {
+						klose(k)
 						// fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
 					}
 				}(i)
@@ -250,6 +252,7 @@ func TestGetKites(t *testing.T) {
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
 	m.Config = conf.Config.Copy()
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
 	_, err := m.Register(kiteURL)
@@ -268,10 +271,12 @@ func TestGetKites(t *testing.T) {
 	// exp2 queries for mathkite
 	exp3 := kite.New("exp3", "0.0.1")
 	exp3.Config = conf.Config.Copy()
+	defer exp3.Close()
 	kites, err := exp3.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")
@@ -296,13 +301,13 @@ func TestGetToken(t *testing.T) {
 	m := kite.New(testName, testVersion)
 	m.Config = conf.Config.Copy()
 	m.Config.Port = 6666
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6666", Path: "/kite"}
 	_, err := m.Register(kiteURL)
 	if err != nil {
 		t.Error(err)
 	}
-	defer m.Close()
 
 	_, err = m.GetToken(m.Kite())
 	if err != nil {
@@ -334,6 +339,7 @@ func TestKontrol(t *testing.T) {
 	mathKite.HandleFunc("square", Square)
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
@@ -341,6 +347,7 @@ func TestKontrol(t *testing.T) {
 	// exp2 kite is the mathworker client
 	exp2Kite := kite.New("exp2", "0.0.1")
 	exp2Kite.Config = conf.Config.Copy()
+	defer exp2Kite.Close()
 
 	query := &protocol.KontrolQuery{
 		Username:    exp2Kite.Kite().Username,
@@ -354,6 +361,7 @@ func TestKontrol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")
@@ -389,7 +397,6 @@ func TestKontrol(t *testing.T) {
 	if result != 4 {
 		t.Fatalf("Invalid result: %d", result)
 	}
-
 }
 
 func Square(r *kite.Request) (interface{}, error) {
@@ -460,6 +467,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	mathKite.HandleFunc("square", Square)
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
@@ -470,6 +478,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	exp3Kite.Config = conf.Config.Copy()
 	exp3Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
 	exp3Kite.Config.KontrolKey = testkeys.PublicSecond
+	defer exp3Kite.Close()
 
 	query := &protocol.KontrolQuery{
 		Username:    exp3Kite.Kite().Username,
@@ -483,6 +492,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")

@@ -58,6 +58,12 @@ func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
 	}
 }
 
+func klose(clients []*kite.Client) {
+	for _, c := range clients {
+		c.Close()
+	}
+}
+
 type HelloKite struct {
 	Kite  *kite.Kite
 	URL   *url.URL
