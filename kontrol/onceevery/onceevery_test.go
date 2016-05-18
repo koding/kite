@@ -41,14 +41,4 @@ func TestOnceEvery(t *testing.T) {
 	if n-1 > count || count > n+1 {
 		t.Errorf("want count ∈ [%d, %d]; got %d", n-1, n+1, count)
 	}
-
-	once.Stop()
-
-	defer func() {
-		if err := recover(); err != nil {
-			t.Errorf("Second stop should not panic: %s", err)
-		}
-	}()
-
-	once.Stop()
 }

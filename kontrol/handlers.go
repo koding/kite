@@ -103,7 +103,6 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 				})
 			case <-time.After(HeartbeatInterval + HeartbeatDelay):
 				k.log.Debug("Kite didn't sent any heartbeat %s.", &kiteCopy)
-				every.Stop()
 				atomic.StoreInt32(&closed, 1)
 				return
 			}
@@ -151,7 +150,6 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 
 	remote.OnDisconnect(func() {
 		k.log.Info("Kite disconnected: %s", remote.Kite)
-		every.Stop()
 	})
 
 	// send response back to the kite, also send the new public Key if it's exist
