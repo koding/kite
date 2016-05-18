@@ -93,6 +93,7 @@ func init() {
 	// Monkey-patch default logging handler that is used by Kite.Logger
 	// in order to hide logs until "-v" flag is given to "test.sh" script.
 	original := logging.DefaultHandler
+	original.SetLevel(logging.DEBUG)
 	logging.DefaultHandler = &quietHandler{original}
 }
 

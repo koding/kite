@@ -145,8 +145,6 @@ func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
 		k.Config.Port = DefaultPort
 	}
 
-	k.SetLogLevel(kite.DEBUG)
-
 	return &Kontrol{
 		Kite:        k,
 		log:         k.Log,

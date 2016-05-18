@@ -71,7 +71,6 @@ func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 	k.Config = conf.Config.Copy()
 	k.Config.Port = 0
 	k.Config.KiteKey = testutil.NewToken(name, conf.Private, conf.Public).Raw
-	k.SetLogLevel(kite.DEBUG)
 
 	k.HandleFunc("hello", func(r *kite.Request) (interface{}, error) {
 		return fmt.Sprintf("%s says hello", name), nil

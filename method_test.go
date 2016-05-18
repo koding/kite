@@ -92,7 +92,7 @@ func TestMethod_Latest(t *testing.T) {
 
 func TestMethod_First(t *testing.T) {
 	k := New("testkite", "0.0.1")
-	k.SetLogLevel(DEBUG)
+
 	k.Config.DisableAuthentication = true
 	k.Config.Port = 9998
 
