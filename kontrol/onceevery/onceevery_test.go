@@ -7,27 +7,39 @@ import (
 )
 
 func TestOnceEvery(t *testing.T) {
-	once := New(time.Second)
+	var wg sync.WaitGroup
+	var start time.Time
 	count := 0
-	var countMu sync.Mutex
+	interval := 500 * time.Millisecond
+	once := New(interval)
+	done := make(chan struct{})
+	wg.Add(1)
 
 	go func() {
-		for i := 0; i < 100; i++ {
-			once.Do(func() {
-				countMu.Lock()
-				count++
-				countMu.Unlock()
-			})
+		defer wg.Done()
+		start = time.Now()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				once.Do(func() {
+					count++
+				})
+			}
 		}
 	}()
 
 	time.Sleep(time.Second * 2)
 
-	countMu.Lock()
-	defer countMu.Unlock()
+	close(done)
+	wg.Wait()
 
-	if count != 2 {
-		t.Errorf("function should be called two times, got '%d'", count)
+	n := int(time.Now().Sub(start) / interval)
+
+	// test against range to account runtime scheduling
+	if n-1 > count || count > n+1 {
+		t.Errorf("want count ∈ [%d, %d]; got %d", n-1, n+1, count)
 	}
 
 	once.Stop()
