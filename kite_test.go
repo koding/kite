@@ -101,11 +101,13 @@ func TestConcurrency(t *testing.T) {
 	// Create a mathworker kite
 	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
+	mathKite.Config.Port = 3637
 	mathKite.HandleFunc("ping", func(r *Request) (interface{}, error) {
 		time.Sleep(time.Second)
 		return "pong", nil
 	})
-	go http.ListenAndServe("127.0.0.1:3637", mathKite)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
 
 	// Wait until it's started
 	time.Sleep(time.Second)
@@ -113,15 +115,12 @@ func TestConcurrency(t *testing.T) {
 	// number of exp kites that will call mathworker kite
 	clientNumber := 3
 
-	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
-	for i := 0; i < clientNumber; i++ {
-		c := newXhrKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
-		if err := c.Dial(); err != nil {
+	for i := range clients {
+		clients[i] = newXhrKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
+		if err := clients[i].Dial(); err != nil {
 			t.Fatal(err)
 		}
-
-		clients[i] = c
 	}
 
 	var wg sync.WaitGroup
