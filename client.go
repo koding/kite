@@ -429,7 +429,6 @@ func (c *Client) Close() {
 		session.Close(3000, "Go away!")
 	}
 
-	close(c.send)
 	close(c.closeChan)
 
 	// wait for consumers to finish buffered messages
@@ -443,13 +442,7 @@ func (c *Client) sendHub() {
 
 	for {
 		select {
-		case msg, ok := <-c.send:
-			if !ok {
-				c.send = nil
-				c.LocalKite.Log.Debug("Send hub is closed")
-				return
-			}
-
+		case msg := <-c.send:
 			c.LocalKite.Log.Debug("Sending: %s", string(msg))
 			session := c.getSession()
 			if session == nil {
@@ -468,6 +461,9 @@ func (c *Client) sendHub() {
 				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Debug("Send err: %s", err.Error())
 			}
+		case <-c.closeChan:
+			c.LocalKite.Log.Debug("Send hub is closed")
+			return
 		}
 	}
 }
