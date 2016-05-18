@@ -6,6 +6,7 @@ go:
 install:
   - go get -d -v -t ./...
 script:
+  - export GOMAXPROCS=$(nproc)
   - make test
 addons:
   postgresql: "9.3"
