@@ -89,6 +89,10 @@ type Kite struct {
 	// Handlers to call when a client has disconnected.
 	onDisconnectHandlers []func(*Client)
 
+	// onRegisterHandlers field holds callbacks invoked when Kite
+	// registers successfully to Kontrol
+	onRegisterHandlers []func(*protocol.RegisterResult)
+
 	// server fields, are initialized and used when
 	// TODO: move them to their own struct, just like KontrolClient
 	listener  *gracefulListener
@@ -130,8 +134,6 @@ func New(name, version string) *Kite {
 		Authenticators:     make(map[string]func(*Request) error),
 		trustedKontrolKeys: make(map[string]string),
 		handlers:           make(map[string]*Method),
-		preHandlers:        make([]Handler, 0),
-		postHandlers:       make([]Handler, 0),
 		kontrol:            kClient,
 		name:               name,
 		version:            version,
@@ -225,11 +227,14 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 	k.callOnDisconnectHandlers(c)
 }
 
+// OnConnect registers a callbacks which is called when a Kite connects
+// to the k Kite.
 func (k *Kite) OnConnect(handler func(*Client)) {
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
 }
 
-// OnFirstRequest registers a function to run when a Kite connects to this Kite.
+// OnFirstRequest registers a function to run when we receive first request
+// from other Kite.
 func (k *Kite) OnFirstRequest(handler func(*Client)) {
 	k.onFirstRequestHandlers = append(k.onFirstRequestHandlers, handler)
 }
@@ -237,6 +242,12 @@ func (k *Kite) OnFirstRequest(handler func(*Client)) {
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
 func (k *Kite) OnDisconnect(handler func(*Client)) {
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
+}
+
+// OnRegister registers a callback which is called when a Kite registers
+// to a Kontrol.
+func (k *Kite) OnRegister(handler func(*protocol.RegisterResult)) {
+	k.onRegisterHandlers = append(k.onRegisterHandlers, handler)
 }
 
 func (k *Kite) callOnConnectHandlers(c *Client) {
@@ -254,6 +265,12 @@ func (k *Kite) callOnFirstRequestHandlers(c *Client) {
 func (k *Kite) callOnDisconnectHandlers(c *Client) {
 	for _, handler := range k.onDisconnectHandlers {
 		handler(c)
+	}
+}
+
+func (k *Kite) callOnRegisterHandlers(r *protocol.RegisterResult) {
+	for _, handler := range k.onRegisterHandlers {
+		handler(r)
 	}
 }
 

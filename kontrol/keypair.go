@@ -55,6 +55,14 @@ type KeyPairStorage interface {
 	IsValid(publicKey string) error
 }
 
+// keyArchiver defines additional functionality a KetPairStorage may offer.
+//
+// If a Storage upgrades to keyArchiver, it will be used for
+// updating caller's kite key.
+type keyArchiver interface {
+	IsDeleted(publicKey string) (bool, error)
+}
+
 func NewMemKeyPairStorage() *MemKeyPairStorage {
 	return &MemKeyPairStorage{
 		id:     cache.NewMemory(),

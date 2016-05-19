@@ -86,6 +86,9 @@ type Kontrol struct {
 	// storage defines the storage of the kites.
 	storage Storage
 
+	// selfKeyPair is a key pair used to sign Kontrol's kite key.
+	selfKeyPair *KeyPair
+
 	// RegisterURL defines the URL that is used to self register when adding
 	// itself to the storage backend
 	RegisterURL string
@@ -337,7 +340,7 @@ func (k *Kontrol) registerSelf() {
 		value.URL = k.RegisterURL
 	}
 
-	keyPair, err := k.selfKeyPair()
+	keyPair, err := k.KeyPair()
 	if err != nil {
 		if err != errNoSelfKeyPair {
 			k.log.Error("%s", err)
@@ -385,7 +388,14 @@ func (k *Kontrol) registerSelf() {
 	}
 }
 
-func (k *Kontrol) selfKeyPair() (pair *KeyPair, err error) {
+// KeyPair looks up a key pair that was used to sign Kontrol's kite key.
+//
+// The value is cached on first call of the function.
+func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
+	if k.selfKeyPair != nil {
+		return k.selfKeyPair, nil
+	}
+
 	if k.Kite.Config.KiteKey == "" || len(k.lastPublic) == 0 {
 		return nil, errNoSelfKeyPair
 	}
@@ -414,11 +424,13 @@ func (k *Kontrol) selfKeyPair() (pair *KeyPair, err error) {
 		return nil, fmt.Errorf("no matching self key pair found: %s", me)
 	}
 
-	return &KeyPair{
+	k.selfKeyPair = &KeyPair{
 		ID:      k.lastIDs[keyIndex],
 		Public:  k.lastPublic[keyIndex],
 		Private: k.lastPrivate[keyIndex],
-	}, nil
+	}
+
+	return k.selfKeyPair, nil
 }
 
 // generateToken returns a JWT token string. Please see the URL for details:

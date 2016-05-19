@@ -329,6 +329,12 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 		k.Config.KontrolKey = rr.PublicKey
 	}
 
+	if rr.KiteKey != "" {
+		k.Config.KiteKey = rr.KiteKey
+	}
+
+	k.callOnRegisterHandlers(&rr)
+
 	return &registerResult{parsed}, nil
 }
 

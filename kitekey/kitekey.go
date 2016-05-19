@@ -3,6 +3,7 @@ package kitekey
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -91,7 +92,27 @@ func ParseFile(file string) (*jwt.Token, error) {
 	return jwt.Parse(string(bytes.TrimSpace(kiteKey)), GetKontrolKey)
 }
 
+// Extractor is used to extract kontrol key from JWT token.
+type Extractor struct {
+	Token      *jwt.Token
+	KontrolKey string
+}
+
+// Key is a keyFunc argument for jwt.Parse function.
+func (e *Extractor) Key(token *jwt.Token) (interface{}, error) {
+	e.Token = token
+
+	key, ok := token.Claims["kontrolKey"].(string)
+	if !ok {
+		return nil, errors.New("no kontrol key found")
+	}
+
+	e.KontrolKey = key
+
+	return []byte(key), nil
+}
+
 // GetKontrolKey is used as key getter func for jwt.Parse() function.
 func GetKontrolKey(token *jwt.Token) (interface{}, error) {
-	return []byte(token.Claims["kontrolKey"].(string)), nil
+	return (&Extractor{}).Key(token)
 }

@@ -141,9 +141,17 @@ type RegisterResult struct {
 	URL               string `json:"url"`
 	HeartbeatInterval int64  `json:"heartbeatInterval"`
 	Error             string `json:"err,omitempty"`
+
 	// PublicKey is only available if the public Key of the request is
-	// invalid
+	// invalid.
 	PublicKey string `json:"publicKey,omitempty"`
+
+	// KiteKey is non-empty when caller made a request using kitekey
+	// signed by a keypair that was recently deleted.
+	//
+	// In such case Kontrol is going to create new kite key by signing
+	// it with new keys.
+	KiteKey string `json:"kiteKey,omitempty"`
 }
 
 type GetKitesArgs struct {
