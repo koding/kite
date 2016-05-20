@@ -32,6 +32,7 @@ func (k *KeyPair) Validate() error {
 	if k.Private == "" {
 		return errors.New("KeyPair Private field is empty")
 	}
+
 	return nil
 }
 

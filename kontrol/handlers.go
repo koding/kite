@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -82,37 +83,41 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	every := onceevery.New(UpdateInterval)
 
 	ping := make(chan struct{}, 1)
-	closed := false
+	closed := int32(0)
+
+	kiteCopy := remote.Kite
 
 	updaterFunc := func() {
 		for {
 			select {
+			case <-k.closed:
+				return
 			case <-ping:
-				k.log.Debug("Kite is active, got a ping %s", remote.Kite)
+				k.log.Debug("Kite is active, got a ping %s", &kiteCopy)
 				every.Do(func() {
-					k.log.Debug("Kite is active, updating the value %s", remote.Kite)
-					err := k.storage.Update(&remote.Kite, value)
+					k.log.Debug("Kite is active, updating the value %s", &kiteCopy)
+					err := k.storage.Update(&kiteCopy, value)
 					if err != nil {
-						k.log.Error("storage update '%s' error: %s", remote.Kite, err)
+						k.log.Error("storage update '%s' error: %s", &kiteCopy, err)
 					}
 				})
 			case <-time.After(HeartbeatInterval + HeartbeatDelay):
-				k.log.Debug("Kite didn't sent any heartbeat %s.", remote.Kite)
-				every.Stop()
-				closed = true
+				k.log.Debug("Kite didn't sent any heartbeat %s.", &kiteCopy)
+				atomic.StoreInt32(&closed, 1)
 				return
 			}
 		}
 	}
+
 	go updaterFunc()
 
 	heartbeatArgs := []interface{}{
 		HeartbeatInterval / time.Second,
 		dnode.Callback(func(args *dnode.Partial) {
-			k.log.Debug("Kite send us an heartbeat. %s", remote.Kite)
+			k.log.Debug("Kite send us an heartbeat. %s", &kiteCopy)
 
-			k.clientLocks.Get(remote.Kite.ID).Lock()
-			defer k.clientLocks.Get(remote.Kite.ID).Unlock()
+			k.clientLocks.Get(kiteCopy.ID).Lock()
+			defer k.clientLocks.Get(kiteCopy.ID).Unlock()
 
 			select {
 			case ping <- struct{}{}:
@@ -120,28 +125,31 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 			}
 
 			// seems we miss a heartbeat, so start it again!
-			if closed {
-				closed = false
-				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s",
-					remote.Kite)
+			if atomic.CompareAndSwapInt32(&closed, 1, 0) {
+				k.log.Warning("Updater was closed, but we are still getting heartbeats. Starting again %s", &kiteCopy)
 
 				// it might be removed because the ttl cleaner would come
 				// before us, so try to add it again, the updater will than
 				// continue to update it afterwards.
-				k.storage.Upsert(&remote.Kite, value)
+				k.storage.Upsert(&kiteCopy, value)
 				go updaterFunc()
 			}
 		}),
 	}
 
 	// now trigger the remote kite so it sends us periodically an heartbeat
-	remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+	resp := remote.GoWithTimeout("kite.heartbeat", 4*time.Second, heartbeatArgs...)
+
+	go func() {
+		if err := (<-resp).Err; err != nil {
+			k.log.Error("failed requesting heartbeats from %q kite: %s", kiteCopy.Name, err)
+		}
+	}()
 
 	k.log.Info("Kite registered: %s", remote.Kite)
 
 	remote.OnDisconnect(func() {
 		k.log.Info("Kite disconnected: %s", remote.Kite)
-		every.Stop()
 	})
 
 	// send response back to the kite, also send the new public Key if it's exist
@@ -296,6 +304,6 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 		}, nil
 	}
 
-	k.log.Error("neither machineKeyPicker neither public/private keys are available")
+	k.log.Error("neither machineKeyPicker nor public/private keys are available")
 	return nil, errors.New("internal error - 1")
 }

@@ -17,20 +17,22 @@ import (
 // kontrol.go) If the host does not have a kite.key file kite.New() panics.
 // This is a helper to put a fake key on it's location.
 func NewKiteKey() *jwt.Token {
-	return newKiteKey("", testkeys.Private, testkeys.Public)
+	return NewToken("", testkeys.Private, testkeys.Public)
 }
 
 // NewKiteKeyUsername is like NewKiteKey() but it uses the given username
 // instead of using the "testuser" name
 func NewKiteKeyUsername(username string) *jwt.Token {
-	return newKiteKey(username, testkeys.Private, testkeys.Public)
+	return NewToken(username, testkeys.Private, testkeys.Public)
 }
 
 func NewKiteKeyWithKeyPair(private, public string) *jwt.Token {
-	return newKiteKey("", private, public)
+	return NewToken("", private, public)
 }
 
-func newKiteKey(username, private, public string) *jwt.Token {
+// NewToken creates new JWT token for the gien username. It embedds the given
+// public key as kontrolKey and signs the token with the private one.
+func NewToken(username, private, public string) *jwt.Token {
 	tknID := uuid.NewV4()
 
 	hostname, err := os.Hostname()
@@ -63,6 +65,15 @@ func newKiteKey(username, private, public string) *jwt.Token {
 		panic(err)
 	}
 
+	// verify the token
+	_, err = jwt.Parse(token.Raw, func(*jwt.Token) (interface{}, error) {
+		return []byte(public), nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
 	token.Valid = true
 	return token
 
@@ -82,6 +93,7 @@ func init() {
 	// Monkey-patch default logging handler that is used by Kite.Logger
 	// in order to hide logs until "-v" flag is given to "test.sh" script.
 	original := logging.DefaultHandler
+	original.SetLevel(logging.DEBUG)
 	logging.DefaultHandler = &quietHandler{original}
 }
 

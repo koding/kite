@@ -6,14 +6,14 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
-	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
@@ -22,39 +22,82 @@ import (
 )
 
 var (
-	conf *config.Config
+	conf *Config
 	kon  *Kontrol
 )
 
 func init() {
-	conf = config.New()
-	conf.Username = "testuser"
-	conf.KontrolURL = "http://localhost:5555/kite"
-	conf.KontrolKey = testkeys.Public
-	conf.KontrolUser = "testuser"
-	conf.KiteKey = testutil.NewKiteKey().Raw
-	conf.ReadEnvironmentVariables()
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	DefaultPort = 5555
-	kon = New(conf.Copy(), "0.0.1")
+	kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5500)
+}
 
-	switch os.Getenv("KONTROL_STORAGE") {
-	case "etcd":
-		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
-	case "postgres":
-		p := NewPostgres(nil, kon.Kite.Log)
-		kon.SetStorage(p)
-		kon.SetKeyPairStorage(p)
-	default:
-		kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
+func TestUpdateKeys(t *testing.T) {
+	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
+		t.Skip("skipping TestUpdateKeys for storage %q: not implemented", storage)
 	}
 
-	kon.AddKeyPair("", testkeys.Public, testkeys.Private)
+	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
 
-	go kon.Run()
-	<-kon.Kite.ServerReadyNotify()
+	hk1, err := NewHelloKite("kite1", conf)
+	if err != nil {
+		t.Fatalf("error creating kite1: %s", err)
+	}
+	defer hk1.Close()
 
-	rand.Seed(time.Now().UTC().UnixNano())
+	hk2, err := NewHelloKite("kite2", conf)
+	if err != nil {
+		t.Fatalf("error creating kite1: %s", err)
+	}
+	defer hk2.Close()
+
+	hk2.Token = true
+
+	calls := HelloKites{
+		hk1: hk2,
+		hk2: hk1,
+	}
+
+	if err := Call(calls); err != nil {
+		t.Fatal(err)
+	}
+
+	kon.Close()
+
+	kon, conf = startKontrol(testkeys.PrivateThird, testkeys.PublicThird, 5501)
+	defer kon.Close()
+
+	pause("started kontrol 2")
+
+	hk3, err := NewHelloKite("kite3", conf)
+	if err != nil {
+		t.Fatalf("error creating kite3: %s", err)
+	}
+	defer hk3.Close()
+
+	if err := WaitTillConnected(conf, 15*time.Second, hk1, hk2, hk3); err != nil {
+		t.Fatal(err)
+	}
+
+	calls = HelloKites{
+		hk3: hk1,
+		hk3: hk2,
+		hk2: hk1,
+		hk1: hk3,
+		hk1: hk2,
+	}
+
+	if err := Call(calls); err != nil {
+		t.Fatal(err)
+	}
+
+	pause("kite2 -> kite3 starting")
+
+	// TODO(rjeczalik): enable after implementing kite key updates in kontrol
+	//
+	// if err := Call(HelloKites{hk2: hk3}); err != nil {
+	//   t.Fatal(err)
+	// }
 }
 
 func TestRegisterMachine(t *testing.T) {
@@ -86,15 +129,15 @@ func TestTokenInvalidation(t *testing.T) {
 	testName := "mathworker6"
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
-	m.Config = conf.Copy()
+	m.Config = conf.Config.Copy()
 	m.Config.Port = 6666
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6666", Path: "/mathworker6"}
 	_, err := m.Register(kiteURL)
 	if err != nil {
 		t.Error(err)
 	}
-	defer m.Close()
 
 	token, err := m.GetToken(m.Kite())
 	if err != nil {
@@ -127,7 +170,6 @@ func TestTokenInvalidation(t *testing.T) {
 	if token3 != token4 {
 		t.Error("tokens should be the same")
 	}
-
 }
 
 func TestMultiple(t *testing.T) {
@@ -136,14 +178,14 @@ func TestMultiple(t *testing.T) {
 	// number of kites that will be queried. Means if there are 50 example
 	// kites available only 10 of them will be queried. Increasing this number
 	// makes the test fail.
-	kiteNumber := 5
+	kiteNumber := runtime.GOMAXPROCS(0)
 
 	// number of clients that will query example kites
 	clientNumber := 10
 
 	for i := 0; i < kiteNumber; i++ {
 		m := kite.New("example"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
-		m.Config = conf.Copy()
+		m.Config = conf.Config.Copy()
 
 		kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
 		err := m.RegisterForever(kiteURL)
@@ -156,9 +198,10 @@ func TestMultiple(t *testing.T) {
 	clients := make([]*kite.Kite, clientNumber)
 	for i := 0; i < clientNumber; i++ {
 		c := kite.New("client"+strconv.Itoa(i), "0.0.1")
-		c.Config = conf.Copy()
+		c.Config = conf.Config.Copy()
 		c.SetupKontrolClient()
 		clients[i] = c
+		defer c.Close()
 	}
 
 	var wg sync.WaitGroup
@@ -178,37 +221,38 @@ func TestMultiple(t *testing.T) {
 					time.Sleep(time.Millisecond * time.Duration(rand.Intn(500)))
 
 					query := &protocol.KontrolQuery{
-						Username:    conf.Username,
-						Environment: conf.Environment,
+						Username:    conf.Config.Username,
+						Environment: conf.Config.Environment,
 						Name:        "example" + strconv.Itoa(rand.Intn(kiteNumber)),
 					}
 
 					start := time.Now()
-					_, err := clients[i].GetKites(query)
+					k, err := clients[i].GetKites(query)
 					elapsedTime := time.Since(start)
 					if err != nil {
 						// we don't fail here otherwise pprof can't gather information
 						fmt.Printf("[%d] aborted, elapsed %f sec err: %s\n",
 							i, elapsedTime.Seconds(), err)
 					} else {
+						klose(k)
 						// fmt.Printf("[%d] finished, elapsed %f sec\n", i, elapsedTime.Seconds())
 					}
 				}(i)
+
+				wg.Wait()
 			}
 		case <-timeout:
-			t.SkipNow()
+			return
 		}
-
 	}
-
-	wg.Wait()
 }
 
 func TestGetKites(t *testing.T) {
 	testName := "mathworker4"
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
-	m.Config = conf.Copy()
+	m.Config = conf.Config.Copy()
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
 	_, err := m.Register(kiteURL)
@@ -218,19 +262,21 @@ func TestGetKites(t *testing.T) {
 	defer m.Close()
 
 	query := &protocol.KontrolQuery{
-		Username:    conf.Username,
-		Environment: conf.Environment,
+		Username:    conf.Config.Username,
+		Environment: conf.Config.Environment,
 		Name:        testName,
 		Version:     "1.1.1",
 	}
 
 	// exp2 queries for mathkite
 	exp3 := kite.New("exp3", "0.0.1")
-	exp3.Config = conf.Copy()
+	exp3.Config = conf.Config.Copy()
+	defer exp3.Close()
 	kites, err := exp3.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")
@@ -253,15 +299,15 @@ func TestGetToken(t *testing.T) {
 	testName := "mathworker5"
 	testVersion := "1.1.1"
 	m := kite.New(testName, testVersion)
-	m.Config = conf.Copy()
+	m.Config = conf.Config.Copy()
 	m.Config.Port = 6666
+	defer m.Close()
 
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:6666", Path: "/kite"}
 	_, err := m.Register(kiteURL)
 	if err != nil {
 		t.Error(err)
 	}
-	defer m.Close()
 
 	_, err = m.GetToken(m.Kite())
 	if err != nil {
@@ -272,11 +318,11 @@ func TestGetToken(t *testing.T) {
 func TestRegisterKite(t *testing.T) {
 	kiteURL := &url.URL{Scheme: "http", Host: "localhost:4444", Path: "/kite"}
 	m := kite.New("mathworker3", "1.1.1")
-	m.Config = conf.Copy()
+	m.Config = conf.Config.Copy()
 
 	res, err := m.Register(kiteURL)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	defer m.Close()
 
@@ -288,18 +334,20 @@ func TestRegisterKite(t *testing.T) {
 func TestKontrol(t *testing.T) {
 	// Start mathworker
 	mathKite := kite.New("mathworker", "1.2.3")
-	mathKite.Config = conf.Copy()
+	mathKite.Config = conf.Config.Copy()
 	mathKite.Config.Port = 6161
 	mathKite.HandleFunc("square", Square)
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
 
 	// exp2 kite is the mathworker client
 	exp2Kite := kite.New("exp2", "0.0.1")
-	exp2Kite.Config = conf.Copy()
+	exp2Kite.Config = conf.Config.Copy()
+	defer exp2Kite.Close()
 
 	query := &protocol.KontrolQuery{
 		Username:    exp2Kite.Kite().Username,
@@ -313,6 +361,7 @@ func TestKontrol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")
@@ -348,7 +397,6 @@ func TestKontrol(t *testing.T) {
 	if result != 4 {
 		t.Fatalf("Invalid result: %d", result)
 	}
-
 }
 
 func Square(r *kite.Request) (interface{}, error) {
@@ -406,6 +454,7 @@ func TestGetQueryKey(t *testing.T) {
 func TestKontrolMultiKey(t *testing.T) {
 	i := uuid.NewV4()
 	secondID := i.String()
+
 	// add so we can use it as key
 	if err := kon.AddKeyPair(secondID, testkeys.PublicSecond, testkeys.PrivateSecond); err != nil {
 		t.Fatal(err)
@@ -413,11 +462,12 @@ func TestKontrolMultiKey(t *testing.T) {
 
 	// Start mathworker
 	mathKite := kite.New("mathworker2", "2.0.0")
-	mathKite.Config = conf.Copy()
+	mathKite.Config = conf.Config.Copy()
 	mathKite.Config.Port = 6162
 	mathKite.HandleFunc("square", Square)
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	go mathKite.RegisterForever(&url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(mathKite.Config.Port), Path: "/kite"})
 	<-mathKite.KontrolReadyNotify()
@@ -425,9 +475,10 @@ func TestKontrolMultiKey(t *testing.T) {
 	// exp3 kite is the mathworker client. However it uses a different public
 	// key
 	exp3Kite := kite.New("exp3", "0.0.1")
-	exp3Kite.Config = conf.Copy()
+	exp3Kite.Config = conf.Config.Copy()
 	exp3Kite.Config.KiteKey = testutil.NewKiteKeyWithKeyPair(testkeys.PrivateSecond, testkeys.PublicSecond).Raw
 	exp3Kite.Config.KontrolKey = testkeys.PublicSecond
+	defer exp3Kite.Close()
 
 	query := &protocol.KontrolQuery{
 		Username:    exp3Kite.Kite().Username,
@@ -441,6 +492,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer klose(kites)
 
 	if len(kites) == 0 {
 		t.Fatal("No mathworker available")

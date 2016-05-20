@@ -162,6 +162,8 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		updaterFunc := func() {
 			for {
 				select {
+				case <-k.closed:
+					return
 				case <-updater.C:
 					k.log.Debug("Kite is active (via HTTP), updating the value %s", remoteKite)
 					err := k.storage.Update(remoteKite, value)

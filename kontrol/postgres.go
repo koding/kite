@@ -419,8 +419,7 @@ func (p *Postgres) DeleteKey(keyPair *KeyPair) error {
 }
 
 func (p *Postgres) IsValid(public string) error {
-	// for us valid means if deleted_at is not set. Because the gey keys
-	// doesn't if  deleted_at row is set, we just check if we can fetch it.
+	// A valid key is currently a key that is not deleted.
 	_, err := p.GetKeyFromPublic(public)
 	return err
 }
@@ -431,9 +430,9 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 		Select("id", "public", "private").
 		From("kite.key").
 		Where(map[string]interface{}{
-		"id":         id,
-		"deleted_at": nil,
-	}).ToSql()
+			"id":         id,
+			"deleted_at": nil,
+		}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -456,9 +455,9 @@ func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
 		Select("id", "public", "private").
 		From("kite.key").
 		Where(map[string]interface{}{
-		"public":     public,
-		"deleted_at": nil,
-	}).Limit(1).ToSql()
+			"public":     public,
+			"deleted_at": nil,
+		}).Limit(1).ToSql()
 	if err != nil {
 		return nil, err
 	}

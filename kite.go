@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -92,7 +91,7 @@ type Kite struct {
 
 	// server fields, are initialized and used when
 	// TODO: move them to their own struct, just like KontrolClient
-	listener  net.Listener
+	listener  *gracefulListener
 	TLSConfig *tls.Config
 	readyC    chan bool // To signal when kite is ready to accept connections
 	closeC    chan bool // To signal when kite is closed with Close()

@@ -9,17 +9,14 @@ import (
 // interval.
 type OnceEvery struct {
 	Interval time.Duration
-	ticker   *time.Ticker
-	once     sync.Once
 	mu       sync.Mutex
-	stopped  chan bool
+	last     time.Time
 }
 
 // NewOnceEvery creates a new OnceEvery struct
 func New(d time.Duration) *OnceEvery {
 	return &OnceEvery{
 		Interval: d,
-		stopped:  make(chan bool, 1),
 	}
 }
 
@@ -34,38 +31,14 @@ func (o *OnceEvery) Do(f func()) {
 	}
 
 	o.mu.Lock()
-	if o.ticker == nil {
-		o.ticker = time.NewTicker(o.Interval)
+	now := time.Now()
+	ok := o.last.Add(o.Interval).Before(now)
+	if ok {
+		o.last = now
 	}
 	o.mu.Unlock()
 
-	go func() {
-		o.once.Do(func() {
-			f() // call it once first
-
-			for {
-				select {
-				case <-o.ticker.C:
-					f()
-				case <-o.stopped:
-					return
-				}
-			}
-		})
-	}()
-}
-
-// Stop stops the ticker. No other call made with Do will be called anymore.
-func (o *OnceEvery) Stop() {
-	o.mu.Lock()
-	if o.ticker != nil {
-		o.ticker.Stop()
-	}
-	o.mu.Unlock()
-
-	select {
-	case <-o.stopped:
-	default:
-		close(o.stopped)
+	if ok {
+		f()
 	}
 }

@@ -1,9 +1,7 @@
 package kite
 
 import (
-	"fmt"
 	"math/rand"
-	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -27,8 +25,6 @@ func TestMultiple(t *testing.T) {
 	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
 
-	fmt.Printf("Creating %d mathworker kites\n", kiteNumber)
-
 	var transport config.Transport
 	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
 		tr, ok := config.Transports[transportName]
@@ -43,37 +39,36 @@ func TestMultiple(t *testing.T) {
 		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))
 		m.Config.DisableAuthentication = true
 		m.Config.Transport = transport
+		m.Config.Port = port + i
 
 		m.HandleFunc("square", Square)
-
-		go http.ListenAndServe("127.0.0.1:"+strconv.Itoa(port+i), m)
+		go m.Run()
+		<-m.ServerReadyNotify()
+		defer m.Close()
 	}
 
-	// Wait until it's started
-	time.Sleep(time.Second * 2)
-
-	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
 	for i := 0; i < clientNumber; i++ {
 		cn := New("exp"+strconv.Itoa(i), "0.0.1")
 		cn.Config.Transport = transport
+
 		c := cn.NewClient("http://127.0.0.1:" + strconv.Itoa(port+i) + "/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
 
 		clients[i] = c
+		defer c.Close()
 	}
 
-	var wg sync.WaitGroup
-
-	fmt.Printf("Calling mathworker kites with %d conccurent clients randomly\n", clientNumber)
 	timeout := time.After(testDuration)
 
 	// every one second
 	for {
 		select {
 		case <-time.Tick(time.Second):
+			var wg sync.WaitGroup
+
 			for i := 0; i < clientNumber; i++ {
 				wg.Add(1)
 
@@ -87,14 +82,12 @@ func TestMultiple(t *testing.T) {
 					}
 				}(i, t)
 			}
+
+			wg.Wait()
 		case <-timeout:
-			fmt.Println("test stopped")
-			t.SkipNow()
+			return
 		}
-
 	}
-
-	wg.Wait()
 }
 
 // Call a single method with multiple clients. This test is implemented to be
@@ -103,27 +96,27 @@ func TestConcurrency(t *testing.T) {
 	// Create a mathworker kite
 	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
+	mathKite.Config.Port = 3637
 	mathKite.HandleFunc("ping", func(r *Request) (interface{}, error) {
 		time.Sleep(time.Second)
 		return "pong", nil
 	})
-	go http.ListenAndServe("127.0.0.1:3637", mathKite)
-
-	// Wait until it's started
-	time.Sleep(time.Second)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	// number of exp kites that will call mathworker kite
 	clientNumber := 3
 
-	fmt.Printf("Creating %d exp clients\n", clientNumber)
 	clients := make([]*Client, clientNumber)
-	for i := 0; i < clientNumber; i++ {
+	for i := range clients {
 		c := newXhrKite("exp", "0.0.1").NewClient("http://127.0.0.1:3637/kite")
 		if err := c.Dial(); err != nil {
 			t.Fatal(err)
 		}
 
 		clients[i] = c
+		defer c.Close()
 	}
 
 	var wg sync.WaitGroup
@@ -151,13 +144,13 @@ func TestKite(t *testing.T) {
 	// Create a mathworker kite
 	mathKite := newXhrKite("mathworker", "0.0.1")
 	mathKite.Config.DisableAuthentication = true
+	mathKite.Config.Port = 3636
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
 	mathKite.HandleFunc("sleep", Sleep)
-	go http.ListenAndServe("127.0.0.1:3636", mathKite)
-
-	// Wait until it's started
-	time.Sleep(time.Second)
+	go mathKite.Run()
+	<-mathKite.ServerReadyNotify()
+	defer mathKite.Close()
 
 	// Create exp2 kite
 	exp2Kite := newXhrKite("exp2", "0.0.1")
@@ -175,6 +168,7 @@ func TestKite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer remote.Close()
 
 	result, err := remote.TellWithTimeout("square", 4*time.Second, 2)
 	if err != nil {
