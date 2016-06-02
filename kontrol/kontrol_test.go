@@ -486,6 +486,8 @@ func TestGetQueryKey(t *testing.T) {
 }
 
 func TestKontrolMultiKey(t *testing.T) {
+	t.Skip("TODO(rjeczalik): rework")
+
 	i := uuid.NewV4()
 	secondID := i.String()
 
