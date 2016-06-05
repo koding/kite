@@ -2,6 +2,7 @@
 package kitekey
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -78,6 +79,16 @@ func Parse() (*jwt.Token, error) {
 	}
 
 	return jwt.Parse(kiteKey, GetKontrolKey)
+}
+
+// ParseFile reads the given kite key file and parses it as a JWT token.
+func ParseFile(file string) (*jwt.Token, error) {
+	kiteKey, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwt.Parse(string(bytes.TrimSpace(kiteKey)), GetKontrolKey)
 }
 
 // GetKontrolKey is used as key getter func for jwt.Parse() function.
