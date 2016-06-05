@@ -8,6 +8,15 @@ import (
 
 var errNoSelfKeyPair = errors.New("kontrol has no key pair")
 
+// ErrKeyDeleted is returned by Storage methods when
+// requested key pair is no longer valid because it was
+// deleted.
+//
+// The caller upon receiving this error may decide to
+// recreate / resign a new kitekey or token for the caller
+// (update the key).
+var ErrKeyDeleted = errors.New("key pair is removed")
+
 type multiError struct {
 	err []error
 }

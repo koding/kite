@@ -98,8 +98,8 @@ type Extractor struct {
 	KontrolKey string
 }
 
-// Key is a keyFunc argument for jwt.Parse function.
-func (e *Extractor) Key(token *jwt.Token) (interface{}, error) {
+// Extract is a keyFunc argument for jwt.Parse function.
+func (e *Extractor) Extract(token *jwt.Token) (interface{}, error) {
 	e.Token = token
 
 	key, ok := token.Claims["kontrolKey"].(string)
@@ -114,5 +114,5 @@ func (e *Extractor) Key(token *jwt.Token) (interface{}, error) {
 
 // GetKontrolKey is used as key getter func for jwt.Parse() function.
 func GetKontrolKey(token *jwt.Token) (interface{}, error) {
-	return (&Extractor{}).Key(token)
+	return (&Extractor{}).Extract(token)
 }

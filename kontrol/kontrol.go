@@ -194,7 +194,7 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 		Public: public,
 	})
 
-	if err != nil {
+	if err != nil && err != ErrKeyDeleted {
 		return err
 	}
 

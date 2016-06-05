@@ -486,7 +486,9 @@ func TestGetQueryKey(t *testing.T) {
 }
 
 func TestKontrolMultiKey(t *testing.T) {
-	t.Skip("TODO(rjeczalik): rework")
+	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
+		t.Skip("%q storage does not currently implement soft key pair deletes", storage)
+	}
 
 	i := uuid.NewV4()
 	secondID := i.String()
