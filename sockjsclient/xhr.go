@@ -124,15 +124,11 @@ func (x *XHRSession) Recv() (string, error) {
 
 			switch frame {
 			case 'o':
-				// Abort session on second 'o' frame:
-				//
-				//   https://github.com/sockjs/sockjs-protocol/wiki/Connecting-to-SockJS-without-the-browser
-				//
 				x.mu.Lock()
-				x.opened = false
+				x.opened = true
 				x.mu.Unlock()
 
-				return "", errors.New("session aborted")
+				continue
 			case 'a':
 				// received an array of messages
 				var messages []string
