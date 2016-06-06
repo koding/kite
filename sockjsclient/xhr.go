@@ -101,69 +101,78 @@ func (x *XHRSession) Recv() (string, error) {
 
 			return "", fmt.Errorf("session aborted by server")
 		case res := <-x.do(req):
-			resp := res.Response
-
 			if res.Error != nil {
 				return "", fmt.Errorf("Receiving data failed: %s", res.Error)
 			}
 
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				return "", fmt.Errorf("Receiving data failed. Want: %d Got: %d",
-					http.StatusOK, resp.StatusCode)
-			}
-
-			buf := bufio.NewReader(resp.Body)
-
-			// returns an error if buffer is empty
-			frame, err := buf.ReadByte()
+			msg, ok, err := x.handleResp(res.Response)
 			if err != nil {
 				return "", err
 			}
 
-			switch frame {
-			case 'o':
-				x.mu.Lock()
-				x.opened = true
-				x.mu.Unlock()
-
+			if ok {
 				continue
-			case 'a':
-				// received an array of messages
-				var messages []string
-				if err := json.NewDecoder(buf).Decode(&messages); err != nil {
-					return "", err
-				}
-
-				x.messages = append(x.messages, messages...)
-
-				if len(x.messages) == 0 {
-					return "", errors.New("no message")
-				}
-
-				// Return first message in slice, and remove it from the slice, so
-				// next time the others will be picked
-				msg := x.messages[0]
-				x.messages = x.messages[1:]
-
-				return msg, nil
-			case 'h':
-				// heartbeat received
-				continue
-			case 'c':
-				x.mu.Lock()
-				x.opened = false
-				x.mu.Unlock()
-
-				return "", errors.New("session closed")
-			default:
-				return "", errors.New("invalid frame type")
 			}
+
+			return msg, nil
 		}
 	}
+}
 
-	return "", errors.New("FATAL: If we get here, please revisit the logic again")
+func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, err error) {
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("Receiving data failed. Want: %d Got: %d",
+			http.StatusOK, resp.StatusCode)
+	}
+
+	buf := bufio.NewReader(resp.Body)
+
+	// returns an error if buffer is empty
+	frame, err := buf.ReadByte()
+	if err != nil {
+		return "", false, err
+	}
+
+	switch frame {
+	case 'o':
+		x.mu.Lock()
+		x.opened = true
+		x.mu.Unlock()
+
+		return "", true, nil
+	case 'a':
+		// received an array of messages
+		var messages []string
+		if err := json.NewDecoder(buf).Decode(&messages); err != nil {
+			return "", false, err
+		}
+
+		x.messages = append(x.messages, messages...)
+
+		if len(x.messages) == 0 {
+			return "", false, errors.New("no message")
+		}
+
+		// Return first message in slice, and remove it from the slice, so
+		// next time the others will be picked
+		msg := x.messages[0]
+		x.messages = x.messages[1:]
+
+		return msg, false, nil
+	case 'h':
+		// heartbeat received
+		return "", true, nil
+	case 'c':
+		x.mu.Lock()
+		x.opened = false
+		x.mu.Unlock()
+
+		return "", false, errors.New("session closed")
+	default:
+		return "", false, errors.New("invalid frame type")
+	}
 }
 
 func (x *XHRSession) Send(frame string) error {
