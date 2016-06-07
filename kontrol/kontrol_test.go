@@ -8,13 +8,13 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
-	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
@@ -119,13 +119,25 @@ func TestRegisterMachine(t *testing.T) {
 }
 
 func TestRegisterDenyEvil(t *testing.T) {
-	evil := kite.New("evil", "1.0.0")
-	evil.Config = config.New()
+	// TODO(rjeczalik): use sentinel error value instead
+	const authErr = "no valid authentication key found"
+
+	legit, err := NewHelloKite("testuser", conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = legit.Kite.GetToken(legit.Kite.Kite()); err != nil {
+		t.Fatal(err)
+	}
+
+	evil := kite.New("testuser", "1.0.0")
+	evil.Config = conf.Config.Copy()
 	evil.Config.Port = 6767
-	evil.Config.Username = "evil"
-	evil.Config.KontrolUser = "evil"
+	evil.Config.Username = "testuser"
+	evil.Config.KontrolUser = "testuser"
 	evil.Config.KontrolURL = conf.Config.KontrolURL
-	evil.Config.KiteKey = testutil.NewToken("evil", testkeys.PrivateEvil, testkeys.PublicEvil).Raw
+	evil.Config.KiteKey = testutil.NewToken("testuser", testkeys.PrivateEvil, testkeys.PublicEvil).Raw
 	// KontrolKey can be easily extracted from existing kite.key
 	evil.Config.KontrolKey = testkeys.Public
 	evil.Config.ReadEnvironmentVariables()
@@ -136,18 +148,26 @@ func TestRegisterDenyEvil(t *testing.T) {
 		Path:   "/kite",
 	}
 
-	_, err := evil.Register(evilURL)
+	_, err = evil.Register(evilURL)
 	if err == nil {
 		t.Errorf("expected kontrol to deny register request: %s", evil.Kite())
 	} else {
 		t.Logf("register denied: %s", err)
 	}
 
-	_, err = evil.GetToken(evil.Kite())
+	_, err = evil.GetToken(legit.Kite.Kite())
 	if err == nil {
 		t.Errorf("expected kontrol to deny token request: %s", evil.Kite())
 	} else {
 		t.Logf("token denied: %s", err)
+	}
+
+	_, err = evil.TellKontrolWithTimeout("registerMachine", 4*time.Second, map[string]interface{}{})
+	if err == nil {
+		t.Fatal("expected registerMachine to fail")
+	}
+	if !strings.Contains(err.Error(), authErr) {
+		t.Fatalf("got %q, want %q error", err, authErr)
 	}
 }
 
