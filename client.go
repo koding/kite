@@ -443,7 +443,7 @@ func (c *Client) sendHub() {
 	for {
 		select {
 		case msg := <-c.send:
-			c.LocalKite.Log.Debug("Sending: %s", string(msg))
+			c.LocalKite.Log.Debug("sending: %s", msg)
 			session := c.getSession()
 			if session == nil {
 				c.LocalKite.Log.Error("not connected")
@@ -459,7 +459,7 @@ func (c *Client) sendHub() {
 				// by the server).
 				//
 				// And get rid of the timeout workaround.
-				c.LocalKite.Log.Debug("Send err: %s", err.Error())
+				c.LocalKite.Log.Error("error sending %q: %s", msg, err)
 			}
 		case <-c.closeChan:
 			c.LocalKite.Log.Debug("Send hub is closed")

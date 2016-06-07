@@ -14,6 +14,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/testkeys"
@@ -114,6 +115,39 @@ func TestRegisterMachine(t *testing.T) {
 
 	if username := token.Claims["sub"].(string); username != "foo" {
 		t.Fatalf("invalid username: %s", username)
+	}
+}
+
+func TestRegisterDenyEvil(t *testing.T) {
+	evil := kite.New("evil", "1.0.0")
+	evil.Config = config.New()
+	evil.Config.Port = 6767
+	evil.Config.Username = "evil"
+	evil.Config.KontrolUser = "evil"
+	evil.Config.KontrolURL = conf.Config.KontrolURL
+	evil.Config.KiteKey = testutil.NewToken("evil", testkeys.PrivateEvil, testkeys.PublicEvil).Raw
+	// KontrolKey can be easily extracted from existing kite.key
+	evil.Config.KontrolKey = testkeys.Public
+	evil.Config.ReadEnvironmentVariables()
+
+	evilURL := &url.URL{
+		Scheme: "http",
+		Host:   "127.0.0.1:6767",
+		Path:   "/kite",
+	}
+
+	_, err := evil.Register(evilURL)
+	if err == nil {
+		t.Errorf("expected kontrol to deny register request: %s", evil.Kite())
+	} else {
+		t.Logf("register denied: %s", err)
+	}
+
+	_, err = evil.GetToken(evil.Kite())
+	if err == nil {
+		t.Errorf("expected kontrol to deny token request: %s", evil.Kite())
+	} else {
+		t.Logf("token denied: %s", err)
 	}
 }
 
@@ -452,6 +486,10 @@ func TestGetQueryKey(t *testing.T) {
 }
 
 func TestKontrolMultiKey(t *testing.T) {
+	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
+		t.Skip("%q storage does not currently implement soft key pair deletes", storage)
+	}
+
 	i := uuid.NewV4()
 	secondID := i.String()
 

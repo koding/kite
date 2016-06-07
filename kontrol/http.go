@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -86,38 +85,40 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	args.Kite.Username = username
 
-	t, err := jwt.Parse(args.Auth.Key, kitekey.GetKontrolKey)
-	if err != nil {
-		http.Error(rw, jsonError(err), http.StatusBadRequest)
-		return
-	}
+	ex := &kitekey.Extractor{}
 
-	publicKey, ok := t.Claims["kontrolKey"].(string)
-	if !ok {
-		err := errors.New("public key is not passed")
+	t, err := jwt.Parse(args.Auth.Key, ex.Extract)
+	if err != nil {
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
 	var keyPair *KeyPair
-	var newKey bool
+	resp := &protocol.RegisterResult{
+		URL:               args.URL,
+		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
+	}
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// found we don't allow to register anyone.
-	keyPair, err = k.keyPair.GetKeyFromPublic(strings.TrimSpace(publicKey))
+	r := &kite.Request{
+		Username: username,
+		Auth: &kite.Auth{
+			Type: args.Auth.Type,
+			Key:  args.Auth.Key,
+		},
+	}
+
+	keyPair, resp.KiteKey, err = k.getOrUpdateKeyPub(ex.KontrolKey, t, r)
 	if err != nil {
-		newKey = true
-		keyPair, err = k.pickKey(&kite.Request{
-			Username: username,
-			Auth: &kite.Auth{
-				Type: args.Auth.Type,
-				Key:  args.Auth.Key,
-			},
-		})
-		if err != nil {
-			http.Error(rw, jsonError(err), http.StatusBadRequest)
-			return
-		}
+		http.Error(rw, jsonError(err), http.StatusBadRequest)
+		return
+	}
+
+	if ex.KontrolKey != keyPair.Public {
+		// NOTE(rjeczalik): updates public key for old kites, new kites
+		// expect kite key to be updated
+		resp.PublicKey = keyPair.Public
 	}
 
 	remoteKite := args.Kite
@@ -202,17 +203,8 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	k.log.Info("Kite registered (via HTTP): %s", remoteKite)
 
-	rr := &protocol.RegisterResult{
-		URL:               args.URL,
-		HeartbeatInterval: int64(HeartbeatInterval / time.Second),
-	}
-
-	if newKey {
-		rr.PublicKey = keyPair.Public
-	}
-
 	// send the response back to the requester
-	if err := json.NewEncoder(rw).Encode(&rr); err != nil {
+	if err := json.NewEncoder(rw).Encode(resp); err != nil {
 		errMsg := fmt.Errorf("could not encode response: '%s'", err)
 		http.Error(rw, jsonError(errMsg), http.StatusInternalServerError)
 		return

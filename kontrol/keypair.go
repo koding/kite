@@ -47,11 +47,19 @@ type KeyPairStorage interface {
 	// GetKeyFromID retrieves the KeyPair from the given ID
 	GetKeyFromID(id string) (*KeyPair, error)
 
-	// GetKeyFromPublic retrieves the KeyPairs from the given public Key
+	// GetKeyFromPublic retrieves the KeyPairs from the given public key.
+	//
+	// If the key is no longer valid and the storage is able to deterime
+	// that it was deleted, the returned error is of *DeletedKeyPairError
+	// type.
 	GetKeyFromPublic(publicKey string) (*KeyPair, error)
 
 	// Is valid checks if the given publicKey is valid or not. It's up to the
 	// implementer how to implement it. A valid public key returns a nil error.
+	//
+	// If the key is no longer valid and the storage is able to deterime
+	// that it was deleted, the returned error is of *DeletedKeyPairError
+	// type.
 	IsValid(publicKey string) error
 }
 

@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	sq "github.com/lann/squirrel"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
@@ -37,6 +37,11 @@ type Postgres struct {
 	DB  *sql.DB
 	Log kite.Logger
 }
+
+var (
+	_ Storage        = (*Postgres)(nil)
+	_ KeyPairStorage = (*Postgres)(nil)
+)
 
 func NewPostgres(conf *PostgresConfig, log kite.Logger) *Postgres {
 	if conf == nil {
@@ -262,8 +267,8 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		}
 	}()
 
-	res, err := tx.Exec(`UPDATE kite.kite SET url = $1, updated_at = (now() at time zone 'utc') 
-	WHERE id = $2`, value.URL, kiteProt.ID)
+	res, err := tx.Exec(`UPDATE kite.kite SET url = $1, updated_at = (now() at time zone 'utc') WHERE id = $2`,
+		value.URL, kiteProt.ID)
 	if err != nil {
 		return err
 	}
@@ -424,21 +429,26 @@ func (p *Postgres) IsValid(public string) error {
 	return err
 }
 
-func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-	sqlQuery, args, err := psql.
-		Select("id", "public", "private").
-		From("kite.key").
-		Where(map[string]interface{}{
-			"id":         id,
-			"deleted_at": nil,
-		}).ToSql()
+func (p *Postgres) getKey(preds ...interface{}) (*KeyPair, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar).
+		Select("id", "public", "private", "deleted_at").
+		From("kite.key")
+
+	for _, pred := range preds {
+		psql = psql.Where(pred)
+	}
+
+	sqlQuery, args, err := psql.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	keyPair := &KeyPair{}
-	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
+	var (
+		kp KeyPair
+		t  pq.NullTime
+	)
+
+	err = p.DB.QueryRow(sqlQuery, args...).Scan(&kp.ID, &kp.Public, &kp.Private, &t)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNoKeyFound
@@ -446,30 +456,17 @@ func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
 		return nil, err
 	}
 
-	return keyPair, nil
+	if t.Valid {
+		return nil, ErrKeyDeleted
+	}
+
+	return &kp, nil
+}
+
+func (p *Postgres) GetKeyFromID(id string) (*KeyPair, error) {
+	return p.getKey(sq.Eq{"id": id})
 }
 
 func (p *Postgres) GetKeyFromPublic(public string) (*KeyPair, error) {
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-	sqlQuery, args, err := psql.
-		Select("id", "public", "private").
-		From("kite.key").
-		Where(map[string]interface{}{
-			"public":     public,
-			"deleted_at": nil,
-		}).Limit(1).ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	keyPair := &KeyPair{}
-	err = p.DB.QueryRow(sqlQuery, args...).Scan(&keyPair.ID, &keyPair.Public, &keyPair.Private)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrNoKeyFound
-		}
-		return nil, err
-	}
-
-	return keyPair, nil
+	return p.getKey(sq.Eq{"public": public})
 }

@@ -142,6 +142,10 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		k.Config.KontrolKey = rr.PublicKey
 	}
 
+	if rr.KiteKey != "" {
+		k.Config.KiteKey = rr.KiteKey
+	}
+
 	parsed, err := url.Parse(rr.URL)
 	if err != nil {
 		k.Log.Error("Cannot parse registered URL: %s", err.Error())
@@ -153,6 +157,8 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		rr.URL, heartbeat)
 
 	go k.sendHeartbeats(heartbeat, kiteURL)
+
+	k.callOnRegisterHandlers(&rr)
 
 	return &registerResult{parsed}, nil
 }
@@ -191,7 +197,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return err
 		}
 
-		k.Log.Debug("Heartbeat response received '%s'", strings.TrimSpace(string(body)))
+		k.Log.Debug("Heartbeat response received %q", body)
 
 		switch string(body) {
 		case "pong":
@@ -206,7 +212,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return errRegisterAgain
 		}
 
-		return fmt.Errorf("malformed heartbeat response %v", strings.TrimSpace(string(body)))
+		return fmt.Errorf("malformed heartbeat response %q", body)
 	}
 
 	for _ = range tick.C {

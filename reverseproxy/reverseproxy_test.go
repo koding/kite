@@ -140,6 +140,10 @@ func TestWebSocketProxy(t *testing.T) {
 		Name:        "backendKite",
 	})
 
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	remoteBackendKite := backendKites[0]
 	color.Green("Dialing BackendKite")
 	err = remoteBackendKite.Dial()
