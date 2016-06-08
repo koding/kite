@@ -18,15 +18,18 @@ func TestScrub(t *testing.T) {
 		{"foo", nil},
 		{[]interface{}{"foo", "bar"}, nil},
 		{[]interface{}{cb}, map[string]Path{"0": {0}}},
+		{[]interface{}{cb, "foo", cb}, map[string]Path{"0": {0}, "1": {2}}},
 		{[]interface{}{"foo", "bar", cb}, map[string]Path{"0": {2}}},
 		{[]interface{}{"foo", []interface{}{"bar", cb}}, map[string]Path{"0": {1, 1}}},
+		{[...]interface{}{"foo", cb, cb}, map[string]Path{"0": {1}, "1": {2}}},
 		{map[string]interface{}{"foo": 1, "bar": 2}, nil},
 		{map[string]interface{}{"foo": 1, "bar": 2, "cb": cb}, map[string]Path{"0": {"cb"}}},
-		{T{1, 2, cb, cb, nil}, map[string]Path{
-			"0": {"c"},
-			"1": {"f1"},
+		{T{privT{0, cb, cb}, 1, 2, cb, cb, nil}, map[string]Path{
+			"0": {"embedB"},
+			"1": {"c"},
+			"2": {"f1"},
 		}},
-		{T{1, 2, cb, cb, &T{C: cb, d: cb}}, map[string]Path{
+		{T{A: 1, b: 2, C: cb, d: cb, E: &T{C: cb, d: cb}}, map[string]Path{
 			"0": {"c"},
 			"1": {"E", "c"},
 			"2": {"E", "f1"},
@@ -48,10 +51,17 @@ func TestScrub(t *testing.T) {
 	}
 }
 
+type privT struct {
+	A int
+	B Function `json:"embedB"`
+	F Function `dnode:"-"`
+}
+
 type T struct {
+	privT
 	A int
 	b int
-	C Function `json:"c"`
+	C Function `json:"c,omitempty"`
 	d Function
 	E *T
 }
