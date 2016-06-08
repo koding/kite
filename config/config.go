@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/kitekey"
+	"github.com/koding/kite/protocol"
 )
 
 // Options is passed to kite.New when creating new instance.
@@ -25,6 +27,37 @@ type Config struct {
 	// Options for Server
 	IP   string
 	Port int
+
+	// VerifyFunc is used to verify the public key of the signed token.
+	//
+	// If the pub key is not to be trusted, the function must return
+	// kite.ErrKeyNotTrusted error.
+	//
+	// If nil, the default verify is used. By default the public key
+	// is verified by calling Kontrol and the result cached for
+	// VerifyTTL seconds if KontrolVerify is true. Otherwise
+	// only public keys that are the same as the KontrolKey one are
+	// accepted.
+	VerifyFunc func(pub string) error
+
+	// VerifyTTL is used to control time after result of a single
+	// VerifyFunc's call expires.
+	//
+	// When <0, the result is not cached.
+	//
+	// When 0, the default value of 60s is used.
+	VerifyTTL time.Duration
+
+	// KontrolVerify, when true, verifies the KontrolKey (jwt-go public key)
+	// by calling Kontrol and caching the result for VerifyTTL seconds.
+	KontrolVerify bool
+
+	// VerifyAudienceFunc is used to verify the audience of JWT token.
+	//
+	// If nil, the default audience verify function is used which
+	// expects the aud to be a kite path that matches the username,
+	// environment and name of the client.
+	VerifyAudiencefunc func(client *protocol.Kite, aud string) error
 
 	KontrolURL  string
 	KontrolKey  string
@@ -100,6 +133,10 @@ func (c *Config) ReadEnvironmentVariables() error {
 		}
 
 		c.Transport = transport
+	}
+
+	if ttl, err := time.ParseDuration(os.Getenv("KITE_VERIFY_TTL")); err == nil {
+		c.VerifyTTL = ttl
 	}
 
 	return nil

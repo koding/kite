@@ -11,10 +11,12 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
+	"github.com/koding/cache"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
@@ -79,6 +81,32 @@ type Kite struct {
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
 	kontrol *kontrolClient
+
+	// verifyCache is used as a cache for verify method.
+	//
+	// The field is set by verifyInit method.
+	verifyCache *cache.MemoryTTL
+
+	// verifyFunc is a verify method used to verify auth keys.
+	//
+	// For more details see (config.Config).VerifyFunc.
+	//
+	// The field is set by verifyInit method.
+	verifyFunc func(pub string) error
+
+	// verifyAudienceFunc is used to verify the audience of an
+	// an incoming JWT token.
+	//
+	// For more details see (config.Config).VerifyAudienceFunc.
+	//
+	// The field is set by verifyInit method.
+	verifyAudienceFunc func(*protocol.Kite, string) error
+
+	// verifyOnce ensures all verify* fields are set up only once.
+	verifyOnce sync.Once
+
+	// mu protects assigment to verifyCache.
+	mu sync.Mutex
 
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)

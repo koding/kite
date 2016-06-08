@@ -6,11 +6,9 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/koding/kite/dnode"
-	"github.com/mitchellh/mapstructure"
 )
 
 // Kite is the base struct containing the public fields. It is usually embeded
@@ -94,32 +92,23 @@ func (k *Kite) Validate() error {
 // KiteFromString returns a new Kite string from the given string
 // representation in the form of "/username/environment/...". It's the inverse
 // of k.String()
-func KiteFromString(stringRepr string) (*Kite, error) {
-	fields := strings.Split(strings.TrimPrefix(stringRepr, "/"), "/")
-
-	var keyOrder = []string{
-		"username",
-		"environment",
-		"name",
-		"version",
-		"region",
-		"hostname",
-		"id",
+func KiteFromString(s string) (*Kite, error) {
+	if s == "" || s[0] != '/' {
+		return nil, errors.New("invalid kite string")
 	}
 
-	kiteFields := make(map[string]string, len(fields))
+	fields := make([]string, 7)
+	copy(fields, strings.SplitN(s[1:], "/", 7))
 
-	for i, field := range fields {
-		kiteFields[keyOrder[i]] = field
-	}
-
-	var k *Kite
-
-	if err := mapstructure.Decode(kiteFields, &k); err != nil {
-		return nil, fmt.Errorf("failed parsing kite string: %s", err)
-	}
-
-	return k, nil
+	return &Kite{
+		Username:    fields[0],
+		Environment: fields[1],
+		Name:        fields[2],
+		Version:     fields[3],
+		Region:      fields[4],
+		Hostname:    fields[5],
+		ID:          fields[6],
+	}, nil
 }
 
 // RegisterArgs is used as the function argument to the Kontrol's register

@@ -433,6 +433,10 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 	return k.selfKeyPair, nil
 }
 
+func (k *Kontrol) verify(pub string) error {
+	return nil
+}
+
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
 func generateToken(aud, username, issuer, privateKey string) (string, error) {

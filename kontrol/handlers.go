@@ -199,9 +199,13 @@ func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 
 func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 	var query *protocol.KontrolQuery
-	err := r.Args.One().Unmarshal(&query)
-	if err != nil {
-		return nil, errors.New("Invalid query")
+
+	if err := r.Args.One().Unmarshal(&query); err != nil {
+		return nil, fmt.Errorf("invalid query: %s", err)
+	}
+
+	if query.Username != "" && r.Username != query.Username {
+		return nil, fmt.Errorf("user %q not allowed", query.Username)
 	}
 
 	// check if it's exist
@@ -219,14 +223,17 @@ func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 	}
 
 	kite := kites[0]
-	audience := getAudience(query)
+
+	if kite.Kite.Username != r.Username {
+		return nil, fmt.Errorf("user %q not allowed", query.Username)
+	}
 
 	keyPair, err := k.getOrUpdateKeyID(kite.KeyID, r)
 	if err != nil {
 		return nil, err
 	}
 
-	return generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair.Private)
+	return generateToken(getAudience(query), r.Username, k.Kite.Kite().Username, keyPair.Private)
 }
 
 func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {
