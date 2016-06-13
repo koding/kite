@@ -9,7 +9,6 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/cache"
 	"github.com/koding/kite/dnode"
-	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 )
@@ -215,6 +214,16 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 	k.verifyOnce.Do(k.verifyInit)
 
 	token, err := jwt.Parse(r.Auth.Key, r.LocalKite.RSAKey)
+
+	if e, ok := err.(*jwt.ValidationError); ok {
+		// Translate public key mismatch errors to token-is-expired one.
+		// This is to signal remote client the key pairs have been
+		// updated on kontrol and it should invalidate all tokens.
+		if (e.Errors & jwt.ValidationErrorSignatureInvalid) != 0 {
+			return errors.New("token is expired")
+		}
+	}
+
 	if err != nil {
 		return err
 	}
@@ -288,40 +297,11 @@ func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
 	return username, nil
 }
 
-// TODO:
-//
-// 1. cache verify
-// 2. kontrol.GetKiteKey
-// 3. kontrol.Verify
-// 4. signaling the key is old in verify methond and GetKey (once)
-//
-
 func (k *Kite) verifyInit() {
 	k.verifyFunc = k.Config.VerifyFunc
 
 	if k.verifyFunc == nil {
-		k.verifyFunc = k.kontrolVerify
-	}
-
-	switch {
-	case !k.Config.KontrolVerify:
-		ex := &kitekey.Extractor{}
-
-		_, err := jwt.Parse(k.Config.KiteKey, ex.Extract)
-		if err != nil {
-			k.Log.Warning("failed parsing KiteKey: %s", err)
-			break
-		}
-
-		publicKey := ex.KontrolKey
-
-		k.verifyFunc = func(pub string) error {
-			if pub != publicKey {
-				return ErrKeyNotTrusted
-			}
-
-			return nil
-		}
+		k.verifyFunc = k.selfVerify
 	}
 
 	k.verifyAudienceFunc = k.Config.VerifyAudiencefunc
@@ -333,7 +313,7 @@ func (k *Kite) verifyInit() {
 	ttl := k.Config.VerifyTTL
 
 	if ttl == 0 {
-		ttl = 1 * time.Minute
+		ttl = 5 * time.Minute
 	}
 
 	if ttl > 0 {
@@ -343,6 +323,14 @@ func (k *Kite) verifyInit() {
 
 		k.verifyCache.StartGC(ttl / 2)
 	}
+}
+
+func (k *Kite) selfVerify(pub string) error {
+	if pub != k.KontrolKey() {
+		return ErrKeyNotTrusted
+	}
+
+	return nil
 }
 
 func (k *Kite) verify(token *jwt.Token) (interface{}, error) {

@@ -183,8 +183,7 @@ func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 
 		// Generate token once here because we are using the same token for every
 		// kite we return and generating many tokens is really slow.
-		token, err := generateToken(audience, r.Username,
-			k.Kite.Kite().Username, keyPair.Private)
+		token, err := k.generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair)
 		if err != nil {
 			return nil, err
 		}
@@ -204,10 +203,6 @@ func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("invalid query: %s", err)
 	}
 
-	if query.Username != "" && r.Username != query.Username {
-		return nil, fmt.Errorf("user %q not allowed", query.Username)
-	}
-
 	// check if it's exist
 	kites, err := k.storage.Get(query)
 	if err != nil {
@@ -224,16 +219,13 @@ func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 
 	kite := kites[0]
 
-	if kite.Kite.Username != r.Username {
-		return nil, fmt.Errorf("user %q not allowed", query.Username)
-	}
-
 	keyPair, err := k.getOrUpdateKeyID(kite.KeyID, r)
 	if err != nil {
 		return nil, err
 	}
+	audience := getAudience(query)
 
-	return generateToken(getAudience(query), r.Username, k.Kite.Kite().Username, keyPair.Private)
+	return k.generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair)
 }
 
 func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {

@@ -24,12 +24,14 @@ const (
 )
 
 var (
-	TokenTTL    = 48 * time.Hour
+	// TokenTTL - identifies the expiration time after which the JWT MUST NOT be
+	// accepted for processing.
+	TokenTTL = 48 * time.Hour
+
+	// TokenLeeway - implementers MAY provide for some small leeway, usually
+	// no more than a few minutes, to account for clock skew.
 	TokenLeeway = 1 * time.Minute
 	DefaultPort = 4000
-
-	tokenCache   = make(map[string]string)
-	tokenCacheMu sync.Mutex
 
 	// HeartbeatInterval is the interval in which kites are sending heartbeats
 	HeartbeatInterval = time.Second * 10
@@ -70,6 +72,9 @@ type Kontrol struct {
 
 	heartbeats   map[string]*time.Timer
 	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
+
+	tokenCache   map[string]string
+	tokenCacheMu sync.Mutex
 
 	// closed notifies goroutines started by kontrol that it got closed
 	closed chan struct{}
@@ -140,23 +145,47 @@ func New(conf *config.Config, version string) *Kontrol {
 //     kontrol.Kite.HandleHTTPFunc("/register", kontrol.HandleRegisterHTTP)
 //
 func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
-	k := kite.New("kontrol", version)
-	k.Config = conf
-
-	// Listen on 4000 by default
-	if k.Config.Port == 0 {
-		k.Config.Port = DefaultPort
+	k := &Kontrol{
+		clientLocks: NewIdlock(),
+		heartbeats:  make(map[string]*time.Timer),
+		closed:      make(chan struct{}),
+		tokenCache:  make(map[string]string),
 	}
 
-	return &Kontrol{
-		Kite:        k,
-		log:         k.Log,
-		clientLocks: NewIdlock(),
-		heartbeats:  make(map[string]*time.Timer, 0),
-		closed:      make(chan struct{}),
-		lastIDs:     make([]string, 0),
-		lastPublic:  make([]string, 0),
-		lastPrivate: make([]string, 0),
+	// Make a copy to not modify user-provided value.
+	conf = conf.Copy()
+
+	// Listen on 4000 by default.
+	if conf.Port == 0 {
+		conf.Port = DefaultPort
+	}
+
+	// Allow keys that were recently deleted - for Register{,HTTP} to
+	// give client kite a chance to update them.
+	if conf.VerifyFunc == nil {
+		conf.VerifyFunc = k.Verify
+	}
+
+	k.Kite = kite.New("kontrol", version)
+	k.Kite.Config = conf
+	k.log = k.Kite.Log
+
+	return k
+}
+
+// Verify is used for token and kiteKey authenticators to verify
+// client's kontrol keys. In order to allow for gracefull key
+// updates deleted keys are allowed.
+//
+// If Config.VerifyFunc is nil during Kontrol instantiation with
+// one of New* functions, this is the default verify method
+// used by kontrol kite.
+func (k *Kontrol) Verify(pub string) error {
+	switch err := k.keyPair.IsValid(pub); err {
+	case nil, ErrKeyDeleted:
+		return nil
+	default:
+		return err
 	}
 }
 
@@ -190,22 +219,17 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	}
 
 	err = k.keyPair.DeleteKey(&KeyPair{
-		ID:     id,
-		Public: public,
+		ID:     pair.ID,
+		Public: pair.Public,
 	})
 
 	if err != nil && err != ErrKeyDeleted {
 		return err
 	}
 
-	// if public is empty
-	if public == "" {
-		public = pair.Public
-	}
-
 	deleteIndex := -1
 	for i, p := range k.lastPublic {
-		if p == public {
+		if p == pair.Public {
 			deleteIndex = i
 			break
 		}
@@ -216,6 +240,8 @@ func (k *Kontrol) DeleteKeyPair(id, public string) error {
 	}
 
 	// delete the given public key
+	//
+	// TODO(rjeczalik): rework to keypairs map[string]*KeyPair
 	k.lastIDs = append(k.lastIDs[:deleteIndex], k.lastIDs[deleteIndex+1:]...)
 	k.lastPublic = append(k.lastPublic[:deleteIndex], k.lastPublic[deleteIndex+1:]...)
 	k.lastPrivate = append(k.lastPrivate[:deleteIndex], k.lastPrivate[deleteIndex+1:]...)
@@ -396,7 +422,9 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 		return k.selfKeyPair, nil
 	}
 
-	if k.Kite.Config.KiteKey == "" || len(k.lastPublic) == 0 {
+	kiteKey := k.Kite.KiteKey()
+
+	if kiteKey == "" || len(k.lastPublic) == 0 {
 		return nil, errNoSelfKeyPair
 	}
 
@@ -411,7 +439,7 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 			return []byte(k.lastPublic[ri]), nil
 		}
 
-		if _, err := jwt.Parse(k.Kite.Config.KiteKey, keyFn); err != nil {
+		if _, err := jwt.Parse(kiteKey, keyFn); err != nil {
 			me.err = append(me.err, err)
 			continue
 		}
@@ -433,58 +461,44 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 	return k.selfKeyPair, nil
 }
 
-func (k *Kontrol) verify(pub string) error {
-	return nil
-}
-
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func generateToken(aud, username, issuer, privateKey string) (string, error) {
-	tokenCacheMu.Lock()
-	defer tokenCacheMu.Unlock()
+func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (string, error) {
+	uniqKey := aud + username + issuer + kp.ID
 
-	uniqKey := aud + username + issuer // neglect privateKey, its always the same
-	signed, ok := tokenCache[uniqKey]
+	k.tokenCacheMu.Lock()
+	defer k.tokenCacheMu.Unlock()
+
+	signed, ok := k.tokenCache[uniqKey]
 	if ok {
 		return signed, nil
 	}
 
-	tknID := uuid.NewV4()
-
-	// Identifies the expiration time after which the JWT MUST NOT be accepted
-	// for processing.
-	ttl := TokenTTL
-
-	// Implementers MAY provide for some small leeway, usually no more than
-	// a few minutes, to account for clock skew.
-	leeway := TokenLeeway
-
 	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
-	tkn.Claims["iss"] = issuer                                       // Issuer
-	tkn.Claims["sub"] = username                                     // Subject
-	tkn.Claims["aud"] = aud                                          // Audience
-	tkn.Claims["exp"] = time.Now().UTC().Add(ttl).Add(leeway).Unix() // Expiration Time
-	tkn.Claims["nbf"] = time.Now().UTC().Add(-leeway).Unix()         // Not Before
-	tkn.Claims["iat"] = time.Now().UTC().Unix()                      // Issued At
-	tkn.Claims["jti"] = tknID.String()                               // JWT ID
+	tkn.Claims["iss"] = issuer                                                 // Issuer
+	tkn.Claims["sub"] = username                                               // Subject
+	tkn.Claims["aud"] = aud                                                    // Audience
+	tkn.Claims["exp"] = time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix() // Expiration Time
+	tkn.Claims["nbf"] = time.Now().UTC().Add(-TokenLeeway).Unix()              // Not Before
+	tkn.Claims["iat"] = time.Now().UTC().Unix()                                // Issued At
+	tkn.Claims["jti"] = uuid.NewV4().String()                                  // JWT ID
 
-	var err error
-	signed, err = tkn.SignedString([]byte(privateKey))
+	signed, err := tkn.SignedString([]byte(kp.Private))
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
 
 	// cache our token
-	tokenCache[uniqKey] = signed
+	k.tokenCache[uniqKey] = signed
 
 	// cache invalidation, because we cache the token in tokenCache we need to
 	// invalidate it expiration time. This was handled usually within JWT, but
 	// now we have to do it manually for our own cache.
 	time.AfterFunc(TokenTTL-TokenLeeway, func() {
-		tokenCacheMu.Lock()
-		defer tokenCacheMu.Unlock()
+		k.tokenCacheMu.Lock()
+		defer k.tokenCacheMu.Unlock()
 
-		delete(tokenCache, uniqKey)
+		delete(k.tokenCache, uniqKey)
 	})
 
 	return signed, nil

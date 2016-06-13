@@ -1,6 +1,7 @@
 package kontrol
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -34,6 +35,7 @@ func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
 
 	DefaultPort = port
 	kon := New(conf.Copy(), "1.0.0")
+	// kon.Kite.SetLogLevel(kite.DEBUG)
 
 	switch os.Getenv("KONTROL_STORAGE") {
 	case "etcd":
@@ -70,6 +72,8 @@ type HelloKite struct {
 	Token bool
 
 	clients map[string]*kite.Client
+	regs    chan *protocol.RegisterResult
+	toks    chan struct{}
 }
 
 func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
@@ -77,6 +81,7 @@ func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 	k.Config = conf.Config.Copy()
 	k.Config.Port = 0
 	k.Config.KiteKey = testutil.NewToken(name, conf.Private, conf.Public).Raw
+	// k.SetLogLevel(kite.DEBUG)
 
 	k.HandleFunc("hello", func(r *kite.Request) (interface{}, error) {
 		return fmt.Sprintf("%s says hello", name), nil
@@ -91,16 +96,56 @@ func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 		Path:   "/kite",
 	}
 
+	hk := &HelloKite{
+		Kite:    k,
+		URL:     u,
+		clients: make(map[string]*kite.Client),
+		regs:    make(chan *protocol.RegisterResult, 16),
+		toks:    make(chan struct{}, 16),
+	}
+
+	hk.Kite.OnRegister(hk.onRegister)
+
 	if err := k.RegisterForever(u); err != nil {
 		k.Close()
 		return nil, err
 	}
 
-	return &HelloKite{
-		Kite:    k,
-		URL:     u,
-		clients: make(map[string]*kite.Client),
-	}, nil
+	if _, err := hk.WaitRegister(15 * time.Second); err != nil {
+		return nil, err
+	}
+
+	return hk, nil
+}
+
+func (hk *HelloKite) onRegister(reg *protocol.RegisterResult) {
+	hk.regs <- reg
+}
+
+func (hk *HelloKite) WaitRegister(timeout time.Duration) (*protocol.RegisterResult, error) {
+	select {
+	case reg := <-hk.regs:
+		return reg, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("waiting for register timed out after %s", timeout)
+	}
+}
+
+func (hk *HelloKite) onTokenExpire() {
+	hk.toks <- struct{}{}
+}
+
+func (hk *HelloKite) WaitTokenExpired(timeout time.Duration) error {
+	if !hk.Token {
+		return errors.New("kite is not authenticated with token")
+	}
+
+	select {
+	case <-hk.toks:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("waiting for token to expire timed out after %s", timeout)
+	}
 }
 
 func (hk *HelloKite) Hello(remote *HelloKite) (string, error) {
@@ -119,7 +164,7 @@ func (hk *HelloKite) hello(remote *HelloKite, force bool) (string, error) {
 
 			kites, err := hk.Kite.GetKites(query)
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("%s: %+v", err, query)
 			}
 
 			if len(kites) != 1 {
@@ -127,16 +172,17 @@ func (hk *HelloKite) hello(remote *HelloKite, force bool) (string, error) {
 			}
 
 			c = kites[0]
+			c.OnTokenExpire(hk.onTokenExpire)
 		} else {
 			c = hk.Kite.NewClient(remote.URL.String())
 			c.Auth = &kite.Auth{
 				Type: "kiteKey",
-				Key:  hk.Kite.Config.KiteKey,
+				Key:  hk.Kite.KiteKey(),
 			}
 		}
 
 		if err := c.DialTimeout(timeout); err != nil {
-			return "", nil
+			return "", err
 		}
 
 		hk.clients[remote.Kite.Id] = c
@@ -173,17 +219,27 @@ func (hk *HelloKite) Close() error {
 type HelloKites map[*HelloKite]*HelloKite
 
 func Call(kitePairs HelloKites) error {
+	merr := &multiError{}
+
 	for local, remote := range kitePairs {
 		call := fmt.Sprintf("%s -> %s", local.Kite.Kite().Name, remote.Kite.Kite().Name)
 
 		got, err := local.Hello(remote)
 		if err != nil {
-			return fmt.Errorf("%s: error calling: %s", call, err)
+			err = fmt.Errorf("%s: error calling: %s", call, err)
+			merr.err = append(merr.err, err)
+			continue
 		}
 
 		if want := fmt.Sprintf("%s says hello", remote.Kite.Kite().Name); got != want {
-			return fmt.Errorf("%s: invalid response: got %q, want %q", call, got, want)
+			err = fmt.Errorf("%s: invalid response: got %q, want %q", call, got, want)
+			merr.err = append(merr.err, err)
+			continue
 		}
+	}
+
+	if len(merr.err) != 0 {
+		return merr
 	}
 
 	return nil

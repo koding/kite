@@ -65,8 +65,64 @@ func TestUpdateKeys(t *testing.T) {
 
 	kon.Close()
 
+	if err := kon.DeleteKeyPair("", testkeys.Public); err != nil {
+		t.Fatalf("error deleting key pair: %s", err)
+	}
+
 	kon, conf = startKontrol(testkeys.PrivateThird, testkeys.PublicThird, 5501)
 	defer kon.Close()
+
+	reg, err := hk1.WaitRegister(15 * time.Second)
+	if err != nil {
+		t.Fatalf("kite1 register error: %s", err)
+	}
+
+	if reg.PublicKey != testkeys.PublicThird {
+		t.Fatalf("kite1: got public key %q, want %q", reg.PublicKey, testkeys.PublicThird)
+	}
+
+	if reg.KiteKey == "" {
+		t.Fatal("kite1: kite key was not updated")
+	}
+
+	reg, err = hk2.WaitRegister(15 * time.Second)
+	if err != nil {
+		t.Fatalf("kite2 register error: %s", err)
+	}
+
+	if reg.PublicKey != testkeys.PublicThird {
+		t.Fatalf("kite2: got public key %q, want %q", reg.PublicKey, testkeys.PublicThird)
+	}
+
+	if reg.KiteKey == "" {
+		t.Fatal("kite2: kite key was not updated")
+	}
+
+	pause("token renew")
+
+	calls = HelloKites{
+		hk1: hk2,
+		hk2: hk1,
+	}
+
+	if err := Call(calls); err == nil || !strings.Contains(err.Error(), "token is expired") {
+		t.Fatalf("got nil or unexpected error: %v", err)
+	}
+
+	if err := hk2.WaitTokenExpired(10 * time.Second); err != nil {
+		t.Fatalf("kite2: waiting for token expire: %s", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	calls = HelloKites{
+		hk1: hk2,
+		hk2: hk1,
+	}
+
+	if err := Call(calls); err != nil {
+		t.Fatal(err)
+	}
 
 	pause("started kontrol 2")
 
@@ -94,11 +150,9 @@ func TestUpdateKeys(t *testing.T) {
 
 	pause("kite2 -> kite3 starting")
 
-	// TODO(rjeczalik): enable after implementing kite key updates in kontrol
-	//
-	// if err := Call(HelloKites{hk2: hk3}); err != nil {
-	//   t.Fatal(err)
-	// }
+	if err := Call(HelloKites{hk2: hk3}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRegisterMachine(t *testing.T) {
@@ -429,7 +483,11 @@ func TestKontrol(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
-	tokenCache = make(map[string]string) // empty it
+	// TODO(rjeczalik): rework test to not touch Kontrol internals
+	kon.tokenCacheMu.Lock()
+	kon.tokenCache = make(map[string]string)
+	kon.tokenCacheMu.Unlock()
+
 	_, err = exp2Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)
@@ -564,7 +622,11 @@ func TestKontrolMultiKey(t *testing.T) {
 	}
 
 	// Test Kontrol.GetToken
-	tokenCache = make(map[string]string) // empty it
+	// TODO(rjeczalik): rework test to not touch Kontrol internals
+	kon.tokenCacheMu.Lock()
+	kon.tokenCache = make(map[string]string) // empty it
+	kon.tokenCacheMu.Unlock()
+
 	newToken, err := exp3Kite.GetToken(&remoteMathWorker.Kite)
 	if err != nil {
 		t.Error(err)

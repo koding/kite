@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -60,6 +61,9 @@ type Client struct {
 	disconnect   chan struct{}
 	disconnectMu sync.Mutex // protects disconnect chan
 
+	// authMu protects Auth field.
+	authMu sync.Mutex
+
 	// To signal about the close
 	closeChan chan struct{}
 
@@ -86,8 +90,9 @@ type Client struct {
 
 	// on connect/disconnect handlers are invoked after every
 	// connect/disconnect.
-	onConnectHandlers    []func()
-	onDisconnectHandlers []func()
+	onConnectHandlers     []func()
+	onTokenExpireHandlers []func()
+	onDisconnectHandlers  []func()
 
 	// For protecting access over OnConnect and OnDisconnect handlers.
 	m sync.RWMutex
@@ -146,9 +151,11 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
 		Concurrent:    true,
-		send:          make(chan []byte, 512), // buffered
+		send:          make(chan []byte, 128), // buffered
 		wg:            &sync.WaitGroup{},
 	}
+
+	k.OnRegister(c.updateAuth)
 
 	return c
 }
@@ -185,6 +192,31 @@ func (c *Client) DialForever() (connected chan bool, err error) {
 	connected = make(chan bool, 1) // This will be closed on first connection.
 	go c.dialForever(connected)
 	return
+}
+
+func (c *Client) updateAuth(reg *protocol.RegisterResult) {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+
+	if c.Auth == nil {
+		return
+	}
+
+	if c.Auth.Type == "kiteKey" && reg.KiteKey != "" {
+		c.Auth.Key = reg.KiteKey
+	}
+}
+
+func (c *Client) authCopy() *Auth {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+
+	if c.Auth == nil {
+		return nil
+	}
+
+	authCopy := *c.Auth
+	return &authCopy
 }
 
 func (c *Client) dial(timeout time.Duration) (err error) {
@@ -224,7 +256,7 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 	}
 
 	c.setSession(session)
-	c.wg.Add(1) // with sendHub we added a new listener
+	c.wg.Add(1)
 	go c.sendHub()
 
 	// Reset the wait time.
@@ -423,19 +455,18 @@ func (c *Client) Close() {
 	c.Reconnect = false
 	c.muReconnect.Unlock()
 
-	if session := c.getSession(); session != nil {
-		session.Close(3000, "Go away!")
-	}
-
 	close(c.closeChan)
 
 	// wait for consumers to finish buffered messages
 	c.wg.Wait()
+
+	if session := c.getSession(); session != nil {
+		session.Close(3000, "Go away!")
+	}
 }
 
 // sendhub sends the msg received from the send channel to the remote client
 func (c *Client) sendHub() {
-	// notify that we are done
 	defer c.wg.Done()
 
 	for {
@@ -458,6 +489,10 @@ func (c *Client) sendHub() {
 				//
 				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Error("error sending %q: %s", msg, err)
+
+				if err == sockjsclient.ErrSessionClosed {
+					return
+				}
 			}
 		case <-c.closeChan:
 			c.LocalKite.Log.Debug("Send hub is closed")
@@ -477,6 +512,14 @@ func (c *Client) OnConnect(handler func()) {
 func (c *Client) OnDisconnect(handler func()) {
 	c.m.Lock()
 	c.onDisconnectHandlers = append(c.onDisconnectHandlers, handler)
+	c.m.Unlock()
+}
+
+// OnTokenExpire registers a callback run when an error from remote
+// kite is received about expired token.
+func (c *Client) OnTokenExpire(handler func()) {
+	c.m.Lock()
+	c.onTokenExpireHandlers = append(c.onTokenExpireHandlers, handler)
 	c.m.Unlock()
 }
 
@@ -504,12 +547,26 @@ func (c *Client) callOnDisconnectHandlers() {
 	c.m.RUnlock()
 }
 
+// callOnTokenExpireHandlers calls registered functions when an error
+// from remote kite is received that token used is expired..
+func (c *Client) callOnTokenExpireHandlers() {
+	c.m.RLock()
+	for _, handler := range c.onTokenExpireHandlers {
+		func() {
+			defer recover()
+			handler()
+		}()
+	}
+	c.m.RUnlock()
+}
+
 func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Function) []interface{} {
 	options := callOptionsOut{
 		WithArgs: args,
 		callOptions: callOptions{
-			Kite:             *c.LocalKite.Kite(),
-			Auth:             c.Auth,
+			Kite: *c.LocalKite.Kite(),
+			Auth: c.authCopy(),
+			// Auth:             c.Auth,
 			ResponseCallback: responseCallback,
 		},
 	}
@@ -593,6 +650,12 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 
 		select {
 		case resp := <-doneChan:
+			if e, ok := resp.Err.(*Error); ok {
+				if e.Type == "authenticationError" && strings.Contains(e.Message, "token is expired") {
+					c.callOnTokenExpireHandlers()
+				}
+			}
+
 			responseChan <- resp
 		case <-c.disconnect:
 			responseChan <- &response{
@@ -678,6 +741,10 @@ func (c *Client) getSession() sockjs.Session {
 
 func (c *Client) setSession(session sockjs.Session) {
 	c.m.Lock()
+	if c.session != nil {
+		c.session.Close(3000, "Go away!")
+	}
+
 	c.session = session
 	c.m.Unlock()
 }

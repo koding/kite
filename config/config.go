@@ -45,12 +45,8 @@ type Config struct {
 	//
 	// When <0, the result is not cached.
 	//
-	// When 0, the default value of 60s is used.
+	// When 0, the default value of 300s is used.
 	VerifyTTL time.Duration
-
-	// KontrolVerify, when true, verifies the KontrolKey (jwt-go public key)
-	// by calling Kontrol and caching the result for VerifyTTL seconds.
-	KontrolVerify bool
 
 	// VerifyAudienceFunc is used to verify the audience of JWT token.
 	//
