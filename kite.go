@@ -103,7 +103,7 @@ type Kite struct {
 	// verifyOnce ensures all verify* fields are set up only once.
 	verifyOnce sync.Once
 
-	// mu protects assigment to verifyCache.
+	// mu protects assigment to verifyCache
 	mu sync.Mutex
 
 	// Handlers to call when a new connection is received.
@@ -118,6 +118,9 @@ type Kite struct {
 	// onRegisterHandlers field holds callbacks invoked when Kite
 	// registers successfully to Kontrol
 	onRegisterHandlers []func(*protocol.RegisterResult)
+
+	// handlersMu protects access to on*Handlers fields.
+	handlersMu sync.RWMutex
 
 	// server fields, are initialized and used when
 	// TODO: move them to their own struct, just like KontrolClient
@@ -250,10 +253,8 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 	// This Client also handles the connected client.
 	// Since both sides can send/receive messages the client code is reused here.
 	c := k.NewClient("")
-	c.m.Lock()
-	c.session = session
-	c.m.Unlock()
 
+	c.setSession(session)
 	c.wg.Add(1)
 	go c.sendHub()
 
@@ -269,45 +270,65 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 // OnConnect registers a callbacks which is called when a Kite connects
 // to the k Kite.
 func (k *Kite) OnConnect(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnFirstRequest registers a function to run when we receive first request
 // from other Kite.
 func (k *Kite) OnFirstRequest(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onFirstRequestHandlers = append(k.onFirstRequestHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
 func (k *Kite) OnDisconnect(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnRegister registers a callback which is called when a Kite registers
 // to a Kontrol.
 func (k *Kite) OnRegister(handler func(*protocol.RegisterResult)) {
+	k.handlersMu.Lock()
 	k.onRegisterHandlers = append(k.onRegisterHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 func (k *Kite) callOnConnectHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onConnectHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnFirstRequestHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onFirstRequestHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnDisconnectHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onDisconnectHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnRegisterHandlers(r *protocol.RegisterResult) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onRegisterHandlers {
 		handler(r)
 	}
