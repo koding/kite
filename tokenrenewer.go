@@ -126,18 +126,20 @@ func (t *TokenRenewer) renewToken() error {
 		ID: t.client.Kite.ID,
 	}
 
-	tokenString, err := t.localKite.GetToken(renew)
+	token, err := t.localKite.GetToken(renew)
 	if err != nil {
 		return err
 	}
 
-	if err = t.parse(tokenString); err != nil {
+	if err = t.parse(token); err != nil {
 		return err
 	}
 
 	t.client.authMu.Lock()
-	t.client.Auth.Key = tokenString
+	t.client.Auth.Key = token
 	t.client.authMu.Unlock()
+
+	t.client.callOnTokenRenewHandlers(token)
 
 	return nil
 }

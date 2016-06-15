@@ -91,8 +91,9 @@ type Client struct {
 	// on connect/disconnect handlers are invoked after every
 	// connect/disconnect.
 	onConnectHandlers     []func()
-	onTokenExpireHandlers []func()
 	onDisconnectHandlers  []func()
+	onTokenExpireHandlers []func()
+	onTokenRenewHandlers  []func(string)
 
 	// For protecting access over OnConnect and OnDisconnect handlers.
 	m sync.RWMutex
@@ -501,25 +502,35 @@ func (c *Client) sendHub() {
 	}
 }
 
-// OnConnect registers a function to run on connect.
+// OnConnect adds a callback which is called when client connects
+// to a remote kite.
 func (c *Client) OnConnect(handler func()) {
 	c.m.Lock()
 	c.onConnectHandlers = append(c.onConnectHandlers, handler)
 	c.m.Unlock()
 }
 
-// OnDisconnect registers a function to run on disconnect.
+// OnDisconnect adds a callback which is called when client disconnects
+// from a remote kite.
 func (c *Client) OnDisconnect(handler func()) {
 	c.m.Lock()
 	c.onDisconnectHandlers = append(c.onDisconnectHandlers, handler)
 	c.m.Unlock()
 }
 
-// OnTokenExpire registers a callback run when an error from remote
-// kite is received about expired token.
+// OnTokenExpire adds a callback which is called when client receives
+// token-is-expired error from a remote kite.
 func (c *Client) OnTokenExpire(handler func()) {
 	c.m.Lock()
 	c.onTokenExpireHandlers = append(c.onTokenExpireHandlers, handler)
+	c.m.Unlock()
+}
+
+// OnTokenRenew adds a callback which is called when client successfully
+// renews its token.
+func (c *Client) OnTokenRenew(handler func(token string)) {
+	c.m.Lock()
+	c.onTokenRenewHandlers = append(c.onTokenRenewHandlers, handler)
 	c.m.Unlock()
 }
 
@@ -548,13 +559,26 @@ func (c *Client) callOnDisconnectHandlers() {
 }
 
 // callOnTokenExpireHandlers calls registered functions when an error
-// from remote kite is received that token used is expired..
+// from remote kite is received that token used is expired.
 func (c *Client) callOnTokenExpireHandlers() {
 	c.m.RLock()
 	for _, handler := range c.onTokenExpireHandlers {
 		func() {
 			defer recover()
 			handler()
+		}()
+	}
+	c.m.RUnlock()
+}
+
+// callOnTokenRenewHandlers calls all registered functions when
+// we successfully obtain new token from kontrol.
+func (c *Client) callOnTokenRenewHandlers(token string) {
+	c.m.RLock()
+	for _, handler := range c.onTokenRenewHandlers {
+		func() {
+			defer recover()
+			handler(token)
 		}()
 	}
 	c.m.RUnlock()

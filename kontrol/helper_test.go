@@ -74,6 +74,7 @@ type HelloKite struct {
 	clients map[string]*kite.Client
 	regs    chan *protocol.RegisterResult
 	toks    chan struct{}
+	renew   chan struct{}
 }
 
 func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
@@ -102,6 +103,7 @@ func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 		clients: make(map[string]*kite.Client),
 		regs:    make(chan *protocol.RegisterResult, 16),
 		toks:    make(chan struct{}, 16),
+		renew:   make(chan struct{}, 16),
 	}
 
 	hk.Kite.OnRegister(hk.onRegister)
@@ -135,6 +137,10 @@ func (hk *HelloKite) onTokenExpire() {
 	hk.toks <- struct{}{}
 }
 
+func (hk *HelloKite) onTokenRenew(string) {
+	hk.renew <- struct{}{}
+}
+
 func (hk *HelloKite) WaitTokenExpired(timeout time.Duration) error {
 	if !hk.Token {
 		return errors.New("kite is not authenticated with token")
@@ -145,6 +151,19 @@ func (hk *HelloKite) WaitTokenExpired(timeout time.Duration) error {
 		return nil
 	case <-time.After(timeout):
 		return fmt.Errorf("waiting for token to expire timed out after %s", timeout)
+	}
+}
+
+func (hk *HelloKite) WaitTokenRenew(timeout time.Duration) error {
+	if !hk.Token {
+		return errors.New("kite is not authenticated with token")
+	}
+
+	select {
+	case <-hk.renew:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("waiting for token to renew timed out after %s", timeout)
 	}
 }
 
@@ -173,6 +192,7 @@ func (hk *HelloKite) hello(remote *HelloKite, force bool) (string, error) {
 
 			c = kites[0]
 			c.OnTokenExpire(hk.onTokenExpire)
+			c.OnTokenRenew(hk.onTokenRenew)
 		} else {
 			c = hk.Kite.NewClient(remote.URL.String())
 			c.Auth = &kite.Auth{

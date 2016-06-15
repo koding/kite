@@ -113,7 +113,9 @@ func TestUpdateKeys(t *testing.T) {
 		t.Fatalf("kite2: waiting for token expire: %s", err)
 	}
 
-	time.Sleep(1 * time.Second)
+	if err := hk2.WaitTokenRenew(10 * time.Second); err != nil {
+		t.Fatalf("kite2: waiting for token renew: %s", err)
+	}
 
 	calls = HelloKites{
 		hk1: hk2,
