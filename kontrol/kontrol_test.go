@@ -38,7 +38,7 @@ func TestUpdateKeys(t *testing.T) {
 		t.Skip("skipping TestUpdateKeys for storage %q: not implemented", storage)
 	}
 
-	kon, conf := startKontrol(testkeys.Private, testkeys.Public, 5501)
+	kon, conf := startKontrol(testkeys.PrivateThird, testkeys.PublicThird, 5501)
 
 	hk1, err := NewHelloKite("kite1", conf)
 	if err != nil {
@@ -65,11 +65,11 @@ func TestUpdateKeys(t *testing.T) {
 
 	kon.Close()
 
-	if err := kon.DeleteKeyPair("", testkeys.Public); err != nil {
+	if err := kon.DeleteKeyPair("", testkeys.PublicThird); err != nil {
 		t.Fatalf("error deleting key pair: %s", err)
 	}
 
-	kon, conf = startKontrol(testkeys.PrivateThird, testkeys.PublicThird, 5501)
+	kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5501)
 	defer kon.Close()
 
 	reg, err := hk1.WaitRegister(15 * time.Second)
@@ -77,8 +77,8 @@ func TestUpdateKeys(t *testing.T) {
 		t.Fatalf("kite1 register error: %s", err)
 	}
 
-	if reg.PublicKey != testkeys.PublicThird {
-		t.Fatalf("kite1: got public key %q, want %q", reg.PublicKey, testkeys.PublicThird)
+	if reg.PublicKey != testkeys.Public {
+		t.Fatalf("kite1: got public key %q, want %q", reg.PublicKey, testkeys.Public)
 	}
 
 	if reg.KiteKey == "" {
@@ -90,8 +90,8 @@ func TestUpdateKeys(t *testing.T) {
 		t.Fatalf("kite2 register error: %s", err)
 	}
 
-	if reg.PublicKey != testkeys.PublicThird {
-		t.Fatalf("kite2: got public key %q, want %q", reg.PublicKey, testkeys.PublicThird)
+	if reg.PublicKey != testkeys.Public {
+		t.Fatalf("kite2: got public key %q, want %q", reg.PublicKey, testkeys.Public)
 	}
 
 	if reg.KiteKey == "" {
