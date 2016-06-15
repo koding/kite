@@ -59,6 +59,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 			select {
 			case <-done:
 				heartbeat.Stop()
+				return
 			case <-heartbeat.C:
 				if err := ping.Call(); err != nil {
 					k.Log.Error(err.Error())
@@ -72,8 +73,13 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 
 // handleLog prints a log message to stderr.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
-	msg := r.Args.One().MustString()
-	k.Log.Info(fmt.Sprintf("%s: %s", r.Client.Name, msg))
+	msg, err := r.Args.One().String()
+	if err != nil {
+		return nil, err
+	}
+
+	k.Log.Info("%s: %s", r.Client.Name, msg)
+
 	return nil, nil
 }
 

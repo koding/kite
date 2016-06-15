@@ -92,9 +92,6 @@ type Client struct {
 	// For protecting access over OnConnect and OnDisconnect handlers.
 	m sync.RWMutex
 
-	// once ensures sendHub was started only once
-	once sync.Once
-
 	firstRequestHandlersNotified sync.Once
 
 	// ReadBufferSize is the input buffer size. By default it's 4096.
@@ -227,7 +224,8 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 	}
 
 	c.setSession(session)
-	c.once.Do(c.initSendHub)
+	c.wg.Add(1) // with sendHub we added a new listener
+	go c.sendHub()
 
 	// Reset the wait time.
 	c.redialBackOff.Reset()
@@ -466,11 +464,6 @@ func (c *Client) sendHub() {
 			return
 		}
 	}
-}
-
-func (c *Client) initSendHub() {
-	go c.sendHub()
-	c.wg.Add(1) // with sendHub we added a new listener
 }
 
 // OnConnect registers a function to run on connect.
