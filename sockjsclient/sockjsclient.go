@@ -42,6 +42,8 @@ type WebsocketSession struct {
 	id       string
 	messages []string
 	closed   int32
+
+	mu sync.Mutex // mu protects writes to conn
 }
 
 // DialOptions are used to overwrite default behavior
@@ -222,6 +224,9 @@ func (w *WebsocketSession) Send(str string) error {
 	if atomic.LoadInt32(&w.closed) == 1 {
 		return ErrSessionClosed
 	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	b, _ := json.Marshal([]string{str})
 	return w.conn.WriteMessage(websocket.TextMessage, b)
