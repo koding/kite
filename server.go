@@ -50,6 +50,14 @@ func (k *Kite) Close() {
 	if k.listener != nil {
 		k.listener.Close()
 	}
+
+	k.mu.Lock()
+	cache := k.verifyCache
+	k.mu.Unlock()
+
+	if cache != nil {
+		cache.StopGC()
+	}
 }
 
 func (k *Kite) Addr() string {

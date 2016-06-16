@@ -1,7 +1,6 @@
 package reverseproxy
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -50,6 +49,8 @@ func TestWebSocketProxy(t *testing.T) {
 	<-kon.Kite.ServerReadyNotify()
 
 	// start proxy
+	proxyRegistered := make(chan struct{})
+
 	color.Green("Starting Proxy and registering to Kontrol")
 	proxyConf := conf.Copy()
 	proxyConf.Port = 4999
@@ -57,8 +58,15 @@ func TestWebSocketProxy(t *testing.T) {
 	proxy.PublicHost = "localhost"
 	proxy.PublicPort = proxyConf.Port
 	proxy.Scheme = "http"
+	proxy.Kite.OnRegister(func(*protocol.RegisterResult) { close(proxyRegistered) })
+
 	go proxy.Run()
-	<-proxy.ReadyNotify()
+
+	select {
+	case <-proxy.ReadyNotify():
+	case <-time.After(10 * time.Second):
+		t.Fatalf("timed out waiting for proxy to start up")
+	}
 
 	proxyRegisterURL := &url.URL{
 		Scheme: proxy.Scheme,
@@ -66,11 +74,15 @@ func TestWebSocketProxy(t *testing.T) {
 		Path:   "/kite",
 	}
 
-	fmt.Printf("proxyRegisterURL %+v\n", proxyRegisterURL)
-
 	_, err := proxy.Kite.Register(proxyRegisterURL)
 	if err != nil {
 		t.Error(err)
+	}
+
+	select {
+	case <-proxyRegistered:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("timed out waiting for proxy to register")
 	}
 
 	// start now backend kite
@@ -87,13 +99,15 @@ func TestWebSocketProxy(t *testing.T) {
 	go backendKite.Run()
 	<-backendKite.ServerReadyNotify()
 
-	// now search for a proxy from kontrol
-	color.Green("BackendKite is searching proxy from kontrol")
-	kites, err := backendKite.GetKites(&protocol.KontrolQuery{
+	query := &protocol.KontrolQuery{
 		Username:    "testuser",
 		Environment: config.DefaultConfig.Environment,
 		Name:        Name,
-	})
+	}
+
+	// now search for a proxy from kontrol
+	color.Green("BackendKite is searching proxy from kontrol")
+	kites, err := backendKite.GetKites(query)
 	if err != nil {
 		t.Fatal(err)
 	}

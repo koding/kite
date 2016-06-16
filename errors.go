@@ -1,10 +1,15 @@
 package kite
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/koding/kite/dnode"
 )
+
+// ErrKeyNotTrusted is returned by verify functions when the key
+// should not be trusted.
+var ErrKeyNotTrusted = errors.New("kontrol key is not trusted")
 
 // Error is the type of the kite related errors returned from kite package.
 type Error struct {

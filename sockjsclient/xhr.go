@@ -22,8 +22,9 @@ type XHRSession struct {
 	sessionURL string
 	sessionID  string
 	messages   []string
-	opened     bool
 	abort      chan struct{}
+	opened     bool
+	closed     bool
 }
 
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
@@ -82,6 +83,10 @@ func (x *XHRSession) Recv() (string, error) {
 		msg := x.messages[0]
 		x.messages = x.messages[1:]
 		return msg, nil
+	}
+
+	if x.isClosed() {
+		return "", ErrSessionClosed
 	}
 
 	// start to poll from the server until we receive something
@@ -176,12 +181,13 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 }
 
 func (x *XHRSession) Send(frame string) error {
-	x.mu.Lock()
-	if !x.opened {
-		x.mu.Unlock()
+	if !x.isOpened() {
 		return errors.New("session is not opened yet")
 	}
-	x.mu.Unlock()
+
+	if x.isClosed() {
+		return ErrSessionClosed
+	}
 
 	// Need's to be JSON encoded array of string messages (SockJS protocol
 	// requirement)
@@ -213,6 +219,7 @@ func (x *XHRSession) Send(frame string) error {
 func (x *XHRSession) Close(status uint32, reason string) error {
 	x.mu.Lock()
 	x.opened = false
+	x.closed = true
 	x.mu.Unlock()
 
 	select {
@@ -221,6 +228,20 @@ func (x *XHRSession) Close(status uint32, reason string) error {
 	}
 
 	return nil
+}
+
+func (x *XHRSession) isOpened() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+
+	return x.opened
+}
+
+func (x *XHRSession) isClosed() bool {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+
+	return x.closed
 }
 
 type doResult struct {

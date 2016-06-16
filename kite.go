@@ -11,10 +11,12 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
+	"github.com/koding/cache"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
@@ -59,11 +61,6 @@ type Kite struct {
 	// See also: kite.Client.ClientFunc docstring.
 	ClientFunc func(*sockjsclient.DialOptions) *http.Client
 
-	// Kontrol keys to trust. Kontrol will issue access tokens for kites
-	// that are signed with the private counterpart of these keys.
-	// Key data must be PEM encoded.
-	trustedKontrolKeys map[string]string
-
 	// Handlers added with Kite.HandleFunc().
 	handlers     map[string]*Method // method map for exported methods
 	preHandlers  []Handler          // a list of handlers that are executed before any handler
@@ -80,6 +77,35 @@ type Kite struct {
 	// from kontrol
 	kontrol *kontrolClient
 
+	// configMu protects access to Config.{Kite,Kontrol}Key fields.
+	configMu sync.RWMutex
+
+	// verifyCache is used as a cache for verify method.
+	//
+	// The field is set by verifyInit method.
+	verifyCache *cache.MemoryTTL
+
+	// verifyFunc is a verify method used to verify auth keys.
+	//
+	// For more details see (config.Config).VerifyFunc.
+	//
+	// The field is set by verifyInit method.
+	verifyFunc func(pub string) error
+
+	// verifyAudienceFunc is used to verify the audience of an
+	// an incoming JWT token.
+	//
+	// For more details see (config.Config).VerifyAudienceFunc.
+	//
+	// The field is set by verifyInit method.
+	verifyAudienceFunc func(*protocol.Kite, string) error
+
+	// verifyOnce ensures all verify* fields are set up only once.
+	verifyOnce sync.Once
+
+	// mu protects assigment to verifyCache
+	mu sync.Mutex
+
 	// Handlers to call when a new connection is received.
 	onConnectHandlers []func(*Client)
 
@@ -92,6 +118,9 @@ type Kite struct {
 	// onRegisterHandlers field holds callbacks invoked when Kite
 	// registers successfully to Kontrol
 	onRegisterHandlers []func(*protocol.RegisterResult)
+
+	// handlersMu protects access to on*Handlers fields.
+	handlersMu sync.RWMutex
 
 	// server fields, are initialized and used when
 	// TODO: move them to their own struct, just like KontrolClient
@@ -128,19 +157,18 @@ func New(name, version string) *Kite {
 	}
 
 	k := &Kite{
-		Config:             config.New(),
-		Log:                l,
-		SetLogLevel:        setlevel,
-		Authenticators:     make(map[string]func(*Request) error),
-		trustedKontrolKeys: make(map[string]string),
-		handlers:           make(map[string]*Method),
-		kontrol:            kClient,
-		name:               name,
-		version:            version,
-		Id:                 kiteID.String(),
-		readyC:             make(chan bool),
-		closeC:             make(chan bool),
-		muxer:              mux.NewRouter(),
+		Config:         config.New(),
+		Log:            l,
+		SetLogLevel:    setlevel,
+		Authenticators: make(map[string]func(*Request) error),
+		handlers:       make(map[string]*Method),
+		kontrol:        kClient,
+		name:           name,
+		version:        version,
+		Id:             kiteID.String(),
+		readyC:         make(chan bool),
+		closeC:         make(chan bool),
+		muxer:          mux.NewRouter(),
 	}
 
 	// We change the heartbeat interval from 25 seconds to 10 seconds. This is
@@ -155,6 +183,7 @@ func New(name, version string) *Kite {
 	k.OnConnect(func(c *Client) { k.Log.Debug("New session: %s", c.session.ID()) })
 	k.OnFirstRequest(func(c *Client) { k.Log.Debug("Session %q is identified as %q", c.session.ID(), c.Kite) })
 	k.OnDisconnect(func(c *Client) { k.Log.Debug("Kite has disconnected: %q", c.Kite) })
+	k.OnRegister(k.updateAuth)
 
 	// Every kite should be able to authenticate the user from token.
 	// Tokens are granted by Kontrol Kite.
@@ -182,9 +211,22 @@ func (k *Kite) Kite() *protocol.Kite {
 	}
 }
 
-// Trust a Kontrol key for validating tokens.
-func (k *Kite) TrustKontrolKey(issuer, key string) {
-	k.trustedKontrolKeys[issuer] = key
+// KiteKey gives a kite key used to authenticate to kontrol and other kites.
+func (k *Kite) KiteKey() string {
+	k.configMu.RLock()
+	defer k.configMu.RUnlock()
+
+	return k.Config.KiteKey
+}
+
+// KontrolKey gives a Kontrol's public key.
+//
+// The value is taken form kite key's kontrolKey claim.
+func (k *Kite) KontrolKey() string {
+	k.configMu.RLock()
+	defer k.configMu.RUnlock()
+
+	return k.Config.KontrolKey
 }
 
 // HandleHTTP registers the HTTP handler for the given pattern into the
@@ -206,17 +248,15 @@ func (k *Kite) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (k *Kite) sockjsHandler(session sockjs.Session) {
-	defer session.Close(0, "")
+	defer session.Close(3000, "Go away!")
 
 	// This Client also handles the connected client.
 	// Since both sides can send/receive messages the client code is reused here.
 	c := k.NewClient("")
-	c.m.Lock()
-	c.session = session
-	c.m.Unlock()
 
+	c.setSession(session)
+	c.wg.Add(1)
 	go c.sendHub()
-	c.wg.Add(1) // with sendHub we added a new listener
 
 	k.callOnConnectHandlers(c)
 
@@ -230,54 +270,91 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 // OnConnect registers a callbacks which is called when a Kite connects
 // to the k Kite.
 func (k *Kite) OnConnect(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onConnectHandlers = append(k.onConnectHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnFirstRequest registers a function to run when we receive first request
 // from other Kite.
 func (k *Kite) OnFirstRequest(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onFirstRequestHandlers = append(k.onFirstRequestHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnDisconnect registers a function to run when a connected Kite is disconnected.
 func (k *Kite) OnDisconnect(handler func(*Client)) {
+	k.handlersMu.Lock()
 	k.onDisconnectHandlers = append(k.onDisconnectHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 // OnRegister registers a callback which is called when a Kite registers
 // to a Kontrol.
 func (k *Kite) OnRegister(handler func(*protocol.RegisterResult)) {
+	k.handlersMu.Lock()
 	k.onRegisterHandlers = append(k.onRegisterHandlers, handler)
+	k.handlersMu.Unlock()
 }
 
 func (k *Kite) callOnConnectHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onConnectHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnFirstRequestHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onFirstRequestHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnDisconnectHandlers(c *Client) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onDisconnectHandlers {
 		handler(c)
 	}
 }
 
 func (k *Kite) callOnRegisterHandlers(r *protocol.RegisterResult) {
+	k.handlersMu.RLock()
+	defer k.handlersMu.RUnlock()
+
 	for _, handler := range k.onRegisterHandlers {
 		handler(r)
+	}
+}
+
+func (k *Kite) updateAuth(reg *protocol.RegisterResult) {
+	k.configMu.Lock()
+	defer k.configMu.Unlock()
+
+	// we also received a new public key (means the old one was invalidated).
+	// Use it now.
+	if reg.PublicKey != "" {
+		k.Config.KontrolKey = reg.PublicKey
+	}
+
+	if reg.KiteKey != "" {
+		k.Config.KiteKey = reg.KiteKey
 	}
 }
 
 // RSAKey returns the corresponding public key for the issuer of the token.
 // It is called by jwt-go package when validating the signature in the token.
 func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
-	if k.Config.KontrolKey == "" {
+	kontrolKey := k.KontrolKey()
+
+	if kontrolKey == "" {
 		panic("kontrol key is not set in config")
 	}
 
@@ -290,5 +367,5 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
 	}
 
-	return []byte(k.Config.KontrolKey), nil
+	return []byte(kontrolKey), nil
 }

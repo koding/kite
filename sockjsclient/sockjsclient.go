@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,16 +27,30 @@ type Rand struct {
 	sync.Mutex
 }
 
-var r = Rand{r: rand.New(rand.NewSource(time.Now().UnixNano()))}
+var r = Rand{
+	r: rand.New(rand.NewSource(time.Now().UnixNano())),
+}
 
+// ErrSessionClosed is returned by Send/Recv methods when
+// calling them after the session got closed.
+var ErrSessionClosed = errors.New("session is closed")
+
+// WebsocketSession represents a sockjs.Session over
+// a websocket connection.
 type WebsocketSession struct {
 	conn     *websocket.Conn
 	id       string
 	messages []string
+	closed   int32
+
+	mu sync.Mutex // mu protects writes to conn
 }
 
+// DialOptions are used to overwrite default behavior
+// of the websocket session.
 type DialOptions struct {
-	BaseURL         string
+	BaseURL string // required
+
 	ReadBufferSize  int
 	WriteBufferSize int
 	Timeout         time.Duration
@@ -61,6 +76,8 @@ func defaultClient(opts *DialOptions) *http.Client {
 	}
 }
 
+// ConnectWebsocketSession dials the remote specified in the opts and
+// creates new websocket session.
 func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 	dialURL, err := url.Parse(opts.BaseURL)
 	if err != nil {
@@ -121,22 +138,25 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 	return session, nil
 }
 
+// NewWebsocketSession creates new sockjs.Session from existing
+// websocket connection.
 func NewWebsocketSession(conn *websocket.Conn) *WebsocketSession {
 	return &WebsocketSession{
 		conn: conn,
 	}
 }
 
+// RemoteAddr gives network address of the remote client.
 func (w *WebsocketSession) RemoteAddr() string {
 	return w.conn.RemoteAddr().String()
 }
 
-// ID returns a session id
+// ID returns a session id.
 func (w *WebsocketSession) ID() string {
 	return w.id
 }
 
-// Recv reads one text frame from session
+// Recv reads one text frame from session.
 func (w *WebsocketSession) Recv() (string, error) {
 	// Return previously received messages if there is any.
 	if len(w.messages) > 0 {
@@ -146,6 +166,10 @@ func (w *WebsocketSession) Recv() (string, error) {
 	}
 
 read_frame:
+	if atomic.LoadInt32(&w.closed) == 1 {
+		return "", ErrSessionClosed
+	}
+
 	// Read one SockJS frame.
 	_, buf, err := w.conn.ReadMessage()
 	if err != nil {
@@ -197,13 +221,24 @@ read_frame:
 
 // Send sends one text frame to session
 func (w *WebsocketSession) Send(str string) error {
+	if atomic.LoadInt32(&w.closed) == 1 {
+		return ErrSessionClosed
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	b, _ := json.Marshal([]string{str})
 	return w.conn.WriteMessage(websocket.TextMessage, b)
 }
 
 // Close closes the session with provided code and reason.
-func (w *WebsocketSession) Close(status uint32, reason string) error {
-	return w.conn.Close()
+func (w *WebsocketSession) Close(uint32, string) error {
+	if atomic.CompareAndSwapInt32(&w.closed, 0, 1) {
+		return w.conn.Close()
+	}
+
+	return ErrSessionClosed
 }
 
 // threeDigits is used to generate a server_id.
