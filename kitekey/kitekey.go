@@ -116,7 +116,7 @@ func (e *Extractor) Extract(token *jwt.Token) (interface{}, error) {
 
 	e.Claims = claims
 
-	return []byte(claims.KontrolKey), nil
+	return jwt.ParseRSAPublicKeyFromPEM([]byte(claims.KontrolKey))
 }
 
 // GetKontrolKey is used as key getter func for jwt.Parse() function.

@@ -305,6 +305,9 @@ func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
 }
 
 func (k *Kite) verifyInit() {
+	k.configMu.Lock()
+	defer k.configMu.Unlock()
+
 	k.verifyFunc = k.Config.VerifyFunc
 
 	if k.verifyFunc == nil {
@@ -330,10 +333,23 @@ func (k *Kite) verifyInit() {
 
 		k.verifyCache.StartGC(ttl / 2)
 	}
+
+	key, err := jwt.ParseRSAPublicKeyFromPEM([]byte(k.Config.KontrolKey))
+	if err != nil {
+		k.Log.Error("unable to init kontrol key: %s", err)
+
+		return
+	}
+
+	k.kontrolKey = key
 }
 
 func (k *Kite) selfVerify(pub string) error {
-	if pub != k.KontrolKey() {
+	k.configMu.RLock()
+	ourKey := k.Config.KontrolKey
+	k.configMu.RUnlock()
+
+	if pub != ourKey {
 		return ErrKeyNotTrusted
 	}
 
@@ -348,6 +364,11 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 		return nil, errors.New("no kontrol key found")
 	}
 
+	rsaKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(key))
+	if err != nil {
+		return nil, err
+	}
+
 	switch {
 	case k.verifyCache != nil:
 		v, err := k.verifyCache.Get(key)
@@ -359,7 +380,7 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 			return nil, errors.New("invalid kontrol key found")
 		}
 
-		return []byte(key), nil
+		return rsaKey, nil
 	}
 
 	if err := k.verifyFunc(key); err != nil {
@@ -374,7 +395,7 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 
 	k.verifyCache.Set(key, true)
 
-	return []byte(key), nil
+	return rsaKey, nil
 }
 
 func (k *Kite) verifyAudience(kite *protocol.Kite, audience string) error {

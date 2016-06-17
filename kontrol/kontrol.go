@@ -438,7 +438,7 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 		ri := len(k.lastPublic) - i - 1
 
 		keyFn := func(token *jwt.Token) (interface{}, error) {
-			return []byte(k.lastPublic[ri]), nil
+			return jwt.ParseRSAPublicKeyFromPEM([]byte(k.lastPublic[ri]))
 		}
 
 		if _, err := jwt.Parse(kiteKey, keyFn); err != nil {

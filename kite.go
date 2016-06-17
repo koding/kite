@@ -4,6 +4,7 @@
 package kite
 
 import (
+	"crypto/rsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -77,6 +78,9 @@ type Kite struct {
 	// kontrolclient is used to register to kontrol and query third party kites
 	// from kontrol
 	kontrol *kontrolClient
+
+	// kontrolKey stores parsed Config.KontrolKey
+	kontrolKey *rsa.PublicKey
 
 	// configMu protects access to Config.{Kite,Kontrol}Key fields.
 	configMu sync.RWMutex
@@ -223,11 +227,11 @@ func (k *Kite) KiteKey() string {
 // KontrolKey gives a Kontrol's public key.
 //
 // The value is taken form kite key's kontrolKey claim.
-func (k *Kite) KontrolKey() string {
+func (k *Kite) KontrolKey() *rsa.PublicKey {
 	k.configMu.RLock()
 	defer k.configMu.RUnlock()
 
-	return k.Config.KontrolKey
+	return k.kontrolKey
 }
 
 // HandleHTTP registers the HTTP handler for the given pattern into the
@@ -348,6 +352,15 @@ func (k *Kite) updateAuth(reg *protocol.RegisterResult) {
 	if reg.KiteKey != "" {
 		k.Config.KiteKey = reg.KiteKey
 	}
+
+	key, err := jwt.ParseRSAPublicKeyFromPEM([]byte(reg.PublicKey))
+	if err != nil {
+		k.Log.Error("unable to update kontrol key: %s", err)
+
+		return
+	}
+
+	k.kontrolKey = key
 }
 
 // RSAKey returns the corresponding public key for the issuer of the token.
@@ -355,7 +368,7 @@ func (k *Kite) updateAuth(reg *protocol.RegisterResult) {
 func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 	kontrolKey := k.KontrolKey()
 
-	if kontrolKey == "" {
+	if kontrolKey == nil {
 		panic("kontrol key is not set in config")
 	}
 
@@ -368,5 +381,5 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 		return nil, fmt.Errorf("issuer is not trusted: %s", claims.Issuer)
 	}
 
-	return []byte(kontrolKey), nil
+	return kontrolKey, nil
 }
