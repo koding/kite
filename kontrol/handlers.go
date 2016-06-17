@@ -45,9 +45,11 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 		URL: args.URL,
 	}
 
-	ex := &kitekey.Extractor{}
+	ex := &kitekey.Extractor{
+		Claims: &kitekey.KiteClaims{},
+	}
 
-	t, err := jwt.Parse(r.Auth.Key, ex.Extract)
+	t, err := jwt.ParseWithClaims(r.Auth.Key, ex.Claims, ex.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -261,9 +263,11 @@ func (k *Kontrol) HandleGetKey(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
 	}
 
-	ex := &kitekey.Extractor{}
+	ex := &kitekey.Extractor{
+		Claims: &kitekey.KiteClaims{},
+	}
 
-	if _, err := jwt.Parse(r.Auth.Key, ex.Extract); err != nil {
+	if _, err := jwt.ParseWithClaims(r.Auth.Key, ex.Claims, ex.Extract); err != nil {
 		return nil, err
 	}
 

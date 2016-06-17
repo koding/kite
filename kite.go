@@ -366,6 +366,8 @@ func (k *Kite) updateAuth(reg *protocol.RegisterResult) {
 // RSAKey returns the corresponding public key for the issuer of the token.
 // It is called by jwt-go package when validating the signature in the token.
 func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
+	k.verifyOnce.Do(k.verifyInit)
+
 	kontrolKey := k.KontrolKey()
 
 	if kontrolKey == nil {

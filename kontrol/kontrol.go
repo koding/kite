@@ -441,7 +441,7 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 			return jwt.ParseRSAPublicKeyFromPEM([]byte(k.lastPublic[ri]))
 		}
 
-		if _, err := jwt.Parse(kiteKey, keyFn); err != nil {
+		if _, err := jwt.ParseWithClaims(kiteKey, &kitekey.KiteClaims{}, keyFn); err != nil {
 			me.err = append(me.err, err)
 			continue
 		}

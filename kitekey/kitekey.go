@@ -3,7 +3,7 @@ package kitekey
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -110,8 +110,8 @@ func (e *Extractor) Extract(token *jwt.Token) (interface{}, error) {
 	e.Token = token
 
 	claims, ok := token.Claims.(*KiteClaims)
-	if !ok || claims.KontrolKey == "" {
-		return nil, errors.New("no kontrol key found")
+	if !ok {
+		return nil, fmt.Errorf("no kontrol key found")
 	}
 
 	e.Claims = claims

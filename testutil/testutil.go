@@ -74,7 +74,7 @@ func NewToken(username, private, public string) *jwt.Token {
 	}
 
 	// verify the token
-	_, err = jwt.Parse(token.Raw, func(*jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(token.Raw, claims, func(*jwt.Token) (interface{}, error) {
 		return jwt.ParseRSAPublicKeyFromPEM([]byte(public))
 	})
 
