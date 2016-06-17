@@ -3,13 +3,13 @@ package dnode
 import "sync"
 
 type Scrubber struct {
-	// Reference to sent callbacks are saved in this map.
-	callbacks  map[uint64]func(*Partial)
-	sync.Mutex // protects
-
 	// Next callback number.
-	// Incremented atomically by registerCallback().
+	// Incremented atomically by register().
 	seq uint64
+
+	// Reference to sent callbacks are saved in this map.
+	sync.Mutex // protects
+	callbacks  map[uint64]func(*Partial)
 }
 
 // New returns a pointer to a new Scrubber.

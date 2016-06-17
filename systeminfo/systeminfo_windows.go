@@ -56,7 +56,7 @@ func memoryStats() (*memory, error) {
 		return nil, err
 	}
 
-	// memoryStats functions from other platforms return disk usage in bytes.
+	// memoryStats functions from other platforms return memory usage in bytes.
 	return &memory{
 		Usage: mstat.totalPhys - mstat.availPhys,
 		Total: mstat.totalPhys,
