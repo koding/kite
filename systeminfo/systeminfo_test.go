@@ -5,8 +5,7 @@ import "testing"
 func TestInfo(t *testing.T) {
 	i, err := New()
 	if err != nil {
-		t.Errorf(err.Error())
-		return
+		t.Fatalf("want err == nil; got %v", err)
 	}
 
 	t.Logf("info: %+v\n", i)
