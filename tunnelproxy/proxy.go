@@ -168,6 +168,9 @@ func (p *Proxy) handleRegister(r *kite.Request) (interface{}, error) {
 
 // handleProxy is the client side of the Tunnel (on public network).
 func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
+	const ttl = time.Duration(1 * time.Hour)
+	const leeway = time.Duration(1 * time.Minute)
+
 	kiteID := req.URL.Query().Get("kiteID")
 
 	client, ok := p.kites[kiteID]
@@ -179,18 +182,15 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 	tunnel := client.newTunnel(session)
 	defer tunnel.Close()
 
-	token := jwt.New(jwt.GetSigningMethod("RS256"))
-
-	const ttl = time.Duration(1 * time.Hour)
-	const leeway = time.Duration(1 * time.Minute)
-
-	token.Claims = map[string]interface{}{
+	claims := jwt.MapClaims{
 		"sub": client.ID,                                    // kite ID
 		"seq": tunnel.id,                                    // tunnel number
 		"iat": time.Now().UTC().Unix(),                      // Issued At
 		"exp": time.Now().UTC().Add(ttl).Add(leeway).Unix(), // Expiration Time
 		"nbf": time.Now().UTC().Add(-leeway).Unix(),         // Not Before
 	}
+
+	token := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
 
 	signed, err := token.SignedString([]byte(p.privKey))
 	if err != nil {
@@ -231,8 +231,8 @@ func (p *Proxy) handleTunnel(session sockjs.Session, req *http.Request) {
 		return
 	}
 
-	kiteID := token.Claims["sub"].(string)
-	seq := uint64(token.Claims["seq"].(float64))
+	kiteID := token.Claims.(jwt.MapClaims)["sub"].(string)
+	seq := uint64(token.Claims.(jwt.MapClaims)["seq"].(float64))
 
 	client, ok := p.kites[kiteID]
 	if !ok {

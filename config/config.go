@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -151,26 +152,16 @@ func (c *Config) ReadKiteKey() error {
 func (c *Config) readToken(key *jwt.Token) error {
 	c.KiteKey = key.Raw
 
-	if username, ok := key.Claims["sub"].(string); ok {
-		c.Username = username
+	claims, ok := key.Claims.(*kitekey.KiteClaims)
+	if !ok {
+		return errors.New("no claims found")
 	}
 
-	if kontrolUser, ok := key.Claims["iss"].(string); ok {
-		c.KontrolUser = kontrolUser
-	}
-
-	// jti is used for jwt's but let's also use it for kite ID
-	if id, ok := key.Claims["jti"].(string); ok {
-		c.Id = id
-	}
-
-	if kontrolURL, ok := key.Claims["kontrolURL"].(string); ok {
-		c.KontrolURL = kontrolURL
-	}
-
-	if kontrolKey, ok := key.Claims["kontrolKey"].(string); ok {
-		c.KontrolKey = kontrolKey
-	}
+	c.Username = claims.Subject
+	c.KontrolUser = claims.Issuer
+	c.Id = claims.Id // jti is used for jwt's but let's also use it for kite ID
+	c.KontrolURL = claims.KontrolURL
+	c.KontrolKey = claims.KontrolKey
 
 	return nil
 }

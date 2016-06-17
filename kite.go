@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/koding/cache"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 	uuid "github.com/satori/go.uuid"
@@ -358,13 +359,13 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 		panic("kontrol key is not set in config")
 	}
 
-	issuer, ok := token.Claims["iss"].(string)
+	claims, ok := token.Claims.(*kitekey.KiteClaims)
 	if !ok {
-		return nil, errors.New("token does not contain a valid issuer claim")
+		return nil, errors.New("token does not have valid claims")
 	}
 
-	if issuer != k.Config.KontrolUser {
-		return nil, fmt.Errorf("issuer is not trusted: %s", issuer)
+	if claims.Issuer != k.Config.KontrolUser {
+		return nil, fmt.Errorf("issuer is not trusted: %s", claims.Issuer)
 	}
 
 	return []byte(kontrolKey), nil

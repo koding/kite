@@ -109,13 +109,13 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		},
 	}
 
-	keyPair, resp.KiteKey, err = k.getOrUpdateKeyPub(ex.KontrolKey, t, r)
+	keyPair, resp.KiteKey, err = k.getOrUpdateKeyPub(ex.Claims.KontrolKey, t, r)
 	if err != nil {
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
-	if ex.KontrolKey != keyPair.Public {
+	if ex.Claims.KontrolKey != keyPair.Public {
 		// NOTE(rjeczalik): updates public key for old kites, new kites
 		// expect kite key to be updated
 		resp.PublicKey = keyPair.Public

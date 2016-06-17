@@ -341,13 +341,15 @@ func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey 
 
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 
-	token.Claims = map[string]interface{}{
-		"iss":        k.Kite.Kite().Username,       // Issuer
-		"sub":        username,                     // Subject
-		"iat":        time.Now().UTC().Unix(),      // Issued At
-		"jti":        tknID.String(),               // JWT ID
-		"kontrolURL": k.Kite.Config.KontrolURL,     // Kontrol URL
-		"kontrolKey": strings.TrimSpace(publicKey), // Public key of kontrol
+	token.Claims = &kitekey.KiteClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:   k.Kite.Kite().Username,
+			Subject:  username,
+			IssuedAt: time.Now().UTC().Unix(),
+			Id:       tknID.String(),
+		},
+		KontrolURL: k.Kite.Config.KontrolURL,
+		KontrolKey: strings.TrimSpace(publicKey),
 	}
 
 	k.Kite.Log.Info("Registered machine on user: %s", username)
@@ -474,14 +476,19 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		return signed, nil
 	}
 
-	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
-	tkn.Claims["iss"] = issuer                                                 // Issuer
-	tkn.Claims["sub"] = username                                               // Subject
-	tkn.Claims["aud"] = aud                                                    // Audience
-	tkn.Claims["exp"] = time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix() // Expiration Time
-	tkn.Claims["nbf"] = time.Now().UTC().Add(-TokenLeeway).Unix()              // Not Before
-	tkn.Claims["iat"] = time.Now().UTC().Unix()                                // Issued At
-	tkn.Claims["jti"] = uuid.NewV4().String()                                  // JWT ID
+	claims := &kitekey.KiteClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:    issuer,
+			Subject:   username,
+			Audience:  aud,
+			ExpiresAt: time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix(),
+			NotBefore: time.Now().UTC().Add(-TokenLeeway).Unix(),
+			IssuedAt:  time.Now().UTC().Unix(),
+			Id:        uuid.NewV4().String(),
+		},
+	}
+
+	tkn := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
 
 	signed, err := tkn.SignedString([]byte(kp.Private))
 	if err != nil {

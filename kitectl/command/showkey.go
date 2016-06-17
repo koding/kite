@@ -1,10 +1,12 @@
 package command
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/koding/kite/kitekey"
+
 	"github.com/mitchellh/cli"
 )
 
@@ -16,6 +18,19 @@ var tokenKeyOrder = []string{
 	"iat",        // issued at
 	"jti",        // JWT ID
 	"kontrolKey", // kontrol public key
+}
+
+func toObject(v interface{}) (m map[string]interface{}) {
+	p, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := json.Unmarshal(p, &m); err != nil {
+		panic(err)
+	}
+
+	return m
 }
 
 type Showkey struct {
@@ -50,8 +65,10 @@ func (c *Showkey) Run(_ []string) int {
 		return 1
 	}
 
+	claims := toObject(token.Claims)
+
 	for _, v := range tokenKeyOrder {
-		c.Ui.Output(fmt.Sprintf("%-15s%+v", v, token.Claims[v]))
+		c.Ui.Output(fmt.Sprintf("%-15s%+v", v, claims[v]))
 	}
 
 	return 0
