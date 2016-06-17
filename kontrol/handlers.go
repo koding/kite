@@ -329,7 +329,14 @@ func (k *Kontrol) updateKeyWithKeyPair(t *jwt.Token, keyPair *KeyPair) string {
 		claims.KontrolKey = keyPair.Public
 	}
 
-	kiteKey, err := t.SignedString([]byte(keyPair.Private))
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(keyPair.Private))
+	if err != nil {
+		k.log.Error("key update error for %q: %s", claims.Subject, err)
+
+		return ""
+	}
+
+	kiteKey, err := t.SignedString(rsaPrivate)
 	if err != nil {
 		k.log.Error("key update error for %q: %s", claims.Subject, err)
 

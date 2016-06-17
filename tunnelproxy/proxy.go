@@ -179,6 +179,13 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 		return
 	}
 
+	// TODO(rjeczalik): keep *rsa.PrivateKey in Proxy struct
+	rsaPrivate, err := jwt.ParseECPrivateKeyFromPEM([]byte(p.privKey))
+	if err != nil {
+		p.Kite.Log.Error("key pair encrypt error: %s", err)
+		return
+	}
+
 	tunnel := client.newTunnel(session)
 	defer tunnel.Close()
 
@@ -190,9 +197,7 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 		"nbf": time.Now().UTC().Add(-leeway).Unix(),         // Not Before
 	}
 
-	token := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
-
-	signed, err := token.SignedString([]byte(p.privKey))
+	signed, err := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 	if err != nil {
 		p.Kite.Log.Error("Cannot sign token: %s", err.Error())
 		return

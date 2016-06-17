@@ -63,7 +63,12 @@ func NewToken(username, private, public string) *jwt.Token {
 
 	token := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
 
-	token.Raw, err = token.SignedString([]byte(private))
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(private))
+	if err != nil {
+		panic(err)
+	}
+
+	token.Raw, err = token.SignedString(rsaPrivate)
 	if err != nil {
 		panic(err)
 	}

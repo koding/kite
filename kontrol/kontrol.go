@@ -336,25 +336,25 @@ func (k *Kontrol) InitializeSelf() error {
 }
 
 func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey string, err error) {
-	// Only accept requests of type machine
-	tknID := uuid.NewV4()
-
-	token := jwt.New(jwt.GetSigningMethod("RS256"))
-
-	token.Claims = &kitekey.KiteClaims{
+	claims := &kitekey.KiteClaims{
 		StandardClaims: jwt.StandardClaims{
 			Issuer:   k.Kite.Kite().Username,
 			Subject:  username,
 			IssuedAt: time.Now().UTC().Unix(),
-			Id:       tknID.String(),
+			Id:       uuid.NewV4().String(),
 		},
 		KontrolURL: k.Kite.Config.KontrolURL,
 		KontrolKey: strings.TrimSpace(publicKey),
 	}
 
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKey))
+	if err != nil {
+		return "", err
+	}
+
 	k.Kite.Log.Info("Registered machine on user: %s", username)
 
-	return token.SignedString([]byte(privateKey))
+	return jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 }
 
 // registerSelf adds Kontrol itself to the storage as a kite.
@@ -476,6 +476,11 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		return signed, nil
 	}
 
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(kp.Private))
+	if err != nil {
+		return "", err
+	}
+
 	claims := &kitekey.KiteClaims{
 		StandardClaims: jwt.StandardClaims{
 			Issuer:    issuer,
@@ -488,9 +493,7 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		},
 	}
 
-	tkn := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
-
-	signed, err := tkn.SignedString([]byte(kp.Private))
+	signed, err = jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
