@@ -180,7 +180,7 @@ func (p *Proxy) handleProxy(session sockjs.Session, req *http.Request) {
 	}
 
 	// TODO(rjeczalik): keep *rsa.PrivateKey in Proxy struct
-	rsaPrivate, err := jwt.ParseECPrivateKeyFromPEM([]byte(p.privKey))
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(p.privKey))
 	if err != nil {
 		p.Kite.Log.Error("key pair encrypt error: %s", err)
 		return

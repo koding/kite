@@ -347,20 +347,20 @@ func (k *Kite) updateAuth(reg *protocol.RegisterResult) {
 	// Use it now.
 	if reg.PublicKey != "" {
 		k.Config.KontrolKey = reg.PublicKey
+
+		key, err := jwt.ParseRSAPublicKeyFromPEM([]byte(reg.PublicKey))
+		if err != nil {
+			k.Log.Error("unable to update kontrol key: %s", err)
+
+			return
+		}
+
+		k.kontrolKey = key
 	}
 
 	if reg.KiteKey != "" {
 		k.Config.KiteKey = reg.KiteKey
 	}
-
-	key, err := jwt.ParseRSAPublicKeyFromPEM([]byte(reg.PublicKey))
-	if err != nil {
-		k.Log.Error("unable to update kontrol key: %s", err)
-
-		return
-	}
-
-	k.kontrolKey = key
 }
 
 // RSAKey returns the corresponding public key for the issuer of the token.

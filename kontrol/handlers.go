@@ -55,6 +55,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 	}
 
 	var keyPair *KeyPair
+	var origKey = ex.Claims.KontrolKey
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// check if there is a new key we can use.
@@ -63,7 +64,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	if ex.Claims.KontrolKey != keyPair.Public {
+	if origKey != keyPair.Public {
 		// NOTE(rjeczalik): updates public key for old kites, new kites
 		// expect kite key to be updated
 		res.PublicKey = keyPair.Public
