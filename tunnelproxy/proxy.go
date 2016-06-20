@@ -3,6 +3,7 @@ package tunnelproxy
 
 import (
 	"crypto/tls"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -227,6 +228,10 @@ func (p *Proxy) handleTunnel(session sockjs.Session, req *http.Request) {
 	tokenString := req.URL.Query().Get("token")
 
 	getPublicKey := func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, errors.New("invalid signing method")
+		}
+
 		return jwt.ParseRSAPublicKeyFromPEM([]byte(p.pubKey))
 	}
 

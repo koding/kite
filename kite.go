@@ -374,6 +374,10 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 		panic("kontrol key is not set in config")
 	}
 
+	if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+		return nil, errors.New("invalid signing method")
+	}
+
 	claims, ok := token.Claims.(*kitekey.KiteClaims)
 	if !ok {
 		return nil, errors.New("token does not have valid claims")

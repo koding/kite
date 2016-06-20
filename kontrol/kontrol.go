@@ -438,6 +438,10 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 		ri := len(k.lastPublic) - i - 1
 
 		keyFn := func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, errors.New("invalid signing method")
+			}
+
 			return jwt.ParseRSAPublicKeyFromPEM([]byte(k.lastPublic[ri]))
 		}
 

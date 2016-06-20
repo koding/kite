@@ -3,6 +3,7 @@ package kitekey
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -108,6 +109,10 @@ type Extractor struct {
 // Extract is a keyFunc argument for jwt.Parse function.
 func (e *Extractor) Extract(token *jwt.Token) (interface{}, error) {
 	e.Token = token
+
+	if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+		return nil, errors.New("invalid signing method")
+	}
 
 	claims, ok := token.Claims.(*KiteClaims)
 	if !ok {
