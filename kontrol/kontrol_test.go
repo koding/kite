@@ -164,13 +164,15 @@ func TestRegisterMachine(t *testing.T) {
 		return
 	}
 
-	token, err := jwt.Parse(key, kitekey.GetKontrolKey)
+	claims := &kitekey.KiteClaims{}
+
+	_, err = jwt.ParseWithClaims(key, claims, kitekey.GetKontrolKey)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	if username := token.Claims["sub"].(string); username != "foo" {
-		t.Fatalf("invalid username: %s", username)
+	if claims.Subject != "foo" {
+		t.Fatalf("invalid username: %s", claims.Subject)
 	}
 }
 

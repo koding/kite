@@ -4,6 +4,7 @@ package kitekey
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -17,6 +18,13 @@ const (
 	kiteDirName     = ".kite"
 	kiteKeyFileName = "kite.key"
 )
+
+// KiteClaims represents JWT token claims extended with kontrolKey claim.
+type KiteClaims struct {
+	jwt.StandardClaims
+	KontrolKey string `json:"kontrolKey,omitempty"`
+	KontrolURL string `json:"kontrolURL,omitempty"`
+}
 
 // KiteHome returns the home path of Kite directory.
 // The returned value can be overriden by setting KITE_HOME environment variable.
@@ -79,7 +87,7 @@ func Parse() (*jwt.Token, error) {
 		return nil, err
 	}
 
-	return jwt.Parse(kiteKey, GetKontrolKey)
+	return jwt.ParseWithClaims(kiteKey, &KiteClaims{}, GetKontrolKey)
 }
 
 // ParseFile reads the given kite key file and parses it as a JWT token.
@@ -89,27 +97,31 @@ func ParseFile(file string) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	return jwt.Parse(string(bytes.TrimSpace(kiteKey)), GetKontrolKey)
+	return jwt.ParseWithClaims(string(bytes.TrimSpace(kiteKey)), &KiteClaims{}, GetKontrolKey)
 }
 
 // Extractor is used to extract kontrol key from JWT token.
 type Extractor struct {
-	Token      *jwt.Token
-	KontrolKey string
+	Token  *jwt.Token
+	Claims *KiteClaims
 }
 
 // Extract is a keyFunc argument for jwt.Parse function.
 func (e *Extractor) Extract(token *jwt.Token) (interface{}, error) {
 	e.Token = token
 
-	key, ok := token.Claims["kontrolKey"].(string)
-	if !ok {
-		return nil, errors.New("no kontrol key found")
+	if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+		return nil, errors.New("invalid signing method")
 	}
 
-	e.KontrolKey = key
+	claims, ok := token.Claims.(*KiteClaims)
+	if !ok {
+		return nil, fmt.Errorf("no kontrol key found")
+	}
 
-	return []byte(key), nil
+	e.Claims = claims
+
+	return jwt.ParseRSAPublicKeyFromPEM([]byte(claims.KontrolKey))
 }
 
 // GetKontrolKey is used as key getter func for jwt.Parse() function.

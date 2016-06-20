@@ -21,25 +21,25 @@ func (k Kites) Attach(token string) {
 
 // Shuffle shuffles the order of the kites. This is usefull if you want send
 // back a randomized list of kites.
-func (k Kites) Shuffle() {
-	shuffled := make(Kites, len(k))
-	for i, v := range rand.Perm(len(k)) {
-		shuffled[v] = k[i]
+func (k *Kites) Shuffle() {
+	shuffled := make(Kites, len(*k))
+	for i, v := range rand.Perm(len(*k)) {
+		shuffled[v] = (*k)[i]
 	}
 
-	k = shuffled
+	*k = shuffled
 }
 
 // Filter filters out kites with the given constraints
-func (k Kites) Filter(constraint version.Constraints, keyRest string) {
+func (k *Kites) Filter(constraint version.Constraints, keyRest string) {
 	filtered := make(Kites, 0)
-	for _, kite := range k {
+	for _, kite := range *k {
 		if isValid(&kite.Kite, constraint, keyRest) {
 			filtered = append(filtered, kite)
 		}
 	}
 
-	k = filtered
+	*k = filtered
 }
 
 func isValid(k *protocol.Kite, c version.Constraints, keyRest string) bool {

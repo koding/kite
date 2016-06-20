@@ -8,6 +8,7 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/config"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/testkeys"
 	"github.com/koding/logging"
 	uuid "github.com/satori/go.uuid"
@@ -48,26 +49,33 @@ func NewToken(username, private, public string) *jwt.Token {
 		username = testuser
 	}
 
-	token := jwt.New(jwt.GetSigningMethod("RS256"))
-
-	token.Claims = map[string]interface{}{
-		"iss":        "testuser",                   // Issuer
-		"sub":        username,                     // Issued to
-		"aud":        hostname,                     // Hostname of registered machine
-		"iat":        time.Now().UTC().Unix(),      // Issued At
-		"jti":        tknID.String(),               // JWT ID
-		"kontrolURL": "http://localhost:4000/kite", // Kontrol URL
-		"kontrolKey": public,                       // Public key of kontrol
+	claims := &kitekey.KiteClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:   "testuser",
+			Subject:  username,
+			Audience: hostname,
+			IssuedAt: time.Now().UTC().Unix(),
+			Id:       tknID.String(),
+		},
+		KontrolKey: public,
+		KontrolURL: "http://localhost:4000/kite",
 	}
 
-	token.Raw, err = token.SignedString([]byte(private))
+	token := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims)
+
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(private))
+	if err != nil {
+		panic(err)
+	}
+
+	token.Raw, err = token.SignedString(rsaPrivate)
 	if err != nil {
 		panic(err)
 	}
 
 	// verify the token
-	_, err = jwt.Parse(token.Raw, func(*jwt.Token) (interface{}, error) {
-		return []byte(public), nil
+	_, err = jwt.ParseWithClaims(token.Raw, claims, func(*jwt.Token) (interface{}, error) {
+		return jwt.ParseRSAPublicKeyFromPEM([]byte(public))
 	})
 
 	if err != nil {

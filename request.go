@@ -9,6 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/cache"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 )
@@ -213,7 +214,7 @@ func (r *Request) authenticate() *Error {
 func (k *Kite) AuthenticateFromToken(r *Request) error {
 	k.verifyOnce.Do(k.verifyInit)
 
-	token, err := jwt.Parse(r.Auth.Key, r.LocalKite.RSAKey)
+	token, err := jwt.ParseWithClaims(r.Auth.Key, &kitekey.KiteClaims{}, r.LocalKite.RSAKey)
 
 	if e, ok := err.(*jwt.ValidationError); ok {
 		// Translate public key mismatch errors to token-is-expired one.
@@ -232,32 +233,38 @@ func (k *Kite) AuthenticateFromToken(r *Request) error {
 		return errors.New("Invalid signature in token")
 	}
 
-	// check if we have an audience and it matches our own signature
-	audience, ok := token.Claims["aud"].(string)
+	claims, ok := token.Claims.(*kitekey.KiteClaims)
 	if !ok {
-		return errors.New("missing audience in token")
+		return errors.New("token does not have valid claims")
 	}
 
-	if err := k.verifyAudienceFunc(k.Kite(), audience); err != nil {
+	if claims.Audience == "" {
+		return errors.New("token has no audience")
+	}
+
+	if claims.Subject == "" {
+		return errors.New("token has no username")
+	}
+
+	// check if we have an audience and it matches our own signature
+	if err := k.verifyAudienceFunc(k.Kite(), claims.Audience); err != nil {
 		return err
 	}
 
 	// We don't check for exp and nbf claims here because jwt-go package
 	// already checks them.
-	username, ok := token.Claims["sub"].(string)
-	if !ok {
-		return errors.New("Username is not present in token")
-	}
 
 	// replace the requester username so we reflect the validated
-	r.Username = username
+	r.Username = claims.Subject
 
 	return nil
 }
 
 // AuthenticateFromKiteKey authenticates user from kite key.
 func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
-	token, err := jwt.Parse(r.Auth.Key, k.verify)
+	claims := &kitekey.KiteClaims{}
+
+	token, err := jwt.ParseWithClaims(r.Auth.Key, claims, k.verify)
 	if err != nil {
 		return err
 	}
@@ -266,11 +273,11 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 		return errors.New("Invalid signature in kite key")
 	}
 
-	if username, ok := token.Claims["sub"].(string); !ok {
-		return errors.New("Username is not present in token")
-	} else {
-		r.Username = username
+	if claims.Subject == "" {
+		return errors.New("token has no username")
 	}
+
+	r.Username = claims.Subject
 
 	return nil
 }
@@ -279,7 +286,9 @@ func (k *Kite) AuthenticateFromKiteKey(r *Request) error {
 // returns the authenticated username. It's the same as AuthenticateFromKiteKey
 // but can be used without the need for a *kite.Request.
 func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
-	token, err := jwt.Parse(key, k.verify)
+	claims := &kitekey.KiteClaims{}
+
+	token, err := jwt.ParseWithClaims(key, claims, k.verify)
 	if err != nil {
 		return "", err
 	}
@@ -288,16 +297,17 @@ func (k *Kite) AuthenticateSimpleKiteKey(key string) (string, error) {
 		return "", errors.New("Invalid signature in token")
 	}
 
-	username, ok := token.Claims["sub"].(string)
-	if !ok {
-		return "", errors.New("Username is not present in token")
+	if claims.Subject == "" {
+		return "", errors.New("token has no username")
 	}
 
-	// return authenticated username
-	return username, nil
+	return claims.Subject, nil
 }
 
 func (k *Kite) verifyInit() {
+	k.configMu.Lock()
+	defer k.configMu.Unlock()
+
 	k.verifyFunc = k.Config.VerifyFunc
 
 	if k.verifyFunc == nil {
@@ -323,10 +333,23 @@ func (k *Kite) verifyInit() {
 
 		k.verifyCache.StartGC(ttl / 2)
 	}
+
+	key, err := jwt.ParseRSAPublicKeyFromPEM([]byte(k.Config.KontrolKey))
+	if err != nil {
+		k.Log.Error("unable to init kontrol key: %s", err)
+
+		return
+	}
+
+	k.kontrolKey = key
 }
 
 func (k *Kite) selfVerify(pub string) error {
-	if pub != k.KontrolKey() {
+	k.configMu.RLock()
+	ourKey := k.Config.KontrolKey
+	k.configMu.RUnlock()
+
+	if pub != ourKey {
 		return ErrKeyNotTrusted
 	}
 
@@ -336,9 +359,14 @@ func (k *Kite) selfVerify(pub string) error {
 func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 	k.verifyOnce.Do(k.verifyInit)
 
-	key, ok := token.Claims["kontrolKey"].(string)
-	if !ok {
+	key := token.Claims.(*kitekey.KiteClaims).KontrolKey
+	if key == "" {
 		return nil, errors.New("no kontrol key found")
+	}
+
+	rsaKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(key))
+	if err != nil {
+		return nil, err
 	}
 
 	switch {
@@ -352,7 +380,7 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 			return nil, errors.New("invalid kontrol key found")
 		}
 
-		return []byte(key), nil
+		return rsaKey, nil
 	}
 
 	if err := k.verifyFunc(key); err != nil {
@@ -367,7 +395,7 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 
 	k.verifyCache.Set(key, true)
 
-	return []byte(key), nil
+	return rsaKey, nil
 }
 
 func (k *Kite) verifyAudience(kite *protocol.Kite, audience string) error {
@@ -394,8 +422,4 @@ func (k *Kite) verifyAudience(kite *protocol.Kite, audience string) error {
 	}
 
 	return nil
-}
-
-func (k *Kite) kontrolVerify(pub string) error {
-	return nil // call kontrol with verify (send own public key and theirs)
 }

@@ -45,23 +45,26 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 		URL: args.URL,
 	}
 
-	ex := &kitekey.Extractor{}
+	ex := &kitekey.Extractor{
+		Claims: &kitekey.KiteClaims{},
+	}
 
-	t, err := jwt.Parse(r.Auth.Key, ex.Extract)
+	t, err := jwt.ParseWithClaims(r.Auth.Key, ex.Claims, ex.Extract)
 	if err != nil {
 		return nil, err
 	}
 
 	var keyPair *KeyPair
+	var origKey = ex.Claims.KontrolKey
 
 	// check if the key is valid and is stored in the key pair storage, if not
 	// check if there is a new key we can use.
-	keyPair, res.KiteKey, err = k.getOrUpdateKeyPub(ex.KontrolKey, t, r)
+	keyPair, res.KiteKey, err = k.getOrUpdateKeyPub(ex.Claims.KontrolKey, t, r)
 	if err != nil {
 		return nil, err
 	}
 
-	if ex.KontrolKey != keyPair.Public {
+	if origKey != keyPair.Public {
 		// NOTE(rjeczalik): updates public key for old kites, new kites
 		// expect kite key to be updated
 		res.PublicKey = keyPair.Public
@@ -261,20 +264,22 @@ func (k *Kontrol) HandleGetKey(r *kite.Request) (interface{}, error) {
 		return nil, fmt.Errorf("Unexpected authentication type: %s", r.Auth.Type)
 	}
 
-	ex := &kitekey.Extractor{}
+	ex := &kitekey.Extractor{
+		Claims: &kitekey.KiteClaims{},
+	}
 
-	if _, err := jwt.Parse(r.Auth.Key, ex.Extract); err != nil {
+	if _, err := jwt.ParseWithClaims(r.Auth.Key, ex.Claims, ex.Extract); err != nil {
 		return nil, err
 	}
 
-	if ex.KontrolKey == "" {
+	if ex.Claims.KontrolKey == "" {
 		return nil, errors.New("public key is not passed")
 	}
 
-	switch k.keyPair.IsValid(ex.KontrolKey) {
+	switch k.keyPair.IsValid(ex.Claims.KontrolKey) {
 	case nil:
 		// everything is ok, just return the old one
-		return ex.KontrolKey, nil
+		return ex.Claims.KontrolKey, nil
 	case ErrKeyDeleted:
 		// client is using old key, update to current
 		if kp, err := k.KeyPair(); err == nil {
@@ -310,7 +315,7 @@ func (k *Kontrol) pickKey(r *kite.Request) (*KeyPair, error) {
 func (k *Kontrol) updateKey(t *jwt.Token) (*KeyPair, string) {
 	kp, err := k.KeyPair()
 	if err != nil {
-		k.log.Error("key update error for %q: %s", t.Claims["sub"], err)
+		k.log.Error("key update error for %q: %s", t.Claims.(*kitekey.KiteClaims).Subject, err)
 
 		return nil, ""
 	}
@@ -323,13 +328,22 @@ func (k *Kontrol) updateKey(t *jwt.Token) (*KeyPair, string) {
 }
 
 func (k *Kontrol) updateKeyWithKeyPair(t *jwt.Token, keyPair *KeyPair) string {
-	if _, ok := t.Claims["kontrolKey"]; ok {
-		t.Claims["kontrolKey"] = keyPair.Public
+	claims := t.Claims.(*kitekey.KiteClaims)
+
+	if claims.KontrolKey != "" {
+		claims.KontrolKey = keyPair.Public
 	}
 
-	kiteKey, err := t.SignedString([]byte(keyPair.Private))
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(keyPair.Private))
 	if err != nil {
-		k.log.Error("key update error for %q: %s", t.Claims["sub"], err)
+		k.log.Error("key update error for %q: %s", claims.Subject, err)
+
+		return ""
+	}
+
+	kiteKey, err := t.SignedString(rsaPrivate)
+	if err != nil {
+		k.log.Error("key update error for %q: %s", claims.Subject, err)
 
 		return ""
 	}

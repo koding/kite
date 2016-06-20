@@ -85,9 +85,11 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 	args.Kite.Username = username
 
-	ex := &kitekey.Extractor{}
+	ex := &kitekey.Extractor{
+		Claims: &kitekey.KiteClaims{},
+	}
 
-	t, err := jwt.Parse(args.Auth.Key, ex.Extract)
+	t, err := jwt.ParseWithClaims(args.Auth.Key, ex.Claims, ex.Extract)
 	if err != nil {
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
@@ -109,13 +111,13 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 		},
 	}
 
-	keyPair, resp.KiteKey, err = k.getOrUpdateKeyPub(ex.KontrolKey, t, r)
+	keyPair, resp.KiteKey, err = k.getOrUpdateKeyPub(ex.Claims.KontrolKey, t, r)
 	if err != nil {
 		http.Error(rw, jsonError(err), http.StatusBadRequest)
 		return
 	}
 
-	if ex.KontrolKey != keyPair.Public {
+	if ex.Claims.KontrolKey != keyPair.Public {
 		// NOTE(rjeczalik): updates public key for old kites, new kites
 		// expect kite key to be updated
 		resp.PublicKey = keyPair.Public

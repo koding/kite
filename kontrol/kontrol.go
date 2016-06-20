@@ -336,23 +336,25 @@ func (k *Kontrol) InitializeSelf() error {
 }
 
 func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey string, err error) {
-	// Only accept requests of type machine
-	tknID := uuid.NewV4()
+	claims := &kitekey.KiteClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:   k.Kite.Kite().Username,
+			Subject:  username,
+			IssuedAt: time.Now().UTC().Unix(),
+			Id:       uuid.NewV4().String(),
+		},
+		KontrolURL: k.Kite.Config.KontrolURL,
+		KontrolKey: strings.TrimSpace(publicKey),
+	}
 
-	token := jwt.New(jwt.GetSigningMethod("RS256"))
-
-	token.Claims = map[string]interface{}{
-		"iss":        k.Kite.Kite().Username,       // Issuer
-		"sub":        username,                     // Subject
-		"iat":        time.Now().UTC().Unix(),      // Issued At
-		"jti":        tknID.String(),               // JWT ID
-		"kontrolURL": k.Kite.Config.KontrolURL,     // Kontrol URL
-		"kontrolKey": strings.TrimSpace(publicKey), // Public key of kontrol
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKey))
+	if err != nil {
+		return "", err
 	}
 
 	k.Kite.Log.Info("Registered machine on user: %s", username)
 
-	return token.SignedString([]byte(privateKey))
+	return jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 }
 
 // registerSelf adds Kontrol itself to the storage as a kite.
@@ -436,10 +438,14 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 		ri := len(k.lastPublic) - i - 1
 
 		keyFn := func(token *jwt.Token) (interface{}, error) {
-			return []byte(k.lastPublic[ri]), nil
+			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				return nil, errors.New("invalid signing method")
+			}
+
+			return jwt.ParseRSAPublicKeyFromPEM([]byte(k.lastPublic[ri]))
 		}
 
-		if _, err := jwt.Parse(kiteKey, keyFn); err != nil {
+		if _, err := jwt.ParseWithClaims(kiteKey, &kitekey.KiteClaims{}, keyFn); err != nil {
 			me.err = append(me.err, err)
 			continue
 		}
@@ -474,16 +480,24 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		return signed, nil
 	}
 
-	tkn := jwt.New(jwt.GetSigningMethod("RS256"))
-	tkn.Claims["iss"] = issuer                                                 // Issuer
-	tkn.Claims["sub"] = username                                               // Subject
-	tkn.Claims["aud"] = aud                                                    // Audience
-	tkn.Claims["exp"] = time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix() // Expiration Time
-	tkn.Claims["nbf"] = time.Now().UTC().Add(-TokenLeeway).Unix()              // Not Before
-	tkn.Claims["iat"] = time.Now().UTC().Unix()                                // Issued At
-	tkn.Claims["jti"] = uuid.NewV4().String()                                  // JWT ID
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(kp.Private))
+	if err != nil {
+		return "", err
+	}
 
-	signed, err := tkn.SignedString([]byte(kp.Private))
+	claims := &kitekey.KiteClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:    issuer,
+			Subject:   username,
+			Audience:  aud,
+			ExpiresAt: time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix(),
+			NotBefore: time.Now().UTC().Add(-TokenLeeway).Unix(),
+			IssuedAt:  time.Now().UTC().Unix(),
+			Id:        uuid.NewV4().String(),
+		},
+	}
+
+	signed, err = jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
