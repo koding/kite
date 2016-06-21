@@ -1,8 +1,6 @@
 package kite
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -304,14 +302,6 @@ func (c *Client) RemoteAddr() string {
 	return websocketsession.RemoteAddr()
 }
 
-// randomStringLength is used to generate a session_id.
-func randomStringLength(length int) string {
-	size := (length * 6 / 8) + 1
-	r := make([]byte, size)
-	rand.Read(r)
-	return base64.URLEncoding.EncodeToString(r)[:length]
-}
-
 // run consumes incoming dnode messages. Reconnects if necessary.
 func (c *Client) run() {
 	err := c.readLoop()
@@ -491,7 +481,7 @@ func (c *Client) sendHub() {
 				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Error("error sending %q: %s", msg, err)
 
-				if err == sockjsclient.ErrSessionClosed {
+				if err == sockjsclient.ErrSessionClosed || strings.Contains(err.Error(), errClosing) {
 					return
 				}
 			}
@@ -765,10 +755,6 @@ func (c *Client) getSession() sockjs.Session {
 
 func (c *Client) setSession(session sockjs.Session) {
 	c.m.Lock()
-	if c.session != nil {
-		c.session.Close(3000, "Go away!")
-	}
-
 	c.session = session
 	c.m.Unlock()
 }

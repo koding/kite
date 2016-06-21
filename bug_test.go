@@ -9,9 +9,13 @@ import (
 	"github.com/koding/kite"
 )
 
-func TestKite_SeparateKiteClient(t *testing.T) {
+func TestKite_MultipleDial(t *testing.T) {
 	esrv := kite.New("echo-server", "0.0.0")
 	esrv.Config.DisableAuthentication = true
+	if err := esrv.Config.ReadEnvironmentVariables(); err != nil {
+		t.Fatal(err)
+	}
+
 	esrv.HandleFunc("echo", func(r *kite.Request) (interface{}, error) {
 		var arg string
 
@@ -28,11 +32,18 @@ func TestKite_SeparateKiteClient(t *testing.T) {
 
 	ts := httptest.NewServer(esrv)
 	ecli := kite.New("echo-client", "0.0.0")
+	if err := ecli.Config.ReadEnvironmentVariables(); err != nil {
+		t.Fatal(err)
+	}
 
 	esrv.SetLogLevel(kite.DEBUG)
 	ecli.SetLogLevel(kite.DEBUG)
 
 	c := ecli.NewClient(fmt.Sprintf("%s/kite", ts.URL))
+
+	if err := c.Dial(); err != nil {
+		t.Fatalf("dialing echo-server kite error: %s", err)
+	}
 
 	if err := c.Dial(); err != nil {
 		t.Fatalf("dialing echo-server kite error: %s", err)
