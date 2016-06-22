@@ -481,7 +481,7 @@ func (c *Client) sendHub() {
 				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Error("error sending %q: %s", msg, err)
 
-				if err == sockjsclient.ErrSessionClosed || strings.Contains(err.Error(), errClosing) {
+				if err == sockjsclient.ErrSessionClosed {
 					return
 				}
 			}

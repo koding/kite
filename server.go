@@ -13,11 +13,6 @@ import (
 	"sync"
 )
 
-// An error string equivalent to net.errClosing for using with http.Serve()
-// during a graceful exit. Needed to declare here again because it is not
-// exported by "net" package.
-const errClosing = "use of closed network connection"
-
 // Run is a blocking method. It runs the kite server and then accepts requests
 // asynchronously. It supports graceful restart via SIGUSR2.
 func (k *Kite) Run() {
@@ -25,6 +20,11 @@ func (k *Kite) Run() {
 		fmt.Println(k.Kite().Version)
 		os.Exit(0)
 	}
+
+	// An error string equivalent to net.errClosing for using with http.Serve()
+	// during a graceful exit. Needed to declare here again because it is not
+	// exported by "net" package.
+	const errClosing = "use of closed network connection"
 
 	err := k.listenAndServe()
 	if err != nil {
