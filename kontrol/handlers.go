@@ -241,15 +241,22 @@ func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {
 		return nil, err
 	}
 
+	var keyPair *KeyPair
+
 	if k.MachineAuthenticate != nil {
 		// an empty authType is ok, the implementer is responsible of it. It
 		// can care of it or it can return an error
 		if err := k.MachineAuthenticate(args.AuthType, r); err != nil {
-			return nil, errors.New("cannot authenticate user")
+			k.Kite.Log.Error("machine authentication error: %s", err)
+
+			return nil, fmt.Errorf("cannot authenticate user: %s", err)
 		}
+
+		keyPair, err = k.KeyPair()
+	} else {
+		keyPair, err = k.pickKey(r)
 	}
 
-	keyPair, err := k.pickKey(r)
 	if err != nil {
 		return nil, err
 	}
