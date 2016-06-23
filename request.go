@@ -399,26 +399,32 @@ func (k *Kite) verify(token *jwt.Token) (interface{}, error) {
 }
 
 func (k *Kite) verifyAudience(kite *protocol.Kite, audience string) error {
-	// The root audience is like superuser - it has access to everything.
-	if audience == "/" {
+	switch audience {
+	case "/":
+		// The root audience is like superuser - it has access to everything.
 		return nil
+	case "":
+		return errors.New("invalid empty audience")
 	}
 
 	aud, err := protocol.KiteFromString(audience)
 	if err != nil {
-		return fmt.Errorf("invalid audience: %s", err)
+		return fmt.Errorf("invalid audience: %s (%s)", err, audience)
 	}
+
+	// We verify the Username / Environment / Name matches the kite.
+	// Empty field (except username) is like wildcard - it matches all values.
 
 	if kite.Username != aud.Username {
-		return fmt.Errorf("audience: username %q not allowed", aud.Username)
+		return fmt.Errorf("audience: username %q not allowed (%s)", aud.Username, audience)
 	}
 
-	if kite.Environment != aud.Environment {
-		return fmt.Errorf("audience: environment %q not allowed", aud.Environment)
+	if kite.Environment != aud.Environment && aud.Environment != "" {
+		return fmt.Errorf("audience: environment %q not allowed (%s)", aud.Environment, audience)
 	}
 
-	if kite.Name != aud.Name {
-		return fmt.Errorf("audience: kite %q not allowed", aud.Name)
+	if kite.Name != aud.Name && aud.Name != "" {
+		return fmt.Errorf("audience: kite %q not allowed (%s)", aud.Name, audience)
 	}
 
 	return nil
