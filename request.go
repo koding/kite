@@ -314,7 +314,7 @@ func (k *Kite) verifyInit() {
 		k.verifyFunc = k.selfVerify
 	}
 
-	k.verifyAudienceFunc = k.Config.VerifyAudiencefunc
+	k.verifyAudienceFunc = k.Config.VerifyAudienceFunc
 
 	if k.verifyAudienceFunc == nil {
 		k.verifyAudienceFunc = k.verifyAudience
