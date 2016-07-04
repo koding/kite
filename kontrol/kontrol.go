@@ -31,6 +31,8 @@ var (
 	// TokenLeeway - implementers MAY provide for some small leeway, usually
 	// no more than a few minutes, to account for clock skew.
 	TokenLeeway = 1 * time.Minute
+
+	// DefaultPort is a default kite port value.
 	DefaultPort = 4000
 
 	// HeartbeatInterval is the interval in which kites are sending heartbeats
@@ -67,6 +69,20 @@ type Kontrol struct {
 	// kite.key file for the "handleMachine" method. This overrides the default
 	// last keypair added with kontrol.AddKeyPair method.
 	MachineKeyPicker func(r *kite.Request) (*KeyPair, error)
+
+	// TokenTTL describes default TTL for a token issued by the kontrol.
+	//
+	// If TokenTTL is 0, default global TokenTTL is used.
+	TokenTTL time.Duration
+
+	// TokenLeeway describes time difference to gracefuly handle clock
+	// skew between client and server.
+	//
+	// If TokenLeeway is 0, default global TokenLeeway is used.
+	TokenLeeway time.Duration
+
+	// TokenNoNBF when true does not set nbf field for generated JWT tokens.
+	TokenNoNBF bool
 
 	clientLocks *IdLock
 
@@ -107,11 +123,13 @@ type Kontrol struct {
 //
 // Public and private keys are RSA pem blocks that can be generated with the
 // following command:
+//
 //     openssl genrsa -out testkey.pem 2048
 //     openssl rsa -in testkey.pem -pubout > testkey_pub.pem
 //
 // If you need to provide custom handlers in place of the default ones,
 // use the following command instead:
+//
 //     NewWithoutHandlers(conf, version)
 //
 func New(conf *config.Config, version string) *Kontrol {
@@ -467,6 +485,22 @@ func (k *Kontrol) KeyPair() (pair *KeyPair, err error) {
 	return k.selfKeyPair, nil
 }
 
+func (k *Kontrol) tokenTTL() time.Duration {
+	if k.TokenTTL != 0 {
+		return k.TokenTTL
+	}
+
+	return TokenTTL
+}
+
+func (k *Kontrol) tokenLeeway() time.Duration {
+	if k.TokenLeeway != 0 {
+		return k.TokenLeeway
+	}
+
+	return TokenLeeway
+}
+
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
 func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (string, error) {
@@ -485,16 +519,21 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		return "", err
 	}
 
+	now := time.Now().UTC()
+
 	claims := &kitekey.KiteClaims{
 		StandardClaims: jwt.StandardClaims{
 			Issuer:    issuer,
 			Subject:   username,
 			Audience:  aud,
-			ExpiresAt: time.Now().UTC().Add(TokenTTL).Add(TokenLeeway).Unix(),
-			NotBefore: time.Now().UTC().Add(-TokenLeeway).Unix(),
-			IssuedAt:  time.Now().UTC().Unix(),
+			ExpiresAt: now.Add(k.tokenTTL()).Add(k.tokenLeeway()).Unix(),
+			IssuedAt:  now.Unix(),
 			Id:        uuid.NewV4().String(),
 		},
+	}
+
+	if !k.TokenNoNBF {
+		claims.NotBefore = now.Add(-k.tokenLeeway()).Unix()
 	}
 
 	signed, err = jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)

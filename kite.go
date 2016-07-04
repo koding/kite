@@ -34,6 +34,10 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("kite: cannot get hostname: %s", err.Error()))
 	}
+
+	jwt.TimeFunc = func() time.Time {
+		return time.Now().UTC()
+	}
 }
 
 // Kite defines a single process that enables distributed service messaging

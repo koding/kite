@@ -54,7 +54,7 @@ type Config struct {
 	// If nil, the default audience verify function is used which
 	// expects the aud to be a kite path that matches the username,
 	// environment and name of the client.
-	VerifyAudiencefunc func(client *protocol.Kite, aud string) error
+	VerifyAudienceFunc func(client *protocol.Kite, aud string) error
 
 	KontrolURL  string
 	KontrolKey  string
