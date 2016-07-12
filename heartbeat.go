@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 )
 
@@ -25,6 +26,71 @@ var defaultClient = &http.Client{
 	// add this so we can make use of load balancer's sticky session features,
 	// such as AWS ELB
 	Jar: cookieJar,
+}
+
+type heartbeatReq struct {
+	ping     dnode.Function
+	interval time.Duration
+}
+
+func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
+	if r.Args == nil {
+		return nil, errors.New("empty heartbeat request")
+	}
+
+	args, err := r.Args.Slice()
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := args[0].Float64()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &heartbeatReq{
+		interval: time.Duration(d) * time.Second,
+	}
+
+	if req.ping, err = args[1].Function(); err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func (k *Kite) processHeartbeats() {
+	var (
+		ping dnode.Function
+		t    = time.NewTicker(time.Second) // dummy initial value
+	)
+
+	t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			if err := ping.Call(); err != nil {
+				k.Log.Error("%s", err)
+			}
+
+		case req, ok := <-k.heartbeatC:
+			if t != nil {
+				t.Stop()
+			}
+
+			if !ok {
+				return
+			}
+
+			if req == nil {
+				continue
+			}
+
+			t = time.NewTicker(req.interval)
+			ping = req.ping
+		}
+	}
 }
 
 // RegisterHTTPForever is just like RegisterHTTP however it first tries to

@@ -49,9 +49,15 @@ func (k *Kite) Close() {
 
 	if k.listener != nil {
 		k.listener.Close()
+		k.listener = nil
 	}
 
 	k.mu.Lock()
+	if k.heartbeatC != nil {
+		close(k.heartbeatC)
+		k.heartbeatC = nil
+	}
+
 	cache := k.verifyCache
 	k.mu.Unlock()
 
