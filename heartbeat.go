@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -15,18 +14,8 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/sockjsclient"
 )
-
-// the implementation of New() doesn't have any error to be returned yet it
-// returns, so it's totally safe to neglect the error
-var cookieJar, _ = cookiejar.New(nil)
-
-var defaultClient = &http.Client{
-	Timeout: time.Second * 10,
-	// add this so we can make use of load balancer's sticky session features,
-	// such as AWS ELB
-	Jar: cookieJar,
-}
 
 type heartbeatReq struct {
 	ping     dnode.Function
@@ -59,6 +48,13 @@ func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
 	return req, nil
 }
 
+func (k *Kite) client() *http.Client {
+	return (&sockjsclient.DialOptions{
+		ClientFunc: k.ClientFunc,
+		Timeout:    8 * time.Second,
+	}).Client()
+}
+
 func (k *Kite) processHeartbeats() {
 	var (
 		ping dnode.Function
@@ -67,6 +63,10 @@ func (k *Kite) processHeartbeats() {
 
 	t.Stop()
 
+	k.mu.Lock()
+	c := k.heartbeatC
+	k.mu.Unlock()
+
 	for {
 		select {
 		case <-t.C:
@@ -74,7 +74,7 @@ func (k *Kite) processHeartbeats() {
 				k.Log.Error("%s", err)
 			}
 
-		case req, ok := <-k.heartbeatC:
+		case req, ok := <-c:
 			if t != nil {
 				t.Stop()
 			}
@@ -154,7 +154,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := defaultClient.Post(registerURL, "application/json", bytes.NewBuffer(data))
+	resp, err := k.client().Post(registerURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u.String())
 
-		resp, err := defaultClient.Get(u.String())
+		resp, err := k.client().Get(u.String())
 		if err != nil {
 			return err
 		}
