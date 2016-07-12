@@ -12,13 +12,12 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 )
 
 type heartbeatReq struct {
-	ping     dnode.Function
+	ping     func() error
 	interval time.Duration
 }
 
@@ -37,15 +36,17 @@ func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
 		return nil, err
 	}
 
-	req := &heartbeatReq{
-		interval: time.Duration(d) * time.Second,
-	}
-
-	if req.ping, err = args[1].Function(); err != nil {
+	ping, err := args[1].Function()
+	if err != nil {
 		return nil, err
 	}
 
-	return req, nil
+	return &heartbeatReq{
+		interval: time.Duration(d) * time.Second,
+		ping: func() error {
+			return ping.Call()
+		},
+	}, nil
 }
 
 func (k *Kite) client() *http.Client {
@@ -57,7 +58,7 @@ func (k *Kite) client() *http.Client {
 
 func (k *Kite) processHeartbeats() {
 	var (
-		ping dnode.Function
+		ping func() error
 		t    = time.NewTicker(time.Second) // dummy initial value
 	)
 
@@ -70,14 +71,16 @@ func (k *Kite) processHeartbeats() {
 	for {
 		select {
 		case <-t.C:
-			if err := ping.Call(); err != nil {
+			switch err := ping(); err {
+			case nil:
+			case errRegisterAgain:
+				t.Stop()
+			default:
 				k.Log.Error("%s", err)
 			}
 
 		case req, ok := <-c:
-			if t != nil {
-				t.Stop()
-			}
+			t.Stop()
 
 			if !ok {
 				return
@@ -154,7 +157,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := k.client().Post(registerURL, "application/json", bytes.NewBuffer(data))
+	resp, err := k.client().Post(registerURL, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +193,9 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	return &registerResult{parsed}, nil
 }
 
-func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
-	tick := time.NewTicker(interval)
+var errRegisterAgain = errors.New("register again")
 
+func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	heartbeatURL := k.getKontrolPath("heartbeat")
 
 	k.Log.Debug("Starting to send heartbeat to: %s", heartbeatURL)
@@ -206,10 +209,8 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	q.Set("id", k.Id)
 	u.RawQuery = q.Encode()
 
-	errRegisterAgain := errors.New("register again")
-
 	heartbeatFunc := func() error {
-		k.Log.Debug("Sending heartbeat to %s", u.String())
+		k.Log.Debug("Sending heartbeat to %s", u)
 
 		resp, err := k.client().Get(u.String())
 		if err != nil {
@@ -231,9 +232,9 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return nil
 		case "registeragain":
 			k.Log.Info("Disconnected from Kontrol, going to register again")
+
 			go func() {
 				k.RegisterHTTPForever(kiteURL)
-				tick.Stop()
 			}()
 
 			return errRegisterAgain
@@ -242,14 +243,24 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		return fmt.Errorf("malformed heartbeat response %q", body)
 	}
 
-	for _ = range tick.C {
-		err := heartbeatFunc()
-		if err == errRegisterAgain {
-			return // return so we don't run forever
-		}
-
-		if err != nil {
-			k.Log.Error("couldn't sent hearbeat: %s", err)
-		}
+	k.heartbeatC <- &heartbeatReq{
+		ping:     heartbeatFunc,
+		interval: interval,
 	}
+}
+
+// handleHeartbeat pings the callback with the given interval seconds.
+func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
+	req, err := newHeartbeatReq(r)
+	if err != nil {
+		return nil, err
+	}
+
+	k.mu.Lock()
+	c := k.heartbeatC
+	k.mu.Unlock()
+
+	c <- req
+
+	return nil, req.ping()
 }

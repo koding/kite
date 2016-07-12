@@ -33,18 +33,6 @@ func handleSystemInfo(r *Request) (interface{}, error) {
 	return systeminfo.New()
 }
 
-// handleHeartbeat pings the callback with the given interval seconds.
-func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	req, err := newHeartbeatReq(r)
-	if err != nil {
-		return nil, err
-	}
-
-	k.heartbeatC <- req
-
-	return nil, req.ping.Call()
-}
-
 // handleLog prints a log message to stderr.
 func (k *Kite) handleLog(r *Request) (interface{}, error) {
 	msg, err := r.Args.One().String()
