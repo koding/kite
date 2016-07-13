@@ -155,12 +155,6 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 	}
 
 	k.OnRegister(c.updateAuth)
-	c.OnDisconnect(func() {
-		select {
-		case k.heartbeatC <- nil:
-		default:
-		}
-	})
 
 	return c
 }

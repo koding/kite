@@ -25,15 +25,14 @@ func (k *Kontrol) HandleHeartbeat(rw http.ResponseWriter, req *http.Request) {
 	defer k.heartbeatsMu.Unlock()
 
 	k.log.Debug("Heartbeat received '%s'", id)
-	if updateTimer, ok := k.heartbeats[id]; ok {
+	if h, ok := k.heartbeats[id]; ok {
 		// try to reset the timer every time the remote kite sends us a
 		// heartbeat. Because the timer get reset, the timer is never fired, so
 		// the value get always updated with the updater in the background
 		// according to the write interval. If the kite doesn't send any
 		// heartbeat, the timer func is being called, which stops the updater
 		// so the key is being deleted automatically via the TTL mechanism.
-		updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
-		k.heartbeats[id] = updateTimer
+		h.timer.Reset(HeartbeatInterval + HeartbeatDelay)
 
 		k.log.Debug("Sending pong '%s'", id)
 		rw.Write([]byte("pong"))
@@ -149,44 +148,61 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 	k.heartbeatsMu.Lock()
 	defer k.heartbeatsMu.Unlock()
 
-	updateTimer, ok := k.heartbeats[remoteKite.ID]
+	h, ok := k.heartbeats[remoteKite.ID]
 	if ok {
 		// there is already a previous registration, use it
 		k.log.Info("Kite was already register (via HTTP), use timer cache %s", remoteKite)
-		updateTimer.Reset(HeartbeatInterval + HeartbeatDelay)
-		k.heartbeats[remoteKite.ID] = updateTimer
+
+		h.timer.Reset(HeartbeatInterval + HeartbeatDelay)
+
+		// update registerURL of the previously started heartbeat goroutine
+		// so it does not get overwritten back to the old value
+		h.updateC <- func() error {
+			return k.storage.Update(remoteKite, value)
+		}
 	} else {
 		// we create a new ticker which is going to update the key periodically in
 		// the storage so it's always up to date. Instead of updating the key
 		// periodically according to the HeartBeatInterval below, we are buffering
 		// the write speed here with the UpdateInterval.
-		stopped := make(chan struct{})
+		h = &heartbeat{
+			updateC: make(chan func() error),
+		}
+
 		updater := time.NewTicker(UpdateInterval)
-		updaterFunc := func() {
+
+		go func() {
+			update := func() error {
+				return k.storage.Update(remoteKite, value)
+			}
+
 			for {
 				select {
 				case <-k.closed:
 					return
 				case <-updater.C:
 					k.log.Debug("Kite is active (via HTTP), updating the value %s", remoteKite)
-					err := k.storage.Update(remoteKite, value)
-					if err != nil {
+
+					if err := update(); err != nil {
 						k.log.Error("storage update '%s' error: %s", remoteKite, err)
 					}
-				case <-stopped:
-					k.log.Info("Kite is nonactive (via HTTP). Updater is closed %s", remoteKite)
-					return
+				case fn, ok := <-h.updateC:
+					if !ok {
+						k.log.Info("Kite is nonactive (via HTTP). Updater is closed %s", remoteKite)
+						return
+					}
+
+					update = fn
 				}
 			}
-		}
-		go updaterFunc()
+		}()
 
 		// we are now creating a timer that is going to call the function which
 		// stops the background updater if it's not resetted. The time is being
 		// resetted on a separate HTTP endpoint "/heartbeat"
-		k.heartbeats[remoteKite.ID] = time.AfterFunc(HeartbeatInterval+HeartbeatDelay, func() {
-			k.log.Info("Kite didn't sent any heartbeat (via HTTP). Stopping the updater %s",
-				remoteKite)
+		h.timer = time.AfterFunc(HeartbeatInterval+HeartbeatDelay, func() {
+			k.log.Info("Kite didn't sent any heartbeat (via HTTP). Stopping the updater %s", remoteKite)
+
 			// stop the updater so it doesn't update it in the background
 			updater.Stop()
 
@@ -194,13 +210,15 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 			defer k.heartbeatsMu.Unlock()
 
 			select {
-			case <-stopped:
+			case <-h.updateC:
 			default:
-				close(stopped)
+				close(h.updateC)
 			}
 
 			delete(k.heartbeats, remoteKite.ID)
 		})
+
+		k.heartbeats[remoteKite.ID] = h
 	}
 
 	k.log.Info("Kite registered (via HTTP): %s", remoteKite)
