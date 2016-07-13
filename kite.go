@@ -131,6 +131,11 @@ type Kite struct {
 	// handlersMu protects access to on*Handlers fields.
 	handlersMu sync.RWMutex
 
+	// heartbeatC is used to control kite's heartbeats; sending
+	// a non-nil value on the channel makes heartbeat goroutine issue
+	// new heartbeats; sending nil value stops heartbeats
+	heartbeatC chan *heartbeatReq
+
 	// server fields, are initialized and used when
 	// TODO: move them to their own struct, just like KontrolClient
 	listener  *gracefulListener
@@ -177,6 +182,7 @@ func New(name, version string) *Kite {
 		Id:             kiteID.String(),
 		readyC:         make(chan bool),
 		closeC:         make(chan bool),
+		heartbeatC:     make(chan *heartbeatReq, 1),
 		muxer:          mux.NewRouter(),
 	}
 
@@ -203,6 +209,8 @@ func New(name, version string) *Kite {
 
 	// Register default methods and handlers.
 	k.addDefaultHandlers()
+
+	go k.processHeartbeats()
 
 	return k
 }

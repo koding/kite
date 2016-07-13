@@ -7,24 +7,87 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/protocol"
+	"github.com/koding/kite/sockjsclient"
 )
 
-// the implementation of New() doesn't have any error to be returned yet it
-// returns, so it's totally safe to neglect the error
-var cookieJar, _ = cookiejar.New(nil)
+type heartbeatReq struct {
+	ping     func() error
+	interval time.Duration
+}
 
-var defaultClient = &http.Client{
-	Timeout: time.Second * 10,
-	// add this so we can make use of load balancer's sticky session features,
-	// such as AWS ELB
-	Jar: cookieJar,
+func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
+	if r.Args == nil {
+		return nil, errors.New("empty heartbeat request")
+	}
+
+	args, err := r.Args.SliceOfLength(2)
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := args[0].Float64()
+	if err != nil {
+		return nil, err
+	}
+
+	ping, err := args[1].Function()
+	if err != nil {
+		return nil, err
+	}
+
+	return &heartbeatReq{
+		interval: time.Duration(d) * time.Second,
+		ping: func() error {
+			return ping.Call()
+		},
+	}, nil
+}
+
+func (k *Kite) client() *http.Client {
+	return (&sockjsclient.DialOptions{
+		ClientFunc: k.ClientFunc,
+		Timeout:    8 * time.Second,
+	}).Client()
+}
+
+func (k *Kite) processHeartbeats() {
+	var (
+		ping func() error
+		t    = time.NewTicker(time.Second) // dummy initial value
+	)
+
+	t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			switch err := ping(); err {
+			case nil:
+			case errRegisterAgain:
+				t.Stop()
+			default:
+				k.Log.Error("%s", err)
+			}
+		case <-k.closeC:
+			t.Stop()
+			return
+		case req := <-k.heartbeatC:
+			t.Stop()
+
+			if req == nil {
+				continue
+			}
+
+			t = time.NewTicker(req.interval)
+			ping = req.ping
+		}
+	}
 }
 
 // RegisterHTTPForever is just like RegisterHTTP however it first tries to
@@ -88,7 +151,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := defaultClient.Post(registerURL, "application/json", bytes.NewBuffer(data))
+	resp, err := k.client().Post(registerURL, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -124,9 +187,9 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 	return &registerResult{parsed}, nil
 }
 
-func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
-	tick := time.NewTicker(interval)
+var errRegisterAgain = errors.New("register again")
 
+func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	heartbeatURL := k.getKontrolPath("heartbeat")
 
 	k.Log.Debug("Starting to send heartbeat to: %s", heartbeatURL)
@@ -140,12 +203,10 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	q.Set("id", k.Id)
 	u.RawQuery = q.Encode()
 
-	errRegisterAgain := errors.New("register again")
-
 	heartbeatFunc := func() error {
-		k.Log.Debug("Sending heartbeat to %s", u.String())
+		k.Log.Debug("Sending heartbeat to %s", u)
 
-		resp, err := defaultClient.Get(u.String())
+		resp, err := k.client().Get(u.String())
 		if err != nil {
 			return err
 		}
@@ -165,9 +226,9 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return nil
 		case "registeragain":
 			k.Log.Info("Disconnected from Kontrol, going to register again")
+
 			go func() {
 				k.RegisterHTTPForever(kiteURL)
-				tick.Stop()
 			}()
 
 			return errRegisterAgain
@@ -176,14 +237,20 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		return fmt.Errorf("malformed heartbeat response %q", body)
 	}
 
-	for _ = range tick.C {
-		err := heartbeatFunc()
-		if err == errRegisterAgain {
-			return // return so we don't run forever
-		}
-
-		if err != nil {
-			k.Log.Error("couldn't sent hearbeat: %s", err)
-		}
+	k.heartbeatC <- &heartbeatReq{
+		ping:     heartbeatFunc,
+		interval: interval,
 	}
+}
+
+// handleHeartbeat pings the callback with the given interval seconds.
+func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
+	req, err := newHeartbeatReq(r)
+	if err != nil {
+		return nil, err
+	}
+
+	k.heartbeatC <- req
+
+	return nil, req.ping()
 }

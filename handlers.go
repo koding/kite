@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
-	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/koding/kite/sockjsclient"
@@ -33,42 +31,6 @@ func (k *Kite) addDefaultHandlers() {
 // handleSystemInfo returns info about the system (CPU, memory, disk...).
 func handleSystemInfo(r *Request) (interface{}, error) {
 	return systeminfo.New()
-}
-
-// handleHeartbeat pings the callback with the given interval seconds.
-func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
-	args := r.Args.MustSliceOfLength(2)
-	seconds := args[0].MustFloat64()
-	ping := args[1].MustFunction()
-
-	heartbeat := time.NewTicker(time.Duration(seconds) * time.Second)
-	done := make(chan bool, 0)
-
-	// stop the ticker and close the done chan so we can break the loop
-	var once sync.Once
-	r.Client.OnDisconnect(func() {
-		once.Do(func() { close(done) })
-	})
-
-	// we need to break out because stopping the ticker is not enough. If we
-	// stop the ticker ping.Call() will block until there is data from the
-	// other end of the connection. So use an explicit exit.
-
-	go func() {
-		for {
-			select {
-			case <-done:
-				heartbeat.Stop()
-				return
-			case <-heartbeat.C:
-				if err := ping.Call(); err != nil {
-					k.Log.Error(err.Error())
-				}
-			}
-		}
-	}()
-
-	return nil, ping.Call()
 }
 
 // handleLog prints a log message to stderr.

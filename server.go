@@ -49,6 +49,7 @@ func (k *Kite) Close() {
 
 	if k.listener != nil {
 		k.listener.Close()
+		k.listener = nil
 	}
 
 	k.mu.Lock()

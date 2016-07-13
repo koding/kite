@@ -31,7 +31,7 @@ type XHRSession struct {
 // xhr-polling
 // http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74
 func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
-	client := opts.client()
+	client := opts.Client()
 
 	// following /server_id/session_id should always be the same for every session
 	serverID := threeDigits()

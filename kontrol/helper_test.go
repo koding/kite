@@ -19,9 +19,28 @@ import (
 var interactive = os.Getenv("TEST_INTERACTIVE") == "1"
 
 type Config struct {
-	Config  *config.Config
-	Private string
-	Public  string
+	Config       *config.Config
+	Private      string
+	Public       string
+	RegisterFunc func(*HelloKite) error
+}
+
+func (c *Config) Register(hk *HelloKite) error {
+	if c.RegisterFunc != nil {
+		return c.RegisterFunc(hk)
+	}
+
+	if err := hk.Kite.RegisterForever(hk.URL); err != nil {
+		hk.Kite.Close()
+		return err
+	}
+
+	if _, err := hk.WaitRegister(15 * time.Second); err != nil {
+		hk.Kite.Close()
+		return err
+	}
+
+	return nil
 }
 
 func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
@@ -108,12 +127,7 @@ func NewHelloKite(name string, conf *Config) (*HelloKite, error) {
 
 	hk.Kite.OnRegister(hk.onRegister)
 
-	if err := k.RegisterForever(u); err != nil {
-		k.Close()
-		return nil, err
-	}
-
-	if _, err := hk.WaitRegister(15 * time.Second); err != nil {
+	if err := conf.Register(hk); err != nil {
 		return nil, err
 	}
 

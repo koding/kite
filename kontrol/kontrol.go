@@ -86,7 +86,7 @@ type Kontrol struct {
 
 	clientLocks *IdLock
 
-	heartbeats   map[string]*time.Timer
+	heartbeats   map[string]*heartbeat
 	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
 
 	tokenCache   map[string]string
@@ -115,6 +115,11 @@ type Kontrol struct {
 	RegisterURL string
 
 	log kite.Logger
+}
+
+type heartbeat struct {
+	updateC chan func() error
+	timer   *time.Timer
 }
 
 // New creates a new kontrol instance with the given version and config
@@ -165,7 +170,7 @@ func New(conf *config.Config, version string) *Kontrol {
 func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
 	k := &Kontrol{
 		clientLocks: NewIdlock(),
-		heartbeats:  make(map[string]*time.Timer),
+		heartbeats:  make(map[string]*heartbeat),
 		closed:      make(chan struct{}),
 		tokenCache:  make(map[string]string),
 	}

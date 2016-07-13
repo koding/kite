@@ -57,10 +57,15 @@ type DialOptions struct {
 	ClientFunc      func(*DialOptions) *http.Client
 }
 
-func (opts *DialOptions) client() *http.Client {
+// Client gives a client to use for making HTTP requests.
+//
+// If ClientFunc is non-nil it is used to make the requests.
+// Otherwise default client is returned.
+func (opts *DialOptions) Client() *http.Client {
 	if opts.ClientFunc != nil {
 		return opts.ClientFunc(opts)
 	}
+
 	return defaultClient(opts)
 }
 
@@ -112,7 +117,7 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 	// if the user passed a custom HTTP client and its transport
 	// is of *http.Transport type - we're using its Dial field
 	// for connecting to remote host
-	if t, ok := opts.client().Transport.(*http.Transport); ok {
+	if t, ok := opts.Client().Transport.(*http.Transport); ok {
 		ws.NetDial = t.Dial
 	}
 
