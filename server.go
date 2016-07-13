@@ -53,11 +53,6 @@ func (k *Kite) Close() {
 	}
 
 	k.mu.Lock()
-	if k.heartbeatC != nil {
-		close(k.heartbeatC)
-		k.heartbeatC = nil
-	}
-
 	cache := k.verifyCache
 	k.mu.Unlock()
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/url"
 	"os"
 	"runtime"
@@ -226,6 +227,88 @@ func TestRegisterDenyEvil(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), authErr) {
 		t.Fatalf("got %q, want %q error", err, authErr)
+	}
+}
+
+func TestMultipleRegister(t *testing.T) {
+	confCopy := *conf
+	confCopy.RegisterFunc = func(hk *HelloKite) error {
+		hk.Kite.RegisterHTTPForever(hk.URL)
+
+		if _, err := hk.WaitRegister(15 * time.Second); err != nil {
+			hk.Kite.Close()
+			return err
+		}
+
+		return nil
+	}
+
+	hk, err := NewHelloKite("kite", &confCopy)
+	if err != nil {
+		t.Fatalf("error creating kite: %s", err)
+	}
+	defer hk.Close()
+
+	query := &protocol.KontrolQuery{
+		ID: hk.Kite.Kite().ID,
+	}
+
+	c, err := hk.Kite.GetKites(query)
+	if err != nil {
+		t.Fatalf("GetKites()=%s", err)
+	}
+	klose(c)
+
+	if len(c) != 1 {
+		t.Fatalf("want len(c) = 1; got %d", len(c))
+	}
+
+	if c[0].URL != hk.URL.String() {
+		t.Fatalf("want url = %q; got %q", hk.URL, c[0].URL)
+	}
+
+	urlCopy := *hk.URL
+	_, port, err := net.SplitHostPort(hk.URL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	urlCopy.Host = net.JoinHostPort("localhost", port)
+
+	if _, err := hk.Kite.RegisterHTTP(&urlCopy); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := hk.WaitRegister(15 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	timeout := time.After(2 * time.Minute)
+
+	query = &protocol.KontrolQuery{
+		ID: hk.Kite.Kite().ID,
+	}
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timed out waiting for RegisterURL to update")
+		default:
+			c, err := hk.Kite.GetKites(query)
+			if err != nil {
+				t.Fatalf("GetKites()=%s", err)
+			}
+			klose(c)
+
+			if len(c) != 1 {
+				t.Fatalf("want len(c) = 1; got %d", len(c))
+			}
+
+			if c[0].URL == urlCopy.String() {
+				return
+			}
+
+			time.Sleep(10 * time.Second)
+		}
 	}
 }
 

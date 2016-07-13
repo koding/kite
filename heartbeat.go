@@ -64,10 +64,6 @@ func (k *Kite) processHeartbeats() {
 
 	t.Stop()
 
-	k.mu.Lock()
-	c := k.heartbeatC
-	k.mu.Unlock()
-
 	for {
 		select {
 		case <-t.C:
@@ -78,13 +74,11 @@ func (k *Kite) processHeartbeats() {
 			default:
 				k.Log.Error("%s", err)
 			}
-
-		case req, ok := <-c:
+		case <-k.closeC:
 			t.Stop()
-
-			if !ok {
-				return
-			}
+			return
+		case req := <-k.heartbeatC:
+			t.Stop()
 
 			if req == nil {
 				continue
@@ -256,11 +250,7 @@ func (k *Kite) handleHeartbeat(r *Request) (interface{}, error) {
 		return nil, err
 	}
 
-	k.mu.Lock()
-	c := k.heartbeatC
-	k.mu.Unlock()
-
-	c <- req
+	k.heartbeatC <- req
 
 	return nil, req.ping()
 }
