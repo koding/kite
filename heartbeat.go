@@ -26,7 +26,7 @@ func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
 		return nil, errors.New("empty heartbeat request")
 	}
 
-	args, err := r.Args.Slice()
+	args, err := r.Args.SliceOfLength(2)
 	if err != nil {
 		return nil, err
 	}
