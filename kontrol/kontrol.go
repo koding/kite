@@ -30,7 +30,7 @@ var (
 
 	// TokenLeeway - implementers MAY provide for some small leeway, usually
 	// no more than a few minutes, to account for clock skew.
-	TokenLeeway = 1 * time.Minute
+	TokenLeeway = 5 * time.Minute
 
 	// DefaultPort is a default kite port value.
 	DefaultPort = 4000
@@ -363,7 +363,7 @@ func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey 
 		StandardClaims: jwt.StandardClaims{
 			Issuer:   k.Kite.Kite().Username,
 			Subject:  username,
-			IssuedAt: time.Now().UTC().Unix(),
+			IssuedAt: time.Now().Add(-k.tokenLeeway()).UTC().Unix(),
 			Id:       uuid.NewV4().String(),
 		},
 		KontrolURL: k.Kite.Config.KontrolURL,
@@ -531,8 +531,8 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 			Issuer:    issuer,
 			Subject:   username,
 			Audience:  aud,
-			ExpiresAt: now.Add(k.tokenTTL()).Add(k.tokenLeeway()).Unix(),
-			IssuedAt:  now.Unix(),
+			ExpiresAt: now.Add(k.tokenTTL()).Add(k.tokenLeeway()).UTC().Unix(),
+			IssuedAt:  now.Add(-k.tokenLeeway()).UTC().Unix(),
 			Id:        uuid.NewV4().String(),
 		},
 	}

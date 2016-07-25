@@ -47,6 +47,15 @@ type Client struct {
 	// Should we process incoming messages concurrently or not? Default: true
 	Concurrent bool
 
+	// ConcurrentCallbacks, when true, makes execution of callbacks in
+	// incoming messages concurrent. This may result in a callback
+	// received in an earlier message to be executed after a callback
+	// from a new meesage - no order is guaranteed, it's up to Go scheduler.
+	//
+	// By default this field is false to be backward-compatible with
+	// go1.4 scheduling behaviour.
+	ConcurrentCallbacks bool
+
 	// ClientFunc is called each time new sockjs.Session is established.
 	// The session will use returned *http.Client for HTTP round trips
 	// for XHR transport.
@@ -342,24 +351,31 @@ func (c *Client) reconnect() bool {
 // readLoop reads a message from websocket and processes it.
 func (c *Client) readLoop() error {
 	for {
-		msg, err := c.receiveData()
+		p, err := c.receiveData()
 		if err != nil {
 			return err
 		}
 
-		processed := make(chan bool)
-		go func(msg []byte, processed chan bool) {
-			if err := c.processMessage(msg); err != nil {
-				// don't log callback not found errors
-				if _, ok := err.(dnode.CallbackNotFoundError); !ok {
-					c.LocalKite.Log.Warning("error processing message err: %s message: %q", err.Error(), string(msg))
-				}
+		msg, fn, err := c.processMessage(p)
+		if err != nil {
+			if _, ok := err.(dnode.CallbackNotFoundError); !ok {
+				c.LocalKite.Log.Warning("error processing message err: %s message: %s", err, msg)
 			}
-			close(processed)
-		}(msg, processed)
+		}
 
-		if !c.Concurrent {
-			<-processed
+		switch v := fn.(type) {
+		case *Method: // invoke method
+			if c.Concurrent {
+				go c.runMethod(v, msg.Arguments)
+			} else {
+				c.runMethod(v, msg.Arguments)
+			}
+		case func(*dnode.Partial): // invoke callback
+			if c.Concurrent && c.ConcurrentCallbacks {
+				go c.runCallback(v, msg.Arguments)
+			} else {
+				c.runCallback(v, msg.Arguments)
+			}
 		}
 	}
 }
@@ -382,13 +398,7 @@ func (c *Client) receiveData() ([]byte, error) {
 }
 
 // processMessage processes a single message and calls a handler or callback.
-func (c *Client) processMessage(data []byte) (err error) {
-	var (
-		ok  bool
-		msg dnode.Message
-		m   *Method
-	)
-
+func (c *Client) processMessage(data []byte) (msg *dnode.Message, fn interface{}, err error) {
 	// Call error handler.
 	defer func() {
 		if err != nil {
@@ -396,20 +406,22 @@ func (c *Client) processMessage(data []byte) (err error) {
 		}
 	}()
 
-	if err := json.Unmarshal(data, &msg); err != nil {
-		return err
+	msg = &dnode.Message{}
+
+	if err = json.Unmarshal(data, &msg); err != nil {
+		return nil, nil, err
 	}
 
 	sender := func(id uint64, args []interface{}) error {
 		// do not name the error variable to "err" here, it's a trap for
 		// shadowing variables
-		_, errc := c.marshalAndSend(id, args)
-		return errc
+		_, e := c.marshalAndSend(id, args)
+		return e
 	}
 
 	// Replace function placeholders with real functions.
-	if err := dnode.ParseCallbacks(&msg, sender); err != nil {
-		return err
+	if err := dnode.ParseCallbacks(msg, sender); err != nil {
+		return nil, nil, err
 	}
 
 	// Find the handler function. Method may be string or integer.
@@ -418,21 +430,28 @@ func (c *Client) processMessage(data []byte) (err error) {
 		id := uint64(method)
 		callback := c.scrubber.GetCallback(id)
 		if callback == nil {
-			err = dnode.CallbackNotFoundError{id, msg.Arguments}
-			return err
-		}
-		c.runCallback(callback, msg.Arguments)
-	case string:
-		if m, ok = c.LocalKite.handlers[method]; !ok {
-			err = dnode.MethodNotFoundError{method, msg.Arguments}
-			return err
+			err = dnode.CallbackNotFoundError{
+				ID:   id,
+				Args: msg.Arguments,
+			}
+			return nil, nil, err
 		}
 
-		c.runMethod(m, msg.Arguments)
+		return msg, callback, nil
+	case string:
+		m, ok := c.LocalKite.handlers[method]
+		if !ok {
+			err = dnode.MethodNotFoundError{
+				Method: method,
+				Args:   msg.Arguments,
+			}
+			return nil, nil, err
+		}
+
+		return msg, m, nil
 	default:
-		return fmt.Errorf("Method is not string or integer: %+v (%T)", msg.Method, msg.Method)
+		return nil, nil, fmt.Errorf("Method is not string or integer: %+v (%T)", msg.Method, msg.Method)
 	}
-	return nil
 }
 
 func (c *Client) Close() {

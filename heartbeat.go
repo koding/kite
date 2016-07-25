@@ -52,7 +52,7 @@ func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
 func (k *Kite) client() *http.Client {
 	return (&sockjsclient.DialOptions{
 		ClientFunc: k.ClientFunc,
-		Timeout:    8 * time.Second,
+		Timeout:    10 * time.Second,
 	}).Client()
 }
 
