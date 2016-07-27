@@ -1,8 +1,10 @@
 package kite
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -82,14 +84,16 @@ func publicIP() (net.IP, error) {
 	}
 	defer resp.Body.Close()
 
-	out, err := ioutil.ReadAll(resp.Body)
+	// The ip address is 16 chars long, we read more
+	// to account for excessive whitespace.
+	p, err := ioutil.ReadAll(io.LimitReader(resp.Body, 24))
 	if err != nil {
 		return nil, err
 	}
 
-	n := net.ParseIP(string(out))
+	n := net.ParseIP(string(bytes.TrimSpace(p)))
 	if n == nil {
-		return nil, fmt.Errorf("cannot parse ip %s", string(out))
+		return nil, fmt.Errorf("cannot parse ip %s", p)
 	}
 
 	return n, nil

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -212,16 +213,22 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+
 		// we are just receving small size strings such as "pong",
-		// "registeragain" so it's totally normal to consume the whole response
-		body, err := ioutil.ReadAll(resp.Body)
+		// "registeragain" so we limit the reader to read just that
+		p, err := ioutil.ReadAll(io.LimitReader(resp.Body, 16))
 		if err != nil {
 			return err
 		}
 
-		k.Log.Debug("Heartbeat response received %q", body)
+		p = bytes.TrimSpace(p)
 
-		switch string(body) {
+		k.Log.Debug("Heartbeat response received %q", p)
+
+		switch string(p) {
 		case "pong":
 			return nil
 		case "registeragain":
@@ -234,7 +241,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return errRegisterAgain
 		}
 
-		return fmt.Errorf("malformed heartbeat response %q", body)
+		return fmt.Errorf("malformed heartbeat response: %s", p)
 	}
 
 	k.heartbeatC <- &heartbeatReq{
