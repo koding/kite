@@ -154,7 +154,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		LocalKite:     k,
 		ClientFunc:    k.ClientFunc,
 		URL:           remoteURL,
-		disconnect:    make(chan struct{}, 1),
+		disconnect:    make(chan struct{}),
 		closeChan:     make(chan struct{}),
 		redialBackOff: *forever,
 		scrubber:      dnode.NewScrubber(),
@@ -323,9 +323,9 @@ func (c *Client) run() {
 
 	// let others know that the client has disconnected
 	c.disconnectMu.Lock()
-	select {
-	case c.disconnect <- struct{}{}:
-	default:
+	if c.disconnect != nil {
+		close(c.disconnect)
+		c.disconnect = nil
 	}
 	c.disconnectMu.Unlock()
 
@@ -499,10 +499,6 @@ func (c *Client) sendHub() {
 				//
 				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Error("error sending: %s", err)
-
-				if err == sockjsclient.ErrSessionClosed {
-					return
-				}
 			}
 		case <-c.closeChan:
 			c.LocalKite.Log.Debug("Send hub is closed")
@@ -597,9 +593,8 @@ func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Funct
 	options := callOptionsOut{
 		WithArgs: args,
 		callOptions: callOptions{
-			Kite: *c.LocalKite.Kite(),
-			Auth: c.authCopy(),
-			// Auth:             c.Auth,
+			Kite:             *c.LocalKite.Kite(),
+			Auth:             c.authCopy(),
 			ResponseCallback: responseCallback,
 		},
 	}
