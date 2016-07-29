@@ -261,7 +261,7 @@ func threeDigits() string {
 
 // randomStringLength is used to generate a session_id.
 func randomStringLength(length int) string {
-	size := (length * 6 / 8) + 1
+	size := (length * 3 / 4) + 1
 	r := make([]byte, size)
 	crand.Read(r)
 	return base64.URLEncoding.EncodeToString(r)[:length]
