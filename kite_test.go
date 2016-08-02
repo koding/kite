@@ -238,6 +238,7 @@ func TestNoConcurrentCallbacks(t *testing.T) {
 	url := fmt.Sprintf("http://127.0.0.1:%d/kite", k.Port())
 
 	c := k.NewClient(url)
+	defer c.Close()
 
 	// The TestNoConcurrentCallbacks asserts ConcurrentCallbacks
 	// are disabled by default for each new client.
