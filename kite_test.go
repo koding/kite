@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -16,6 +17,10 @@ import (
 
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
+
+func init() {
+	rand.Seed(time.Now().Unix() + int64(os.Getpid()))
+}
 
 func TestMultiple(t *testing.T) {
 	testDuration := time.Second * 10
@@ -193,6 +198,108 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestNoConcurrentCallbacks(t *testing.T) {
+	const timeout = 2 * time.Second
+
+	type Callback struct {
+		Index int
+		Func  dnode.Function
+	}
+
+	k := newXhrKite("callback", "0.0.1")
+	k.Config.DisableAuthentication = true
+	k.HandleFunc("call", func(r *Request) (interface{}, error) {
+		if r.Args == nil {
+			return nil, errors.New("empty argument")
+		}
+
+		var arg Callback
+		if err := r.Args.One().Unmarshal(&arg); err != nil {
+			return nil, err
+		}
+
+		if !arg.Func.IsValid() {
+			return nil, errors.New("invalid argument")
+		}
+
+		if err := arg.Func.Call(arg.Index); err != nil {
+			return nil, err
+		}
+
+		return true, nil
+	})
+
+	go k.Run()
+	<-k.ServerReadyNotify()
+	defer k.Close()
+
+	url := fmt.Sprintf("http://127.0.0.1:%d/kite", k.Port())
+
+	c := k.NewClient(url)
+	defer c.Close()
+
+	// The TestNoConcurrentCallbacks asserts ConcurrentCallbacks
+	// are disabled by default for each new client.
+	//
+	// When callbacks are executed concurrently, the order
+	// of indices received on the channel is random,
+	// thus making this test to fail.
+	//
+	// c.ConcurrentCallbacks = true
+
+	if err := c.DialTimeout(timeout); err != nil {
+		t.Errorf("DialTimeout(%q)=%s", url, err)
+	}
+
+	indices := make(chan int, 50)
+	callback := dnode.Callback(func(arg *dnode.Partial) {
+		var index int
+		if err := arg.One().Unmarshal(&index); err != nil {
+			t.Logf("failed to unmarshal: %s", err)
+		}
+
+		time.Sleep(time.Duration(rand.Int31n(100)) * time.Millisecond)
+
+		indices <- index
+	})
+
+	for i := 0; i < cap(indices); i++ {
+		arg := &Callback{
+			Index: i + 1,
+			Func:  callback,
+		}
+
+		if _, err := c.TellWithTimeout("call", timeout, arg); err != nil {
+			t.Fatalf("%d: TellWithTimeout()=%s", i, err)
+		}
+	}
+
+	var n, lastIndex int
+
+	for {
+		if n == cap(indices) {
+			// All indices were read.
+			break
+		}
+
+		select {
+		case <-time.After(timeout):
+			t.Fatalf("reading indices has timed out after %s (n=%d)", timeout, n)
+		case index := <-indices:
+			if index == 0 {
+				t.Fatalf("invalid index=%d (n=%d)", index, n)
+			}
+
+			if index <= lastIndex {
+				t.Fatalf("expected to receive indices in ascending order; received %d, last index %d (n=%d)", index, lastIndex, n)
+			}
+
+			lastIndex = index
+			n++
+		}
+	}
 }
 
 // Test 2 way communication between kites.
