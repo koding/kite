@@ -201,7 +201,7 @@ func TestConcurrency(t *testing.T) {
 }
 
 func TestNoConcurrentCallbacks(t *testing.T) {
-	const timeout = 5 * time.Second
+	const timeout = 2 * time.Second
 
 	type Callback struct {
 		Index int
