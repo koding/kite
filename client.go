@@ -83,7 +83,7 @@ type Client struct {
 	// TODO: replace this with a proper interface to support multiple
 	// transport/protocols
 	session sockjs.Session
-	send    chan []byte
+	send    chan *message
 
 	// muReconnect protects Reconnect
 	muReconnect sync.Mutex
@@ -116,6 +116,12 @@ type Client struct {
 
 	// WriteBufferSize is the output buffer size. By default it's 4096.
 	WriteBufferSize int
+}
+
+// message carries an encoded payload sent over connected session.
+type message struct {
+	p    []byte
+	errC chan<- error
 }
 
 // callOptions is the type of first argument in the dnode message.
@@ -164,7 +170,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		scrubber:           dnode.NewScrubber(),
 		testHookSetSession: nopSetSession,
 		Concurrent:         true,
-		send:               make(chan []byte, 128), // buffered
+		send:               make(chan *message),
 		wg:                 &sync.WaitGroup{},
 	}
 
@@ -420,7 +426,7 @@ func (c *Client) processMessage(data []byte) (msg *dnode.Message, fn interface{}
 	sender := func(id uint64, args []interface{}) error {
 		// do not name the error variable to "err" here, it's a trap for
 		// shadowing variables
-		_, e := c.marshalAndSend(id, args)
+		_, _, e := c.marshalAndSend(id, args)
 		return e
 	}
 
@@ -494,16 +500,13 @@ func (c *Client) sendHub() {
 				continue
 			}
 
-			err := session.Send(string(msg))
+			err := session.Send(string(msg.p))
 			if err != nil {
-				// TODO(rjeczalik): dnode.ParseCallbacks and signal
-				// error to the caller - would fix the bug mentioned
-				// in (*Client).sendMethod (e.g. in cases when
-				// send failed due to invalidated XHR session
-				// by the server).
-				//
-				// And get rid of the timeout workaround.
 				c.LocalKite.Log.Error("error sending: %s", err)
+
+				if msg.errC != nil {
+					msg.errC <- err
+				}
 			}
 		case <-c.closeChan:
 			c.LocalKite.Log.Debug("Send hub is closed")
@@ -654,10 +657,7 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 	cb := c.makeResponseCallback(doneChan, removeCallback, method, args)
 	args = c.wrapMethodArgs(args, cb)
 
-	// BUG: This sometimes does not return an error, even if the remote
-	// kite is disconnected. I could not find out why.
-	// Timeout below in goroutine saves us in this case.
-	callbacks, err := c.marshalAndSend(method, args)
+	callbacks, errC, err := c.marshalAndSend(method, args)
 	if err != nil {
 		responseChan <- &response{
 			Result: nil,
@@ -698,6 +698,16 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 					Message: "Remote kite has disconnected",
 				},
 			}
+		case err := <-errC:
+			if err != nil {
+				responseChan <- &response{
+					nil,
+					&Error{
+						Type:    "sendError",
+						Message: err.Error(),
+					},
+				}
+			}
 		case <-afterTimeout:
 			responseChan <- &response{
 				nil,
@@ -720,7 +730,7 @@ func (c *Client) sendMethod(method string, args []interface{}, timeout time.Dura
 
 // marshalAndSend takes a method and arguments, scrubs the arguments to create
 // a dnode message, marshals the message to JSON and sends it over the wire.
-func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (callbacks map[string]dnode.Path, err error) {
+func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (callbacks map[string]dnode.Path, errC <-chan error, err error) {
 	// scrub trough the arguments and save any callbacks.
 	callbacks = c.scrubber.Scrub(arguments)
 
@@ -737,7 +747,7 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 
 	rawArgs, err := json.Marshal(arguments)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	msg := dnode.Message{
@@ -746,23 +756,28 @@ func (c *Client) marshalAndSend(method interface{}, arguments []interface{}) (ca
 		Callbacks: callbacks,
 	}
 
-	data, err := json.Marshal(msg)
+	p, err := json.Marshal(msg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	select {
 	case <-c.closeChan:
-		return nil, errors.New("can't send, client is closed")
+		return nil, nil, errors.New("can't send, client is closed")
 	default:
 		if c.getSession() == nil {
-			return nil, errors.New("can't send, session is not established yet")
+			return nil, nil, errors.New("can't send, session is not established yet")
 		}
 
-		c.send <- data
-	}
+		errC := make(chan error, 1)
 
-	return
+		c.send <- &message{
+			p:    p,
+			errC: errC,
+		}
+
+		return callbacks, errC, nil
+	}
 }
 
 func (c *Client) getSession() sockjs.Session {
