@@ -25,6 +25,8 @@ func init() {
 	forever.MaxElapsedTime = 365 * 24 * time.Hour // 1 year
 }
 
+func nopSetSession(sockjs.Session) {}
+
 // Client is the client for communicating with another Kite.
 // It has Tell() and Go() methods for calling methods sync/async way.
 type Client struct {
@@ -102,6 +104,8 @@ type Client struct {
 	onTokenExpireHandlers []func()
 	onTokenRenewHandlers  []func(string)
 
+	testHookSetSession func(sockjs.Session)
+
 	// For protecting access over OnConnect and OnDisconnect handlers.
 	m sync.RWMutex
 
@@ -151,16 +155,17 @@ type response struct {
 // Tell() and Go() methods.
 func (k *Kite) NewClient(remoteURL string) *Client {
 	c := &Client{
-		LocalKite:     k,
-		ClientFunc:    k.ClientFunc,
-		URL:           remoteURL,
-		disconnect:    make(chan struct{}),
-		closeChan:     make(chan struct{}),
-		redialBackOff: *forever,
-		scrubber:      dnode.NewScrubber(),
-		Concurrent:    true,
-		send:          make(chan []byte, 128), // buffered
-		wg:            &sync.WaitGroup{},
+		LocalKite:          k,
+		ClientFunc:         k.ClientFunc,
+		URL:                remoteURL,
+		disconnect:         make(chan struct{}),
+		closeChan:          make(chan struct{}),
+		redialBackOff:      *forever,
+		scrubber:           dnode.NewScrubber(),
+		testHookSetSession: nopSetSession,
+		Concurrent:         true,
+		send:               make(chan []byte, 128), // buffered
+		wg:                 &sync.WaitGroup{},
 	}
 
 	k.OnRegister(c.updateAuth)
@@ -768,6 +773,8 @@ func (c *Client) getSession() sockjs.Session {
 }
 
 func (c *Client) setSession(session sockjs.Session) {
+	c.testHookSetSession(session)
+
 	c.m.Lock()
 	c.session = session
 	c.m.Unlock()
