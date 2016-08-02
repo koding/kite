@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -10,7 +11,10 @@ import (
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/sockjsclient"
 	_ "github.com/koding/kite/testutil"
+
+	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
 func TestMultiple(t *testing.T) {
@@ -87,6 +91,58 @@ func TestMultiple(t *testing.T) {
 		case <-timeout:
 			return
 		}
+	}
+}
+
+func TestSendError(t *testing.T) {
+	const timeout = 5 * time.Second
+
+	ksrv := newXhrKite("echo-server", "0.0.1")
+	ksrv.Config.DisableAuthentication = true
+	ksrv.HandleFunc("echo", func(r *Request) (interface{}, error) {
+		return r.Args.One().MustString(), nil
+	})
+
+	go ksrv.Run()
+	<-ksrv.ServerReadyNotify()
+	defer ksrv.Close()
+
+	clientSession := make(chan sockjs.Session, 1)
+
+	kcli := newXhrKite("echo-client", "0.0.1")
+	kcli.Config.DisableAuthentication = true
+	c := kcli.NewClient(fmt.Sprintf("http://127.0.0.1:%d/kite", ksrv.Port()))
+	c.testHookSetSession = func(s sockjs.Session) {
+		if _, ok := s.(*sockjsclient.XHRSession); ok {
+			clientSession <- s
+		}
+	}
+
+	if err := c.DialTimeout(timeout); err != nil {
+		t.Fatalf("DialTimeout()=%s", err)
+	}
+
+	select {
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for session")
+	case c := <-clientSession:
+		c.Close(500, "transport closed")
+	}
+
+	done := make(chan error)
+
+	go func() {
+		_, err := c.Tell("echo", "should fail")
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("expected err != nil, was nil")
+		}
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for send failure")
 	}
 }
 

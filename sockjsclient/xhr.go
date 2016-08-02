@@ -15,6 +15,7 @@ import (
 // returns, so it's totally safe to neglect the error
 var cookieJar, _ = cookiejar.New(nil)
 
+// XHRSession implements sockjs.Session with XHR transport.
 type XHRSession struct {
 	mu sync.Mutex
 
@@ -23,8 +24,10 @@ type XHRSession struct {
 	sessionID  string
 	messages   []string
 	abort      chan struct{}
-	opened     bool
-	closed     bool
+
+	// TODO(rjeczalik): replace with single state field
+	opened bool
+	closed bool
 }
 
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
@@ -172,21 +175,22 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 	case 'c':
 		x.mu.Lock()
 		x.opened = false
+		x.closed = true
 		x.mu.Unlock()
 
-		return "", false, errors.New("session closed")
+		return "", false, ErrSessionClosed
 	default:
 		return "", false, errors.New("invalid frame type")
 	}
 }
 
 func (x *XHRSession) Send(frame string) error {
-	if !x.isOpened() {
-		return errors.New("session is not opened yet")
-	}
-
 	if x.isClosed() {
 		return ErrSessionClosed
+	}
+
+	if !x.isOpened() {
+		return errors.New("session is not opened yet")
 	}
 
 	// Need's to be JSON encoded array of string messages (SockJS protocol
