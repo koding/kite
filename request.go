@@ -89,6 +89,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	if !method.initialized {
 		method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
 		method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+		method.finalFuncs = append(method.finalFuncs, c.LocalKite.finalFuncs...)
 		method.initialized = true
 	}
 	method.mu.Unlock()

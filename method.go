@@ -40,6 +40,11 @@ func (h HandlerFunc) ServeKite(r *Request) (interface{}, error) {
 	return h(r)
 }
 
+// FinalFunc represents a proxy function that is called last
+// in the method call chain, regardless whether whole call
+// chained succeeded with non-nil error or not.
+type FinalFunc func(r *Request, resp interface{}, err error) (interface{}, error)
+
 // Method defines a method and the Handler it is bind to. By default
 // "ReturnMethod" handling is used.
 type Method struct {
@@ -47,9 +52,10 @@ type Method struct {
 	name string
 
 	// handler contains the related Handler for the given method
-	handler      Handler   // handler is the base handler, the response of it is returned as the final
-	preHandlers  []Handler // a list of handlers that are executed before the main handler
-	postHandlers []Handler // a list of handlers that are executed after the main handler
+	handler      Handler     // handler is the base handler, the response of it is returned as the final
+	preHandlers  []Handler   // a list of handlers that are executed before the main handler
+	postHandlers []Handler   // a list of handlers that are executed after the main handler
+	finalFuncs   []FinalFunc // a list of final funcs executed upon returning from ServeKite
 
 	// authenticate defines if a given authenticator function is enabled for
 	// the given auth type in the request.
@@ -78,8 +84,6 @@ func (k *Kite) addHandle(method string, handler Handler) *Method {
 	m := &Method{
 		name:         method,
 		handler:      handler,
-		preHandlers:  make([]Handler, 0),
-		postHandlers: make([]Handler, 0),
 		authenticate: authenticate,
 		handling:     k.MethodHandling,
 	}
@@ -142,6 +146,16 @@ func (m *Method) PostHandleFunc(handler HandlerFunc) *Method {
 	return m.PostHandle(handler)
 }
 
+// FinalFunc registers a funtion that is always called as a last one
+// after pre-, handler and post- functions for the given method.
+//
+// It receives a result and an error from last handler that
+// got executed prior to calling final func.
+func (m *Method) FinalFunc(f FinalFunc) *Method {
+	m.finalFuncs = append(m.finalFuncs, f)
+	return m
+}
+
 // Handle registers the handler for the given method. The handler is called
 // when a method call is received from a Kite.
 func (k *Kite) Handle(method string, handler Handler) *Method {
@@ -181,6 +195,15 @@ func (k *Kite) PostHandleFunc(handler HandlerFunc) {
 	k.PostHandle(handler)
 }
 
+// FinalFunc registers a funtion that is always called as a last one
+// after pre-, handler and post- functions.
+//
+// It receives a result and an error from last handler that
+// got executed prior to calling final func.
+func (k *Kite) FinalFunc(f FinalFunc) {
+	k.finalFuncs = append(k.finalFuncs, f)
+}
+
 func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	var firstResp interface{}
 	var resp interface{}
@@ -199,7 +222,7 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	for _, handler := range preHandlers {
 		resp, err = handler.ServeKite(r)
 		if err != nil {
-			return nil, err
+			return m.final(r, nil, err)
 		}
 
 		if m.handling == ReturnFirst && resp != nil && firstResp == nil {
@@ -212,7 +235,7 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	// now call our base handler
 	resp, err = m.handler.ServeKite(r)
 	if err != nil {
-		return nil, err
+		return m.final(r, nil, err)
 	}
 
 	// also save it dependent on the handling mechanism
@@ -233,7 +256,7 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 	for _, handler := range postHandlers {
 		resp, err = handler.ServeKite(r)
 		if err != nil {
-			return nil, err
+			return m.final(r, nil, err)
 		}
 
 		if m.handling == ReturnFirst && resp != nil && firstResp == nil {
@@ -245,12 +268,17 @@ func (m *Method) ServeKite(r *Request) (interface{}, error) {
 
 	switch m.handling {
 	case ReturnMethod:
-		return methodResp, nil
+		resp = methodResp
 	case ReturnFirst:
-		return firstResp, nil
-	case ReturnLatest:
-		return resp, nil
+		resp = firstResp
 	}
 
-	return resp, nil
+	return m.final(r, resp, nil)
+}
+
+func (m *Method) final(r *Request, resp interface{}, err error) (interface{}, error) {
+	for _, f := range m.finalFuncs {
+		resp, err = f(r, resp, err)
+	}
+	return resp, err
 }

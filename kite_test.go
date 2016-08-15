@@ -3,6 +3,7 @@ package kite
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -311,6 +312,18 @@ func TestKite(t *testing.T) {
 	mathKite.HandleFunc("square", Square)
 	mathKite.HandleFunc("squareCB", SquareCB)
 	mathKite.HandleFunc("sleep", Sleep)
+	mathKite.HandleFunc("sqrt", Sqrt)
+	mathKite.FinalFunc(func(r *Request, resp interface{}, err error) (interface{}, error) {
+		if r.Method != "sqrt" || err != ErrNegative {
+			return resp, err
+		}
+
+		a := r.Args.One().MustFloat64()
+
+		// JSON does not marshal complex128,
+		// for test purpose we use just string
+		return fmt.Sprintf("%di", int(math.Sqrt(-a)+0.5)), nil
+	})
 	go mathKite.Run()
 	<-mathKite.ServerReadyNotify()
 	defer mathKite.Close()
@@ -333,7 +346,16 @@ func TestKite(t *testing.T) {
 	}
 	defer remote.Close()
 
-	result, err := remote.TellWithTimeout("square", 4*time.Second, 2)
+	result, err := remote.TellWithTimeout("sqrt", 4*time.Second, -4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s, err := result.String(); err != nil || s != "2i" {
+		t.Fatalf("want 2i, got %v (%v)", result, err)
+	}
+
+	result, err = remote.TellWithTimeout("square", 4*time.Second, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,6 +430,18 @@ func Square(r *Request) (interface{}, error) {
 	r.Client.Go("foo", "bar")
 
 	return result, nil
+}
+
+var ErrNegative = errors.New("negative argument")
+
+func Sqrt(r *Request) (interface{}, error) {
+	a := r.Args.One().MustFloat64()
+
+	if a < 0 {
+		return nil, ErrNegative
+	}
+
+	return math.Sqrt(a), nil
 }
 
 // Calls the callback with the result. For testing requests with Callback.
