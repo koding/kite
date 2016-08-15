@@ -2,6 +2,7 @@ package kite
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -160,7 +161,7 @@ func TestMethod_Error(t *testing.T) {
 		t.Fatal("PreHandle returns an error, however error is non-nil.")
 	}
 
-	if err.Error() != testError.Error() {
+	if !strings.HasPrefix(err.Error(), testError.Error()) {
 		t.Errorf("Error should be '%v', got '%v'", testError, err)
 	}
 }

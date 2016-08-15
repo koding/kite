@@ -66,7 +66,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	defer func() {
 		if r := recover(); r != nil {
 			debug.PrintStack()
-			kiteErr := createError(r)
+			kiteErr := createError(request, r)
 			c.LocalKite.Log.Error(kiteErr.Error()) // let's log it too :)
 			callFunc(nil, kiteErr)
 		}
@@ -76,7 +76,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	request, callFunc = c.newRequest(method.name, args)
 	if method.authenticate {
 		if err := request.authenticate(); err != nil {
-			callFunc(nil, err)
+			callFunc(nil, createError(request, err))
 			return
 		}
 	} else {
@@ -101,8 +101,9 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// available more so it will return a zero.
 	if method.bucket != nil && method.bucket.TakeAvailable(1) == 0 {
 		callFunc(nil, &Error{
-			Type:    "requestLimitError",
-			Message: "The maximum request rate is exceeded.",
+			Type:      "requestLimitError",
+			Message:   "The maximum request rate is exceeded.",
+			RequestID: request.ID,
 		})
 		return
 	}
@@ -110,7 +111,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// Call the handler functions.
 	result, err := method.ServeKite(request)
 
-	callFunc(result, createError(err))
+	callFunc(result, createError(request, err))
 }
 
 // runCallback is called when a callback method call is received from remote Kite.
