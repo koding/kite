@@ -3,12 +3,9 @@ package sockjsclient
 // http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html
 
 import (
-	crand "crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -19,17 +16,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/koding/kite/utils"
 )
-
-// Rand is a threaSafe rand.Rand type
-type Rand struct {
-	r *rand.Rand
-	sync.Mutex
-}
-
-var r = Rand{
-	r: rand.New(rand.NewSource(time.Now().UnixNano())),
-}
 
 // ErrSessionClosed is returned by Send/Recv methods when
 // calling them after the session got closed.
@@ -101,7 +89,7 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 	}
 
 	serverID := threeDigits()
-	sessionID := randomStringLength(20)
+	sessionID := utils.RandomString(20)
 
 	// Add server_id and session_id to the path.
 	dialURL.Path += serverID + "/" + sessionID + "/websocket"
@@ -248,23 +236,7 @@ func (w *WebsocketSession) Close(uint32, string) error {
 
 // threeDigits is used to generate a server_id.
 func threeDigits() string {
-	var i uint64
-
-	r.Lock()
-	i = uint64(r.r.Int31())
-	r.Unlock()
-	if i < 100 {
-		i += 100
-	}
-	return strconv.FormatUint(i, 10)[:3]
-}
-
-// randomStringLength is used to generate a session_id.
-func randomStringLength(length int) string {
-	size := (length * 3 / 4) + 1
-	r := make([]byte, size)
-	crand.Read(r)
-	return base64.URLEncoding.EncodeToString(r)[:length]
+	return strconv.FormatInt(100+int64(utils.Int31n(900)), 10)
 }
 
 func replaceSchemeWithWS(u *url.URL) error {

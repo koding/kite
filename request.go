@@ -12,28 +12,32 @@ import (
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
+	"github.com/koding/kite/utils"
 )
 
 // Request contains information about the incoming request.
 type Request struct {
-	// Method defines the method name which is invoked by the incoming request
+	// ID is an unique string, which may be used for tracing the request.
+	ID string
+
+	// Method defines the method name which is invoked by the incoming request.
 	Method string
-
-	// Args defines the incoming arguments for the given method
-	Args *dnode.Partial
-
-	// LocalKite defines a context for the local kite
-	LocalKite *Kite
-
-	// Client defines a context for the remote kite
-	Client *Client
 
 	// Username defines the username which the incoming request is bound to.
 	// This is authenticated and validated if authentication is enabled.
 	Username string
 
+	// Args defines the incoming arguments for the given method.
+	Args *dnode.Partial
+
+	// LocalKite defines a context for the local kite.
+	LocalKite *Kite
+
+	// Client defines a context for the remote kite.
+	Client *Client
+
 	// Auth stores the authentication information for the incoming request and
-	// the type of authentication. This is not used when authentication is disabled
+	// the type of authentication. This is not used when authentication is disabled.
 	Auth *Auth
 
 	// Context holds a context that used by the current ServeKite handler. Any
@@ -138,6 +142,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	}
 
 	request := &Request{
+		ID:        utils.RandomString(16),
 		Method:    method,
 		Args:      options.WithArgs,
 		LocalKite: c.LocalKite,
