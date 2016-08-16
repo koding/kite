@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"sync"
+
+	"github.com/koding/kite/utils"
 )
 
 // the implementation of New() doesn't have any error to be returned yet it
@@ -38,7 +40,7 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 
 	// following /server_id/session_id should always be the same for every session
 	serverID := threeDigits()
-	sessionID := randomStringLength(20)
+	sessionID := utils.RandomString(20)
 	sessionURL := opts.BaseURL + "/" + serverID + "/" + sessionID
 
 	// start the initial session handshake

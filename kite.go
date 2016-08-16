@@ -71,6 +71,7 @@ type Kite struct {
 	handlers     map[string]*Method // method map for exported methods
 	preHandlers  []Handler          // a list of handlers that are executed before any handler
 	postHandlers []Handler          // a list of handlers that are executed after any handler
+	finalFuncs   []FinalFunc        // a list of funcs executed after any handler regardless of the error
 
 	// MethodHandling defines how the kite is returning the response for
 	// multiple handlers

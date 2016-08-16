@@ -13,9 +13,10 @@ var ErrKeyNotTrusted = errors.New("kontrol key is not trusted")
 
 // Error is the type of the kite related errors returned from kite package.
 type Error struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	CodeVal string `json:"code"`
+	Type      string `json:"type"`
+	Message   string `json:"message"`
+	CodeVal   string `json:"code"`
+	RequestID string `json:"id"`
 }
 
 func (e Error) Code() string {
@@ -23,15 +24,21 @@ func (e Error) Code() string {
 }
 
 func (e Error) Error() string {
-	if e.Type == "genericError" || e.Type == "" {
-		return e.Message
+	s := e.Message
+
+	if e.Type != "genericError" && e.Type != "" {
+		s = e.Type + ": " + e.Message
 	}
 
-	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+	if e.RequestID != "" {
+		return s + " (" + e.RequestID + ")"
+	}
+
+	return s
 }
 
 // createError creates a new kite.Error for the given r variable
-func createError(r interface{}) *Error {
+func createError(req *Request, r interface{}) *Error {
 	if r == nil {
 		return nil
 	}
@@ -50,6 +57,10 @@ func createError(r interface{}) *Error {
 			Type:    "genericError",
 			Message: fmt.Sprint(r),
 		}
+	}
+
+	if kiteErr.RequestID == "" && req != nil {
+		kiteErr.RequestID = req.ID
 	}
 
 	return kiteErr

@@ -12,28 +12,32 @@ import (
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
+	"github.com/koding/kite/utils"
 )
 
 // Request contains information about the incoming request.
 type Request struct {
-	// Method defines the method name which is invoked by the incoming request
+	// ID is an unique string, which may be used for tracing the request.
+	ID string
+
+	// Method defines the method name which is invoked by the incoming request.
 	Method string
-
-	// Args defines the incoming arguments for the given method
-	Args *dnode.Partial
-
-	// LocalKite defines a context for the local kite
-	LocalKite *Kite
-
-	// Client defines a context for the remote kite
-	Client *Client
 
 	// Username defines the username which the incoming request is bound to.
 	// This is authenticated and validated if authentication is enabled.
 	Username string
 
+	// Args defines the incoming arguments for the given method.
+	Args *dnode.Partial
+
+	// LocalKite defines a context for the local kite.
+	LocalKite *Kite
+
+	// Client defines a context for the remote kite.
+	Client *Client
+
 	// Auth stores the authentication information for the incoming request and
-	// the type of authentication. This is not used when authentication is disabled
+	// the type of authentication. This is not used when authentication is disabled.
 	Auth *Auth
 
 	// Context holds a context that used by the current ServeKite handler. Any
@@ -62,7 +66,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	defer func() {
 		if r := recover(); r != nil {
 			debug.PrintStack()
-			kiteErr := createError(r)
+			kiteErr := createError(request, r)
 			c.LocalKite.Log.Error(kiteErr.Error()) // let's log it too :)
 			callFunc(nil, kiteErr)
 		}
@@ -72,7 +76,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	request, callFunc = c.newRequest(method.name, args)
 	if method.authenticate {
 		if err := request.authenticate(); err != nil {
-			callFunc(nil, err)
+			callFunc(nil, createError(request, err))
 			return
 		}
 	} else {
@@ -85,6 +89,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	if !method.initialized {
 		method.preHandlers = append(method.preHandlers, c.LocalKite.preHandlers...)
 		method.postHandlers = append(method.postHandlers, c.LocalKite.postHandlers...)
+		method.finalFuncs = append(method.finalFuncs, c.LocalKite.finalFuncs...)
 		method.initialized = true
 	}
 	method.mu.Unlock()
@@ -96,8 +101,9 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// available more so it will return a zero.
 	if method.bucket != nil && method.bucket.TakeAvailable(1) == 0 {
 		callFunc(nil, &Error{
-			Type:    "requestLimitError",
-			Message: "The maximum request rate is exceeded.",
+			Type:      "requestLimitError",
+			Message:   "The maximum request rate is exceeded.",
+			RequestID: request.ID,
 		})
 		return
 	}
@@ -105,7 +111,7 @@ func (c *Client) runMethod(method *Method, args *dnode.Partial) {
 	// Call the handler functions.
 	result, err := method.ServeKite(request)
 
-	callFunc(result, createError(err))
+	callFunc(result, createError(request, err))
 }
 
 // runCallback is called when a callback method call is received from remote Kite.
@@ -138,6 +144,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 	}
 
 	request := &Request{
+		ID:        utils.RandomString(16),
 		Method:    method,
 		Args:      options.WithArgs,
 		LocalKite: c.LocalKite,
