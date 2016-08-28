@@ -502,7 +502,10 @@ func (c *Client) sendHub() {
 
 			err := session.Send(string(msg.p))
 			if err != nil {
-				c.LocalKite.Log.Error("error sending: %s", err)
+				// TODO(rjeczalik): temporary workaround for koding/koding#8711
+				if err != sockjs.ErrSessionNotOpen {
+					c.LocalKite.Log.Error("error sending: %s", err)
+				}
 
 				if msg.errC != nil {
 					msg.errC <- err
