@@ -119,7 +119,12 @@ func GenerateKiteKey(k *KiteKey, keys *KeyPair) (*jwt.Token, error) {
 		"kontrolKey": string(keys.Public),
 	}
 
-	kiteKey.Raw, err = kiteKey.SignedString(keys.Private)
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(keys.Private)
+	if err != nil {
+		return nil, err
+	}
+
+	kiteKey.Raw, err = kiteKey.SignedString(privateKey)
 	if err != nil {
 		return nil, err
 	}
