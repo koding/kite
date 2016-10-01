@@ -76,6 +76,10 @@ type Client struct {
 	// To signal about the close
 	closeChan chan struct{}
 
+	// closeRenewer is used to stop renewing tokens when client
+	// is closed but was not dialed
+	closeRenewer chan struct{}
+
 	// To syncronize the consumers
 	wg *sync.WaitGroup
 
@@ -477,6 +481,13 @@ func (c *Client) Close() {
 	c.muReconnect.Unlock()
 
 	close(c.closeChan)
+
+	if c.closeRenewer != nil {
+		select {
+		case c.closeRenewer <- struct{}{}:
+		default:
+		}
+	}
 
 	// wait for consumers to finish buffered messages
 	c.wg.Wait()

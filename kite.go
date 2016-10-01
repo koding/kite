@@ -4,10 +4,12 @@
 package kite
 
 import (
+	"bytes"
 	"crypto/rsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -416,4 +418,105 @@ func (k *Kite) RSAKey(token *jwt.Token) (interface{}, error) {
 	}
 
 	return kontrolKey, nil
+}
+
+// ErrClose is returned by the Close function, when the argument passed
+// to it was a slice of kites.
+type ErrClose struct {
+	// Errs has always length of the slice passed to the Close function.
+	// It contains at least one non-nil error.
+	Errs []error
+}
+
+// Error implements the built-in error interface.
+func (err *ErrClose) Error() string {
+	if len(err.Errs) == 1 {
+		return err.Errs[0].Error()
+	}
+
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "The following kites failed to close:\n\n")
+
+	for i, e := range err.Errs {
+		if e == nil {
+			continue
+		}
+
+		fmt.Fprintf(&buf, "\t[%d] %s\n", i, e)
+	}
+
+	return buf.String()
+}
+
+// Closer returns a io.Closer that can be used to close all the kites
+// given by the generic argument.
+//
+// The kites is expected to be one of:
+//
+//   - *kite.Kite
+//   - []*kite.Kite
+//   - *kite.Client
+//   - []*kite.Client
+//
+// If the kites argument is a slice and at least one of the kites returns
+// error on Close, the Close method returns *ErrClose.
+//
+// TODO(rjeczalik): Currently (*Kite).Close and (*Client).Close does
+// not implement io.Closer interface - when [0] is resolved, this
+// method should be adopted accordingly.
+//
+//   [0] - https://github.com/koding/kite/issues/183
+//
+func Closer(kites interface{}) io.Closer {
+	switch k := kites.(type) {
+	case *Kite:
+		return closerFunc(func() []error {
+			k.Close()
+			return nil
+		})
+	case []*Kite:
+		return closerFunc(func() []error {
+			for _, k := range k {
+				k.Close()
+			}
+			return nil
+		})
+	case *Client:
+		return closerFunc(func() []error {
+			k.Close()
+			return nil
+		})
+	case []*Client:
+		return closerFunc(func() []error {
+			for _, c := range k {
+				c.Close()
+			}
+			return nil
+		})
+	default:
+		panic(fmt.Errorf("unrecognized type passed to Close %T", kites))
+	}
+}
+
+// Close is a wrapper for Closer that calls a Close on it.
+func Close(kites interface{}) error {
+	return Closer(kites).Close()
+}
+
+type closerFunc func() []error
+
+func (fn closerFunc) Close() error {
+	errs := fn()
+	if len(errs) > 1 {
+		return &ErrClose{
+			Errs: errs,
+		}
+	}
+
+	if len(errs) == 1 && errs[0] != nil {
+		return errs[0]
+	}
+
+	return nil
 }
