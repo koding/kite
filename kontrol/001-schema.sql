@@ -20,7 +20,6 @@ CREATE ROLE kontrol;
 
 -- create user
 -- please change this password according to your conventions
-CREATE USER kontrolapplication PASSWORD 'somerandompassword';
+CREATE USER kontrolapplication PASSWORD 'kontrolapplication';
 
 GRANT kontrol TO kontrolapplication;
-
