@@ -75,15 +75,24 @@ func (t *TokenRenewer) renewLoop() {
 	for {
 		select {
 		case <-t.signalRenewToken:
-			if err := t.renewToken(); err != nil {
-				t.localKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...", err.Error(), t.client.ID, retryInterval/time.Second)
+			switch err := t.renewToken(); err {
+			case nil:
+				go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
+			case ErrNoKitesAvailable:
+				// If kite went down we're not going to renew the token,
+				// as we need to dial either way.
+				//
+				// This case handles a situation, when kite missed
+				// disconnect signal (observed to happen with XHR transport).
+				return
+			default:
+				t.localKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...",
+					err, t.client.ID, retryInterval/time.Second)
 				// Need to sleep here litle bit because a signal is sent
 				// when an expired token is detected on incoming request.
 				// This sleep prevents the signal from coming too fast.
 				time.Sleep(1 * time.Second)
 				go time.AfterFunc(retryInterval, t.sendRenewTokenSignal)
-			} else {
-				go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
 			}
 		case <-t.disconnect:
 			return
