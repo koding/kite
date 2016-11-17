@@ -86,7 +86,7 @@ func NewFromKiteKey(file string) (*Config, error) {
 	}
 
 	var c Config
-	if err := c.readToken(key); err != nil {
+	if err := c.ReadToken(key); err != nil {
 		return nil, err
 	}
 
@@ -146,10 +146,11 @@ func (c *Config) ReadKiteKey() error {
 		return err
 	}
 
-	return c.readToken(key)
+	return c.ReadToken(key)
 }
 
-func (c *Config) readToken(key *jwt.Token) error {
+// ReadToken reads Kite Claims from JWT token and uses them to initialize Config.
+func (c *Config) ReadToken(key *jwt.Token) error {
 	c.KiteKey = key.Raw
 
 	claims, ok := key.Claims.(*kitekey.KiteClaims)
