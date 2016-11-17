@@ -256,7 +256,7 @@ type doResult struct {
 }
 
 func (x *XHRSession) do(req *http.Request) <-chan doResult {
-	ch := make(chan doResult)
+	ch := make(chan doResult, 1)
 
 	go func() {
 		var res doResult
