@@ -325,7 +325,7 @@ func (k *Kite) callOnConnectHandlers(c *Client) {
 
 	for _, handler := range k.onConnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(c)
 		}()
 	}
@@ -337,7 +337,7 @@ func (k *Kite) callOnFirstRequestHandlers(c *Client) {
 
 	for _, handler := range k.onFirstRequestHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(c)
 		}()
 	}
@@ -349,7 +349,7 @@ func (k *Kite) callOnDisconnectHandlers(c *Client) {
 
 	for _, handler := range k.onDisconnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(c)
 		}()
 	}
@@ -361,7 +361,7 @@ func (k *Kite) callOnRegisterHandlers(r *protocol.RegisterResult) {
 
 	for _, handler := range k.onRegisterHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(r)
 		}()
 	}
@@ -533,3 +533,5 @@ func (fn closerFunc) Close() error {
 
 	return nil
 }
+
+func nopRecover() { recover() }

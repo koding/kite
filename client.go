@@ -568,7 +568,7 @@ func (c *Client) callOnConnectHandlers() {
 
 	for _, handler := range c.onConnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
@@ -581,7 +581,7 @@ func (c *Client) callOnDisconnectHandlers() {
 
 	for _, handler := range c.onDisconnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
@@ -595,7 +595,7 @@ func (c *Client) callOnTokenExpireHandlers() {
 
 	for _, handler := range c.onTokenExpireHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
@@ -609,7 +609,7 @@ func (c *Client) callOnTokenRenewHandlers(token string) {
 
 	for _, handler := range c.onTokenRenewHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(token)
 		}()
 	}
