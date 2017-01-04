@@ -31,8 +31,8 @@ func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 	t := &TokenRenewer{
 		client:           r,
 		localKite:        k,
-		signalRenewToken: make(chan struct{}, 1),
-		disconnect:       make(chan struct{}, 1),
+		signalRenewToken: make(chan struct{}),
+		disconnect:       make(chan struct{}),
 	}
 	return t, t.parse(r.Auth.Key)
 }
