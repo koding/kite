@@ -13,6 +13,7 @@ import (
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
+	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 	_ "github.com/koding/kite/testutil"
 
@@ -21,6 +22,14 @@ import (
 
 func init() {
 	rand.Seed(time.Now().Unix() + int64(os.Getpid()))
+}
+
+func panicHandler(*Client) {
+	panic("this panic should be ignored")
+}
+
+func panicRegisterHandler(*protocol.RegisterResult) {
+	panic("this panic should be ignored")
 }
 
 func TestMultiple(t *testing.T) {
@@ -50,6 +59,11 @@ func TestMultiple(t *testing.T) {
 		m.Config.DisableAuthentication = true
 		m.Config.Transport = transport
 		m.Config.Port = port + i
+
+		m.OnConnect(panicHandler)
+		m.OnRegister(panicRegisterHandler)
+		m.OnDisconnect(panicHandler)
+		m.OnFirstRequest(panicHandler)
 
 		m.HandleFunc("square", Square)
 		go m.Run()

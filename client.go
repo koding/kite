@@ -564,51 +564,55 @@ func (c *Client) OnTokenRenew(handler func(token string)) {
 // callOnConnectHandlers runs the registered connect handlers.
 func (c *Client) callOnConnectHandlers() {
 	c.m.RLock()
+	defer c.m.RUnlock()
+
 	for _, handler := range c.onConnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
-	c.m.RUnlock()
 }
 
 // callOnDisconnectHandlers runs the registered disconnect handlers.
 func (c *Client) callOnDisconnectHandlers() {
 	c.m.RLock()
+	defer c.m.RUnlock()
+
 	for _, handler := range c.onDisconnectHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
-	c.m.RUnlock()
 }
 
 // callOnTokenExpireHandlers calls registered functions when an error
 // from remote kite is received that token used is expired.
 func (c *Client) callOnTokenExpireHandlers() {
 	c.m.RLock()
+	defer c.m.RUnlock()
+
 	for _, handler := range c.onTokenExpireHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler()
 		}()
 	}
-	c.m.RUnlock()
 }
 
 // callOnTokenRenewHandlers calls all registered functions when
 // we successfully obtain new token from kontrol.
 func (c *Client) callOnTokenRenewHandlers(token string) {
 	c.m.RLock()
+	defer c.m.RUnlock()
+
 	for _, handler := range c.onTokenRenewHandlers {
 		func() {
-			defer recover()
+			defer nopRecover()
 			handler(token)
 		}()
 	}
-	c.m.RUnlock()
 }
 
 func (c *Client) wrapMethodArgs(args []interface{}, responseCallback dnode.Function) []interface{} {

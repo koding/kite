@@ -324,7 +324,10 @@ func (k *Kite) callOnConnectHandlers(c *Client) {
 	defer k.handlersMu.RUnlock()
 
 	for _, handler := range k.onConnectHandlers {
-		handler(c)
+		func() {
+			defer nopRecover()
+			handler(c)
+		}()
 	}
 }
 
@@ -333,7 +336,10 @@ func (k *Kite) callOnFirstRequestHandlers(c *Client) {
 	defer k.handlersMu.RUnlock()
 
 	for _, handler := range k.onFirstRequestHandlers {
-		handler(c)
+		func() {
+			defer nopRecover()
+			handler(c)
+		}()
 	}
 }
 
@@ -342,7 +348,10 @@ func (k *Kite) callOnDisconnectHandlers(c *Client) {
 	defer k.handlersMu.RUnlock()
 
 	for _, handler := range k.onDisconnectHandlers {
-		handler(c)
+		func() {
+			defer nopRecover()
+			handler(c)
+		}()
 	}
 }
 
@@ -351,7 +360,10 @@ func (k *Kite) callOnRegisterHandlers(r *protocol.RegisterResult) {
 	defer k.handlersMu.RUnlock()
 
 	for _, handler := range k.onRegisterHandlers {
-		handler(r)
+		func() {
+			defer nopRecover()
+			handler(r)
+		}()
 	}
 }
 
@@ -521,3 +533,5 @@ func (fn closerFunc) Close() error {
 
 	return nil
 }
+
+func nopRecover() { recover() }

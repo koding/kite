@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
 
@@ -66,7 +67,7 @@ func handlePrompt(r *Request) (interface{}, error) {
 // handleGetPass reads a line of input from a terminal without local echo.
 func handleGetPass(r *Request) (interface{}, error) {
 	fmt.Print(r.Args.One().MustString())
-	data, err := terminal.ReadPassword(0) // stdin
+	data, err := terminal.ReadPassword(int(os.Stdin.Fd())) // stdin
 	fmt.Println()
 	if err != nil {
 		return nil, err

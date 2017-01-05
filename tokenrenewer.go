@@ -2,7 +2,8 @@ package kite
 
 import (
 	"fmt"
-	"sync/atomic"
+	"strings"
+	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -22,15 +23,16 @@ type TokenRenewer struct {
 	validUntil       time.Time
 	signalRenewToken chan struct{}
 	disconnect       chan struct{}
-	active           uint32
+	once             sync.Once // for c.installHandlers
+	renewLoopWG      sync.WaitGroup
 }
 
 func NewTokenRenewer(r *Client, k *Kite) (*TokenRenewer, error) {
 	t := &TokenRenewer{
 		client:           r,
 		localKite:        k,
-		signalRenewToken: make(chan struct{}, 1),
-		disconnect:       make(chan struct{}, 1),
+		signalRenewToken: make(chan struct{}),
+		disconnect:       make(chan struct{}),
 	}
 	return t, t.parse(r.Auth.Key)
 }
@@ -60,14 +62,19 @@ func (t *TokenRenewer) parse(tokenString string) error {
 
 // RenewWhenExpires renews the token before it expires.
 func (t *TokenRenewer) RenewWhenExpires() {
-	if atomic.CompareAndSwapUint32(&t.active, 0, 1) {
-		t.client.OnConnect(t.startRenewLoop)
-		t.client.OnTokenExpire(t.sendRenewTokenSignal)
-		t.client.OnDisconnect(t.sendDisconnectSignal)
-	}
+	t.once.Do(t.installHandlers)
+}
+
+func (t *TokenRenewer) installHandlers() {
+	t.client.OnConnect(t.startRenewLoop)
+	t.client.OnTokenExpire(t.sendRenewTokenSignal)
+	t.client.OnDisconnect(t.sendDisconnectSignal)
 }
 
 func (t *TokenRenewer) renewLoop() {
+	t.renewLoopWG.Add(1)
+	defer t.renewLoopWG.Done()
+
 	// renews token before it expires (sends the first signal to the goroutine below)
 	go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
 
@@ -75,16 +82,15 @@ func (t *TokenRenewer) renewLoop() {
 	for {
 		select {
 		case <-t.signalRenewToken:
-			switch err := t.renewToken(); err {
-			case nil:
+			switch err := t.renewToken(); {
+			case err == nil:
 				go time.AfterFunc(t.renewDuration(), t.sendRenewTokenSignal)
-			case ErrNoKitesAvailable:
+			case err == ErrNoKitesAvailable || strings.Contains(err.Error(), "no kites found"):
 				// If kite went down we're not going to renew the token,
 				// as we need to dial either way.
 				//
 				// This case handles a situation, when kite missed
 				// disconnect signal (observed to happen with XHR transport).
-				return
 			default:
 				t.localKite.Log.Error("token renewer: %s Cannot renew token for Kite: %s I will retry in %d seconds...",
 					err, t.client.ID, retryInterval/time.Second)
@@ -107,6 +113,14 @@ func (t *TokenRenewer) renewDuration() time.Duration {
 }
 
 func (t *TokenRenewer) startRenewLoop() {
+	// In case when t.client missed a disconnect signal (e.g. due to timeout observed
+	// by the remote end), previous renewLoop will be still running.
+	t.sendDisconnectSignal()
+
+	// if we don't wait to observe previous renewLoop goroutine handle the disconnect
+	// signal, we'd have a race resulting in new renewLoop goroutine handling it.
+	t.renewLoopWG.Wait()
+
 	go t.renewLoop()
 }
 
