@@ -6,8 +6,9 @@ Kite is a framework for developing micro-services in Go.
 [![GoDoc](http://img.shields.io/badge/go-documentation-brightgreen.svg?style=flat-square)](https://godoc.org/github.com/koding/kite)
 [![Build Status](http://img.shields.io/travis/koding/kite/master.svg?style=flat-square)](https://travis-ci.org/koding/kite)
 
-![Kite](http://i.imgur.com/iNcltPN.png)
-
+<p align="center">
+  <img height="100%" src="http://i.imgur.com/iNcltPN.png" title="Kite"/>
+</p>
 
 Kite is both the name of the framework and the micro-service that is written by
 using this framework.  Basically, Kite is a RPC server as well as a client. It
