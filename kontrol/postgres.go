@@ -100,7 +100,7 @@ func (p *Postgres) RunCleaner(interval, expire time.Duration) {
 		}
 	}
 
-	for _ = range time.Tick(interval) {
+	for range time.Tick(interval) {
 		cleanFunc()
 	}
 }
