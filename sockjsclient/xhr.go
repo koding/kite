@@ -62,7 +62,7 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	}
 
 	if frame != 'o' {
-		return nil, fmt.Errorf("can't start session, invalid frame: %s", frame)
+		return nil, fmt.Errorf("can't start session, invalid frame: %s", string(frame))
 	}
 
 	return &XHRSession{

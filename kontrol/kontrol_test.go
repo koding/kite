@@ -482,11 +482,11 @@ func TestGetKites(t *testing.T) {
 	}
 
 	if kites[0].Name != testName {
-		t.Errorf("getkites got %s exptected %", kites[0].Name, testName)
+		t.Errorf("getkites got %s exptected %s", kites[0].Name, testName)
 	}
 
 	if kites[0].Version != testVersion {
-		t.Errorf("getkites got %s exptected %", kites[0].Version, testVersion)
+		t.Errorf("getkites got %s exptected %s", kites[0].Version, testVersion)
 	}
 }
 
@@ -522,7 +522,7 @@ func TestRegisterKite(t *testing.T) {
 	defer m.Close()
 
 	if kiteURL.String() != res.URL.String() {
-		t.Error("register: got %s expected %s", res.URL.String(), kiteURL.String())
+		t.Errorf("register: got %s expected %s", res.URL.String(), kiteURL.String())
 	}
 }
 

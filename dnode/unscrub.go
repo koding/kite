@@ -103,5 +103,4 @@ func setCallback(value reflect.Value, path Path, cb functionReceived) error {
 			return fmt.Errorf("Unhandled value of kind '%v' in callback path: %s", value.Kind(), value.Interface())
 		}
 	}
-	return nil
 }
