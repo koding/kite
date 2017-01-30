@@ -26,14 +26,14 @@ func NewQuery() cli.CommandFactory {
 }
 
 func (c *Query) Synopsis() string {
-	return "Queries kontrol based on the given criterias"
+	return "Queries kontrol based on the given criteria"
 }
 
 func (c *Query) Help() string {
 	helpText := `
 Usage: kitectl query [options]
 
-  Queries Kontrol based on the given criterias.
+  Queries Kontrol based on the given criteria.
 
 Options:
 

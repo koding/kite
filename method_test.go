@@ -86,7 +86,7 @@ func TestMethod_Latest(t *testing.T) {
 	}
 
 	if result.MustString() != "post2" {
-		t.Errorf("Latest repsonse should be post2, got %s", result.MustString())
+		t.Errorf("Latest response should be post2, got %s", result.MustString())
 	}
 
 }
@@ -125,7 +125,7 @@ func TestMethod_First(t *testing.T) {
 	}
 
 	if result.MustString() != "hello" {
-		t.Errorf("Latest repsonse should be hello, got %s", result.MustString())
+		t.Errorf("Latest response should be hello, got %s", result.MustString())
 	}
 
 }
@@ -241,7 +241,7 @@ func TestMethod_Base(t *testing.T) {
 	}
 
 	if result.MustString() != "main-response" {
-		t.Errorf("Latest repsonse should be main-response, got %s", result.MustString())
+		t.Errorf("Latest response should be main-response, got %s", result.MustString())
 	}
 
 }

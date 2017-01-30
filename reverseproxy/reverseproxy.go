@@ -154,7 +154,7 @@ func (p *Proxy) backend(req *http.Request) *url.URL {
 	// remove the first empty path
 	paths = paths[1:]
 
-	// get our kiteId and indiviudal paths
+	// get our kiteId and individuals paths
 	kiteId, rest := paths[0], path.Join(paths[1:]...)
 
 	p.Kite.Log.Info("[%s] Incoming proxy request for scheme: '%s', endpoint '/%s'",

@@ -27,7 +27,7 @@ type KiteClaims struct {
 }
 
 // KiteHome returns the home path of Kite directory.
-// The returned value can be overriden by setting KITE_HOME environment variable.
+// The returned value can be overridden by setting KITE_HOME environment variable.
 func KiteHome() (string, error) {
 	kiteHome := os.Getenv("KITE_HOME")
 	if kiteHome != "" {
@@ -74,7 +74,7 @@ func Write(kiteKey string) error {
 	}
 
 	// Need to remove the previous key first because we can't write over
-	// when previos file's mode is 0400.
+	// when previous file's mode is 0400.
 	os.Remove(keyPath)
 
 	return ioutil.WriteFile(keyPath, []byte(kiteKey), 0400)

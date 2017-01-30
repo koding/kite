@@ -11,7 +11,7 @@ import (
 	"github.com/koding/kite/dnode"
 )
 
-// Kite is the base struct containing the public fields. It is usually embeded
+// Kite is the base struct containing the public fields. It is usually embedded
 // in other structs, including the db model. The access model is in the form:
 // username.environment.name.version.region.hostname.id
 type Kite struct {

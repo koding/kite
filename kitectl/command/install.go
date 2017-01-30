@@ -277,7 +277,7 @@ func installKite(bundlePath, repoName, version string) error {
 }
 
 // isBinaryFile returns true if the path is the path of the binary file
-// in aplication bundle. Example: fs-0.0.1.kite/bin/fs
+// in application bundle. Example: fs-0.0.1.kite/bin/fs
 func isBinaryFile(path string) bool {
 	parts := strings.Split(path, string(os.PathSeparator))
 	if len(parts) != 3 {
