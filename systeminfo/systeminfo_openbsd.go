@@ -71,7 +71,7 @@ func memoryStats() (*memory, error) {
 		return nil, err
 	}
 
-	m.Total = uint64(vmtotal.t_avm + vmtotal.t_free) * uint64(pgsz)
+	m.Total = uint64(vmtotal.t_avm+vmtotal.t_free) * uint64(pgsz)
 	m.Usage = uint64(vmtotal.t_avm) * uint64(pgsz)
 
 	return m, nil

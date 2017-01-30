@@ -30,7 +30,7 @@ func main() {
 	<-connected
 
 	// Call square method every second
-	for _ = range time.Tick(time.Second) {
+	for range time.Tick(time.Second) {
 		i := rand.Intn(10)
 
 		// Call a method of mathworker kite
