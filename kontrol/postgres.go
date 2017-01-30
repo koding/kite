@@ -251,7 +251,7 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return errors.New("postgres: keyId is empty. Aborting upsert")
 	}
 
-	// we are going to try an UPDATE, if it's not successfull we are going to
+	// we are going to try an UPDATE, if it's not successful we are going to
 	// INSERT the document, all ine one single transaction
 	tx, err := p.DB.Begin()
 	if err != nil {
@@ -278,7 +278,7 @@ func (p *Postgres) Upsert(kiteProt *protocol.Kite, value *kontrolprotocol.Regist
 		return err
 	}
 
-	// we got an update! so this was successfull, just return without an error
+	// we got an update! so this was successful, just return without an error
 	if rowAffected != 0 {
 		return nil
 	}

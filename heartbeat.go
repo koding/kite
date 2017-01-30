@@ -217,7 +217,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 			return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 		}
 
-		// we are just receving small size strings such as "pong",
+		// we are just receiving small size strings such as "pong",
 		// "registeragain" so we limit the reader to read just that
 		p, err := ioutil.ReadAll(io.LimitReader(resp.Body, 16))
 		if err != nil {

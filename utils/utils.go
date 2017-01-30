@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// globalRand is copied here explicitely to no seed globalRand from math/rand
+// globalRand is copied here explicitly to no seed globalRand from math/rand
 // and affect its state.
 var globalRand = rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano() + int64(os.Getpid()))})
 

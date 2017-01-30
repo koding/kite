@@ -14,7 +14,7 @@ import (
 	"github.com/koding/kite/protocol"
 )
 
-// keyOrder defines the order of the query paramaters.
+// keyOrder defines the order of the query parameters.
 var keyOrder = []string{
 	"username",
 	"environment",

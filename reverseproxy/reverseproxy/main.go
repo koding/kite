@@ -33,7 +33,7 @@ func main() {
 	}
 
 	if *flagRegion == "" || *flagEnvironment == "" {
-		log.Fatal("Please specify envrionment via -env and region via -region. Aborting.")
+		log.Fatal("Please specify environment via -env and region via -region. Aborting.")
 	}
 
 	scheme := "http"

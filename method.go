@@ -146,7 +146,7 @@ func (m *Method) PostHandleFunc(handler HandlerFunc) *Method {
 	return m.PostHandle(handler)
 }
 
-// FinalFunc registers a funtion that is always called as a last one
+// FinalFunc registers a function that is always called as a last one
 // after pre-, handler and post- functions for the given method.
 //
 // It receives a result and an error from last handler that
@@ -195,7 +195,7 @@ func (k *Kite) PostHandleFunc(handler HandlerFunc) {
 	k.PostHandle(handler)
 }
 
-// FinalFunc registers a funtion that is always called as a last one
+// FinalFunc registers a function that is always called as a last one
 // after pre-, handler and post- functions.
 //
 // It receives a result and an error from last handler that

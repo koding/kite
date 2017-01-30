@@ -75,7 +75,7 @@ type Kontrol struct {
 	// If TokenTTL is 0, default global TokenTTL is used.
 	TokenTTL time.Duration
 
-	// TokenLeeway describes time difference to gracefuly handle clock
+	// TokenLeeway describes time difference to gracefully handle clock
 	// skew between client and server.
 	//
 	// If TokenLeeway is 0, default global TokenLeeway is used.
@@ -197,7 +197,7 @@ func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
 }
 
 // Verify is used for token and kiteKey authenticators to verify
-// client's kontrol keys. In order to allow for gracefull key
+// client's kontrol keys. In order to allow for graceful key
 // updates deleted keys are allowed.
 //
 // If Config.VerifyFunc is nil during Kontrol instantiation with

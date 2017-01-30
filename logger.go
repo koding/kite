@@ -58,7 +58,7 @@ func getLogLevel() Level {
 	}
 }
 
-// convertLevel converst a kite level into logging level
+// convertLevel converts a kite level into logging level
 func convertLevel(l Level) logging.Level {
 	switch l {
 	case DEBUG:

@@ -32,14 +32,14 @@ type kontrolClient struct {
 	sync.Mutex // protects Client
 
 	// used for synchronizing methods that needs to be called after
-	// successful connection or/and registiration to kontrol.
+	// successful connection or/and registration to kontrol.
 	onceConnected   sync.Once
 	onceRegistered  sync.Once
 	readyConnected  chan struct{}
 	readyRegistered chan struct{}
 
 	// lastRegisteredURL stores the Kite url what was send/registered
-	// succesfully to kontrol
+	// successfully to kontrol
 	lastRegisteredURL *url.URL
 
 	// registerChan registers the url's it receives from the channel to Kontrol
@@ -120,7 +120,7 @@ func (k *Kite) SetupKontrolClient() error {
 //   }
 //
 //   // If we want to only use the first result and discard the rest,
-//   // we need to close the rest explicitely.
+//   // we need to close the rest explicitly.
 //   defer kite.Close(clients[1:])
 //
 //   return clients[0]
@@ -247,21 +247,21 @@ func (k *Kite) NewKeyRenewer(interval time.Duration) {
 }
 
 // KontrolReadyNotify returns a channel that is closed when a successful
-// registiration to kontrol is done.
+// registration to kontrol is done.
 func (k *Kite) KontrolReadyNotify() chan struct{} {
 	return k.kontrol.readyRegistered
 }
 
-// signalReady is an internal method to notify that a sucessful registiration
+// signalReady is an internal method to notify that a successful registration
 // is done.
 func (k *Kite) signalReady() {
 	k.kontrol.onceRegistered.Do(func() { close(k.kontrol.readyRegistered) })
 }
 
-// RegisterForever is equilavent to Register(), but it tries to re-register if
+// RegisterForever is equivalent to Register(), but it tries to re-register if
 // there is a disconnection. The returned error is for the first register
 // attempt. It returns nil if ReadNotify() is ready and it's registered
-// succesfull.
+// successful.
 func (k *Kite) RegisterForever(kiteURL *url.URL) error {
 	errs := make(chan error, 1)
 	go func() {
@@ -350,7 +350,7 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 }
 
 // RegisterToTunnel finds a tunnel proxy kite by asking kontrol then registers
-// itselfs on proxy. On error, retries forever. On every successfull
+// itself on proxy. On error, retries forever. On every successful
 // registration, it sends the proxied URL to the registerChan channel. There is
 // no register URL needed because the Tunnel Proxy automatically gets the IP
 // from tunneling. This is a blocking function.
@@ -374,7 +374,7 @@ func (k *Kite) RegisterToProxy(registerURL *url.URL, query *protocol.KontrolQuer
 	for {
 		var proxyKite *Client
 
-		// The proxy kite to connect can be overriden with the
+		// The proxy kite to connect can be overridden with the
 		// environmental variable "KITE_PROXY_URL". If it is not set
 		// we will ask Kontrol for available Proxy kites.
 		// As an authentication informain kiteKey method will be used,

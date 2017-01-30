@@ -19,7 +19,7 @@ func (k Kites) Attach(token string) {
 	}
 }
 
-// Shuffle shuffles the order of the kites. This is usefull if you want send
+// Shuffle shuffles the order of the kites. This is useful if you want send
 // back a randomized list of kites.
 func (k *Kites) Shuffle() {
 	shuffled := make(Kites, len(*k))
