@@ -196,10 +196,12 @@ func (c *Client) Dial() (err error) {
 }
 
 // DialTimeout acts like Dial but takes a timeout.
-func (c *Client) DialTimeout(timeout time.Duration) (err error) {
-	c.LocalKite.Log.Debug("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+func (c *Client) DialTimeout(timeout time.Duration) error {
+	err := c.dial(timeout)
 
-	if err := c.dial(timeout); err != nil {
+	c.LocalKite.Log.Debug("Dialing '%s' kite: %s (error: %v)", c.Kite.Name, c.URL, err)
+
+	if err != nil {
 		return err
 	}
 
@@ -294,13 +296,19 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 func (c *Client) dialForever(connectNotifyChan chan bool) {
 	dial := func() error {
-		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-
 		if !c.reconnect() {
 			return nil
 		}
 
-		return c.dial(0)
+		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+
+		if err := c.dial(0); err != nil {
+			c.LocalKite.Log.Warning("Dialing '%s' kite error: %s: %v", c.Kite.Name, c.URL, err)
+
+			return err
+		}
+
+		return nil
 	}
 
 	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
