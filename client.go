@@ -245,14 +245,6 @@ func (c *Client) authCopy() *Auth {
 }
 
 func (c *Client) dial(timeout time.Duration) (err error) {
-	if c.ReadBufferSize == 0 {
-		c.ReadBufferSize = 4096
-	}
-
-	if c.WriteBufferSize == 0 {
-		c.WriteBufferSize = 4096
-	}
-
 	opts := &sockjsclient.DialOptions{
 		BaseURL:         c.URL,
 		ReadBufferSize:  c.ReadBufferSize,

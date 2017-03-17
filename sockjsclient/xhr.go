@@ -10,6 +10,8 @@ import (
 	"net/http/cookiejar"
 	"sync"
 
+	"gopkg.in/igm/sockjs-go.v2/sockjs"
+
 	"github.com/koding/kite/utils"
 )
 
@@ -26,11 +28,11 @@ type XHRSession struct {
 	sessionID  string
 	messages   []string
 	abort      chan struct{}
-
-	// TODO(rjeczalik): replace with single state field
-	opened bool
-	closed bool
+	req        *http.Request
+	state      sockjs.SessionState
 }
+
+var _ sockjs.Session = (*XHRSession)(nil)
 
 // NewXHRSession returns a new XHRSession, a SockJS client which supports
 // xhr-polling
@@ -69,7 +71,7 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 		client:     client,
 		sessionID:  sessionID,
 		sessionURL: sessionURL,
-		opened:     true,
+		state:      sockjs.SessionActive,
 		abort:      make(chan struct{}, 1),
 	}, nil
 }
@@ -129,6 +131,25 @@ func (x *XHRSession) Recv() (string, error) {
 	}
 }
 
+func (x *XHRSession) setState(state sockjs.SessionState) {
+	x.mu.Lock()
+	x.state = state
+	x.mu.Unlock()
+}
+
+// GetSessionState gives state of the session.
+func (x *XHRSession) GetSessionState() sockjs.SessionState {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+
+	return x.state
+}
+
+// Request implements the sockjs.Session interface.
+func (x *XHRSession) Request() *http.Request {
+	return x.req
+}
+
 func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, err error) {
 	defer resp.Body.Close()
 
@@ -147,9 +168,7 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 
 	switch frame {
 	case 'o':
-		x.mu.Lock()
-		x.opened = true
-		x.mu.Unlock()
+		x.setState(sockjs.SessionActive)
 
 		return "", true, nil
 	case 'a':
@@ -175,10 +194,7 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 		// heartbeat received
 		return "", true, nil
 	case 'c':
-		x.mu.Lock()
-		x.opened = false
-		x.closed = true
-		x.mu.Unlock()
+		x.setState(sockjs.SessionClosed)
 
 		return "", false, ErrSessionClosed
 	default:
@@ -189,10 +205,6 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 func (x *XHRSession) Send(frame string) error {
 	if x.isClosed() {
 		return ErrSessionClosed
-	}
-
-	if !x.isOpened() {
-		return errors.New("session is not opened yet")
 	}
 
 	// Need's to be JSON encoded array of string messages (SockJS protocol
@@ -223,10 +235,7 @@ func (x *XHRSession) Send(frame string) error {
 }
 
 func (x *XHRSession) Close(status uint32, reason string) error {
-	x.mu.Lock()
-	x.opened = false
-	x.closed = true
-	x.mu.Unlock()
+	x.setState(sockjs.SessionClosed)
 
 	select {
 	case x.abort <- struct{}{}:
@@ -236,18 +245,8 @@ func (x *XHRSession) Close(status uint32, reason string) error {
 	return nil
 }
 
-func (x *XHRSession) isOpened() bool {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	return x.opened
-}
-
 func (x *XHRSession) isClosed() bool {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	return x.closed
+	return x.GetSessionState() == sockjs.SessionClosed
 }
 
 type doResult struct {

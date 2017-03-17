@@ -17,6 +17,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/koding/kite/utils"
+
+	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
 // ErrSessionClosed is returned by Send/Recv methods when
@@ -26,13 +28,17 @@ var ErrSessionClosed = errors.New("session is closed")
 // WebsocketSession represents a sockjs.Session over
 // a websocket connection.
 type WebsocketSession struct {
-	conn     *websocket.Conn
 	id       string
 	messages []string
 	closed   int32
+	req      *http.Request
 
-	mu sync.Mutex // mu protects writes to conn
+	mu    sync.Mutex
+	conn  *websocket.Conn
+	state sockjs.SessionState
 }
+
+var _ sockjs.Session = (*WebsocketSession)(nil)
 
 // DialOptions are used to overwrite default behavior
 // of the websocket session.
@@ -116,8 +122,9 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 		//
 		// Instead we're going to set it ourselves.
 		ws.NetDial = (&net.Dialer{
-			Timeout:  opts.Timeout,
-			Deadline: time.Now().Add(opts.Timeout),
+			Timeout:   opts.Timeout,
+			KeepAlive: 30 * time.Second,
+			Deadline:  time.Now().Add(opts.Timeout),
 		}).Dial
 	}
 
@@ -128,6 +135,7 @@ func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
 
 	session := NewWebsocketSession(conn)
 	session.id = sessionID
+	session.req = &http.Request{URL: dialURL}
 	return session, nil
 }
 
@@ -178,7 +186,7 @@ read_frame:
 
 	switch frameType {
 	case 'o':
-		// TODO handle open
+		w.setState(sockjs.SessionActive)
 		goto read_frame
 	case 'a':
 		var messages []string
@@ -195,7 +203,8 @@ read_frame:
 		}
 		w.messages = append(w.messages, message)
 	case 'c':
-		return "", errors.New("session closed")
+		w.setState(sockjs.SessionClosed)
+		return "", ErrSessionClosed
 	case 'h':
 		// TODO handle heartbeat
 		goto read_frame
@@ -232,6 +241,25 @@ func (w *WebsocketSession) Close(uint32, string) error {
 	}
 
 	return ErrSessionClosed
+}
+
+func (w *WebsocketSession) setState(state sockjs.SessionState) {
+	w.mu.Lock()
+	w.state = state
+	w.mu.Unlock()
+}
+
+// GetSessionState gives state of the session.
+func (w *WebsocketSession) GetSessionState() sockjs.SessionState {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.state
+}
+
+// Request implements the sockjs.Session interface.
+func (w *WebsocketSession) Request() *http.Request {
+	return w.req
 }
 
 // threeDigits is used to generate a server_id.
