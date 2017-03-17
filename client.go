@@ -17,6 +17,7 @@ import (
 	"github.com/koding/kite/sockjsclient"
 
 	"github.com/cenkalti/backoff"
+	"github.com/gorilla/websocket"
 	"github.com/igm/sockjs-go/sockjs"
 )
 
@@ -277,6 +278,13 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
 	case config.XHRPolling:
 		session, err = sockjsclient.DialXHR(c.URL, c.config())
+	case config.Auto:
+		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
+		if err == websocket.ErrBadHandshake {
+			// In cases when kite server is behind a proxy that do
+			// not support websocket connections, fall back to XHR.
+			session, err = sockjsclient.DialXHR(c.URL, c.config())
+		}
 	default:
 		return fmt.Errorf("Connection transport is not known '%v'", transport)
 	}

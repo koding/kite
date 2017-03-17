@@ -100,7 +100,7 @@ var DefaultConfig = &Config{
 	Region:      "unknown",
 	IP:          "0.0.0.0",
 	Port:        0,
-	Transport:   WebSocket,
+	Transport:   Auto,
 	XHR: &http.Client{
 		// TODO(rjeczalik): make XHR handler timeout if polling on body
 		// is idle > timeout. Timing out after 10s is a bad idea when
