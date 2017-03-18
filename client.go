@@ -30,23 +30,28 @@ func nopSetSession(sockjs.Session) {}
 // Client is the client for communicating with another Kite.
 // It has Tell() and Go() methods for calling methods sync/async way.
 type Client struct {
-	// The information about the kite that we are connecting to.
-	protocol.Kite
-	muProt sync.Mutex // protects protocol.Kite access
+	protocol.Kite // remote kite information
 
-	// A reference to the current Kite running.
+	// LocalKite references to the kite which owns the client
+	// connection.
 	LocalKite *Kite
 
-	// Credentials that we sent in each request.
+	// Auth is a credential used to authenticate with a remote kite.
+	//
+	// Required if remote kite requires authentication.
 	Auth *Auth
 
-	// Should we reconnect if disconnected?
+	// Reconnect says whether we should reconnect with a new
+	// session when an old one got invalidated or the connection
+	// broke.
 	Reconnect bool
 
-	// SockJS base URL
+	// URL specifies the SockJS URL of the remote kite.
 	URL string
 
-	// Should we process incoming messages concurrently or not? Default: true
+	// Concurrent specified whether we should process incoming messages concurrently.
+	//
+	// Defaults to true.
 	Concurrent bool
 
 	// ConcurrentCallbacks, when true, makes execution of callbacks in
@@ -64,7 +69,24 @@ type Client struct {
 	//
 	// If ClientFunc is nil, sockjs.Session will use default, internal
 	// *http.Client value.
+	//
+	// Deprecated: Set Config.XHR of the local kite, that
+	// owns this connection, insead.
 	ClientFunc func(*sockjsclient.DialOptions) *http.Client
+
+	// ReadBufferSize is the input buffer size. By default it's 4096.
+	//
+	// Deprecated: Set Config.Websocket.ReadBufferSize of the local kite,
+	// that owns this connection, instead.
+	ReadBufferSize int
+
+	// WriteBufferSize is the output buffer size. By default it's 4096.
+	//
+	// Deprecated: Set Config.Websocket.WriteBufferSize of the local kite,
+	// that owns this connection, instead.
+	WriteBufferSize int
+
+	muProt sync.Mutex // protects protocol.Kite access
 
 	// To signal waiters of Go() on disconnect.
 	disconnect   chan struct{}
@@ -81,7 +103,7 @@ type Client struct {
 	closeRenewer chan struct{}
 
 	// To syncronize the consumers
-	wg *sync.WaitGroup
+	wg sync.WaitGroup
 
 	// SockJS session
 	// TODO: replace this with a proper interface to support multiple
@@ -114,12 +136,6 @@ type Client struct {
 	m sync.RWMutex
 
 	firstRequestHandlersNotified sync.Once
-
-	// ReadBufferSize is the input buffer size. By default it's 4096.
-	ReadBufferSize int
-
-	// WriteBufferSize is the output buffer size. By default it's 4096.
-	WriteBufferSize int
 }
 
 // message carries an encoded payload sent over connected session.
@@ -166,8 +182,6 @@ type response struct {
 func (k *Kite) NewClient(remoteURL string) *Client {
 	c := &Client{
 		LocalKite:          k,
-		ClientFunc:         k.ClientFunc,
-		URL:                remoteURL,
 		disconnect:         make(chan struct{}),
 		closeChan:          make(chan struct{}),
 		redialBackOff:      *forever,
@@ -175,7 +189,6 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		testHookSetSession: nopSetSession,
 		Concurrent:         true,
 		send:               make(chan *message),
-		wg:                 &sync.WaitGroup{},
 	}
 
 	k.OnRegister(c.updateAuth)

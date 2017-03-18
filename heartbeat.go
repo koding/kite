@@ -14,7 +14,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/protocol"
-	"github.com/koding/kite/sockjsclient"
 )
 
 type heartbeatReq struct {
@@ -48,13 +47,6 @@ func newHeartbeatReq(r *Request) (*heartbeatReq, error) {
 			return ping.Call()
 		},
 	}, nil
-}
-
-func (k *Kite) client() *http.Client {
-	return (&sockjsclient.DialOptions{
-		ClientFunc: k.ClientFunc,
-		Timeout:    10 * time.Second,
-	}).Client()
 }
 
 func (k *Kite) processHeartbeats() {
@@ -152,7 +144,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := k.client().Post(registerURL, "application/json", bytes.NewReader(data))
+	resp, err := k.Config.XHR.Post(registerURL, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +199,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u)
 
-		resp, err := k.client().Get(u.String())
+		resp, err := k.Config.XHR.Get(u.String())
 		if err != nil {
 			return err
 		}

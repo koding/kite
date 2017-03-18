@@ -5,7 +5,6 @@ package sockjsclient
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/utils"
 
 	"gopkg.in/igm/sockjs-go.v2/sockjs"
@@ -42,101 +42,94 @@ var _ sockjs.Session = (*WebsocketSession)(nil)
 
 // DialOptions are used to overwrite default behavior
 // of the websocket session.
+//
+// Deprecated: Use *config.Config struct instead for
+// configuring SockJS connection.
 type DialOptions struct {
-	BaseURL string // required
+	// URL of the remote kite.
+	//
+	// Required.
+	BaseURL string
 
-	ReadBufferSize  int
+	// ReadBufferSize is the buffer size used for
+	// reads on a websocket connection.
+	//
+	// Deprecated: Set Config.Dialer.ReadBufferSize of
+	// the local kite instead.
+	ReadBufferSize int
+
+	// WriteBufferSize is the buffer size used for
+	// writes on a websocket connection.
+	//
+	// Deprecated: Set Config.Dialer.WriteBufferSize of the
+	// the local kite instead.
 	WriteBufferSize int
-	Timeout         time.Duration
-	ClientFunc      func(*DialOptions) *http.Client
+
+	// Timeout specifies dial timeout
+	//
+	// Deprecated: Set Config.Dialer.Dial of the local kite instead.
+	Timeout time.Duration
+
+	// ClientFunc gives new HTTP client for use with XHR connections.
+	//
+	// Deprecated: Set Config.ClientFunc of the local kite instead.
+	ClientFunc func(*DialOptions) *http.Client
 }
 
-// Client gives a client to use for making HTTP requests.
-//
-// If ClientFunc is non-nil it is used to make the requests.
-// Otherwise default client is returned.
-func (opts *DialOptions) Client() *http.Client {
+func (opts *DialOptions) client() *http.Client {
 	if opts.ClientFunc != nil {
 		return opts.ClientFunc(opts)
 	}
-
-	return defaultClient(opts)
-}
-
-func defaultClient(opts *DialOptions) *http.Client {
 	return &http.Client{
-		// never make it less than the heartbeat delay from the sockjs server.
-		// If this is los, your requests to the server will time out, so you'll
-		// never receive the heartbeat frames.
 		Timeout: opts.Timeout,
-		// add this so we can make use of load balancer's sticky session features,
-		// such as AWS ELB
-		Jar: cookieJar,
+		Jar:     config.CookieJar,
 	}
 }
 
-// ConnectWebsocketSession dials the remote specified in the opts and
-// creates new websocket session.
-func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
-	dialURL, err := url.Parse(opts.BaseURL)
+// DialWebsocket establishes a SockJS session over a websocket connection.
+//
+// Requires cfg.Websocket to be a valid client.
+func DialWebsocket(uri string, cfg *config.Config) (*WebsocketSession, error) {
+	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
 
-	// will be used to set the origin header
-	originalScheme := dialURL.Scheme
-
-	if err := replaceSchemeWithWS(dialURL); err != nil {
-		return nil, err
-	}
-
-	if err := addMissingPortAndSlash(dialURL); err != nil {
-		return nil, err
+	h := http.Header{
+		"Origin": {u.Scheme + "://" + u.Host},
 	}
 
 	serverID := threeDigits()
 	sessionID := utils.RandomString(20)
 
-	// Add server_id and session_id to the path.
-	dialURL.Path += serverID + "/" + sessionID + "/websocket"
+	u = makeWebsocketURL(u, serverID, sessionID)
 
-	requestHeader := http.Header{}
-	requestHeader.Add("Origin", originalScheme+"://"+dialURL.Host)
-
-	ws := websocket.Dialer{
-		ReadBufferSize:  opts.ReadBufferSize,
-		WriteBufferSize: opts.WriteBufferSize,
-	}
-
-	// if the user passed a custom HTTP client and its transport
-	// is of *http.Transport type - we're using its Dial field
-	// for connecting to remote host
-	if t, ok := opts.Client().Transport.(*http.Transport); ok {
-		ws.NetDial = t.Dial
-	}
-
-	// if the user passed a timeout, use a dial with a timeout
-	if opts.Timeout != 0 && ws.NetDial == nil {
-		// If ws.NetDial is non-nil then gorilla does not
-		// use ws.HandshakeTimeout for the deadlines.
-		//
-		// Instead we're going to set it ourselves.
-		ws.NetDial = (&net.Dialer{
-			Timeout:   opts.Timeout,
-			KeepAlive: 30 * time.Second,
-			Deadline:  time.Now().Add(opts.Timeout),
-		}).Dial
-	}
-
-	conn, _, err := ws.Dial(dialURL.String(), requestHeader)
+	conn, _, err := cfg.Websocket.Dial(u.String(), h)
 	if err != nil {
 		return nil, err
 	}
 
 	session := NewWebsocketSession(conn)
 	session.id = sessionID
-	session.req = &http.Request{URL: dialURL}
+	session.req = &http.Request{
+		URL:    u,
+		Header: h,
+	}
+
 	return session, nil
+}
+
+// ConnectWebsocketSession dials the remote specified in the opts and
+// creates new websocket session.
+//
+// Deprecated: Use DialWebsocket instead.
+func ConnectWebsocketSession(opts *DialOptions) (*WebsocketSession, error) {
+	cfg := config.New()
+	cfg.Websocket.HandshakeTimeout = opts.Timeout
+	cfg.Websocket.ReadBufferSize = opts.ReadBufferSize
+	cfg.Websocket.WriteBufferSize = opts.WriteBufferSize
+
+	return DialWebsocket(opts.BaseURL, cfg)
 }
 
 // NewWebsocketSession creates new sockjs.Session from existing
@@ -267,43 +260,27 @@ func threeDigits() string {
 	return strconv.FormatInt(100+int64(utils.Int31n(900)), 10)
 }
 
-func replaceSchemeWithWS(u *url.URL) error {
-	switch u.Scheme {
-	case "http":
-		u.Scheme = "ws"
-	case "https":
+func makeWebsocketURL(u *url.URL, serverID, sessionID string) *url.URL {
+	if u.Scheme == "https" {
 		u.Scheme = "wss"
-	default:
-		return fmt.Errorf("invalid scheme in url: %s", u.Scheme)
+	} else {
+		u.Scheme = "ws"
 	}
-	return nil
-}
 
-// addMissingPortAndSlash appends 80 or 443 depending on the scheme
-// if there is no port number in the URL.
-// Also it adds "/" to the end of path if path does not ends with "/".
-func addMissingPortAndSlash(u *url.URL) error {
-	_, _, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		if missingPortErr, ok := err.(*net.AddrError); ok && missingPortErr.Err == "missing port in address" {
-			var port string
-			switch u.Scheme {
-			case "ws":
-				port = "80"
-			case "wss":
-				port = "443"
-			default:
-				return fmt.Errorf("unknown scheme: %s", u.Scheme)
-			}
-			u.Host = net.JoinHostPort(strings.TrimRight(missingPortErr.Addr, ":"), port)
+	if _, _, err := net.SplitHostPort(u.Host); err != nil {
+		if u.Scheme == "wss" {
+			u.Host = net.JoinHostPort(u.Host, "443")
 		} else {
-			return err
+			u.Host = net.JoinHostPort(u.Host, "80")
 		}
 	}
 
-	if u.Path == "" || u.Path[len(u.Path)-1:] != "/" {
-		u.Path += "/"
+	if strings.HasSuffix(u.Path, "/") {
+		u.Path = u.Path + "/"
 	}
 
-	return nil
+	// Add server_id and session_id to the path.
+	u.Path = u.Path + serverID + "/" + sessionID + "/websocket"
+
+	return u
 }
