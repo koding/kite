@@ -12,6 +12,8 @@ environment:
 install:
  - go version
  - go get -v -t ./...
+ - rmdir %GOPATH%\src\gopkg.in\igm\sockjs-go.v2 /s /q
+ - git clone git@github.com:igm/sockjs-go %GOPATH%\src\gopkg.in\igm\sockjs-go.v2
 
 build_script:
  - go build ./...
