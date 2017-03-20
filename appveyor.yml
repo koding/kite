@@ -17,10 +17,6 @@ install:
  - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.zip
  - 7z x go%GOVERSION%.windows-amd64.zip -y -oC:\ > NUL
 
- # update sockjs-go
- - rmdir %GOPATH%\src\gopkg.in\igm\sockjs-go.v2 /s /q
- - git clone https://github.com/igm/sockjs-go %GOPATH%\src\gopkg.in\igm\sockjs-go.v2
-
  - go get -v -t ./...
 
 build_script:

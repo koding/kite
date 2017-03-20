@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 type Tunnel struct {

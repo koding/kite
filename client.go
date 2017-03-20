@@ -11,12 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+
+	"github.com/cenkalti/backoff"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 var forever = backoff.NewExponentialBackOff()

@@ -18,7 +18,7 @@ import (
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/utils"
 
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 // ErrSessionClosed is returned by Send/Recv methods when

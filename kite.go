@@ -17,15 +17,16 @@ import (
 	"sync"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-	"github.com/koding/cache"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
+
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
+	"github.com/igm/sockjs-go/sockjs"
+	"github.com/koding/cache"
 	"github.com/koding/kite/sockjsclient"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
 var hostname string

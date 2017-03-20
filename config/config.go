@@ -15,7 +15,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 // the implementation of New() doesn't have any error to be returned yet it

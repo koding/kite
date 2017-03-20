@@ -3,8 +3,6 @@ sudo: false
 go:
   - 1.8
 install:
-  - rm -rf $GOPATH/src/gopkg.in/igm/sockjs-go.v2
-  - git clone https://github.com/igm/sockjs-go $GOPATH/src/gopkg.in/igm/sockjs-go.v2
   - go get -d -v -t ./...
 script:
   - export GOMAXPROCS=$(nproc)

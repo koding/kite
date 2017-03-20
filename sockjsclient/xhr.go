@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"sync"
 
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
-
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/utils"
+
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 // XHRSession implements sockjs.Session with XHR transport.
