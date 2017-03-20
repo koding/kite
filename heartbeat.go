@@ -144,7 +144,7 @@ func (k *Kite) RegisterHTTP(kiteURL *url.URL) (*registerResult, error) {
 		return nil, err
 	}
 
-	resp, err := k.Config.XHR.Post(registerURL, "application/json", bytes.NewReader(data))
+	resp, err := k.Config.Client.Post(registerURL, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (k *Kite) sendHeartbeats(interval time.Duration, kiteURL *url.URL) {
 	heartbeatFunc := func() error {
 		k.Log.Debug("Sending heartbeat to %s", u)
 
-		resp, err := k.Config.XHR.Get(u.String())
+		resp, err := k.Config.Client.Get(u.String())
 		if err != nil {
 			return err
 		}

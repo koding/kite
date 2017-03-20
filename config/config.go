@@ -71,6 +71,10 @@ type Config struct {
 	// Required.
 	XHR *http.Client
 
+	// Client is a HTTP client used for issuing HTTP register request and
+	// HTTP heartbeats.
+	Client *http.Client
+
 	// Websocket is used for creating a client for a websocket transport.
 	//
 	// If custom one is used, ensure any complemenrary field is also
@@ -103,6 +107,10 @@ var DefaultConfig = &Config{
 		// the connection is active.
 		// Timeout: 10 * time.Second,
 		Jar: CookieJar,
+	},
+	Client: &http.Client{
+		Timeout: 20 * time.Second,
+		Jar:     CookieJar,
 	},
 	Websocket: &websocket.Dialer{
 		HandshakeTimeout: 15 * time.Second,
@@ -244,9 +252,11 @@ func (c *Config) ReadToken(key *jwt.Token) error {
 func (c *Config) Copy() *Config {
 	copy := *DefaultConfig
 	xhr := *copy.XHR
+	client := *copy.Client
 	ws := *copy.Websocket
 
 	copy.XHR = &xhr
+	copy.Client = &client
 	copy.Websocket = &ws
 
 	return &copy
