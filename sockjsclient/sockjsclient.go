@@ -8,8 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -275,12 +275,7 @@ func makeWebsocketURL(u *url.URL, serverID, sessionID string) *url.URL {
 		}
 	}
 
-	if strings.HasSuffix(u.Path, "/") {
-		u.Path = u.Path + "/"
-	}
-
-	// Add server_id and session_id to the path.
-	u.Path = u.Path + serverID + "/" + sessionID + "/websocket"
+	u.Path = path.Join(u.Path, serverID, sessionID, "websocket")
 
 	return u
 }

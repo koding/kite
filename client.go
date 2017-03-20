@@ -49,6 +49,12 @@ type Client struct {
 	// URL specifies the SockJS URL of the remote kite.
 	URL string
 
+	// Config is used when setting up client connection to
+	// the remote kite.
+	//
+	// If Config is nil, LocalKite.Config is used instead.
+	Config *config.Config
+
 	// Concurrent specified whether we should process incoming messages concurrently.
 	//
 	// Defaults to true.
@@ -182,6 +188,7 @@ type response struct {
 func (k *Kite) NewClient(remoteURL string) *Client {
 	c := &Client{
 		LocalKite:          k,
+		URL:                remoteURL,
 		disconnect:         make(chan struct{}),
 		closeChan:          make(chan struct{}),
 		redialBackOff:      *forever,
@@ -258,15 +265,7 @@ func (c *Client) authCopy() *Auth {
 }
 
 func (c *Client) dial(timeout time.Duration) (err error) {
-	opts := &sockjsclient.DialOptions{
-		BaseURL:         c.URL,
-		ReadBufferSize:  c.ReadBufferSize,
-		WriteBufferSize: c.WriteBufferSize,
-		ClientFunc:      c.ClientFunc,
-		Timeout:         timeout,
-	}
-
-	transport := c.LocalKite.Config.Transport
+	transport := c.config().Transport
 
 	c.LocalKite.Log.Debug("Client transport is set to '%s'", transport)
 
@@ -274,9 +273,9 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 	switch transport {
 	case config.WebSocket:
-		session, err = sockjsclient.ConnectWebsocketSession(opts)
+		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
 	case config.XHRPolling:
-		session, err = sockjsclient.NewXHRSession(opts)
+		session, err = sockjsclient.DialXHR(c.URL, c.config())
 	default:
 		return fmt.Errorf("Connection transport is not known '%v'", transport)
 	}
@@ -835,6 +834,13 @@ func (c *Client) removeCallbacks(callbacks map[string]dnode.Path) {
 		id, _ := strconv.ParseUint(sid, 10, 64)
 		c.scrubber.RemoveCallback(id)
 	}
+}
+
+func (c *Client) config() *config.Config {
+	if c.Config != nil {
+		return c.Config
+	}
+	return c.LocalKite.Config
 }
 
 // sendCallbackID send the callback number to be deleted after response is received.
