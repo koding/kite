@@ -7,13 +7,21 @@ clone_folder: c:\projects\src\github.com\koding\kite
 environment:
  PATH: c:\projects\bin;%PATH%
  GOPATH: c:\projects
- NOTIFY_TIMEOUT: 5s
+ GOVERSION: 1.8
 
 install:
  - go version
- - go get -v -t ./...
+
+ # update Go
+ - rmdir c:\go /s /q
+ - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.zip
+ - 7z x go%GOVERSION%.windows-amd64.zip -y -oC:\ > NUL
+
+ # update sockjs-go
  - rmdir %GOPATH%\src\gopkg.in\igm\sockjs-go.v2 /s /q
- - git clone git@github.com:igm/sockjs-go %GOPATH%\src\gopkg.in\igm\sockjs-go.v2
+ - git clone https://github.com/igm/sockjs-go %GOPATH%\src\gopkg.in\igm\sockjs-go.v2
+
+ - go get -v -t ./...
 
 build_script:
  - go build ./...

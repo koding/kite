@@ -1,12 +1,11 @@
 language: go
 sudo: false
 go:
-  - 1.7.4
-  - tip
+  - 1.8
 install:
-  - go get -d -v -t ./...
   - rm -rf $GOPATH/src/gopkg.in/igm/sockjs-go.v2
-  - git clone git@github.com:igm/sockjs-go $GOPATH/src/gopkg.in/igm/sockjs-go.v2
+  - git clone https://github.com/igm/sockjs-go $GOPATH/src/gopkg.in/igm/sockjs-go.v2
+  - go get -d -v -t ./...
 script:
   - export GOMAXPROCS=$(nproc)
   - make test
