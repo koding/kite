@@ -250,14 +250,22 @@ func (c *Config) ReadToken(key *jwt.Token) error {
 
 // Copy returns a new copy of the config object.
 func (c *Config) Copy() *Config {
-	copy := *DefaultConfig
-	xhr := *copy.XHR
-	client := *copy.Client
-	ws := *copy.Websocket
+	copy := *c
 
-	copy.XHR = &xhr
-	copy.Client = &client
-	copy.Websocket = &ws
+	if c.XHR != nil {
+		xhr := *copy.XHR
+		copy.XHR = &xhr
+	}
+
+	if c.Client != nil {
+		client := *copy.Client
+		copy.Client = &client
+	}
+
+	if c.Websocket != nil {
+		ws := *copy.Websocket
+		copy.Websocket = &ws
+	}
 
 	return &copy
 }
