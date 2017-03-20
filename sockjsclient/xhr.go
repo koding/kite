@@ -177,6 +177,21 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 		x.setState(sockjs.SessionActive)
 
 		return "", true, nil
+	case 'm':
+		var message string
+		if err := json.NewDecoder(buf).Decode(&message); err != nil {
+			return "", false, err
+		}
+
+		if message == "" {
+			return "", false, errors.New("unexpected empty message")
+		}
+
+		x.messages = append(x.messages, message)
+
+		message, x.messages = x.messages[0], x.messages[1:]
+
+		return message, false, nil
 	case 'a':
 		// received an array of messages
 		var messages []string
