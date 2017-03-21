@@ -7,15 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/http/cookiejar"
 	"sync"
 
+	"github.com/koding/kite/config"
 	"github.com/koding/kite/utils"
-)
 
-// the implementation of New() doesn't have any error to be returned yet it
-// returns, so it's totally safe to neglect the error
-var cookieJar, _ = cookiejar.New(nil)
+	"github.com/igm/sockjs-go/sockjs"
+)
 
 // XHRSession implements sockjs.Session with XHR transport.
 type XHRSession struct {
@@ -26,25 +24,23 @@ type XHRSession struct {
 	sessionID  string
 	messages   []string
 	abort      chan struct{}
-
-	// TODO(rjeczalik): replace with single state field
-	opened bool
-	closed bool
+	req        *http.Request
+	state      sockjs.SessionState
 }
 
-// NewXHRSession returns a new XHRSession, a SockJS client which supports
-// xhr-polling
-// http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74
-func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
-	client := opts.Client()
+var _ sockjs.Session = (*XHRSession)(nil)
 
+// DialXHR establishes a SockJS session over a XHR connection.
+//
+// Requires cfg.XHR to be a valid client.
+func DialXHR(uri string, cfg *config.Config) (*XHRSession, error) {
 	// following /server_id/session_id should always be the same for every session
 	serverID := threeDigits()
 	sessionID := utils.RandomString(20)
-	sessionURL := opts.BaseURL + "/" + serverID + "/" + sessionID
+	sessionURL := uri + "/" + serverID + "/" + sessionID
 
 	// start the initial session handshake
-	sessionResp, err := client.Post(sessionURL+"/xhr", "text/plain", nil)
+	sessionResp, err := cfg.XHR.Post(sessionURL+"/xhr", "text/plain", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +62,24 @@ func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
 	}
 
 	return &XHRSession{
-		client:     client,
+		client:     cfg.XHR,
 		sessionID:  sessionID,
 		sessionURL: sessionURL,
-		opened:     true,
+		state:      sockjs.SessionActive,
 		abort:      make(chan struct{}, 1),
 	}, nil
+}
+
+// NewXHRSession returns a new XHRSession, a SockJS client which supports xhr-polling:
+//
+//   http://sockjs.github.io/sockjs-protocol/sockjs-protocol-0.3.3.html#section-74
+//
+// Deprecated: Use DialXHR instead.
+func NewXHRSession(opts *DialOptions) (*XHRSession, error) {
+	cfg := config.New()
+	cfg.XHR = opts.client()
+
+	return DialXHR(opts.BaseURL, cfg)
 }
 
 func (x *XHRSession) ID() string {
@@ -129,6 +137,25 @@ func (x *XHRSession) Recv() (string, error) {
 	}
 }
 
+func (x *XHRSession) setState(state sockjs.SessionState) {
+	x.mu.Lock()
+	x.state = state
+	x.mu.Unlock()
+}
+
+// GetSessionState gives state of the session.
+func (x *XHRSession) GetSessionState() sockjs.SessionState {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+
+	return x.state
+}
+
+// Request implements the sockjs.Session interface.
+func (x *XHRSession) Request() *http.Request {
+	return x.req
+}
+
 func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, err error) {
 	defer resp.Body.Close()
 
@@ -147,11 +174,24 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 
 	switch frame {
 	case 'o':
-		x.mu.Lock()
-		x.opened = true
-		x.mu.Unlock()
+		x.setState(sockjs.SessionActive)
 
 		return "", true, nil
+	case 'm':
+		var message string
+		if err := json.NewDecoder(buf).Decode(&message); err != nil {
+			return "", false, err
+		}
+
+		if message == "" {
+			return "", false, errors.New("unexpected empty message")
+		}
+
+		x.messages = append(x.messages, message)
+
+		message, x.messages = x.messages[0], x.messages[1:]
+
+		return message, false, nil
 	case 'a':
 		// received an array of messages
 		var messages []string
@@ -175,10 +215,7 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 		// heartbeat received
 		return "", true, nil
 	case 'c':
-		x.mu.Lock()
-		x.opened = false
-		x.closed = true
-		x.mu.Unlock()
+		x.setState(sockjs.SessionClosed)
 
 		return "", false, ErrSessionClosed
 	default:
@@ -191,14 +228,7 @@ func (x *XHRSession) Send(frame string) error {
 		return ErrSessionClosed
 	}
 
-	if !x.isOpened() {
-		return errors.New("session is not opened yet")
-	}
-
-	// Need's to be JSON encoded array of string messages (SockJS protocol
-	// requirement)
-	message := []string{frame}
-	body, err := json.Marshal(&message)
+	body, err := json.Marshal([]string{frame})
 	if err != nil {
 		return err
 	}
@@ -223,10 +253,7 @@ func (x *XHRSession) Send(frame string) error {
 }
 
 func (x *XHRSession) Close(status uint32, reason string) error {
-	x.mu.Lock()
-	x.opened = false
-	x.closed = true
-	x.mu.Unlock()
+	x.setState(sockjs.SessionClosed)
 
 	select {
 	case x.abort <- struct{}{}:
@@ -236,18 +263,8 @@ func (x *XHRSession) Close(status uint32, reason string) error {
 	return nil
 }
 
-func (x *XHRSession) isOpened() bool {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	return x.opened
-}
-
 func (x *XHRSession) isClosed() bool {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	return x.closed
+	return x.GetSessionState() == sockjs.SessionClosed
 }
 
 type doResult struct {

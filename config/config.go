@@ -4,30 +4,38 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/websocket"
+	"github.com/igm/sockjs-go/sockjs"
 )
+
+// the implementation of New() doesn't have any error to be returned yet it
+// returns, so it's totally safe to neglect the error
+var CookieJar, _ = cookiejar.New(nil)
 
 // Options is passed to kite.New when creating new instance.
 type Config struct {
 	// Options for Kite
-	Username              string
-	Environment           string
-	Region                string
-	Id                    string
-	KiteKey               string
-	DisableAuthentication bool
-	DisableConcurrency    bool
-	Transport             Transport
+	Username              string    // Username to set when registering to Kontrol.
+	Environment           string    // Kite environment to set when registering to Kontrol.
+	Region                string    // Kite region to set when registering to Kontrol.
+	Id                    string    // Kite ID to use when registering to Kontrol.
+	KiteKey               string    // The kite.key value to use for "kiteKey" authentication.
+	DisableAuthentication bool      // Do not require authentication for requests.
+	DisableConcurrency    bool      // Do not process messages concurrently.
+	Transport             Transport // SockJS transport to use.
 
-	// Options for Server
-	IP   string
-	Port int
+	IP   string // IP of the kite server.
+	Port int    // Port number of the kite server.
 
 	// VerifyFunc is used to verify the public key of the signed token.
 	//
@@ -56,6 +64,30 @@ type Config struct {
 	// environment and name of the client.
 	VerifyAudienceFunc func(client *protocol.Kite, aud string) error
 
+	// SockJS server / client connection configuration details.
+
+	// XHR is a HTTP client used for polling on responses for a XHR transport.
+	//
+	// Required.
+	XHR *http.Client
+
+	// Client is a HTTP client used for issuing HTTP register request and
+	// HTTP heartbeats.
+	Client *http.Client
+
+	// Websocket is used for creating a client for a websocket transport.
+	//
+	// If custom one is used, ensure any complemenrary field is also
+	// set in sockjs.WebSocketUpgrader value (for server connections).
+	//
+	// Required.
+	Websocket *websocket.Dialer
+
+	// SockJS are used to configure SockJS handler.
+	//
+	// Required.
+	SockJS *sockjs.Options
+
 	KontrolURL  string
 	KontrolKey  string
 	KontrolUser string
@@ -69,13 +101,34 @@ var DefaultConfig = &Config{
 	IP:          "0.0.0.0",
 	Port:        0,
 	Transport:   WebSocket,
+	XHR: &http.Client{
+		// TODO(rjeczalik): make XHR handler timeout if polling on body
+		// is idle > timeout. Timing out after 10s is a bad idea when
+		// the connection is active.
+		// Timeout: 10 * time.Second,
+		Jar: CookieJar,
+	},
+	Client: &http.Client{
+		Timeout: 20 * time.Second,
+		Jar:     CookieJar,
+	},
+	Websocket: &websocket.Dialer{
+		HandshakeTimeout: 15 * time.Second,
+		Jar:              CookieJar,
+	},
+	SockJS: &sockjs.Options{
+		Websocket:       sockjs.DefaultOptions.Websocket,
+		JSessionID:      sockjs.DefaultOptions.JSessionID,
+		SockJSURL:       sockjs.DefaultOptions.SockJSURL,
+		HeartbeatDelay:  10 * time.Second, // better fit for AWS ELB; empirically picked
+		DisconnectDelay: 10 * time.Second, // >= XHR poll interval
+		ResponseLimit:   sockjs.DefaultOptions.ResponseLimit,
+	},
 }
 
 // New returns a new Config initialized with defaults.
 func New() *Config {
-	c := new(Config)
-	*c = *DefaultConfig
-	return c
+	return DefaultConfig.Copy()
 }
 
 // NewFromKiteKey parses the given kite key file and gives a new Config value.
@@ -91,6 +144,26 @@ func NewFromKiteKey(file string) (*Config, error) {
 	}
 
 	return &c, nil
+}
+
+func Get() (*Config, error) {
+	c := New()
+	if err := c.ReadKiteKey(); err != nil {
+		return nil, err
+	}
+	if err := c.ReadEnvironmentVariables(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func MustGet() *Config {
+	c, err := Get()
+	if err != nil {
+		fmt.Printf("Cannot read kite.key: %s\n", err.Error())
+		os.Exit(1)
+	}
+	return c
 }
 
 func (c *Config) ReadEnvironmentVariables() error {
@@ -136,6 +209,14 @@ func (c *Config) ReadEnvironmentVariables() error {
 		c.VerifyTTL = ttl
 	}
 
+	if timeout, err := time.ParseDuration(os.Getenv("KITE_TIMEOUT")); err == nil {
+		c.XHR.Timeout = timeout
+	}
+
+	if timeout, err := time.ParseDuration(os.Getenv("KITE_HANDSHAKE_TIMEOUT")); err == nil {
+		c.Websocket.HandshakeTimeout = timeout
+	}
+
 	return nil
 }
 
@@ -169,27 +250,22 @@ func (c *Config) ReadToken(key *jwt.Token) error {
 
 // Copy returns a new copy of the config object.
 func (c *Config) Copy() *Config {
-	cloned := new(Config)
-	*cloned = *c
-	return cloned
-}
+	copy := *c
 
-func Get() (*Config, error) {
-	c := New()
-	if err := c.ReadKiteKey(); err != nil {
-		return nil, err
+	if c.XHR != nil {
+		xhr := *copy.XHR
+		copy.XHR = &xhr
 	}
-	if err := c.ReadEnvironmentVariables(); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
 
-func MustGet() *Config {
-	c, err := Get()
-	if err != nil {
-		fmt.Printf("Cannot read kite.key: %s\n", err.Error())
-		os.Exit(1)
+	if c.Client != nil {
+		client := *copy.Client
+		copy.Client = &client
 	}
-	return c
+
+	if c.Websocket != nil {
+		ws := *copy.Websocket
+		copy.Websocket = &ws
+	}
+
+	return &copy
 }

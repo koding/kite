@@ -11,12 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/dnode"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+
+	"github.com/cenkalti/backoff"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 var forever = backoff.NewExponentialBackOff()
@@ -30,23 +31,34 @@ func nopSetSession(sockjs.Session) {}
 // Client is the client for communicating with another Kite.
 // It has Tell() and Go() methods for calling methods sync/async way.
 type Client struct {
-	// The information about the kite that we are connecting to.
-	protocol.Kite
-	muProt sync.Mutex // protects protocol.Kite access
+	protocol.Kite // remote kite information
 
-	// A reference to the current Kite running.
+	// LocalKite references to the kite which owns the client
+	// connection.
 	LocalKite *Kite
 
-	// Credentials that we sent in each request.
+	// Auth is a credential used to authenticate with a remote kite.
+	//
+	// Required if remote kite requires authentication.
 	Auth *Auth
 
-	// Should we reconnect if disconnected?
+	// Reconnect says whether we should reconnect with a new
+	// session when an old one got invalidated or the connection
+	// broke.
 	Reconnect bool
 
-	// SockJS base URL
+	// URL specifies the SockJS URL of the remote kite.
 	URL string
 
-	// Should we process incoming messages concurrently or not? Default: true
+	// Config is used when setting up client connection to
+	// the remote kite.
+	//
+	// If Config is nil, LocalKite.Config is used instead.
+	Config *config.Config
+
+	// Concurrent specified whether we should process incoming messages concurrently.
+	//
+	// Defaults to true.
 	Concurrent bool
 
 	// ConcurrentCallbacks, when true, makes execution of callbacks in
@@ -64,7 +76,24 @@ type Client struct {
 	//
 	// If ClientFunc is nil, sockjs.Session will use default, internal
 	// *http.Client value.
+	//
+	// Deprecated: Set Config.XHR of the local kite, that
+	// owns this connection, insead.
 	ClientFunc func(*sockjsclient.DialOptions) *http.Client
+
+	// ReadBufferSize is the input buffer size. By default it's 4096.
+	//
+	// Deprecated: Set Config.Websocket.ReadBufferSize of the local kite,
+	// that owns this connection, instead.
+	ReadBufferSize int
+
+	// WriteBufferSize is the output buffer size. By default it's 4096.
+	//
+	// Deprecated: Set Config.Websocket.WriteBufferSize of the local kite,
+	// that owns this connection, instead.
+	WriteBufferSize int
+
+	muProt sync.Mutex // protects protocol.Kite access
 
 	// To signal waiters of Go() on disconnect.
 	disconnect   chan struct{}
@@ -81,7 +110,7 @@ type Client struct {
 	closeRenewer chan struct{}
 
 	// To syncronize the consumers
-	wg *sync.WaitGroup
+	wg sync.WaitGroup
 
 	// SockJS session
 	// TODO: replace this with a proper interface to support multiple
@@ -114,12 +143,6 @@ type Client struct {
 	m sync.RWMutex
 
 	firstRequestHandlersNotified sync.Once
-
-	// ReadBufferSize is the input buffer size. By default it's 4096.
-	ReadBufferSize int
-
-	// WriteBufferSize is the output buffer size. By default it's 4096.
-	WriteBufferSize int
 }
 
 // message carries an encoded payload sent over connected session.
@@ -166,7 +189,6 @@ type response struct {
 func (k *Kite) NewClient(remoteURL string) *Client {
 	c := &Client{
 		LocalKite:          k,
-		ClientFunc:         k.ClientFunc,
 		URL:                remoteURL,
 		disconnect:         make(chan struct{}),
 		closeChan:          make(chan struct{}),
@@ -175,7 +197,6 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		testHookSetSession: nopSetSession,
 		Concurrent:         true,
 		send:               make(chan *message),
-		wg:                 &sync.WaitGroup{},
 	}
 
 	k.OnRegister(c.updateAuth)
@@ -196,10 +217,12 @@ func (c *Client) Dial() (err error) {
 }
 
 // DialTimeout acts like Dial but takes a timeout.
-func (c *Client) DialTimeout(timeout time.Duration) (err error) {
-	c.LocalKite.Log.Debug("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+func (c *Client) DialTimeout(timeout time.Duration) error {
+	err := c.dial(timeout)
 
-	if err := c.dial(timeout); err != nil {
+	c.LocalKite.Log.Debug("Dialing '%s' kite: %s (error: %v)", c.Kite.Name, c.URL, err)
+
+	if err != nil {
 		return err
 	}
 
@@ -243,23 +266,7 @@ func (c *Client) authCopy() *Auth {
 }
 
 func (c *Client) dial(timeout time.Duration) (err error) {
-	if c.ReadBufferSize == 0 {
-		c.ReadBufferSize = 4096
-	}
-
-	if c.WriteBufferSize == 0 {
-		c.WriteBufferSize = 4096
-	}
-
-	opts := &sockjsclient.DialOptions{
-		BaseURL:         c.URL,
-		ReadBufferSize:  c.ReadBufferSize,
-		WriteBufferSize: c.WriteBufferSize,
-		ClientFunc:      c.ClientFunc,
-		Timeout:         timeout,
-	}
-
-	transport := c.LocalKite.Config.Transport
+	transport := c.config().Transport
 
 	c.LocalKite.Log.Debug("Client transport is set to '%s'", transport)
 
@@ -267,9 +274,9 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 	switch transport {
 	case config.WebSocket:
-		session, err = sockjsclient.ConnectWebsocketSession(opts)
+		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
 	case config.XHRPolling:
-		session, err = sockjsclient.NewXHRSession(opts)
+		session, err = sockjsclient.DialXHR(c.URL, c.config())
 	default:
 		return fmt.Errorf("Connection transport is not known '%v'", transport)
 	}
@@ -294,13 +301,19 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 
 func (c *Client) dialForever(connectNotifyChan chan bool) {
 	dial := func() error {
-		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
-
 		if !c.reconnect() {
 			return nil
 		}
 
-		return c.dial(0)
+		c.LocalKite.Log.Info("Dialing '%s' kite: %s", c.Kite.Name, c.URL)
+
+		if err := c.dial(0); err != nil {
+			c.LocalKite.Log.Warning("Dialing '%s' kite error: %s: %v", c.Kite.Name, c.URL, err)
+
+			return err
+		}
+
+		return nil
 	}
 
 	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
@@ -822,6 +835,13 @@ func (c *Client) removeCallbacks(callbacks map[string]dnode.Path) {
 		id, _ := strconv.ParseUint(sid, 10, 64)
 		c.scrubber.RemoveCallback(id)
 	}
+}
+
+func (c *Client) config() *config.Config {
+	if c.Config != nil {
+		return c.Config
+	}
+	return c.LocalKite.Config
 }
 
 // sendCallbackID send the callback number to be deleted after response is received.

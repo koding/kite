@@ -17,7 +17,7 @@ import (
 	"github.com/koding/kite/sockjsclient"
 	_ "github.com/koding/kite/testutil"
 
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 func init() {

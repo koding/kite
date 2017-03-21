@@ -12,10 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/igm/sockjs-go/sockjs"
 )
 
 const (

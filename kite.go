@@ -17,15 +17,16 @@ import (
 	"sync"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-	"github.com/koding/cache"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
+
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
+	"github.com/igm/sockjs-go/sockjs"
+	"github.com/koding/cache"
 	"github.com/koding/kite/sockjsclient"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
 )
 
 var hostname string
@@ -66,7 +67,7 @@ type Kite struct {
 	// ClientFunc is used as the default value for kite.Client.ClientFunc.
 	// If nil, a default ClientFunc will be used.
 	//
-	// See also: kite.Client.ClientFunc docstring.
+	// Deprecated: Set Config.XHR field instead.
 	ClientFunc func(*sockjsclient.DialOptions) *http.Client
 
 	// Handlers added with Kite.HandleFunc().
@@ -151,10 +152,17 @@ type Kite struct {
 	Id      string // Unique kite instance id
 }
 
-// New creates, initialize and then returns a new Kite instance. Version must
-// be in 3-digit semantic form. Name is important that it's also used to be
-// searched by others.
+// New creates, initializes and then returns a new Kite instance.
+//
+// Version must be in 3-digit semantic form.
+//
+// Name is important that it's also used to be searched by others.
 func New(name, version string) *Kite {
+	return NewWithConfig(name, version, config.New())
+}
+
+// NewWithConfig builds a new kite value for the given configuration.
+func NewWithConfig(name, version string, cfg *config.Config) *Kite {
 	if name == "" {
 		panic("kite: name cannot be empty")
 	}
@@ -174,7 +182,7 @@ func New(name, version string) *Kite {
 	}
 
 	k := &Kite{
-		Config:         config.New(),
+		Config:         cfg,
 		Log:            l,
 		SetLogLevel:    setlevel,
 		Authenticators: make(map[string]func(*Request) error),
@@ -189,13 +197,8 @@ func New(name, version string) *Kite {
 		muxer:          mux.NewRouter(),
 	}
 
-	// We change the heartbeat interval from 25 seconds to 10 seconds. This is
-	// better for environments such as AWS ELB.
-	sockjsOpts := sockjs.DefaultOptions
-	sockjsOpts.HeartbeatDelay = 10 * time.Second
-
 	// All sockjs communication is done through this endpoint..
-	k.muxer.PathPrefix("/kite").Handler(sockjs.NewHandler("/kite", sockjsOpts, k.sockjsHandler))
+	k.muxer.PathPrefix("/kite").Handler(sockjs.NewHandler("/kite", *cfg.SockJS, k.sockjsHandler))
 
 	// Add useful debug logs
 	k.OnConnect(func(c *Client) { k.Log.Debug("New session: %s", c.session.ID()) })
