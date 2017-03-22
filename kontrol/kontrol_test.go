@@ -334,9 +334,18 @@ func TestTokenInvalidation(t *testing.T) {
 		t.Error(err)
 	}
 
-	token, err := m.GetToken(m.Kite())
+	oldToken, err := m.GetToken(m.Kite())
 	if err != nil {
 		t.Error(err)
+	}
+
+	token, err := m.GetTokenForce(m.Kite())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if oldToken == token {
+		t.Errorf("want %q == %q", oldToken, token)
 	}
 
 	time.Sleep(time.Millisecond * 700)
