@@ -184,7 +184,10 @@ func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
 	return clients, nil
 }
 
-// GetToken is used to get a new token for a single Kite.
+// GetToken is used to get a token for a single Kite.
+//
+// In case of calling GetToken multiple times, it usually
+// returns the same token until it expires on Kontrol side.
 func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	if err := k.SetupKontrolClient(); err != nil {
 		return "", err
@@ -193,6 +196,36 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	<-k.kontrol.readyConnected
 
 	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
+	if err != nil {
+		return "", err
+	}
+
+	var tkn string
+	err = result.Unmarshal(&tkn)
+	if err != nil {
+		return "", err
+	}
+
+	return tkn, nil
+}
+
+// GetTokenForce is used to obtain a new token for the given kite.
+//
+// It always returns a new token and forces a Kontrol to
+// forget about any previous ones.
+func (k *Kite) GetTokenForce(kite *protocol.Kite) (string, error) {
+	if err := k.SetupKontrolClient(); err != nil {
+		return "", err
+	}
+
+	<-k.kontrol.readyConnected
+
+	args := &protocol.GetTokenArgs{
+		KontrolQuery: *kite.Query(),
+		Force:        true,
+	}
+
+	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, args)
 	if err != nil {
 		return "", err
 	}
