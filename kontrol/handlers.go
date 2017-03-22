@@ -165,6 +165,7 @@ func (k *Kontrol) HandleRegister(r *kite.Request) (interface{}, error) {
 
 func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 	var args protocol.GetKitesArgs
+
 	if err := r.Args.One().Unmarshal(&args); err != nil {
 		return nil, err
 	}
@@ -176,17 +177,21 @@ func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 	}
 
 	for _, kite := range kites {
-		// audience will go into the token as "aud" claim.
-		audience := getAudience(args.Query)
-
 		keyPair, err := k.getOrUpdateKeyID(kite.KeyID, r)
 		if err != nil {
 			return nil, err
 		}
 
+		tok := &token{
+			audience: getAudience(args.Query),
+			username: r.Username,
+			issuer:   k.Kite.Kite().Username,
+			keyPair:  keyPair,
+		}
+
 		// Generate token once here because we are using the same token for every
 		// kite we return and generating many tokens is really slow.
-		token, err := k.generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair)
+		token, err := k.generateToken(tok)
 		if err != nil {
 			return nil, err
 		}
@@ -200,14 +205,14 @@ func (k *Kontrol) HandleGetKites(r *kite.Request) (interface{}, error) {
 }
 
 func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
-	var query *protocol.KontrolQuery
+	var args protocol.GetTokenArgs
 
-	if err := r.Args.One().Unmarshal(&query); err != nil {
+	if err := r.Args.One().Unmarshal(&args); err != nil {
 		return nil, fmt.Errorf("invalid query: %s", err)
 	}
 
 	// check if it's exist
-	kites, err := k.storage.Get(query)
+	kites, err := k.storage.Get(&args.KontrolQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -226,9 +231,14 @@ func (k *Kontrol) HandleGetToken(r *kite.Request) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	audience := getAudience(query)
 
-	return k.generateToken(audience, r.Username, k.Kite.Kite().Username, keyPair)
+	return k.generateToken(&token{
+		audience: getAudience(&args.KontrolQuery),
+		username: r.Username,
+		issuer:   k.Kite.Kite().Username,
+		keyPair:  keyPair,
+		force:    args.Force,
+	})
 }
 
 func (k *Kontrol) HandleMachine(r *kite.Request) (interface{}, error) {
