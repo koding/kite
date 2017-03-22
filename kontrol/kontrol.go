@@ -89,7 +89,7 @@ type Kontrol struct {
 	heartbeats   map[string]*heartbeat
 	heartbeatsMu sync.Mutex // protects each clients heartbeat timer
 
-	tokenCache   map[string]string
+	tokenCache   map[string]cachedToken
 	tokenCacheMu sync.Mutex
 
 	// closed notifies goroutines started by kontrol that it got closed
@@ -172,7 +172,7 @@ func NewWithoutHandlers(conf *config.Config, version string) *Kontrol {
 		clientLocks: NewIdlock(),
 		heartbeats:  make(map[string]*heartbeat),
 		closed:      make(chan struct{}),
-		tokenCache:  make(map[string]string),
+		tokenCache:  make(map[string]cachedToken),
 	}
 
 	// Make a copy to not modify user-provided value.
@@ -506,20 +506,59 @@ func (k *Kontrol) tokenLeeway() time.Duration {
 	return TokenLeeway
 }
 
+type token struct {
+	audience string
+	username string
+	issuer   string
+	keyPair  *KeyPair
+	force    bool
+}
+
+type cachedToken struct {
+	signed string
+	timer  *time.Timer
+}
+
+func (t *token) String() string {
+	return t.audience + t.username + t.issuer + t.keyPair.ID
+}
+
+// cacheToken cached the signed token under the given key.
+//
+// It also ensures the token is invalidated after its expiration time.
+//
+// If the token was already exists in the cache, it will be
+// overwritten with a new value.
+func (k *Kontrol) cacheToken(key, signed string) {
+	if ct, ok := k.tokenCache[key]; ok {
+		ct.timer.Stop()
+	}
+
+	k.tokenCache[key] = cachedToken{
+		signed: signed,
+		timer: time.AfterFunc(k.tokenTTL()-k.tokenLeeway(), func() {
+			k.tokenCacheMu.Lock()
+			delete(k.tokenCache, key)
+			k.tokenCacheMu.Unlock()
+		}),
+	}
+}
+
 // generateToken returns a JWT token string. Please see the URL for details:
 // http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1
-func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (string, error) {
-	uniqKey := aud + username + issuer + kp.ID
+func (k *Kontrol) generateToken(tok *token) (string, error) {
+	uniqKey := tok.String()
 
 	k.tokenCacheMu.Lock()
 	defer k.tokenCacheMu.Unlock()
 
-	signed, ok := k.tokenCache[uniqKey]
-	if ok {
-		return signed, nil
+	if !tok.force {
+		if ct, ok := k.tokenCache[uniqKey]; ok {
+			return ct.signed, nil
+		}
 	}
 
-	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(kp.Private))
+	rsaPrivate, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(tok.keyPair.Private))
 	if err != nil {
 		return "", err
 	}
@@ -528,9 +567,9 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 
 	claims := &kitekey.KiteClaims{
 		StandardClaims: jwt.StandardClaims{
-			Issuer:    issuer,
-			Subject:   username,
-			Audience:  aud,
+			Issuer:    tok.issuer,
+			Subject:   tok.username,
+			Audience:  tok.audience,
 			ExpiresAt: now.Add(k.tokenTTL()).Add(k.tokenLeeway()).UTC().Unix(),
 			IssuedAt:  now.Add(-k.tokenLeeway()).UTC().Unix(),
 			Id:        uuid.NewV4().String(),
@@ -541,23 +580,12 @@ func (k *Kontrol) generateToken(aud, username, issuer string, kp *KeyPair) (stri
 		claims.NotBefore = now.Add(-k.tokenLeeway()).Unix()
 	}
 
-	signed, err = jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
+	signed, err := jwt.NewWithClaims(jwt.GetSigningMethod("RS256"), claims).SignedString(rsaPrivate)
 	if err != nil {
 		return "", errors.New("Server error: Cannot generate a token")
 	}
 
-	// cache our token
-	k.tokenCache[uniqKey] = signed
-
-	// cache invalidation, because we cache the token in tokenCache we need to
-	// invalidate it expiration time. This was handled usually within JWT, but
-	// now we have to do it manually for our own cache.
-	time.AfterFunc(TokenTTL-TokenLeeway, func() {
-		k.tokenCacheMu.Lock()
-		defer k.tokenCacheMu.Unlock()
-
-		delete(k.tokenCache, uniqKey)
-	})
+	k.cacheToken(uniqKey, signed)
 
 	return signed, nil
 }

@@ -149,6 +149,13 @@ type GetKitesArgs struct {
 	Who           json.RawMessage `json:"who"`
 }
 
+// GetTokenArgs is a request value for the "getToken" kontrol method.
+type GetTokenArgs struct {
+	KontrolQuery // kite to generate a token for
+
+	Force bool `json:"force"` // force creation of a new token
+}
+
 type WhoResult struct {
 	Query *KontrolQuery `json:"query"`
 }

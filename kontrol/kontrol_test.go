@@ -572,7 +572,7 @@ func TestKontrol(t *testing.T) {
 	// Test Kontrol.GetToken
 	// TODO(rjeczalik): rework test to not touch Kontrol internals
 	kon.tokenCacheMu.Lock()
-	kon.tokenCache = make(map[string]string)
+	kon.tokenCache = make(map[string]cachedToken)
 	kon.tokenCacheMu.Unlock()
 
 	_, err = exp2Kite.GetToken(&remoteMathWorker.Kite)
@@ -711,7 +711,7 @@ func TestKontrolMultiKey(t *testing.T) {
 	// Test Kontrol.GetToken
 	// TODO(rjeczalik): rework test to not touch Kontrol internals
 	kon.tokenCacheMu.Lock()
-	kon.tokenCache = make(map[string]string) // empty it
+	kon.tokenCache = make(map[string]cachedToken) // empty it
 	kon.tokenCacheMu.Unlock()
 
 	newToken, err := exp3Kite.GetToken(&remoteMathWorker.Kite)
