@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/utils"
@@ -15,11 +17,20 @@ import (
 	"github.com/igm/sockjs-go/sockjs"
 )
 
+// ErrPollTimeout is returned when reading first byte of the http response
+// body has timed out.
+//
+// It is an fatal error when waiting for the session open frame ('o').
+//
+// After the session is opened, the error makes the poller retry polling.
+var ErrPollTimeout = errors.New("polling on XHR response has timed out")
+
 // XHRSession implements sockjs.Session with XHR transport.
 type XHRSession struct {
 	mu sync.Mutex
 
 	client     *http.Client
+	timeout    time.Duration
 	sessionURL string
 	sessionID  string
 	messages   []string
@@ -51,8 +62,7 @@ func DialXHR(uri string, cfg *config.Config) (*XHRSession, error) {
 			http.StatusOK, sessionResp.StatusCode)
 	}
 
-	buf := bufio.NewReader(sessionResp.Body)
-	frame, err := buf.ReadByte()
+	frame, err := newFrameReader(sessionResp.Body, cfg.Timeout).ReadByte()
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +73,7 @@ func DialXHR(uri string, cfg *config.Config) (*XHRSession, error) {
 
 	return &XHRSession{
 		client:     cfg.XHR,
+		timeout:    cfg.Timeout,
 		sessionID:  sessionID,
 		sessionURL: sessionURL,
 		state:      sockjs.SessionActive,
@@ -106,7 +117,7 @@ func (x *XHRSession) Recv() (string, error) {
 	for {
 		req, err := http.NewRequest("POST", x.sessionURL+"/xhr", nil)
 		if err != nil {
-			return "", fmt.Errorf("Receiving data failed: %s", err)
+			return "", errors.New("invalid session url: " + err.Error())
 		}
 
 		req.Header.Set("Content-Type", "text/plain")
@@ -164,10 +175,12 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 			http.StatusOK, resp.StatusCode)
 	}
 
-	buf := bufio.NewReader(resp.Body)
+	fr := newFrameReader(resp.Body, x.timeout)
 
-	// returns an error if buffer is empty
-	frame, err := buf.ReadByte()
+	frame, err := fr.ReadByte()
+	if err == ErrPollTimeout {
+		return "", true, nil
+	}
 	if err != nil {
 		return "", false, err
 	}
@@ -179,7 +192,7 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 		return "", true, nil
 	case 'm':
 		var message string
-		if err := json.NewDecoder(buf).Decode(&message); err != nil {
+		if err := json.NewDecoder(fr).Decode(&message); err != nil {
 			return "", false, err
 		}
 
@@ -195,7 +208,7 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 	case 'a':
 		// received an array of messages
 		var messages []string
-		if err := json.NewDecoder(buf).Decode(&messages); err != nil {
+		if err := json.NewDecoder(fr).Decode(&messages); err != nil {
 			return "", false, err
 		}
 
@@ -282,4 +295,74 @@ func (x *XHRSession) do(req *http.Request) <-chan doResult {
 	}()
 
 	return ch
+}
+
+type frameReader struct {
+	r       *bufio.Reader
+	timeout time.Duration
+
+	once  sync.Once
+	frame byte
+	err   error
+}
+
+func newFrameReader(r io.Reader, timeout time.Duration) *frameReader {
+	return &frameReader{
+		r:       bufio.NewReader(r),
+		timeout: timeout,
+	}
+}
+
+func (fr *frameReader) Read(p []byte) (int, error) {
+	fr.once.Do(fr.readFrame)
+
+	if fr.err != nil {
+		return 0, fr.err
+	}
+
+	var n int
+
+	if fr.frame != 0 {
+		p[0], p = fr.frame, p[1:]
+		fr.frame, n = 0, 1
+	}
+
+	m, err := fr.r.Read(p)
+	return n + m, err
+}
+
+func (fr *frameReader) ReadByte() (byte, error) {
+	fr.once.Do(fr.readFrame)
+
+	if fr.err != nil {
+		return 0, fr.err
+	}
+
+	if fr.frame != 0 {
+		c := fr.frame
+		fr.frame = 0
+		return c, nil
+	}
+
+	return fr.r.ReadByte()
+}
+
+func (fr *frameReader) readFrame() {
+	type result struct {
+		c   byte
+		err error
+	}
+	done := make(chan result)
+
+	go func() {
+		c, err := fr.r.ReadByte()
+		done <- result{c, err}
+	}()
+
+	select {
+	case res := <-done:
+		fr.frame, fr.err = res.c, res.err
+	case <-time.After(fr.timeout):
+		fr.err = ErrPollTimeout
+	}
 }
