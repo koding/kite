@@ -25,6 +25,8 @@ import (
 // After the session is opened, the error makes the poller retry polling.
 var ErrPollTimeout = errors.New("polling on XHR response has timed out")
 
+var errAborted = errors.New("session aborted by server")
+
 // XHRSession implements sockjs.Session with XHR transport.
 type XHRSession struct {
 	mu sync.Mutex
@@ -128,7 +130,11 @@ func (x *XHRSession) Recv() (string, error) {
 				cn.CancelRequest(req)
 			}
 
-			return "", fmt.Errorf("session aborted by server")
+			return "", &ErrSession{
+				Type:  config.XHRPolling,
+				State: sockjs.SessionClosed,
+				Err:   errAborted,
+			}
 		case res := <-x.do(req):
 			if res.Error != nil {
 				return "", fmt.Errorf("Receiving data failed: %s", res.Error)
@@ -170,9 +176,18 @@ func (x *XHRSession) Request() *http.Request {
 func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, err error) {
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", false, fmt.Errorf("Receiving data failed. Want: %d Got: %d",
-			http.StatusOK, resp.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		x.Close(3000, "session not found") // invalidate session - see details: sockjs/sockjs-client#66
+
+		return "", false, &ErrSession{
+			Type:  config.XHRPolling,
+			State: sockjs.SessionClosed,
+			Err:   errors.New("session does not exist: " + x.sessionID),
+		}
+	default:
+		return "", false, fmt.Errorf("Receiving data failed. Want: 200 Got: %d", resp.StatusCode)
 	}
 
 	fr := newFrameReader(resp.Body, x.timeout)
@@ -225,12 +240,21 @@ func (x *XHRSession) handleResp(resp *http.Response) (msg string, again bool, er
 
 		return msg, false, nil
 	case 'h':
-		// heartbeat received
 		return "", true, nil
 	case 'c':
+		var code int
+		var reason string
+		var frame = []interface{}{&code, &reason}
+
+		_ = json.NewDecoder(fr).Decode(&frame)
+
 		x.setState(sockjs.SessionClosed)
 
-		return "", false, ErrSessionClosed
+		return "", false, &ErrSession{
+			Type:  config.XHRPolling,
+			State: sockjs.SessionClosed,
+			Err:   fmt.Errorf("closed by server: code=%d, reason=%q", code, reason),
+		}
 	default:
 		return "", false, errors.New("invalid frame type")
 	}
@@ -252,14 +276,17 @@ func (x *XHRSession) Send(frame string) error {
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		x.Close(0, "") // invalidate session - see details: sockjs/sockjs-client#66
+		x.Close(3000, "session not found") // invalidate session - see details: sockjs/sockjs-client#66
 
-		return fmt.Errorf("XHR session does not exist: %s", x.sessionID)
+		return &ErrSession{
+			Type:  config.XHRPolling,
+			State: sockjs.SessionClosed,
+			Err:   errors.New("session does not exist: " + x.sessionID),
+		}
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("Sending data failed. Want: %d Got: %d",
-			http.StatusOK, resp.StatusCode)
+		return fmt.Errorf("Sending data failed. Want: %d Got: %d", http.StatusOK, resp.StatusCode)
 	}
 
 	return nil
