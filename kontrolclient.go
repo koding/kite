@@ -17,10 +17,6 @@ import (
 const (
 	kontrolRetryDuration = 10 * time.Second
 	proxyRetryDuration   = 10 * time.Second
-
-	// kontrolConnectTimeout is the timeout for connecting to Kontrol in
-	// TellKontrol-like methods.
-	kontrolConnectTimeout = 10 * time.Second
 )
 
 // Returned from GetKites when query matches no kites.
@@ -146,7 +142,7 @@ func (k *Kite) GetKites(query *protocol.KontrolQuery) ([]*Client, error) {
 func (k *Kite) getKites(args protocol.GetKitesArgs) ([]*Client, error) {
 	<-k.kontrol.readyConnected
 
-	response, err := k.kontrol.TellWithTimeout("getKites", 4*time.Second, args)
+	response, err := k.kontrol.TellWithTimeout("getKites", k.Config.Timeout, args)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +191,7 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 
 	<-k.kontrol.readyConnected
 
-	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, kite)
+	result, err := k.kontrol.TellWithTimeout("getToken", k.Config.Timeout, kite)
 	if err != nil {
 		return "", err
 	}
@@ -225,7 +221,7 @@ func (k *Kite) GetTokenForce(kite *protocol.Kite) (string, error) {
 		Force:        true,
 	}
 
-	result, err := k.kontrol.TellWithTimeout("getToken", 4*time.Second, args)
+	result, err := k.kontrol.TellWithTimeout("getToken", k.Config.Timeout, args)
 	if err != nil {
 		return "", err
 	}
@@ -250,7 +246,7 @@ func (k *Kite) GetKey() (string, error) {
 
 	<-k.kontrol.readyConnected
 
-	result, err := k.kontrol.TellWithTimeout("getKey", 4*time.Second)
+	result, err := k.kontrol.TellWithTimeout("getKey", k.Config.Timeout)
 	if err != nil {
 		return "", err
 	}
@@ -358,7 +354,7 @@ func (k *Kite) Register(kiteURL *url.URL) (*registerResult, error) {
 
 	k.Log.Info("Registering to kontrol with URL: %s", kiteURL.String())
 
-	response, err := k.kontrol.TellWithTimeout("register", 4*time.Second, args)
+	response, err := k.kontrol.TellWithTimeout("register", k.Config.Timeout, args)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +473,7 @@ func (k *Kite) registerToProxyKite(c *Client, kiteURL *url.URL) (*url.URL, error
 
 	// this could be tunnelproxy or reverseproxy. Tunnelproxy doesn't need an
 	// URL however Reverseproxy needs one.
-	result, err := c.TellWithTimeout("register", 4*time.Second, kiteURL.String())
+	result, err := c.TellWithTimeout("register", k.Config.Timeout, kiteURL.String())
 	if err != nil {
 		k.Log.Error("Proxy register error: %s", err.Error())
 		return nil, err
@@ -508,12 +504,12 @@ func (k *Kite) TellKontrolWithTimeout(method string, timeout time.Duration, args
 
 	// Wait for readyConnect, or timeout
 	select {
-	case <-time.After(kontrolConnectTimeout):
+	case <-time.After(k.Config.Timeout):
 		return nil, &Error{
 			Type: "timeout",
 			Message: fmt.Sprintf(
 				"Timed out registering to kontrol for %s method after %s",
-				method, kontrolConnectTimeout,
+				method, k.Config.Timeout,
 			),
 		}
 	case <-k.kontrol.readyConnected:
