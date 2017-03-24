@@ -436,7 +436,7 @@ func (c *Client) receiveData() ([]byte, error) {
 		return nil, errors.New("not connected")
 	}
 
-	done := make(chan recv)
+	done := make(chan recv, 1)
 
 	go func() {
 		msg, err := session.Recv()

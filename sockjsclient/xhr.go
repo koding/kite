@@ -379,7 +379,7 @@ func (fr *frameReader) readFrame() {
 		c   byte
 		err error
 	}
-	done := make(chan result)
+	done := make(chan result, 1)
 
 	go func() {
 		c, err := fr.r.ReadByte()
