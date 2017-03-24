@@ -394,7 +394,7 @@ func (c *Client) readLoop() error {
 	for {
 		p, err := c.receiveData()
 
-		c.LocalKite.Log.Debug("readloop received: %v %v", p, err)
+		c.LocalKite.Log.Debug("readloop received: %s %v", p, err)
 
 		if err != nil {
 			return err
