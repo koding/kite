@@ -345,7 +345,7 @@ func TestTokenInvalidation(t *testing.T) {
 	}
 
 	if oldToken == token {
-		t.Errorf("want %q == %q", oldToken, token)
+		t.Errorf("want %q != %q", oldToken, token)
 	}
 
 	time.Sleep(time.Millisecond * 700)

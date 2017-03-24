@@ -17,6 +17,7 @@ import (
 	"github.com/koding/kite/sockjsclient"
 
 	"github.com/cenkalti/backoff"
+	"github.com/gorilla/websocket"
 	"github.com/igm/sockjs-go/sockjs"
 )
 
@@ -109,6 +110,10 @@ type Client struct {
 	// is closed but was not dialed
 	closeRenewer chan struct{}
 
+	// interrupt is used to signalise readloop that
+	// session was interrupted.
+	interrupt chan error
+
 	// To syncronize the consumers
 	wg sync.WaitGroup
 
@@ -197,6 +202,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		testHookSetSession: nopSetSession,
 		Concurrent:         true,
 		send:               make(chan *message),
+		interrupt:          make(chan error, 1),
 	}
 
 	k.OnRegister(c.updateAuth)
@@ -277,6 +283,13 @@ func (c *Client) dial(timeout time.Duration) (err error) {
 		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
 	case config.XHRPolling:
 		session, err = sockjsclient.DialXHR(c.URL, c.config())
+	case config.Auto:
+		session, err = sockjsclient.DialWebsocket(c.URL, c.config())
+		if err == websocket.ErrBadHandshake {
+			// In cases when kite server is behind a proxy that do
+			// not support websocket connections, fall back to XHR.
+			session, err = sockjsclient.DialXHR(c.URL, c.config())
+		}
 	default:
 		return fmt.Errorf("Connection transport is not known '%v'", transport)
 	}
@@ -380,6 +393,9 @@ func (c *Client) reconnect() bool {
 func (c *Client) readLoop() error {
 	for {
 		p, err := c.receiveData()
+
+		c.LocalKite.Log.Debug("readloop received: %s %v", p, err)
+
 		if err != nil {
 			return err
 		}
@@ -410,19 +426,29 @@ func (c *Client) readLoop() error {
 
 // receiveData reads a message from session.
 func (c *Client) receiveData() ([]byte, error) {
+	type recv struct {
+		msg []byte
+		err error
+	}
+
 	session := c.getSession()
 	if session == nil {
 		return nil, errors.New("not connected")
 	}
 
-	msg, err := session.Recv()
-	if err != nil {
-		c.LocalKite.Log.Debug("Receive err: %s", err)
-	} else {
-		c.LocalKite.Log.Debug("Received : %s", msg)
-	}
+	done := make(chan recv, 1)
 
-	return []byte(msg), err
+	go func() {
+		msg, err := session.Recv()
+		done <- recv{[]byte(msg), err}
+	}()
+
+	select {
+	case r := <-done:
+		return r.msg, r.err
+	case err := <-c.interrupt:
+		return nil, err
+	}
 }
 
 // processMessage processes a single message and calls a handler or callback.
@@ -526,13 +552,19 @@ func (c *Client) sendHub() {
 
 			err := session.Send(string(msg.p))
 			if err != nil {
-				// TODO(rjeczalik): temporary workaround for koding/koding#8711
-				if err != sockjs.ErrSessionNotOpen {
-					c.LocalKite.Log.Error("error sending: %s", err)
-				}
-
 				if msg.errC != nil {
 					msg.errC <- err
+				}
+
+				if sockjsclient.IsSessionClosed(err) {
+					// The readloop may already be interrupted, thus the non-blocking send.
+					select {
+					case c.interrupt <- err:
+					default:
+					}
+
+					c.LocalKite.Log.Error("error sending to %s: %s", session.ID(), err)
+					return
 				}
 			}
 		case <-c.closeChan:

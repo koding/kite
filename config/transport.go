@@ -6,6 +6,7 @@ type Transport int
 const (
 	WebSocket = iota
 	XHRPolling
+	Auto
 )
 
 func (t Transport) String() string {
@@ -14,6 +15,8 @@ func (t Transport) String() string {
 		return "WebSocket"
 	case XHRPolling:
 		return "XHRPolling"
+	case Auto:
+		return "auto"
 	default:
 		return "UnkownKiteTransport"
 	}
@@ -22,4 +25,5 @@ func (t Transport) String() string {
 var Transports = map[string]Transport{
 	"WebSocket":  WebSocket,
 	"XHRPolling": XHRPolling,
+	"auto":       Auto,
 }

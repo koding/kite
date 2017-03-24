@@ -71,6 +71,18 @@ type Config struct {
 	// Required.
 	XHR *http.Client
 
+	// Timeout specified max time waiting for the following operations to complete:
+	//
+	//   - polling on an XHR connection
+	//   - default timeout for certain kite requests (Kontrol API)
+	//   - HTTP heartbeats and register method
+	//
+	// NOTE: Ensure the Timeout is higher than SockJS.HeartbeatDelay, otherwise
+	// XHR connections may get randomly closed.
+	//
+	// TODO(rjeczalik): Make kite heartbeats configurable as well.
+	Timeout time.Duration
+
 	// Client is a HTTP client used for issuing HTTP register request and
 	// HTTP heartbeats.
 	Client *http.Client
@@ -100,16 +112,13 @@ var DefaultConfig = &Config{
 	Region:      "unknown",
 	IP:          "0.0.0.0",
 	Port:        0,
-	Transport:   WebSocket,
+	Transport:   Auto,
+	Timeout:     15 * time.Second,
 	XHR: &http.Client{
-		// TODO(rjeczalik): make XHR handler timeout if polling on body
-		// is idle > timeout. Timing out after 10s is a bad idea when
-		// the connection is active.
-		// Timeout: 10 * time.Second,
 		Jar: CookieJar,
 	},
 	Client: &http.Client{
-		Timeout: 20 * time.Second,
+		Timeout: 15 * time.Second,
 		Jar:     CookieJar,
 	},
 	Websocket: &websocket.Dialer{
@@ -121,7 +130,7 @@ var DefaultConfig = &Config{
 		JSessionID:      sockjs.DefaultOptions.JSessionID,
 		SockJSURL:       sockjs.DefaultOptions.SockJSURL,
 		HeartbeatDelay:  10 * time.Second, // better fit for AWS ELB; empirically picked
-		DisconnectDelay: 10 * time.Second, // >= XHR poll interval
+		DisconnectDelay: 10 * time.Second, // >= Timeout
 		ResponseLimit:   sockjs.DefaultOptions.ResponseLimit,
 	},
 }
@@ -210,7 +219,8 @@ func (c *Config) ReadEnvironmentVariables() error {
 	}
 
 	if timeout, err := time.ParseDuration(os.Getenv("KITE_TIMEOUT")); err == nil {
-		c.XHR.Timeout = timeout
+		c.Timeout = timeout
+		c.Client.Timeout = timeout
 	}
 
 	if timeout, err := time.ParseDuration(os.Getenv("KITE_HANDSHAKE_TIMEOUT")); err == nil {

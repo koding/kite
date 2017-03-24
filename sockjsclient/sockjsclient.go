@@ -5,6 +5,7 @@ package sockjsclient
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,7 +24,50 @@ import (
 
 // ErrSessionClosed is returned by Send/Recv methods when
 // calling them after the session got closed.
-var ErrSessionClosed = errors.New("session is closed")
+//
+// Deprecated: Send/Recv methods return *ErrSession error
+// with State set to sockjs.SessionClosed instead.
+var ErrSessionClosed = &ErrSession{
+	State: sockjs.SessionClosed,
+}
+
+// ErrSession is returned by Send/Recv methods when
+// the underlying session state change is responsible
+// for the failure.
+type ErrSession struct {
+	Type  config.Transport
+	State sockjs.SessionState // session state
+	Err   error               // more detailed description of the problem
+}
+
+var stateTexts = map[sockjs.SessionState]string{
+	sockjs.SessionActive:  "session is active",
+	sockjs.SessionOpening: "session is opening",
+	sockjs.SessionClosing: "session is closing",
+	sockjs.SessionClosed:  "session is closed",
+}
+
+// Error implements the buildin error interface.
+func (err *ErrSession) Error() string {
+	if err.Err == nil {
+		return fmt.Sprintf("%s (%s)", stateTexts[err.State], err.Type)
+	}
+	return fmt.Sprintf("%s: %s (%s)", stateTexts[err.State], err.Err, err.Type)
+}
+
+// IsSessionClosed tests whether given error is caused
+// by a closed session.
+func IsSessionClosed(err error) bool {
+	switch err {
+	case ErrSessionClosed, sockjs.ErrSessionNotOpen, websocket.ErrCloseSent:
+		return true
+	}
+	if e, ok := err.(*ErrSession); ok && e.State > sockjs.SessionActive {
+		return true
+	}
+	_, ok := err.(*websocket.CloseError)
+	return ok
+}
 
 // WebsocketSession represents a sockjs.Session over
 // a websocket connection.
