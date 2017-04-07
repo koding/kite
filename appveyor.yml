@@ -21,8 +21,7 @@ install:
 
 build_script:
  - go build ./...
- - go test -v -race ./dnode
- - go test -v -race ./systeminfo
+ - go test -v -race github.com/koding/kite github.com/koding/kite/dnode github.com/koding/kite/systeminfo
  # - go test -v -race ./...
 
 test: off
