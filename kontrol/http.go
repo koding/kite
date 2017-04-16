@@ -215,6 +215,10 @@ func (k *Kontrol) HandleRegisterHTTP(rw http.ResponseWriter, req *http.Request) 
 				close(h.updateC)
 			}
 
+			if err := k.storage.Delete(remoteKite); err != nil {
+				k.log.Error("Could not delete kite '%v' from storage: %s", remoteKite, err)
+			}
+
 			delete(k.heartbeats, remoteKite.ID)
 		})
 
