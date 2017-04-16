@@ -61,6 +61,29 @@ func Read() (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
+// Read the contents of the kite.key file from the given filename
+func ReadFile(filename string) (string, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// Write kite.key to the given file path
+func WriteFile(kiteKey, filename string) error {
+	err := os.MkdirAll(filepath.Dir(filename), 0700)
+	if err != nil {
+		return err
+	}
+
+	// Need to remove the previous key first because we can't write over
+	// when previos file's mode is 0400.
+	os.Remove(filename)
+
+	return ioutil.WriteFile(filename, []byte(kiteKey), 0400)
+}
+
 // Write over the kite.key file.
 func Write(kiteKey string) error {
 	keyPath, err := kiteKeyPath()
