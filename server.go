@@ -91,7 +91,14 @@ func (k *Kite) listenAndServe() error {
 	defer close(k.closeC) // serving is finished, notify waiters.
 	k.Log.Info("Serving...")
 
-	return http.Serve(k.listener, k)
+	return k.serve(k.listener, k)
+}
+
+func (k *Kite) serve(l net.Listener, h http.Handler) error {
+	if k.Config.Serve != nil {
+		return k.Config.Serve(l, h)
+	}
+	return http.Serve(l, h)
 }
 
 // Port returns the TCP port number that the kite listens.
