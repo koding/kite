@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -13,7 +14,7 @@ import (
 	"github.com/koding/kite/kitekey"
 	"github.com/koding/kite/protocol"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
 	"github.com/igm/sockjs-go/sockjs"
 )
@@ -99,6 +100,12 @@ type Config struct {
 	//
 	// Required.
 	SockJS *sockjs.Options
+
+	// Serve is serving HTTP requests using handler on requests
+	// comming from the given listener.
+	//
+	// If Serve is nil, http.Serve is used by default.
+	Serve func(net.Listener, http.Handler) error
 
 	KontrolURL  string
 	KontrolKey  string
