@@ -33,7 +33,7 @@ type Etcd struct {
 
 func NewEtcd(machines []string, log kite.Logger) *Etcd {
 	if machines == nil || len(machines) == 0 {
-		machines = []string{"127.0.0.1:4001"}
+		machines = []string{"//127.0.0.1:4001"}
 	}
 
 	client := etcd.NewClient(machines)
