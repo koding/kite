@@ -1,13 +1,14 @@
 package kontrol
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
@@ -27,7 +28,7 @@ var keyOrder = []string{
 
 // Etcd implements the Storage interface
 type Etcd struct {
-	client *etcd.Client
+	client etcd.KeysAPI
 	log    kite.Logger
 }
 
@@ -36,14 +37,19 @@ func NewEtcd(machines []string, log kite.Logger) *Etcd {
 		machines = []string{"//127.0.0.1:4001"}
 	}
 
-	client := etcd.NewClient(machines)
-	ok := client.SetCluster(machines)
-	if !ok {
+	cfg := etcd.Config{
+		Endpoints:               machines,
+		Transport:               etcd.DefaultTransport,
+		HeaderTimeoutPerRequest: time.Second,
+	}
+
+	client, err := etcd.New(cfg)
+	if err != nil {
 		panic("cannot connect to etcd cluster: " + strings.Join(machines, ","))
 	}
 
 	return &Etcd{
-		client: client,
+		client: etcd.NewKeysAPI(client),
 		log:    log,
 	}
 }
@@ -52,13 +58,19 @@ func (e *Etcd) Delete(k *protocol.Kite) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
 
-	_, err := e.client.Delete(etcdKey, true)
-	_, err = e.client.Delete(etcdIDKey, true)
+	_, err := e.client.Delete(context.TODO(), etcdKey, &etcd.DeleteOptions{
+		Recursive: true,
+	})
+	_, err = e.client.Delete(context.TODO(), etcdIDKey, &etcd.DeleteOptions{
+		Recursive: true,
+	})
 	return err
 }
 
 func (e *Etcd) Clear() error {
-	_, err := e.client.Delete(KitesPrefix, true)
+	_, err := e.client.Delete(context.TODO(), KitesPrefix, &etcd.DeleteOptions{
+		Recursive: true,
+	})
 	return err
 }
 
@@ -79,13 +91,27 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 
 	// Set the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err = e.client.Set(etcdKey, valueString, uint64(KeyTTL/time.Second))
+	_, err = e.client.Set(context.TODO(),
+		etcdKey,
+		valueString,
+		&etcd.SetOptions{
+			TTL:       KeyTTL / time.Second,
+			PrevExist: etcd.PrevExist,
+		},
+	)
 	if err != nil {
 		return err
 	}
 
 	// Also store the the kite.Key Id for easy lookup
-	_, err = e.client.Set(etcdIDKey, valueString, uint64(KeyTTL/time.Second))
+	_, err = e.client.Set(context.TODO(),
+		etcdIDKey,
+		valueString,
+		&etcd.SetOptions{
+			TTL:       KeyTTL / time.Second,
+			PrevExist: etcd.PrevExist,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -106,7 +132,14 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 
 	// update the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
-	_, err = e.client.Update(etcdKey, valueString, uint64(KeyTTL/time.Second))
+	_, err = e.client.Set(context.TODO(),
+		etcdKey,
+		valueString,
+		&etcd.SetOptions{
+			TTL:       KeyTTL / time.Second,
+			PrevExist: etcd.PrevExist,
+		},
+	)
 	if err != nil {
 		err = e.Add(k, value)
 		if err != nil {
@@ -116,14 +149,27 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 	}
 
 	// Also update the the kite.Key Id for easy lookup
-	_, err = e.client.Update(etcdIDKey, valueString, uint64(KeyTTL/time.Second))
+	_, err = e.client.Set(context.TODO(),
+		etcdIDKey,
+		valueString,
+		&etcd.SetOptions{
+			TTL:       KeyTTL / time.Second,
+			PrevExist: etcd.PrevExist,
+		},
+	)
 	if err != nil {
 		return err
 	}
 
 	// Set the TTL for the username. Otherwise, empty dirs remain in etcd.
-	_, err = e.client.Update(KitesPrefix+"/"+k.Username,
-		"", uint64(KeyTTL/time.Second))
+	_, err = e.client.Set(context.TODO(),
+		KitesPrefix+"/"+k.Username,
+		"",
+		&etcd.SetOptions{
+			TTL:       KeyTTL / time.Second,
+			PrevExist: etcd.PrevExist,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -171,7 +217,13 @@ func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
 			query.Region+"/"+query.Hostname+"/"+query.ID, "/")
 	}
 
-	resp, err := e.client.Get(KitesPrefix+etcdKey, false, true)
+	resp, err := e.client.Get(context.TODO(),
+		KitesPrefix+"/"+etcdKey,
+		&etcd.GetOptions{
+			Recursive: true,
+			Sort:      false,
+		},
+	)
 	if err != nil {
 		// if it's something else just return
 		return nil, err
@@ -212,7 +264,13 @@ func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
 
 func (e *Etcd) etcdKey(query *protocol.KontrolQuery) (string, error) {
 	if onlyIDQuery(query) {
-		resp, err := e.client.Get(KitesPrefix+"/"+query.ID, false, true)
+		resp, err := e.client.Get(context.TODO(),
+			KitesPrefix+"/"+query.ID,
+			&etcd.GetOptions{
+				Recursive: true,
+				Sort:      false,
+			},
+		)
 		if err != nil {
 			return "", err
 		}
