@@ -3,7 +3,7 @@ package kontrol
 import (
 	"errors"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/hashicorp/go-version"
 	"github.com/koding/kite"
 	"github.com/koding/kite/dnode"
