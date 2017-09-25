@@ -48,10 +48,31 @@ func NewEtcd(machines []string, log kite.Logger) *Etcd {
 		panic("cannot connect to etcd cluster: " + strings.Join(machines, ","))
 	}
 
-	return &Etcd{
-		client: etcd.NewKeysAPI(client),
+	e := &Etcd{
+		client: NewKeysAPILogger(etcd.NewKeysAPI(client), log),
 		log:    log,
 	}
+
+	// Create our prefix as a directory if it does not exist
+	_, err = e.client.Get(context.Background(), KitesPrefix, nil)
+	if err == nil {
+		return e
+	}
+
+	_, err = e.client.Set(
+		context.Background(),
+		KitesPrefix,
+		"",
+		&etcd.SetOptions{
+			Dir:       true,
+			PrevExist: etcd.PrevIgnore,
+		},
+	)
+	if err != nil {
+		log.Fatal("Could not create KitesPrefix %q: %v", KitesPrefix, err)
+	}
+
+	return e
 }
 
 func (e *Etcd) Delete(k *protocol.Kite) error {
@@ -95,7 +116,7 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 		etcdKey,
 		valueString,
 		&etcd.SetOptions{
-			TTL:       KeyTTL / time.Second,
+			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
@@ -108,7 +129,7 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 		etcdIDKey,
 		valueString,
 		&etcd.SetOptions{
-			TTL:       KeyTTL / time.Second,
+			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
@@ -136,7 +157,7 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 		etcdKey,
 		valueString,
 		&etcd.SetOptions{
-			TTL:       KeyTTL / time.Second,
+			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
@@ -153,7 +174,7 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 		etcdIDKey,
 		valueString,
 		&etcd.SetOptions{
-			TTL:       KeyTTL / time.Second,
+			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
@@ -166,7 +187,7 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 		KitesPrefix+"/"+k.Username,
 		"",
 		&etcd.SetOptions{
-			TTL:       KeyTTL / time.Second,
+			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
