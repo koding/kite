@@ -21,10 +21,13 @@ import (
 	"github.com/igm/sockjs-go/sockjs"
 )
 
-var forever = backoff.NewExponentialBackOff()
+var forever backoff.BackOff
 
 func init() {
-	forever.MaxElapsedTime = 365 * 24 * time.Hour // 1 year
+	b := backoff.NewExponentialBackOff()
+	b.MaxElapsedTime = 365 * 24 * time.Hour // 1 year
+
+	forever = &lockedBackoff{b: b}
 }
 
 func nopSetSession(sockjs.Session) {}
@@ -133,7 +136,7 @@ type Client struct {
 	scrubber *dnode.Scrubber
 
 	// Time to wait before redial connection.
-	redialBackOff backoff.ExponentialBackOff
+	redialBackOff backoff.BackOff
 
 	// on connect/disconnect handlers are invoked after every
 	// connect/disconnect.
@@ -197,7 +200,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		URL:                remoteURL,
 		disconnect:         make(chan struct{}),
 		closeChan:          make(chan struct{}),
-		redialBackOff:      *forever,
+		redialBackOff:      forever,
 		scrubber:           dnode.NewScrubber(),
 		testHookSetSession: nopSetSession,
 		Concurrent:         true,
@@ -329,7 +332,7 @@ func (c *Client) dialForever(connectNotifyChan chan bool) {
 		return nil
 	}
 
-	backoff.Retry(dial, &c.redialBackOff) // this will retry dial forever
+	backoff.Retry(dial, c.redialBackOff) // this will retry dial forever
 
 	if connectNotifyChan != nil {
 		close(connectNotifyChan)
@@ -987,4 +990,23 @@ func onError(err error) {
 			options.ResponseCallback.Call(response)
 		}
 	}
+}
+
+type lockedBackoff struct {
+	mu sync.Mutex
+	b  backoff.BackOff
+}
+
+func (lb *lockedBackoff) NextBackOff() time.Duration {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+
+	return lb.b.NextBackOff()
+}
+
+func (lb *lockedBackoff) Reset() {
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+
+	lb.b.Reset()
 }
