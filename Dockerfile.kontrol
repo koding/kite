@@ -1,0 +1,45 @@
+FROM golang:latest
+MAINTAINER John Andersen <johnandersepdx@gmail.com>
+
+RUN useradd -m -s /bin/false kontrol
+
+USER kontrol
+
+ARG KITE_GITHUB=github.com/koding/kite
+ENV KITE_GITHUB=${KITE_GITHUB}
+ARG GOPATH=/home/kontrol/Documents/go
+ENV GOPATH=${GOPATH}
+ENV GOBIN=/home/kontrol/Documents/go/bin
+
+RUN mkdir -p $GOBIN && \
+	go get github.com/coreos/etcd/client \
+    github.com/cenkalti/backoff \
+    github.com/dgrijalva/jwt-go \
+    github.com/gorilla/mux \
+    github.com/gorilla/websocket \
+    github.com/igm/sockjs-go/sockjs \
+    github.com/juju/ratelimit \
+    github.com/koding/cache \
+    github.com/koding/logging \
+    github.com/satori/go.uuid \
+    golang.org/x/crypto/ssh/terminal \
+		github.com/hashicorp/go-version \
+		github.com/koding/kite/kitectl \
+		github.com/koding/multiconfig \
+		github.com/lann/squirrel \
+		github.com/lib/pq && \
+  rm -rf "$GOPATH/src/$KITE_GITHUB"
+
+COPY . ${GOPATH}/src/${KITE_GITHUB}
+
+RUN cd "$GOPATH/src/$KITE_GITHUB" && \
+  go build -tags netgo -o "$HOME/kontrol" ./kontrol/kontrol && \
+  chown kontrol:kontrol "$HOME/kontrol" && \
+  chmod 500 "$HOME/kontrol" && \
+  mkdir -p "$HOME/.kontrol" && \
+  openssl genrsa -out "$HOME/.kontrol/key.pem" 4096 && \
+  openssl rsa -in "$HOME/.kontrol/key.pem" -pubout > \
+    "$HOME/.kontrol/key_pub.pem"
+#   "$GOBIN/kitectl" -init
+
+ENTRYPOINT ["/home/kontrol/kontrol"]

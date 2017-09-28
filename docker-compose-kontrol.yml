@@ -1,0 +1,17 @@
+version: '2'
+
+services:
+
+  kontrol:
+    build:
+      context: .
+      dockerfile: Dockerfile.kontrol
+    image: kontrol:latest
+    env_file: .env-docker-kontrol
+    ports:
+      - 6000:6000
+    links:
+      - postgres
+
+  postgres:
+    image: koding/postgres
