@@ -3,15 +3,14 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/url"
-	"os"
-
 	"github.com/koding/kite"
 	"github.com/koding/kite/config"
 	"github.com/koding/kite/kontrol"
 	"github.com/koding/multiconfig"
+	"io/ioutil"
+	"log"
+	"net/url"
+	"os"
 )
 
 type Kontrol struct {
@@ -38,6 +37,12 @@ type Kontrol struct {
 		Password       string
 		DBName         string
 		ConnectTimeout int `default:"20"`
+	}
+
+	Crate struct {
+		Host  string `default:"127.0.0.1"`
+		Port  int    `default:"4200"`
+		Table string `default:"kontrol"`
 	}
 }
 
@@ -95,6 +100,15 @@ func main() {
 		p := kontrol.NewPostgres(postgresConf, k.Kite.Log)
 		k.SetStorage(p)
 		k.SetKeyPairStorage(p)
+	case "crate":
+		crateConf := &kontrol.CrateConfig{
+			Host:  conf.Crate.Host,
+			Port:  conf.Crate.Port,
+			Table: conf.Crate.Table,
+		}
+
+		p := kontrol.NewCrate(crateConf, k.Kite.Log)
+		k.SetStorage(p)
 	default:
 		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	}

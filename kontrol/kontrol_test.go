@@ -28,10 +28,12 @@ var (
 	kon  *Kontrol
 )
 
-func init() {
+func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	kon, conf = startKontrol(testkeys.Private, testkeys.Public, 5500)
+
+	os.Exit(m.Run())
 }
 
 func TestUpdateKeys(t *testing.T) {

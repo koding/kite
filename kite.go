@@ -173,7 +173,7 @@ func NewWithConfig(name, version string, cfg *config.Config) *Kite {
 
 	kiteID := uuid.NewV4()
 
-	l, setlevel := newLogger(name)
+	l, setlevel := NewLogger(name)
 
 	kClient := &kontrolClient{
 		readyConnected:  make(chan struct{}),
