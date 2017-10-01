@@ -126,7 +126,7 @@ func (c *Crate) whereArgs(query *protocol.KontrolQuery) (string, []interface{}) 
 			args = append(args, v)
 		}
 	}
-	return strings.Join(where, ", "), args
+	return strings.Join(where, " AND "), args
 }
 
 // Get retrieves the Kites with the given query
