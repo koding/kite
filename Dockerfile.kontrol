@@ -1,0 +1,61 @@
+FROM golang:latest
+MAINTAINER John Andersen <johnandersepdx@gmail.com>
+
+RUN useradd -m -s /bin/false kontrol
+
+USER kontrol
+
+ARG KITE_GITHUB=github.com/koding/kite
+ENV KITE_GITHUB=${KITE_GITHUB}
+ARG GOPATH=/home/kontrol/Documents/go
+ENV GOPATH=${GOPATH}
+ARG GOBIN=/home/kontrol/Documents/go/bin
+ENV GOBIN=${GOBIN}
+
+RUN mkdir -p $GOBIN && \
+	go get github.com/coreos/etcd/client \
+    github.com/cenkalti/backoff \
+    github.com/dgrijalva/jwt-go \
+    github.com/gorilla/mux \
+    github.com/gorilla/websocket \
+    github.com/igm/sockjs-go/sockjs \
+    github.com/juju/ratelimit \
+    github.com/koding/cache \
+    github.com/koding/logging \
+    github.com/satori/go.uuid \
+    golang.org/x/crypto/ssh/terminal \
+		github.com/hashicorp/go-version \
+		github.com/koding/kite/kitectl \
+		github.com/koding/multiconfig \
+		github.com/lann/squirrel \
+		github.com/docker/docker/client \
+		github.com/docker/docker/api/types \
+		github.com/docker/docker/pkg/jsonmessage \
+		github.com/lib/pq && \
+  rm -rf "$GOPATH/src/$KITE_GITHUB"
+
+ENV KONTROL_PORT=6000
+ENV KONTROL_USERNAME=kontrol
+ENV KONTROL_KONTROLURL=http://127.0.0.1:6000/kite
+ENV KONTROL_PUBLICKEYFILE=/home/kontrol/.kontrol/key_pub.pem
+ENV KONTROL_PRIVATEKEYFILE=/home/kontrol/.kontrol/key.pem
+
+COPY . ${GOPATH}/src/${KITE_GITHUB}
+
+RUN cd "$GOPATH/src/$KITE_GITHUB" && \
+  go install ./kontrol/kontrol && \
+  chown kontrol:kontrol "$GOBIN/kontrol" && \
+  chmod 500 "$GOBIN/kontrol" && \
+  mkdir -p "$HOME/.kontrol" && \
+  openssl genrsa -out "$KONTROL_PRIVATEKEYFILE" 4096 && \
+  openssl rsa -in "$KONTROL_PRIVATEKEYFILE" -pubout > \
+    "$KONTROL_PUBLICKEYFILE"
+
+USER root
+
+RUN mv ${GOBIN}/kontrol /bin/kontrol
+
+USER kontrol
+
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c", "kontrol -initial && kontrol"]

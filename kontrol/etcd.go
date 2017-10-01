@@ -75,6 +75,12 @@ func NewEtcd(machines []string, log kite.Logger) *Etcd {
 	return e
 }
 
+// Wait never returns an error because NewEtcd() requires that etcd
+// is ready.
+func (e *Etcd) Wait(timeout time.Duration) error {
+	return nil
+}
+
 func (e *Etcd) Delete(k *protocol.Kite) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID

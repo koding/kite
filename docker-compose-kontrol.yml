@@ -1,0 +1,51 @@
+version: "3.3"
+
+services:
+  kontrol:
+    build:
+      context: .
+      dockerfile: Dockerfile.kontrol
+    image: kontrol:latest
+    environment:
+      - "KONTROL_STORAGE=crate"
+      - "KONTROL_CRATE_HOST=crate"
+    ports:
+      - "6000:6000"
+    depends_on:
+      - crate
+    networks:
+      - crate_network
+    deploy:
+      endpoint_mode: vip
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  crate:
+    image: crate
+    networks:
+      - crate_network
+    deploy:
+      endpoint_mode: dnsrr
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        reservations:
+          cpus: "0.2"
+          memory: 512M
+
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - crate_network
+
+networks:
+  crate_network:

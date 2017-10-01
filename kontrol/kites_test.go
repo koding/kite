@@ -1,16 +1,15 @@
-package kontrol_test
+package kontrol
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"github.com/koding/kite/kontrol"
 	"github.com/koding/kite/protocol"
 )
 
 func TestKitesShuffle(t *testing.T) {
-	kites := kontrol.Kites{
+	kites := Kites{
 		{KeyID: "1"},
 		{KeyID: "2"},
 		{KeyID: "3"},
@@ -22,7 +21,7 @@ func TestKitesShuffle(t *testing.T) {
 		{KeyID: "9"},
 	}
 
-	kitesCopy := make(kontrol.Kites, len(kites))
+	kitesCopy := make(Kites, len(kites))
 	copy(kitesCopy, kites)
 
 	kites.Shuffle()
@@ -33,7 +32,7 @@ func TestKitesShuffle(t *testing.T) {
 }
 
 func TestKitesFilter(t *testing.T) {
-	kites := kontrol.Kites{
+	kites := Kites{
 		{Kite: protocol.Kite{Version: "1.0.0"}},
 		{Kite: protocol.Kite{Version: "1.1.0"}},
 		{Kite: protocol.Kite{Version: "1.2.0"}},
@@ -46,7 +45,7 @@ func TestKitesFilter(t *testing.T) {
 		{Kite: protocol.Kite{Version: "1.9.0"}},
 	}
 
-	want := kontrol.Kites{
+	want := Kites{
 		kites[6],
 		kites[7],
 		kites[8],

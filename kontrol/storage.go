@@ -1,6 +1,8 @@
 package kontrol
 
 import (
+	"time"
+
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )
@@ -22,4 +24,8 @@ type Storage interface {
 
 	// Upsert inserts or updates the value for the given kite
 	Upsert(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) error
+
+	// Wait should wait until the storage is ready. Or return an error
+	// if it is not ready before the timeout.
+	Wait(timeout time.Duration) error
 }

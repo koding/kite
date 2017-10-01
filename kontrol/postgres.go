@@ -14,6 +14,7 @@ import (
 
 	"github.com/koding/kite"
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
+	"github.com/koding/kite/kontrol/util"
 	"github.com/koding/kite/protocol"
 	"github.com/koding/multiconfig"
 )
@@ -122,6 +123,11 @@ func (p *Postgres) CleanExpiredRows(expire time.Duration) (int64, error) {
 	}
 
 	return rows.RowsAffected()
+}
+
+// Wait calls DB.Ping until the timeout is reached.
+func (p *Postgres) Wait(timeout time.Duration) error {
+	return util.PingTimeout(p.DB, timeout)
 }
 
 func (p *Postgres) Get(query *protocol.KontrolQuery) (Kites, error) {
