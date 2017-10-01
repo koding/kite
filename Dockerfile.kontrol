@@ -9,7 +9,8 @@ ARG KITE_GITHUB=github.com/koding/kite
 ENV KITE_GITHUB=${KITE_GITHUB}
 ARG GOPATH=/home/kontrol/Documents/go
 ENV GOPATH=${GOPATH}
-ENV GOBIN=/home/kontrol/Documents/go/bin
+ARG GOBIN=/home/kontrol/Documents/go/bin
+ENV GOBIN=${GOBIN}
 
 RUN mkdir -p $GOBIN && \
 	go get github.com/coreos/etcd/client \
@@ -30,16 +31,29 @@ RUN mkdir -p $GOBIN && \
 		github.com/lib/pq && \
   rm -rf "$GOPATH/src/$KITE_GITHUB"
 
+ENV KONTROL_PORT=6000
+ENV KONTROL_USERNAME=kontrol
+ENV KONTROL_DBPING_RETRY=
+ENV KONTROL_KONTROLURL=http://127.0.0.1:6000/kite
+ENV KONTROL_PUBLICKEYFILE=/home/kontrol/.kontrol/key_pub.pem
+ENV KONTROL_PRIVATEKEYFILE=/home/kontrol/.kontrol/key.pem
+
 COPY . ${GOPATH}/src/${KITE_GITHUB}
 
 RUN cd "$GOPATH/src/$KITE_GITHUB" && \
-  go build -tags netgo -o "$HOME/kontrol" ./kontrol/kontrol && \
-  chown kontrol:kontrol "$HOME/kontrol" && \
-  chmod 500 "$HOME/kontrol" && \
+  go install ./kontrol/kontrol && \
+  chown kontrol:kontrol "$GOBIN/kontrol" && \
+  chmod 500 "$GOBIN/kontrol" && \
   mkdir -p "$HOME/.kontrol" && \
-  openssl genrsa -out "$HOME/.kontrol/key.pem" 4096 && \
-  openssl rsa -in "$HOME/.kontrol/key.pem" -pubout > \
-    "$HOME/.kontrol/key_pub.pem"
-#   "$GOBIN/kitectl" -init
+  openssl genrsa -out "$KONTROL_PRIVATEKEYFILE" 4096 && \
+  openssl rsa -in "$KONTROL_PRIVATEKEYFILE" -pubout > \
+    "$KONTROL_PUBLICKEYFILE"
 
-ENTRYPOINT ["/home/kontrol/kontrol"]
+USER root
+
+RUN mv ${GOBIN}/kontrol /bin/kontrol
+
+USER kontrol
+
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c", "kontrol -initial && kontrol"]

@@ -11,7 +11,7 @@ services:
     ports:
       - 6000:6000
     links:
-      - postgres
+      - crate
 
-  postgres:
-    image: koding/postgres
+  crate:
+    image: crate
