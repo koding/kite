@@ -3,6 +3,7 @@ package kontrol
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "github.com/herenow/go-crate"
 
@@ -79,21 +80,7 @@ func NewCrate(conf *CrateConfig, log kite.Logger) *Crate {
 func (c *Crate) exec(cmd string, args ...interface{}) (sql.Result, error) {
 	if !c.TableCreated {
 		c.Log.Debug("CrateDB.Exec running table creation: %s", cmd)
-		c.TableCreated = true
-		cmd := "CREATE TABLE IF NOT EXISTS " + c.Table + " ( " +
-			"id string PRIMARY KEY, " +
-			"name string, " +
-			"username string, " +
-			"environment string, " +
-			"region string, " +
-			"version string, " +
-			"hostname string, " +
-			"key_id string, " +
-			"url string)"
-		_, err := c.exec(cmd)
-		if err != nil {
-			c.Log.Fatal("%v", err)
-		}
+		c.createTable()
 	}
 
 	c.Log.Debug("CrateDB.Exec: %s", cmd)
@@ -104,89 +91,73 @@ func (c *Crate) exec(cmd string, args ...interface{}) (sql.Result, error) {
 	return result, err
 }
 
+func (c *Crate) createTable() error {
+	c.TableCreated = true
+	cmd := "CREATE TABLE IF NOT EXISTS " + c.Table + " ( " +
+		"id string PRIMARY KEY, " +
+		"name string, " +
+		"username string, " +
+		"environment string, " +
+		"region string, " +
+		"version string, " +
+		"hostname string, " +
+		"key_id string, " +
+		"url string)"
+	_, err := c.exec(cmd)
+	if err != nil {
+		c.Log.Fatal("%v", err)
+	}
+	return err
+}
+
+func (c *Crate) whereArgs(query *protocol.KontrolQuery) (string, []interface{}) {
+	where := make([]string, 0)
+	args := make([]interface{}, 0)
+	for k, v := range query.Fields() {
+		if len(v) > 0 {
+			where = append(where, fmt.Sprintf("%s = ?", k))
+			args = append(args, v)
+		}
+	}
+	return strings.Join(where, ", "), args
+}
+
 // Get retrieves the Kites with the given query
 func (c *Crate) Get(query *protocol.KontrolQuery) (Kites, error) {
-	return nil, fmt.Errorf("Not Impmentented")
-	// // We will make a get request to etcd store with this key. So get a "etcd"
-	// // key from the given query so that we can use it to query from Etcd.
-	// etcdKey, err := e.etcdKey(query)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	kites := make(Kites, 0)
+	where, args := c.whereArgs(query)
+	cmd := "SELECT id, name, username, environment, region, version, " +
+		"hostname, key_id, url FROM " + c.Table + " WHERE " + where
+	c.Log.Debug("CrateDB.Get: %s", cmd)
+	rows, err := c.DB.Query(cmd, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		kite := protocol.KiteWithToken{}
+		err := rows.Scan(
+			&kite.Kite.ID,
+			&kite.Kite.Name,
+			&kite.Kite.Username,
+			&kite.Kite.Environment,
+			&kite.Kite.Region,
+			&kite.Kite.Version,
+			&kite.Kite.Hostname,
+			&kite.KeyID,
+			&kite.URL,
+		)
+		if err != nil {
+			return nil, err
+		}
+		kites = append(kites, &kite)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
 
-	// // If version field contains a constraint we need no make a new query up to
-	// // "name" field and filter the results after getting all versions.
-	// // NewVersion returns an error if it's a constraint, like: ">= 1.0, < 1.4"
-	// // Because NewConstraint doesn't return an error for version's like "0.0.1"
-	// // we check it with the NewVersion function.
-	// var hasVersionConstraint bool // does query contains a constraint on version?
-	// var keyRest string            // query key after the version field
-	// var versionConstraint version.Constraints
-	// _, err = version.NewVersion(query.Version)
-	// if err != nil && query.Version != "" {
-	// 	// now parse our constraint
-	// 	versionConstraint, err = version.NewConstraint(query.Version)
-	// 	if err != nil {
-	// 		// version is a malformed, just return the error
-	// 		return nil, err
-	// 	}
-
-	// 	hasVersionConstraint = true
-	// 	nameQuery := &protocol.KontrolQuery{
-	// 		Username:    query.Username,
-	// 		Environment: query.Environment,
-	// 		Name:        query.Name,
-	// 	}
-	// 	// We will make a get request to all nodes under this name
-	// 	// and filter the result later.
-	// 	etcdKey, _ = GetQueryKey(nameQuery)
-
-	// 	// Rest of the key after version field
-	// 	keyRest = "/" + strings.TrimRight(
-	// 		query.Region+"/"+query.Hostname+"/"+query.ID, "/")
-	// }
-
-	// resp, err := e.client.Get(context.TODO(),
-	// 	KitesPrefix+"/"+etcdKey,
-	// 	&etcd.GetOptions{
-	// 		Recursive: true,
-	// 		Sort:      false,
-	// 	},
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// kites := make(Kites, 0)
-	// node := NewNode(resp.Node)
-
-	// // means a query with all fields were made or a query with an ID was made,
-	// // in which case also returns a full path. This path has a value that
-	// // contains the final kite URL. Therefore this is a single kite result,
-	// // create it and pass it back.
-	// if node.HasValue() {
-	// 	oneKite, err := node.Kite()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	kites = append(kites, oneKite)
-	// } else {
-	// 	kites, err = node.Kites()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	// Filter kites by version constraint
-	// 	if hasVersionConstraint {
-	// 		kites.Filter(versionConstraint, keyRest)
-	// 	}
-	// }
-
-	// // Shuffle the list
-	// kites.Shuffle()
-
-	// return kites, nil
+	return kites, nil
 }
 
 // Add inserts the given kite with the given value
@@ -221,11 +192,8 @@ func (c *Crate) Update(kite *protocol.Kite, value *kontrolprotocol.RegisterValue
 
 // Delete deletes the given kite from the storage
 func (c *Crate) Delete(kite *protocol.Kite) error {
-	_, err := c.exec(
-		"DELETE FROM "+c.Table+" WHERE ($1, $2)",
-		"gopher",
-		27,
-	)
+	where, args := c.whereArgs(kite.Query())
+	_, err := c.exec("DELETE FROM "+c.Table+" WHERE "+where, args...)
 	return err
 }
 
