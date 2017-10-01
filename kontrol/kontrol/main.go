@@ -17,13 +17,14 @@ import (
 
 type Kontrol struct {
 	Ip          string
-	Storage     string `default:"etcd"`
 	Port        int
 	TLSCertFile string
 	TLSKeyFile  string
 	RegisterUrl string
 
-	Timeout    time.Duration `default:"30s"`
+	Storage string        `default:"etcd"`
+	Timeout time.Duration `default:"30s"`
+
 	Initial    bool
 	Username   string
 	KontrolURL string
