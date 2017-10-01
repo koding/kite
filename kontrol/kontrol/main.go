@@ -11,15 +11,18 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"time"
 )
 
 type Kontrol struct {
 	Ip          string
+	Storage     string `default:"etcd"`
 	Port        int
 	TLSCertFile string
 	TLSKeyFile  string
 	RegisterUrl string
 
+	Timeout    time.Duration `default:"30s"`
 	Initial    bool
 	Username   string
 	KontrolURL string
@@ -85,7 +88,7 @@ func main() {
 		k.RegisterURL = conf.RegisterUrl
 	}
 
-	switch os.Getenv("KONTROL_STORAGE") {
+	switch conf.Storage {
 	case "etcd":
 		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	case "postgres":
@@ -98,6 +101,7 @@ func main() {
 		}
 
 		p := kontrol.NewPostgres(postgresConf, k.Kite.Log)
+		p.Wait(conf.Timeout)
 		k.SetStorage(p)
 		k.SetKeyPairStorage(p)
 	case "crate":
@@ -108,10 +112,8 @@ func main() {
 		}
 
 		c := kontrol.NewCrate(crateConf, k.Kite.Log)
-		c.Wait()
+		c.Wait(conf.Timeout)
 		k.SetStorage(c)
-	default:
-		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	}
 
 	k.AddKeyPair("", string(publicKey), string(privateKey))

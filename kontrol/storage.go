@@ -1,6 +1,8 @@
 package kontrol
 
 import (
+	"time"
+
 	kontrolprotocol "github.com/koding/kite/kontrol/protocol"
 	"github.com/koding/kite/protocol"
 )

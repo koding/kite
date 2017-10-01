@@ -28,12 +28,14 @@ RUN mkdir -p $GOBIN && \
 		github.com/koding/kite/kitectl \
 		github.com/koding/multiconfig \
 		github.com/lann/squirrel \
+		github.com/docker/docker/client \
+		github.com/docker/docker/api/types \
+		github.com/docker/docker/pkg/jsonmessage \
 		github.com/lib/pq && \
   rm -rf "$GOPATH/src/$KITE_GITHUB"
 
 ENV KONTROL_PORT=6000
 ENV KONTROL_USERNAME=kontrol
-ENV KONTROL_DBPING_RETRY=
 ENV KONTROL_KONTROLURL=http://127.0.0.1:6000/kite
 ENV KONTROL_PUBLICKEYFILE=/home/kontrol/.kontrol/key_pub.pem
 ENV KONTROL_PRIVATEKEYFILE=/home/kontrol/.kontrol/key.pem
