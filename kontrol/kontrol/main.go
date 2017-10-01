@@ -107,8 +107,9 @@ func main() {
 			Table: conf.Crate.Table,
 		}
 
-		p := kontrol.NewCrate(crateConf, k.Kite.Log)
-		k.SetStorage(p)
+		c := kontrol.NewCrate(crateConf, k.Kite.Log)
+		c.Wait()
+		k.SetStorage(c)
 	default:
 		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	}

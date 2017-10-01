@@ -76,6 +76,11 @@ func NewCrate(conf *CrateConfig, log kite.Logger) *Crate {
 	return c
 }
 
+// Wait calls DB.Ping until the timeout is reached.
+func (c *Crate) Wait(timeout time.Duration) error {
+	return util.PingTimeout(c.DB, timeout)
+}
+
 // exec calls Crate.Log.Debug then calls Exec.
 func (c *Crate) exec(cmd string, args ...interface{}) (sql.Result, error) {
 	if !c.TableCreated {
