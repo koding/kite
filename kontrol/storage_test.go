@@ -23,13 +23,7 @@ func NewTestCrate(t *testing.T) (c util.TestContainer, s Storage) {
 	return c, s
 }
 
-func TestNewCrate(t *testing.T) {
-	c, _ := NewTestCrate(t)
-	defer c.Stop(t)
-}
-
 func TestCrateAdd(t *testing.T) {
-	t.Skip("Crate.Add doesn't work yet")
 	c, s := NewTestCrate(t)
 	defer c.Stop(t)
 	storageAdd(s, t)

@@ -32,14 +32,15 @@ func (d *DockerCrate) Start(t *testing.T) {
 		t.Skip("Failed to start crate docker container", err)
 	}
 
-	t.Log("Container IP:", d.c.IPAddress())
 	d.db, err = sql.Open("crate",
-		fmt.Sprintf("http://%s:4200/", d.c.IPAddress()))
+		fmt.Sprintf("http://%s:4200/?timeout=%s",
+			d.c.IPAddress(),
+			(time.Second/time.Duration(PingTimeoutFrequency)).String()))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = PingTimeout(d.db, 30*time.Second)
+	err = PingTimeout(d.db, 20*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

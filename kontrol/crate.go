@@ -18,15 +18,17 @@ const (
 
 // Crate holds Crate database related configuration
 type CrateConfig struct {
-	Host  string `default:"127.0.0.1"`
-	Port  int    `default:"4200"`
-	Table string `default:"kontrol"`
+	Host         string `default:"127.0.0.1"`
+	Port         int    `default:"4200"`
+	Table        string `default:"kontrol"`
+	TableCreated bool   `default:"false"`
 }
 
 type Crate struct {
-	DB    *sql.DB
-	Log   kite.Logger
-	Table string
+	DB           *sql.DB
+	Log          kite.Logger
+	Table        string
+	TableCreated bool
 }
 
 func NewCrate(conf *CrateConfig, log kite.Logger) *Crate {
@@ -60,16 +62,46 @@ func NewCrate(conf *CrateConfig, log kite.Logger) *Crate {
 	}
 
 	c := &Crate{
-		DB:    db,
-		Log:   log,
-		Table: conf.Table,
+		DB:           db,
+		Log:          log,
+		Table:        conf.Table,
+		TableCreated: conf.TableCreated,
 	}
 
-	// TODO
+	// TODO Shouldn't this be managed by a distributed cron daemon?
 	// cleanInterval := 120 * time.Second // clean every 120 second
 	// go p.RunCleaner(cleanInterval, KeyTTL)
 
 	return c
+}
+
+// exec calls Crate.Log.Debug then calls Exec.
+func (c *Crate) exec(cmd string, args ...interface{}) (sql.Result, error) {
+	if !c.TableCreated {
+		c.Log.Debug("CrateDB.Exec running table creation: %s", cmd)
+		c.TableCreated = true
+		cmd := "CREATE TABLE IF NOT EXISTS " + c.Table + " ( " +
+			"id string PRIMARY KEY, " +
+			"name string, " +
+			"username string, " +
+			"environment string, " +
+			"region string, " +
+			"version string, " +
+			"hostname string, " +
+			"key_id string, " +
+			"url string)"
+		_, err := c.exec(cmd)
+		if err != nil {
+			c.Log.Fatal("%v", err)
+		}
+	}
+
+	c.Log.Debug("CrateDB.Exec: %s", cmd)
+	result, err := c.DB.Exec(cmd, args...)
+	if err != nil {
+		c.Log.Debug("CrateDB.Exec ERROR: %v", err)
+	}
+	return result, err
 }
 
 // Get retrieves the Kites with the given query
@@ -163,13 +195,11 @@ func (c *Crate) Add(kite *protocol.Kite, value *kontrolprotocol.RegisterValue) e
 		"region, version, hostname, key_id, url) " +
 		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " +
 		"on duplicate key update " +
-		"id=VALUES(id), " +
 		"name=VALUES(name), username=VALUES(username), " +
 		"environment=VALUES(environment), region=VALUES(region), " +
 		"version=VALUES(version), hostname=VALUES(hostname), " +
 		"key_id=VALUES(key_id), url=VALUES(url)"
-	c.Log.Info(cmd)
-	_, err := c.DB.Exec(
+	_, err := c.exec(
 		cmd,
 		kite.ID,
 		kite.Name,
@@ -191,7 +221,7 @@ func (c *Crate) Update(kite *protocol.Kite, value *kontrolprotocol.RegisterValue
 
 // Delete deletes the given kite from the storage
 func (c *Crate) Delete(kite *protocol.Kite) error {
-	_, err := c.DB.Exec(
+	_, err := c.exec(
 		"DELETE FROM "+c.Table+" WHERE ($1, $2)",
 		"gopher",
 		27,
