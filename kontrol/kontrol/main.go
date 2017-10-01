@@ -3,15 +3,16 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/koding/kite"
-	"github.com/koding/kite/config"
-	"github.com/koding/kite/kontrol"
-	"github.com/koding/multiconfig"
 	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/koding/kite"
+	"github.com/koding/kite/config"
+	"github.com/koding/kite/kontrol"
+	"github.com/koding/multiconfig"
 )
 
 type Kontrol struct {
