@@ -58,7 +58,7 @@ func main() {
 
 	if conf.Initial {
 		initialKey(conf, publicKey, privateKey)
-		os.Exit(0)
+		return
 	}
 
 	kiteConf := config.MustGet()
