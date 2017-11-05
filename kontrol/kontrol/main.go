@@ -81,8 +81,6 @@ func main() {
 	}
 
 	switch os.Getenv("KONTROL_STORAGE") {
-	case "etcd":
-		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	case "postgres":
 		postgresConf := &kontrol.PostgresConfig{
 			Host:     conf.Postgres.Host,
@@ -95,6 +93,8 @@ func main() {
 		p := kontrol.NewPostgres(postgresConf, k.Kite.Log)
 		k.SetStorage(p)
 		k.SetKeyPairStorage(p)
+	case "etcd":
+		fallthrough
 	default:
 		k.SetStorage(kontrol.NewEtcd(conf.Machines, k.Kite.Log))
 	}
