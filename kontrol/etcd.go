@@ -34,7 +34,7 @@ type Etcd struct {
 
 func NewEtcd(machines []string, log kite.Logger) *Etcd {
 	if machines == nil || len(machines) == 0 {
-		machines = []string{"//127.0.0.1:4001"}
+		machines = []string{"http://127.0.0.1:2379"}
 	}
 
 	cfg := etcd.Config{
@@ -79,13 +79,13 @@ func (e *Etcd) Delete(k *protocol.Kite) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
 
-	_, err := e.client.Delete(context.TODO(), etcdKey, &etcd.DeleteOptions{
+	_, e1 := e.client.Delete(context.TODO(), etcdKey, &etcd.DeleteOptions{
 		Recursive: true,
 	})
-	_, err = e.client.Delete(context.TODO(), etcdIDKey, &etcd.DeleteOptions{
+	_, e2 := e.client.Delete(context.TODO(), etcdIDKey, &etcd.DeleteOptions{
 		Recursive: true,
 	})
-	return err
+	return nonil(e1, e2)
 }
 
 func (e *Etcd) Clear() error {
@@ -95,29 +95,29 @@ func (e *Etcd) Clear() error {
 	return err
 }
 
-func (e *Etcd) Upsert(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
-	return e.Add(k, value)
+func (e *Etcd) Upsert(k *protocol.Kite, v *kontrolprotocol.RegisterValue) error {
+	return e.Add(k, v)
 }
 
-func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+func (e *Etcd) Add(k *protocol.Kite, v *kontrolprotocol.RegisterValue) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
 
-	valueBytes, err := json.Marshal(value)
+	p, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	valueString := string(valueBytes)
+	value := string(p)
 
 	// Set the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 	_, err = e.client.Set(context.TODO(),
 		etcdKey,
-		valueString,
+		value,
 		&etcd.SetOptions{
 			TTL:       KeyTTL,
-			PrevExist: etcd.PrevExist,
+			PrevExist: etcd.PrevIgnore,
 		},
 	)
 	if err != nil {
@@ -127,52 +127,46 @@ func (e *Etcd) Add(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error
 	// Also store the the kite.Key Id for easy lookup
 	_, err = e.client.Set(context.TODO(),
 		etcdIDKey,
-		valueString,
+		value,
 		&etcd.SetOptions{
 			TTL:       KeyTTL,
-			PrevExist: etcd.PrevExist,
+			PrevExist: etcd.PrevIgnore,
 		},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
-func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) error {
+func (e *Etcd) Update(k *protocol.Kite, v *kontrolprotocol.RegisterValue) error {
 	etcdKey := KitesPrefix + k.String()
 	etcdIDKey := KitesPrefix + "/" + k.ID
 
-	valueBytes, err := json.Marshal(value)
+	p, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	valueString := string(valueBytes)
+	value := string(p)
 
 	// update the kite key.
 	// Example "/koding/production/os/0.0.1/sj/kontainer1.sj.koding.com/1234asdf..."
 	_, err = e.client.Set(context.TODO(),
 		etcdKey,
-		valueString,
+		value,
 		&etcd.SetOptions{
 			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
 		},
 	)
 	if err != nil {
-		err = e.Add(k, value)
-		if err != nil {
-			return err
-		}
-		return nil
+		// TODO(rjeczalik): Add only if err == KeyNotFound?
+		return e.Add(k, v)
 	}
 
 	// Also update the the kite.Key Id for easy lookup
 	_, err = e.client.Set(context.TODO(),
 		etcdIDKey,
-		valueString,
+		value,
 		&etcd.SetOptions{
 			TTL:       KeyTTL,
 			PrevExist: etcd.PrevExist,
@@ -191,11 +185,7 @@ func (e *Etcd) Update(k *protocol.Kite, value *kontrolprotocol.RegisterValue) er
 			PrevExist: etcd.PrevExist,
 		},
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
@@ -242,7 +232,6 @@ func (e *Etcd) Get(query *protocol.KontrolQuery) (Kites, error) {
 		KitesPrefix+"/"+etcdKey,
 		&etcd.GetOptions{
 			Recursive: true,
-			Sort:      false,
 		},
 	)
 	if err != nil {
@@ -289,7 +278,6 @@ func (e *Etcd) etcdKey(query *protocol.KontrolQuery) (string, error) {
 			KitesPrefix+"/"+query.ID,
 			&etcd.GetOptions{
 				Recursive: true,
-				Sort:      false,
 			},
 		)
 		if err != nil {
