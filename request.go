@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -44,7 +45,10 @@ type Request struct {
 	// items added to the Context can be fetched from other handlers in the
 	// chain. This is useful with PreHandle and PostHandle handlers to pass
 	// data between handlers.
-	Context cache.Cache
+	//
+	// The context is canceled when client has disconnected or session
+	// was prematurely terminated.
+	Context context.Context
 }
 
 // Response is the type of the object that is returned from request handlers
@@ -150,7 +154,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 		LocalKite: c.LocalKite,
 		Client:    c,
 		Auth:      options.Auth,
-		Context:   cache.NewMemory(),
+		Context:   context.TODO(),
 	}
 
 	// Call response callback function, send back our response
