@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -126,6 +127,11 @@ type Client struct {
 	session sockjs.Session
 	send    chan *message
 
+	// ctx and cancel keeps track of session lifetime
+	ctxMu  sync.Mutex
+	ctx    context.Context
+	cancel func()
+
 	// muReconnect protects Reconnect
 	muReconnect sync.Mutex
 
@@ -206,7 +212,12 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		Concurrent:         true,
 		send:               make(chan *message),
 		interrupt:          make(chan error, 1),
+		ctx:                context.TODO(),
+		cancel:             func() {},
 	}
+
+	c.OnConnect(c.setContext)
+	c.OnDisconnect(c.closeContext)
 
 	k.OnRegister(c.updateAuth)
 
@@ -260,6 +271,24 @@ func (c *Client) updateAuth(reg *protocol.RegisterResult) {
 	if c.Auth.Type == "kiteKey" && reg.KiteKey != "" {
 		c.Auth.Key = reg.KiteKey
 	}
+}
+
+func (c *Client) setContext() {
+	c.ctxMu.Lock()
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.ctxMu.Unlock()
+}
+
+func (c *Client) closeContext() {
+	c.ctxMu.Lock()
+	c.cancel()
+	c.ctxMu.Unlock()
+}
+
+func (c *Client) context() context.Context {
+	c.ctxMu.Lock()
+	defer c.ctxMu.Unlock()
+	return c.ctx
 }
 
 func (c *Client) authCopy() *Auth {

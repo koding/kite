@@ -283,6 +283,7 @@ func (k *Kite) sockjsHandler(session sockjs.Session) {
 	go c.sendHub()
 
 	k.callOnConnectHandlers(c)
+	c.callOnConnectHandlers()
 
 	// Run after methods are registered and delegate is set
 	c.readLoop()

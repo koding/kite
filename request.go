@@ -154,7 +154,7 @@ func (c *Client) newRequest(method string, args *dnode.Partial) (*Request, func(
 		LocalKite: c.LocalKite,
 		Client:    c,
 		Auth:      options.Auth,
-		Context:   context.TODO(),
+		Context:   c.context(),
 	}
 
 	// Call response callback function, send back our response
