@@ -48,7 +48,7 @@ func transportFromEnv() config.Transport {
 func TestContext(t *testing.T) {
 	flag.Parse()
 
-	ch := make(chan int, 4) // checkpoints, to ensure flor of control
+	ch := make(chan int, 4) // checkpoints, to ensure correct control flow
 
 	k := New("server", "0.0.1")
 	k.Config.DisableAuthentication = true
@@ -60,7 +60,6 @@ func TestContext(t *testing.T) {
 		go func() {
 			<-r.Context.Done()
 			ch <- 4
-			close(ch)
 		}()
 		return nil, nil
 	})
@@ -84,22 +83,22 @@ func TestContext(t *testing.T) {
 	c.Close()
 
 	var got []int
+	want := []int{1, 2, 3, 4}
 	timeout := time.After(2 * time.Second)
 
 collect:
 	for {
 		select {
-		case i, ok := <-ch:
-			if !ok {
+		case i := <-ch:
+			got = append(got, i)
+
+			if len(got) == len(want) {
 				break collect
 			}
-			got = append(got, i)
 		case <-timeout:
 			t.Fatal("timed out collecting checkpoints")
 		}
 	}
-
-	want := []int{1, 2, 3, 4}
 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v")
