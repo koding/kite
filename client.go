@@ -212,7 +212,7 @@ func (k *Kite) NewClient(remoteURL string) *Client {
 		Concurrent:         true,
 		send:               make(chan *message),
 		interrupt:          make(chan error, 1),
-		ctx:                context.TODO(),
+		ctx:                context.Background(),
 		cancel:             func() {},
 	}
 

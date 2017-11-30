@@ -86,15 +86,10 @@ func TestContext(t *testing.T) {
 	want := []int{1, 2, 3, 4}
 	timeout := time.After(2 * time.Second)
 
-collect:
-	for {
+	for len(got) != len(want) {
 		select {
 		case i := <-ch:
 			got = append(got, i)
-
-			if len(got) == len(want) {
-				break collect
-			}
 		case <-timeout:
 			t.Fatal("timed out collecting checkpoints")
 		}
