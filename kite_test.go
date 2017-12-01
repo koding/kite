@@ -2,10 +2,12 @@ package kite
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"math"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"sync"
 	"testing"
@@ -20,6 +22,8 @@ import (
 	"github.com/igm/sockjs-go/sockjs"
 )
 
+var timeout = flag.Duration("telltime", 4*time.Second, "Timeout for kite calls.")
+
 func init() {
 	rand.Seed(time.Now().Unix() + int64(os.Getpid()))
 }
@@ -30,6 +34,70 @@ func panicHandler(*Client) {
 
 func panicRegisterHandler(*protocol.RegisterResult) {
 	panic("this panic should be ignored")
+}
+
+func transportFromEnv() config.Transport {
+	env := os.Getenv("KITE_TRANSPORT")
+	tr, ok := config.Transports[env]
+	if env != "" && !ok {
+		panic(fmt.Errorf("transport %q doesn't exists", env))
+	}
+	return tr
+}
+
+func TestContext(t *testing.T) {
+	flag.Parse()
+
+	ch := make(chan int, 4) // checkpoints, to ensure correct control flow
+
+	k := New("server", "0.0.1")
+	k.Config.DisableAuthentication = true
+	k.Config.Port = 3333
+	k.Config.Transport = transportFromEnv()
+	k.HandleFunc("longrunning", func(r *Request) (interface{}, error) {
+		ch <- 2
+
+		go func() {
+			<-r.Context.Done()
+			ch <- 4
+		}()
+		return nil, nil
+	})
+	go k.Run()
+	<-k.ServerReadyNotify()
+	defer k.Close()
+
+	c := New("client", "0.0.1").NewClient("http://127.0.0.1:3333/kite")
+	if err := c.Dial(); err != nil {
+		t.Fatalf("Dial()=%s", err)
+	}
+
+	ch <- 1
+
+	if _, err := c.TellWithTimeout("longrunning", *timeout); err != nil {
+		t.Fatalf("TellWithTimeout()=%s", err)
+	}
+
+	ch <- 3
+
+	c.Close()
+
+	var got []int
+	want := []int{1, 2, 3, 4}
+	timeout := time.After(2 * time.Second)
+
+	for len(got) != len(want) {
+		select {
+		case i := <-ch:
+			got = append(got, i)
+		case <-timeout:
+			t.Fatal("timed out collecting checkpoints")
+		}
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v")
+	}
 }
 
 func TestMultiple(t *testing.T) {
@@ -44,15 +112,7 @@ func TestMultiple(t *testing.T) {
 	// ports are starting from 6000 up to 6000 + kiteNumber
 	port := 6000
 
-	var transport config.Transport
-	if transportName := os.Getenv("KITE_TRANSPORT"); transportName != "" {
-		tr, ok := config.Transports[transportName]
-		if !ok {
-			t.Fatalf("transport '%s' doesn't exists", transportName)
-		}
-
-		transport = tr
-	}
+	transport := transportFromEnv()
 
 	for i := 0; i < kiteNumber; i++ {
 		m := New("mathworker"+strconv.Itoa(i), "0.1."+strconv.Itoa(i))

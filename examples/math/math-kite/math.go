@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
@@ -20,7 +21,7 @@ func main() {
 		resp := "hello from pre handler!"
 
 		// let us return an hello to base square method!
-		r.Context.Set("response", resp)
+		r.Context = context.WithValue(r.Context, "response", resp)
 		return resp, nil
 	})
 
@@ -30,7 +31,7 @@ func main() {
 
 		// Pass the response from the previous square method back to the
 		// client, this is imporant if you use post handler.
-		return r.Context.Get("response")
+		return r.Context.Value("response").(string), nil
 	})
 
 	// Add our handler method, authentication is disabled for this example.

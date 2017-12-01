@@ -1,6 +1,7 @@
 package kite
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -172,53 +173,53 @@ func TestMethod_Base(t *testing.T) {
 	k.Config.Port = 10000
 
 	k.PreHandleFunc(func(r *Request) (interface{}, error) {
-		r.Context.Set("pre1", "pre1")
+		r.Context = context.WithValue(r.Context, "pre1", "pre1")
 		return nil, nil
 	})
 
 	k.PreHandleFunc(func(r *Request) (interface{}, error) {
-		res, _ := r.Context.Get("pre1")
+		res, _ := r.Context.Value("pre1").(string)
 		if res != "pre1" {
 			t.Errorf("Context response from previous pre handler should be pre1, got: %v", res)
 		}
 
-		r.Context.Set("pre2", "pre2")
+		r.Context = context.WithValue(r.Context, "pre2", "pre2")
 		return nil, nil
 	})
 
 	k.HandleFunc("foo", func(r *Request) (interface{}, error) {
-		res, _ := r.Context.Get("funcPre1")
+		res, _ := r.Context.Value("funcPre1").(string)
 		if res != "funcPre1" {
 			t.Errorf("Context response from previous pre handler should be funcPre1, got: %v", res)
 		}
 
-		r.Context.Set("handle", "handle")
+		r.Context = context.WithValue(r.Context, "handle", "handle")
 		return "main-response", nil
 	}).PreHandleFunc(func(r *Request) (interface{}, error) {
-		r.Context.Set("funcPre1", "funcPre1")
+		r.Context = context.WithValue(r.Context, "funcPre1", "funcPre1")
 		return "funcPre1", nil
 	}).PostHandleFunc(func(r *Request) (interface{}, error) {
-		res, _ := r.Context.Get("handle")
+		res, _ := r.Context.Value("handle").(string)
 		if res != "handle" {
 			t.Errorf("Context response from previous pre handler should be handle, got: %v", res)
 		}
 
-		r.Context.Set("funcPost1", "funcPost1")
+		r.Context = context.WithValue(r.Context, "funcPost1", "funcPost1")
 		return "funcPost1", nil
 	})
 
 	k.PostHandleFunc(func(r *Request) (interface{}, error) {
-		res, _ := r.Context.Get("funcPost1")
+		res, _ := r.Context.Value("funcPost1").(string)
 		if res != "funcPost1" {
 			t.Errorf("Context response from previous pre handler should be funcPost1, got: %v", res)
 		}
 
-		r.Context.Set("post1", "post1")
+		r.Context = context.WithValue(r.Context, "post1", "post1")
 		return "post1", nil
 	})
 
 	k.PostHandleFunc(func(r *Request) (interface{}, error) {
-		res, _ := r.Context.Get("post1")
+		res, _ := r.Context.Value("post1").(string)
 		if res != "post1" {
 			t.Errorf("Context response from previous pre handler should be post1, got: %v", res)
 		}
