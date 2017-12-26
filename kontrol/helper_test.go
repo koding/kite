@@ -51,7 +51,7 @@ func startKontrol(pem, pub string, port int) (*Kontrol, *Config) {
 	conf.KontrolUser = "testuser"
 	conf.KiteKey = testutil.NewToken("testuser", pem, pub).Raw
 	conf.ReadEnvironmentVariables()
-
+	conf.UseWebRTC = true
 	DefaultPort = port
 	kon := New(conf.Copy(), "1.0.0")
 	// kon.Kite.SetLogLevel(kite.DEBUG)

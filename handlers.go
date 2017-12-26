@@ -1,18 +1,84 @@
 package kite
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/koding/cache"
+	"github.com/koding/kite/protocol"
 	"github.com/koding/kite/sockjsclient"
 	"github.com/koding/kite/systeminfo"
 	"golang.org/x/crypto/ssh/terminal"
 )
+
+var (
+	errDstNotSet        = errors.New("dst not set")
+	errDstNotRegistered = errors.New("dst not registered")
+)
+
+// WebRTCHandlerName provides the naming scheme for the handler
+const WebRTCHandlerName = "kite.handleWebRTC"
+
+type webRTCHandler struct {
+	kitesColl cache.Cache
+}
+
+// NewWebRCTHandler creates a new handler for web rtc signalling services.
+func NewWebRCTHandler() *webRTCHandler {
+	return &webRTCHandler{
+		kitesColl: cache.NewMemory(),
+	}
+}
+
+func (w *webRTCHandler) registerSrc(src *Client) {
+	w.kitesColl.Set(src.ID, src)
+	src.OnDisconnect(func() {
+		time.Sleep(time.Second * 2)
+		id := src.ID
+		// delete from the collection
+		w.kitesColl.Delete(id)
+	})
+}
+
+func (w *webRTCHandler) getDst(dst string) (*Client, error) {
+	if dst == "" {
+		return nil, errDstNotSet
+	}
+
+	dstKite, err := w.kitesColl.Get(dst)
+	if err != nil {
+		return nil, errDstNotRegistered
+	}
+
+	return dstKite.(*Client), nil
+}
+
+// ServeKite implements Hander interface.
+func (w *webRTCHandler) ServeKite(r *Request) (interface{}, error) {
+	var args protocol.WebRTCSignalMessage
+
+	if err := r.Args.One().Unmarshal(&args); err != nil {
+		return nil, fmt.Errorf("invalid query: %s", err)
+	}
+
+	args.Src = r.Client.ID
+
+	w.registerSrc(r.Client)
+
+	dst, err := w.getDst(args.Dst)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, dst.SendWebRTCRequest(&args)
+}
 
 func (k *Kite) addDefaultHandlers() {
 	// Default RPC methods
@@ -26,6 +92,9 @@ func (k *Kite) addDefaultHandlers() {
 	k.HandleFunc("kite.getPass", handleGetPass)
 	if runtime.GOOS == "darwin" {
 		k.HandleFunc("kite.notify", handleNotifyDarwin)
+	}
+	if k.WebRTCHandler != nil {
+		k.Handle(WebRTCHandlerName, k.WebRTCHandler)
 	}
 }
 

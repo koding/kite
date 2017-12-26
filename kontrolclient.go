@@ -205,6 +205,18 @@ func (k *Kite) GetToken(kite *protocol.Kite) (string, error) {
 	return tkn, nil
 }
 
+// SendWebRTCRequest sends requests to kontrol for signalling purposes.
+func (k *Kite) SendWebRTCRequest(req *protocol.WebRTCSignalMessage) error {
+	if err := k.SetupKontrolClient(); err != nil {
+		return err
+	}
+
+	<-k.kontrol.readyConnected
+
+	_, err := k.kontrol.TellWithTimeout(WebRTCHandlerName, k.Config.Timeout, req)
+	return err
+}
+
 // GetTokenForce is used to obtain a new token for the given kite.
 //
 // It always returns a new token and forces a Kontrol to
