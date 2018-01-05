@@ -1,10 +1,10 @@
 language: go
 sudo: false
 go:
-  - 1.8.3
-  - 1.9
+  - 1.9.1
 install:
-  - go get -d -v -t ./...
+  - go get -u -v github.com/golang/dep/cmd/dep
+  - $GOPATH/bin/dep ensure -vendor-only -v
 script:
   - export GOMAXPROCS=$(nproc)
   - make test

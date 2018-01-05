@@ -7,7 +7,7 @@ clone_folder: c:\projects\src\github.com\koding\kite
 environment:
  PATH: c:\projects\bin;%PATH%
  GOPATH: c:\projects
- GOVERSION: 1.8
+ GOVERSION: 1.9.1
 
 install:
  - go version
@@ -17,7 +17,8 @@ install:
  - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.zip
  - 7z x go%GOVERSION%.windows-amd64.zip -y -oC:\ > NUL
 
- - go get -v -t ./...
+ - go get -u -v github.com/golang/dep/cmd/dep
+ - dep ensure -vendor-only -v
 
 build_script:
  - go build ./...

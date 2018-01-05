@@ -1,0 +1,93 @@
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#  name = "github.com/x/y"
+#  version = "2.4.0"
+
+
+[[constraint]]
+  name = "github.com/cenkalti/backoff"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/coreos/etcd"
+  version = "3.3.0-rc.1"
+
+[[constraint]]
+  name = "github.com/dgrijalva/jwt-go"
+  version = "3.1.0"
+
+[[constraint]]
+  name = "github.com/fatih/color"
+  version = "1.5.0"
+
+[[constraint]]
+  name = "github.com/gorilla/mux"
+  version = "1.6.0"
+
+[[constraint]]
+  name = "github.com/gorilla/websocket"
+  version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/go-version"
+
+[[constraint]]
+  name = "github.com/igm/sockjs-go"
+  revision = "c8a8c6429d10e3b6865960ad8cb43779b8a834ef"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/juju/ratelimit"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/koding/cache"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/koding/logging"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/koding/multiconfig"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/koding/websocketproxy"
+
+[[constraint]]
+  name = "github.com/lann/squirrel"
+  version = "1.0.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/lib/pq"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mitchellh/cli"
+
+[[constraint]]
+  name = "github.com/satori/go.uuid"
+  version = "1.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "golang.org/x/crypto"
