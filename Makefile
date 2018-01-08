@@ -139,8 +139,8 @@ endif
 
 	@echo "Creating test key"
 	@`which go` run ./testutil/writekey/main.go
-
-	@echo "$(OK_COLOR)==> Downloading dependencies$(NO_COLOR)"
+	
+	@echo "$(OK_COLOR)==> Downloading test dependencies$(NO_COLOR)"		
 	@`which go` get -d -v -t ./...
 
 	@echo "$(OK_COLOR)==> Testing packages $(NO_COLOR)"
