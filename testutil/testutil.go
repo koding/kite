@@ -34,7 +34,7 @@ func NewKiteKeyWithKeyPair(private, public string) *jwt.Token {
 // NewToken creates new JWT token for the gien username. It embedds the given
 // public key as kontrolKey and signs the token with the private one.
 func NewToken(username, private, public string) *jwt.Token {
-	tknID := uuid.NewV4()
+	tknID := uuid.Must(uuid.NewV4())
 
 	hostname, err := os.Hostname()
 	if err != nil {

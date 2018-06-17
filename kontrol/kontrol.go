@@ -283,7 +283,10 @@ func (k *Kontrol) AddKeyPair(id, public, private string) error {
 	}
 
 	if id == "" {
-		i := uuid.NewV4()
+		i, err := uuid.NewV4()
+		if err != nil {
+			return err
+		}
 		id = i.String()
 	}
 
@@ -358,12 +361,16 @@ func (k *Kontrol) InitializeSelf() error {
 }
 
 func (k *Kontrol) registerUser(username, publicKey, privateKey string) (kiteKey string, err error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
 	claims := &kitekey.KiteClaims{
 		StandardClaims: jwt.StandardClaims{
 			Issuer:   k.Kite.Kite().Username,
 			Subject:  username,
 			IssuedAt: time.Now().Add(-k.tokenLeeway()).UTC().Unix(),
-			Id:       uuid.NewV4().String(),
+			Id:       id.String(),
 		},
 		KontrolURL: k.Kite.Config.KontrolURL,
 		KontrolKey: strings.TrimSpace(publicKey),
@@ -400,12 +407,17 @@ func (k *Kontrol) registerSelf() {
 		// to generate its kitekey or no kitekey is defined,
 		// use a dummy entry in order to register the kontrol.
 		keyPair = &KeyPair{
-			ID:      uuid.NewV4().String(),
 			Public:  "kontrol-self",
 			Private: "kontrol-self",
 		}
 
-		if err := k.keyPair.AddKey(keyPair); err != nil {
+		if id, err := uuid.NewV4(); err == nil {
+			keyPair.ID = id.String()
+
+			if err := k.keyPair.AddKey(keyPair); err != nil {
+				k.log.Error("%s", err)
+			}
+		} else {
 			k.log.Error("%s", err)
 		}
 	}
@@ -562,6 +574,11 @@ func (k *Kontrol) generateToken(tok *token) (string, error) {
 		return "", err
 	}
 
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+
 	now := time.Now().UTC()
 
 	claims := &kitekey.KiteClaims{
@@ -571,7 +588,7 @@ func (k *Kontrol) generateToken(tok *token) (string, error) {
 			Audience:  tok.audience,
 			ExpiresAt: now.Add(k.tokenTTL()).Add(k.tokenLeeway()).UTC().Unix(),
 			IssuedAt:  now.Add(-k.tokenLeeway()).UTC().Unix(),
-			Id:        uuid.NewV4().String(),
+			Id:        id.String(),
 		},
 	}
 
