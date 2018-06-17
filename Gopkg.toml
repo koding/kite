@@ -85,8 +85,8 @@
   name = "github.com/mitchellh/cli"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/satori/go.uuid"
-  version = "1.1.0"
 
 [[constraint]]
   branch = "master"
