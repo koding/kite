@@ -36,7 +36,7 @@ func init() {
 
 func TestUpdateKeys(t *testing.T) {
 	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
-		t.Skip("skipping TestUpdateKeys for storage %q: not implemented", storage)
+		t.Skipf("skipping TestUpdateKeys for storage %q: not implemented", storage)
 	}
 
 	kon, conf := startKontrol(testkeys.PrivateThird, testkeys.PublicThird, 5501)
@@ -661,10 +661,10 @@ func TestGetQueryKey(t *testing.T) {
 
 func TestKontrolMultiKey(t *testing.T) {
 	if storage := os.Getenv("KONTROL_STORAGE"); storage != "postgres" {
-		t.Skip("%q storage does not currently implement soft key pair deletes", storage)
+		t.Skipf("%q storage does not currently implement soft key pair deletes", storage)
 	}
 
-	i := uuid.NewV4()
+	i := uuid.Must(uuid.NewV4())
 	secondID := i.String()
 
 	// add so we can use it as key

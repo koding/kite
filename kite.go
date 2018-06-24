@@ -171,7 +171,7 @@ func NewWithConfig(name, version string, cfg *config.Config) *Kite {
 		panic("kite: version must be 3-digits semantic version")
 	}
 
-	kiteID := uuid.NewV4()
+	kiteID := uuid.Must(uuid.NewV4())
 
 	l, setlevel := newLogger(name)
 

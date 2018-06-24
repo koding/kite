@@ -12,7 +12,7 @@ func BenchmarkPostgres(b *testing.B) {
 	kon.SetStorage(NewPostgres(nil, kon.Kite.Log))
 
 	newKite := func() *protocol.Kite {
-		id := uuid.NewV4()
+		id := uuid.Must(uuid.NewV4())
 		return &protocol.Kite{
 			Username:    "bench-user",
 			Environment: "bench-env",
@@ -53,7 +53,7 @@ func BenchmarkEtcdAdd(b *testing.B) {
 	kon.SetStorage(NewEtcd(nil, kon.Kite.Log))
 
 	newKite := func() *protocol.Kite {
-		id := uuid.NewV4()
+		id := uuid.Must(uuid.NewV4())
 		return &protocol.Kite{
 			Username:    "bench-user",
 			Environment: "bench-env",

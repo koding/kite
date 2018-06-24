@@ -36,7 +36,7 @@ func (k *KiteKey) id() string {
 	if k.ID != "" {
 		return k.ID
 	}
-	return uuid.NewV4().String()
+	return uuid.Must(uuid.NewV4()).String()
 }
 
 func (k *KiteKey) issuer() string {

@@ -96,7 +96,7 @@ func TestContext(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %v, want %v")
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 
