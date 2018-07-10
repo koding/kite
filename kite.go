@@ -70,6 +70,9 @@ type Kite struct {
 	// Deprecated: Set Config.XHR field instead.
 	ClientFunc func(*sockjsclient.DialOptions) *http.Client
 
+	// WebRTCHandler handles the webrtc responses coming from a signalling server.
+	WebRTCHandler Handler
+
 	// Handlers added with Kite.HandleFunc().
 	handlers     map[string]*Method // method map for exported methods
 	preHandlers  []Handler          // a list of handlers that are executed before any handler
@@ -195,6 +198,10 @@ func NewWithConfig(name, version string, cfg *config.Config) *Kite {
 		closeC:         make(chan bool),
 		heartbeatC:     make(chan *heartbeatReq, 1),
 		muxer:          mux.NewRouter(),
+	}
+
+	if cfg != nil && cfg.UseWebRTC {
+		k.WebRTCHandler = NewWebRCTHandler()
 	}
 
 	// All sockjs communication is done through this endpoint..

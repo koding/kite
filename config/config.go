@@ -19,8 +19,8 @@ import (
 	"github.com/igm/sockjs-go/sockjs"
 )
 
-// the implementation of New() doesn't have any error to be returned yet it
-// returns, so it's totally safe to neglect the error
+// CookieJar ignoring err: the implementation of New() doesn't have any error to
+// be returned yet it returns, so it's totally safe to neglect the error
 var CookieJar, _ = cookiejar.New(nil)
 
 // Options is passed to kite.New when creating new instance.
@@ -110,6 +110,9 @@ type Config struct {
 	KontrolURL  string
 	KontrolKey  string
 	KontrolUser string
+
+	// UseWebRTC is the flag for Kite's to communicate over WebRTC if possible.
+	UseWebRTC bool
 }
 
 // DefaultConfig contains the default settings.

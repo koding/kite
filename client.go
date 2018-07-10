@@ -711,6 +711,16 @@ func (c *Client) Tell(method string, args ...interface{}) (result *dnode.Partial
 	return c.TellWithTimeout(method, 0, args...)
 }
 
+// SendWebRTCRequest sends requests to kontrol for signalling purposes.
+func (c *Client) SendWebRTCRequest(req *protocol.WebRTCSignalMessage) error {
+	timeout := time.Duration(0)
+	if c.Config != nil {
+		timeout = c.Config.Timeout
+	}
+	_, err := c.TellWithTimeout(WebRTCHandlerName, timeout, req)
+	return err
+}
+
 // TellWithTimeout does the same thing with Tell() method except it takes an
 // extra argument that is the timeout for waiting reply from the remote Kite.
 // If timeout is given 0, the behavior is same as Tell().
